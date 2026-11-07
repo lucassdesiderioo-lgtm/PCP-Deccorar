@@ -82,3 +82,17 @@ tubos podem bater na contagem com material mais fino.
   linha na lista `TELAS` do `auth.js`, que é o que manda quem não tem sessão para o
   login. As telas `/admin/...` entram nessa lista sozinhas, a partir do mapa; as
   outras, não. A 504 já entrou junto.
+
+## Fase 6 — contagem de material e consumo (07/11/2026)
+
+- **A diferença é contra o saldo da hora em que o material começou a ser
+  contado.** O primeiro desenho pegava o saldo no "terminei", e uma entrega que
+  chegasse no meio da contagem virava falta. É a R-EST-16 do estoque de peça
+  pela porta do material: a diferença se mede no momento de olhar a prateleira e
+  se aplica sobre o saldo de agora.
+- **O teste do "cego" acusou a própria chave** `modo_saldo` (tem "saldo" no
+  nome); a tela passou a receber `modo`.
+- **A aprovação mora na 302** (aba Contagem), ao lado da contagem antiga, porque
+  quem aprova não opera a 504.
+- **O `teste_linguagem` pegou "dono" num apelido de coluna do SQL** da contagem: a
+  função e a coluna viraram "quem abriu".

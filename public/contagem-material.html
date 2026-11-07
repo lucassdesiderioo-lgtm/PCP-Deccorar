@@ -1,0 +1,90 @@
+<!doctype html><html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Contagem de material — Deccorar</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Contagem">
+<link rel="stylesheet" href="/ipad.css">
+<style>
+/* 504 CONTAGEM DE MATERIAL (spec COMPRAS-E-RECEBIMENTO, fase 6). Uma pessoa,
+   CEGA, por almoxarifado: a tela nunca mostra o saldo. Estacao de operacao:
+   fundo claro, alvo de 52 px. */
+:root{--bg:#fff;--pan:#F4F6F8;--line:#D8DEE6;--txt:#1A1D23;--sub:#5A6472;--verm:#C62828;--ambar:#B26A00;--verde:#2E7D32;--azul:#1565C0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif;font-size:16px}
+header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.mark{width:34px;height:34px;border-radius:9px;background:var(--verde);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800}
+h1{font-size:19px;margin:0}.sub{color:var(--sub);font-size:15px}
+.wrap{max-width:900px;margin:0 auto;padding:18px}
+.card{background:var(--pan);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.item{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}
+.nome{font-size:18px;font-weight:700}
+input,select{font-family:inherit;font-size:18px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--txt)}
+.b{min-height:54px;padding:0 20px;font-size:16px;font-weight:700;border-radius:12px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--txt);margin:6px 6px 0 0}
+.b.pri{background:var(--verde);border-color:var(--verde);color:#fff}
+.lin{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:8px}
+.lin label{display:block;font-size:14px;color:var(--sub)}
+.avi{border-radius:10px;padding:12px 14px;margin-top:12px;font-size:15px}
+.ok{background:#EAF3E7;border:1px solid #A9CEA2;color:#1F5E22}.err{background:#FBEBEB;border:1px solid #E4A9A9;color:#8A2020}
+.tot{font-size:15px;color:var(--sub);margin-top:6px}
+</style></head><body>
+<header><div class="mark">C</div><div><h1>504 · Contagem de material</h1>
+  <div class="sub">Conte o que está no almoxarifado. Você não vê o saldo do sistema — conte o que vê. Zero vale.</div></div></header>
+<div class="wrap"><div id="app">carregando…</div></div>
+<script src="/nav.js"></script>
+<script>
+var $=function(s){return document.querySelector(s);};
+function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+function n3(v){return v==null?'—':(Math.round((+v||0)*1000)/1000).toString().replace('.',',');}
+function numero(v){ var t=String(v==null?'':v).trim().replace(',','.'); return t===''?null:+t; }
+async function api(m,u,b){ try{ var r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined}); var j=await r.json(); if(!r.ok && !j.erro) j.erro='recusado'; return j; }catch(e){ return {erro:'SEM CONEXÃO — confira o Wi-Fi e tente de novo'}; } }
+var CID=null;
+async function inicio(){
+  var al=await api('GET','/api/almoxarifados'); if(!Array.isArray(al)) al=[];
+  var ab=await api('GET','/api/contagem-material/abertas'); if(!Array.isArray(ab)) ab=[];
+  $('#app').innerHTML='<div class="card"><div class="nome">Em qual almoxarifado você vai contar?</div>'
+    +'<div class="lin"><select id="alm">'+al.filter(function(a){return a.ativo;}).map(function(a){return '<option value="'+a.id+'">'+esc(a.nome)+'</option>';}).join('')+'</select>'
+    +'<button class="b pri" id="abrir">Começar a contagem</button></div><div id="msg"></div></div>'
+    +(ab.length?'<div class="card"><div class="nome">Contagens abertas</div>'+ab.map(function(c){return '<div class="lin"><span>'+esc(c.almoxarifado)+' · '+esc(c.usuario_nome||'')+'</span><button class="b" data-cont="'+c.id+'">Continuar</button></div>';}).join('')+'</div>':'');
+}
+async function abrirC(id, limpar){
+  /* o redesenho devolve o que estava digitado nos OUTROS materiais (§12) */
+  var guard={}; Array.prototype.forEach.call(document.querySelectorAll('[data-q],[data-med],[data-tipo]'),function(e){
+    var k=['data-q','data-med','data-tipo'].filter(function(a){return e.hasAttribute(a);})[0]; if(limpar && e.getAttribute(k)===String(limpar)) return; guard[k+'='+e.getAttribute(k)]=e.value; });
+  CID=id; var c=await api('GET','/api/contagem-material/'+id);
+  if(c.erro){ $('#app').innerHTML='<div class="avi err">'+esc(c.erro)+'</div>'; return; }
+  var h='<div class="card"><div class="nome">'+esc(c.almoxarifado)+'</div><div class="sub">Lance cada prateleira; as linhas somam. Tubo em metro: barras inteiras (medida × quantas) e cortados (medida × quantas) — a tela faz a conta.</div>';
+  c.itens.forEach(function(i){
+    var metro=i.unidade==='m';
+    h+='<div class="item"><div class="nome">'+esc(i.nome)+'</div>'
+      +(i.linhas.length?i.linhas.map(function(l){ return '<div class="tot">'+(metro?(l.tipo==='cortado'?'cortados ':'inteiras ')+n3(l.medida_m)+' m × '+n3(l.quantidade):n3(l.quantidade)+' '+esc(i.unidade))+' <button class="b" style="min-height:36px" data-tira="'+l.id+'">tirar</button></div>'; }).join('')
+        +'<div class="tot"><b>Total contado: '+n3(i.contado)+' '+esc(i.unidade)+'</b></div>':'<div class="tot">não contado ainda</div>')
+      +'<div class="lin">'+(metro?'<div><label>Tipo</label><select data-tipo="'+i.componente_id+'"><option value="inteiro">barras inteiras</option><option value="cortado">cortados</option></select></div>'
+        +'<div><label>Medida (m)</label><input inputmode="decimal" data-med="'+i.componente_id+'" style="width:110px"></div>':'')
+      +'<div><label>Quantas</label><input inputmode="decimal" data-q="'+i.componente_id+'" style="width:110px"></div>'
+      +'<button class="b" data-lanca="'+i.componente_id+'">Lançar</button></div><div data-msg="'+i.componente_id+'"></div></div>';
+  });
+  h+='<button class="b pri" id="terminar">Terminei a contagem</button><div id="msg"></div></div>';
+  $('#app').innerHTML=h;
+  Object.keys(guard).forEach(function(k){ var p=k.split('='); var e=document.querySelector('['+p[0]+'="'+p[1]+'"]'); if(e && guard[k]!=='' && (p[0]!=='data-tipo' || guard[k])) e.value=guard[k]; });
+}
+document.addEventListener('click',async function(ev){
+  var t=ev.target, b;
+  if(t.id==='abrir'){ var r=await api('POST','/api/contagem-material/abrir',{almoxarifado_id:+$('#alm').value}); if(r.erro){ $('#msg').innerHTML='<div class="avi err">'+esc(r.erro)+'</div>'; return; } return abrirC(r.id); }
+  if((b=t.closest('[data-cont]'))) return abrirC(+b.getAttribute('data-cont'));
+  if((b=t.closest('[data-tira]'))){ var r1=await api('POST','/api/contagem-material/linhas/'+b.getAttribute('data-tira')+'/tirar',{}); if(r1.erro) return alert(r1.erro); return abrirC(CID); }
+  if((b=t.closest('[data-lanca]'))){
+    var id=b.getAttribute('data-lanca'), tp=$('[data-tipo="'+id+'"]'), md=$('[data-med="'+id+'"]');
+    var r2=await api('POST','/api/contagem-material/'+CID+'/linha',{componente_id:+id, tipo:tp?tp.value:'inteiro', medida_m:md?numero(md.value):null, quantidade:numero($('[data-q="'+id+'"]').value)});
+    if(r2.erro){ $('[data-msg="'+id+'"]').innerHTML='<div class="avi err">'+esc(r2.erro)+'</div>'; return; }
+    return abrirC(CID, id);
+  }
+  if(t.id==='terminar'){
+    if(!confirm('Terminar? O que você não lançou fica "não contado" (não vira zero).')) return;
+    var r3=await api('POST','/api/contagem-material/'+CID+'/terminar',{});
+    if(r3.erro){ $('#msg').innerHTML='<div class="avi err">'+esc(r3.erro)+'</div>'; return; }
+    $('#app').innerHTML='<div class="card avi ok">✓ Contagem terminada. '+r3.aplicados+' corrigido(s) sozinho(s) (dentro da tolerância), '+r3.pendentes+' para quem aprova, '+r3.iguais+' igual(is).</div>';
+    CID=null; setTimeout(inicio,4000);
+  }
+});
+inicio();
+</script></body></html>

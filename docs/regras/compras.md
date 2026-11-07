@@ -358,6 +358,40 @@
 - Status:           em código desde 07/11/2026.
 - História:         fase 5.
 
+## G. Contagem e consumo (fase 6)
+
+### R-CMP-42 · Contagem de material: uma pessoa, cega, por almoxarifado
+- Regra:            a 504 (`/contagem-material`) abre a contagem de UM almoxarifado (um por vez) e lista os materiais por quantidade e por volume dele, sem o saldo (nem pelo JSON). Só quem abriu lança e termina. Ao terminar, por material contado: diferença até `tol_aviso_pct` aplica sozinha (motivo `contagem`, com quem contou); acima, vai para quem tem `contagem.aprovar` (aba Contagem da 302 e central de Pendências), que aplica a DIFERENÇA sobre o saldo de agora, com motivo. Quem contou não aprova. O saldo comparado é o da hora em que o material começou a ser contado. `contagem_dias` (30) diz quem está "a contar".
+- Por quê:          a contagem de material ganhou spec própria.
+- Exceções:         material por volume nunca é ajustado aqui: o saldo dele é a soma dos volumes; a diferença vai para ciência, e corrige-se na 503.
+- Teste que trava:  `teste_contagem_material.js` (saldo vazando, reprova 1; aplicando tudo sozinho, reprova; quem contou aprovando, 1; o saldo do "terminei", 2)
+- Status:           em código desde 07/11/2026. A contagem de material antiga da 302 continua.
+- História:         fase 6.
+
+### R-CMP-43 · Tubo cortado ainda é material
+- Regra:            no material em metro, a linha é "barras inteiras" ou "cortados", medida × quantidade, e a tela soma em metros. Fora do metro, não há cortado.
+- Por quê:          quem conta não faz conta.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_contagem_material.js` (sem converter em metro, reprova)
+- Status:           em código desde 07/11/2026.
+- História:         fase 6.
+
+### R-CMP-44 · Consumo pela contagem, e com uma contagem só é `null`
+- Regra:            consumo = contado na anterior + entradas (recebimento) − contado nesta, por dia sobre os dias entre as duas. Com menos de duas contagens: `null`, dizendo por quê — nunca zero. Zero contado é lançamento válido; material não contado na rodada fica "não contado", e não vira zero.
+- Por quê:          zero é um número válido e mentiroso.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_contagem_material.js` (consumo zero, reprova 1; não contado virando zero, 2)
+- Status:           em código desde 07/11/2026.
+- História:         fase 6.
+
+### R-CMP-45 · O consumo de quem não tem saldo é a média das compras
+- Regra:            média mensal das quantidades recebidas na janela (6 meses), cortada no primeiro recebimento, dizendo de quantos meses saiu; abaixo de 3 meses, "pouco histórico".
+- Por quê:          a armadilha #16 (média cuja janela é maior que a história).
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_contagem_material.js` (sem a tarja, reprova 1)
+- Status:           em código desde 07/11/2026.
+- História:         fase 6.
+
 ---
 
 ## O que NÃO fazer
@@ -373,4 +407,6 @@
 - ❌ Dar entrada no saldo do retido antes de alguém decidir
 - ❌ Calcular crédito de imposto no código, ou recalcular o líquido de uma nota antiga quando o regime muda
 - ❌ Pôr o ICMS próprio no custo pago
+- ❌ Mandar o saldo a quem conta material, ou tratar material não contado como zero
+- ❌ Dar consumo zero com uma contagem só (é `null`)
 - ❌ Mexer no saldo de material por volume fora do volume (ele é a soma dos volumes não encerrados), ou encerrar volume sem a saída pelo livro

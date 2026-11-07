@@ -243,7 +243,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
     </div>
   </div>
 
-  <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="sub" id="dvUltima" style="margin:0 0 10px 4px"></div><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide">
+  <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="sub" id="dvUltima" style="margin:0 0 10px 4px"></div><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide"><div class="card" id="cmAprov" style="display:none"></div>
   <!-- A CONFERENCIA DE PECA (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA, 26/09/2026).
        Contar e no tablet, as cegas, em /inventario; aqui fica o que e de quem
        planeja e de quem aprova. A contagem de MATERIAL continua logo abaixo,
@@ -2972,6 +2972,7 @@ async function ctAjustar(){
 function ctItem(l){ return {tipo:l.tipo||'sku', codigo:l.codigo, componente_id:l.componente_id||null}; }
 document.addEventListener('DOMContentLoaded',function(){
   if(naTela('ct')) ctComponentes();
+  if(naTela('ct') && window.CMP && window.CMP.contagemAprov) window.CMP.contagemAprov(document.getElementById('cmAprov'));
   var q=document.getElementById('ctCompQtd');
   if(q) q.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); ctLancarComp(); } });
   var b=document.getElementById('ctBipe');

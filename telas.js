@@ -79,6 +79,8 @@ const TELAS = [
   { n:502, nome:'Recebimento',           rota:'/recebimento',   nivel:'operacao',   onde:'tablet',     perms:['pedido.receber'],        area:'recebimento' },
   // COMPRAS-E-RECEBIMENTO fase 5: guardar, mover e abrir volume por bipe (nasce so para quem tem a chave — backfill da spec §7)
   { n:503, nome:'Almoxarifado',          rota:'/almoxarifado',  nivel:'operacao',   onde:'tablet',     perms:['volume.movimentar'] },
+  // COMPRAS-E-RECEBIMENTO fase 6: a contagem de material por almoxarifado (as chaves de contagem que ja existem)
+  { n:504, nome:'Contagem de material',  rota:'/contagem-material', nivel:'operacao', onde:'tablet',  perms:['contagem.contar'] },
   // ── 600 · Sob medida: as telas moram em tecido/nucleo/telas.js (numero e nivel la) ──
   // ── 700 · Frota e 800 · Mercado Livre: reservados para as specs deles ──
   // ── 900 · Sistema ──

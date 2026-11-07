@@ -497,6 +497,28 @@
     };
   };
 
+  /* ── A CONTAGEM DE MATERIAL QUE PASSOU DA TOLERANCIA (fase 6, R-CMP-42) ──
+     Desenhada na 302 (aba Contagem), para quem tem contagem.aprovar. */
+  window.CMP.contagemAprov = async function(box){
+    if(!box) return;
+    await perms(); if(!pode('contagem.aprovar')) return;
+    var l = await api('GET', '/api/contagem-material/pendentes'); if(!Array.isArray(l)) return;
+    box.style.display = '';
+    box.innerHTML = '<div style="font-weight:700">Contagem de material por almoxarifado — esperando aprovação</div>'
+      + '<div class="sub" style="margin:4px 0 10px">A diferença passou da tolerância do material. Aprovar aplica a DIFERENÇA sobre o saldo de agora. Quem contou não aprova.'
+      + ' Material por volume não se ajusta aqui: o saldo dele é a soma dos volumes (corrige-se abrindo/encerrando o volume na 503).</div>'
+      + (l.length ? '<table class="cmpTab"><thead><tr><th>Material</th><th>Almox.</th><th>Contado</th><th>Sistema</th><th>Diferença</th><th>Contou</th><th></th></tr></thead><tbody>'
+        + l.map(function(i){ return '<tr><td>' + esc(i.nome) + '</td><td>' + esc(i.almoxarifado || '') + '</td><td>' + n3(i.contado) + ' ' + esc(i.unidade || '') + '</td><td>' + n3(i.sistema) + '</td>'
+          + '<td>' + n3(i.diferenca) + ' (' + n3(i.diferenca_pct) + '%)</td><td>' + esc(i.contado_por || '') + '</td>'
+          + '<td><input data-cm-mot="' + i.id + '" placeholder="motivo"> <button class="primary" data-cm="' + i.id + '" data-a="aprovar">Aprovar</button> <button class="ghost" data-cm="' + i.id + '" data-a="rejeitar">Rejeitar</button> <span class="msg" data-cm-msg="' + i.id + '"></span></td></tr>'; }).join('')
+        + '</tbody></table>' : '<div class="sub">Nada esperando.</div>');
+    box.onclick = async function(ev){
+      var b = ev.target.closest('[data-cm]'); if(!b) return; var id = b.getAttribute('data-cm');
+      var r = await api('POST', '/api/contagem-material/itens/' + id + '/' + b.getAttribute('data-a'), { motivo:$('[data-cm-mot="' + id + '"]').value });
+      if(r.erro) return msg($('[data-cm-msg="' + id + '"]'), r); window.CMP.contagemAprov(box);
+    };
+  };
+
   /* ── COMPRA RAPIDA (fase 2, R-CMP-21) ───────────────────────────────── */
   registrar({ id:'rapida', nome:'Compra rápida', perms:['pedido.criar'],
     desenhar: async function(box){

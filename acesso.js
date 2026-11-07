@@ -1091,6 +1091,12 @@ module.exports = function(app, db){
        que esta usa prefixo: a proxima leitura de formula ja nasce coberta. */
     if(pre('/api/formulas')) return 'compras.ver';
     if(M !== 'GET' && pre('/api/fornecedores')) return 'fornecedor.cadastrar';
+    /* COMPRAS-E-RECEBIMENTO fase 6: a contagem de material (R-CMP-42 a 45),
+       pelas chaves de contagem que ja existem. */
+    if(eq('/api/contagem-material/pendentes')) return ['contagem.aprovar','contagem.ajustar'];
+    if(M !== 'GET' && pre('/api/contagem-material/itens')) return 'contagem.aprovar';
+    if(eq('/api/contagem-material/consumo')) return ['compras.ver','contagem.aprovar','contagem.contar'];
+    if(pre('/api/contagem-material')) return 'contagem.contar';
     /* COMPRAS-E-RECEBIMENTO fase 5: o endereco e o volume (R-CMP-38 a 41). */
     if(M !== 'GET' && /\/enderecos$/.test(p) && pre('/api/almoxarifados')) return 'almoxarifado.cadastrar';
     if(/\/enderecos$/.test(p) && pre('/api/almoxarifados')) return ['almoxarifado.cadastrar','volume.movimentar','compras.ver','contagem.contar','pedido.receber'];

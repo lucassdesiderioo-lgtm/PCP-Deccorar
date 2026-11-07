@@ -103,6 +103,11 @@ const LINHAS = [
   { chave:'recebimento_aviso', nome:'Recebimento com aviso de peso', perm:['recebimento.liberar'], onde:{ aba:'compras' },
     ajuda:'entrou no saldo com o peso entre as duas tolerâncias: dar ciência',
     contar(db){ const r = require('./recebimento_dominio').pendencias(db).aviso; return { n:r.n, desde:r.desde }; } },
+  /* COMPRAS-E-RECEBIMENTO fase 6 (R-CMP-42): a contagem de material que passou
+     da tolerancia espera outra pessoa aprovar. */
+  { chave:'contagem_material', nome:'Contagem de material por almoxarifado', perm:['contagem.aprovar'], onde:{ aba:'ct' },
+    ajuda:'diferença acima da tolerância na contagem cega da 504',
+    contar(db){ return require('./contagem_material_dominio').pendencias(db); } },
   { chave:'devolucoes', nome:'Devoluções', perm:['devolucao.baixar'], onde:{ aba:'dv' },
     ajuda:'devoluções esperando a baixa com reputação e motivo',
     contar(db){

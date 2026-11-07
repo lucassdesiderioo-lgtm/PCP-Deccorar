@@ -250,6 +250,37 @@ function garantirSchemaCompras(db){
       criado_em TEXT DEFAULT (datetime('now','localtime'))
     );
 
+    /* ── A CONTAGEM DE MATERIAL (COMPRAS-E-RECEBIMENTO fase 6, R-CMP-42 a 44):
+       uma pessoa, cega, por almoxarifado. A cabeca (quem e onde), as linhas
+       que quem conta lanca (inteiros e cortados) e o resultado por material
+       (contado, sistema, diferenca e o que aconteceu: igual, aplicado sozinho,
+       pendente, aprovado, rejeitado, ciente). */
+    CREATE TABLE IF NOT EXISTS contagem_material (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      almoxarifado_id INTEGER NOT NULL REFERENCES almoxarifado(id),
+      situacao TEXT NOT NULL DEFAULT 'aberta',     -- aberta | terminada
+      usuario_id INTEGER, usuario_nome TEXT,
+      aberta_em TEXT DEFAULT (datetime('now','localtime')), terminada_em TEXT
+    );
+    CREATE TABLE IF NOT EXISTS contagem_material_linha (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      contagem_id INTEGER NOT NULL REFERENCES contagem_material(id),
+      componente_id INTEGER NOT NULL REFERENCES componente(id),
+      tipo TEXT NOT NULL DEFAULT 'inteiro',        -- inteiro | cortado
+      medida_m REAL, quantidade REAL NOT NULL,
+      usuario_id INTEGER, criado_em TEXT DEFAULT (datetime('now','localtime')),
+      sistema REAL                                 -- o saldo na hora desta linha (nunca vai para a tela)
+    );
+    CREATE TABLE IF NOT EXISTS contagem_material_item (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      contagem_id INTEGER NOT NULL REFERENCES contagem_material(id),
+      componente_id INTEGER NOT NULL REFERENCES componente(id),
+      contado REAL, sistema REAL, diferenca REAL, diferenca_pct REAL,
+      situacao TEXT,                               -- igual|aplicado|pendente|aprovado|rejeitado|ciente
+      contado_em TEXT, decidido_por TEXT, decidido_por_id INTEGER, decidido_em TEXT, motivo TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_cm_item_comp ON contagem_material_item(componente_id, contado_em);
+
     /* ── FORNECEDOR (§9) ──────────────────────────────────────────────────── */
     CREATE TABLE IF NOT EXISTS fornecedor (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,

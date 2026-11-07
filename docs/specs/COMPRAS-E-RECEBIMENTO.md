@@ -6,7 +6,7 @@ Situação: em construção (execução contínua das fases 1 a 11 autorizada pe
 Criada em: 06/11/2026
 Última atualização: 07/11/2026
 Fase atual: ver o diário de construção logo abaixo
-Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☐  7 ☐  8 ☐  9 ☐  10 ☐  11 ☐
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☐  8 ☐  9 ☐  10 ☐  11 ☐
 Decidido em 07/11/2026: fase 10 = o PCP é dono do endereço, o sob medida do rolo e
 da sobra (R-CMP-50) · fase 11 construída sem certificado, pronta para recebê-lo
 Risco: 🔴 (schema, estoque de material, custo, acesso, dado do sob medida)
@@ -199,6 +199,36 @@ foi para o `CLAUDE.md` §7-C.
 nível reprova 2; abrir sem saída, 3; sem o volume no recebimento, reprova; abrir duas vezes,
 1). A 503 a 1024 px: guardou por bipe e recusou o nível ocupado dizendo o volume.
 
+### Fase 6 — contagem de material e consumo (07/11/2026) ☑
+
+```
+📋 PLANO
+Tipo: FASE 6 da spec COMPRAS-E-RECEBIMENTO        Risco: 🟡 (mexe em saldo de material: tratado como 🔴, teste antes)
+O que vai ser feito: a 504 (uma pessoa, cega, por almoxarifado, inteiros e cortados),
+  tolerância que aplica sozinha, aprovação acima dela, consumo pela contagem, média de
+  compra de quem não tem saldo, "a contar" pela frequência.
+O que vou mudar: compras_schema.js (contagem_material, _linha, _item) ·
+  contagem_material_dominio.js e contagem_material_route.js (novos) ·
+  public/contagem-material.html (nova) · public/index.html e compras_abas.js (a aprovação
+  na 302) · pendencias_dominio.js · telas.js (504) · auth.js · acesso.js
+Regra de negócio muda? SIM → antes: contagem de material por qualquer um, sempre
+  aprovada. Depois: uma pessoa, cega, aplica sozinha dentro da tolerância (DECISOES.md 06/11)
+Como vou testar: teste_contagem_material.js (novo, antes do código); defeitos
+  reintroduzidos; a 504 aberta a 1024 px
+Fica de fora: a contagem por bipe de volume (o volume se corrige na 503)
+
+🔐 ALÇADA
+Telas novas: 504 · Contagem de material · Compras · operação (tablet)
+Ações novas: nenhuma (contagem.contar e contagem.aprovar já existem)
+Setores novos: nenhum
+Quem recebe: quem já tem contagem.contar
+```
+
+**Feito.** `teste_contagem_material.js` 31 casos; oito defeitos reintroduzidos (saldo
+vazando reprova 1; aplicando tudo sozinho, reprova; quem contou aprovando, 1; consumo zero,
+1; não contado virando zero, 2; cortado sem metro, reprova; o saldo do "terminei", 2; sem a
+tarja do pouco histórico, 1). A 504 a 1024 px, com o digitado do outro material preservado.
+
 ### Mudanças no caminho
 
 (decisões de construção que não mudam regra — nome de coluna, layout, ordem de campos)
@@ -257,6 +287,17 @@ nível reprova 2; abrir sem saída, 3; sem o volume no recebimento, reprova; abr
 - **Fase 5:** o código de bipe do endereço é `E-` + o id do nível; o do volume, `M-` sequencial.
 - **Fase 5:** a etiqueta do volume é um PDF de 100 × 35 mm (a Zebra da casa), com o CODE128
   do `public/barras.js`.
+- **Fase 6:** a contagem ganhou cabeça (`contagem_material`) e resultado por material
+  (`contagem_material_item`) além das linhas que a spec lista (`contagem_material_linha`).
+- **Fase 6:** o saldo comparado é o da primeira linha do material (coluna `sistema` na linha,
+  nunca enviada à tela), e a diferença se aplica sobre o saldo de agora (R-EST-16).
+- **Fase 6:** a tolerância que aplica sozinha é a `tol_aviso_pct` do material (a spec diz
+  "dentro de tol_aviso_pct").
+- **Fase 6:** material por volume entra na contagem, mas a diferença nunca o ajusta: vai para
+  ciência ("ciente"), e a correção é abrir/encerrar o volume na 503.
+- **Fase 6:** a aprovação aparece na 302 (aba Contagem), porque quem aprova é de nível Admin e
+  não opera a 504.
+- **Fase 6:** uma contagem aberta por almoxarifado; só quem abriu lança, tira linha e termina.
 
 ### Achei no caminho (não mexi)
 
