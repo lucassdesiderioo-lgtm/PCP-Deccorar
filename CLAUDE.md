@@ -1644,6 +1644,12 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 > loja escrita), e os dois cadastros são desativados. Oferta repetida nos dois
 > recusa tudo. `node teste_arrumar_fornecedores.js` (19).
 >
+> ✅ **APLICADO EM 07/11/2026**, e a segunda rodada diz "já feito" nos três: os 10
+> rolos e o espelho do sob medida passaram ao #2 ("Ação"); ML e SHOPI desativados,
+> e 9 ofertas deles deixaram de valer (fita crepe, parafuso, bucha, as etiquetas,
+> fita durex, filme stretch, grampo) — esses itens se compram pela compra rápida,
+> com o canal. A lista de compras não sugere mais fornecedor para eles, e é assim.
+>
 > Nada disto está provado com dado real ainda:
 > - quem recebe as cinco chaves novas, marcado na tela de Acessos;
 > - a primeira compra por kg recebida em partes, e o "fechar com falta" dela;
