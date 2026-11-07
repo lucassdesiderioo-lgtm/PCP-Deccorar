@@ -129,7 +129,8 @@ function garantirSchemaCompras(db){
       ativo       INTEGER DEFAULT 1,
       criado_em   TEXT DEFAULT (datetime('now','localtime')),
       criado_por  TEXT,
-      criado_por_id INTEGER
+      criado_por_id INTEGER,
+      origem_sm   TEXT        -- fase 10: a chave do armazem do sob medida (ROLO, SOBRA), para a migracao ser conferivel
     );
 
     /* ── ALCADA POR PESSOA (COMPRAS-E-RECEBIMENTO R-CMP-17) ─────────────────
@@ -214,18 +215,21 @@ function garantirSchemaCompras(db){
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       almoxarifado_id INTEGER NOT NULL REFERENCES almoxarifado(id),
       nome TEXT NOT NULL, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+      origem_sm_id INTEGER,    -- fase 10: o id antigo no sob medida
       UNIQUE(almoxarifado_id, nome)
     );
     CREATE TABLE IF NOT EXISTS alm_andar (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       haste_id INTEGER NOT NULL REFERENCES alm_haste(id),
       nome TEXT NOT NULL, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+      origem_sm_id INTEGER,
       UNIQUE(haste_id, nome)
     );
     CREATE TABLE IF NOT EXISTS alm_nivel (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       andar_id INTEGER NOT NULL REFERENCES alm_andar(id),
       nome TEXT NOT NULL, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+      origem_sm_id INTEGER,
       UNIQUE(andar_id, nome)
     );
     /* O VOLUME (R-CMP-39): a peca fisica etiquetada (M-000001). O saldo de um
@@ -583,6 +587,8 @@ function garantirSchemaCompras(db){
   colunas('pedido_compra', [['canal','TEXT'],['loja','TEXT'],['numero_externo','TEXT'],['comprado_em','TEXT'],
     ['comprado_por','TEXT'],['comprado_por_id','INTEGER'],['aprovacao','TEXT'],['aprovado_por','TEXT'],
     ['aprovado_por_id','INTEGER'],['aprovado_em','TEXT'],['motivo_aprovacao','TEXT'],['rapida','INTEGER DEFAULT 0']]);
+  colunas('almoxarifado', [['origem_sm','TEXT']]);
+  for(const t of ['alm_haste','alm_andar','alm_nivel']) colunas(t, [['origem_sm_id','INTEGER']]);
   colunas('recebimento_item', [['qtd_contada','REAL'],['peso_1_kg','REAL'],['peso_10_kg','REAL'],['esperado_nota_kg','REAL'],
     ['esperado_cadastro_kg','REAL'],['desvio_pct','REAL'],['faixa','TEXT'],['decisao','TEXT'],['decidido_por','TEXT'],
     ['decidido_por_id','INTEGER'],['decidido_em','TEXT'],['motivo_decisao','TEXT'],['fator_real','REAL'],['almoxarifado_id','INTEGER'],['custo_unit','REAL']]);

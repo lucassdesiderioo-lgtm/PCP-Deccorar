@@ -130,3 +130,18 @@ tubos podem bater na contagem com material mais fino.
 - **A varredura do `teste_backup` pegou o nome `tecido.db` escrito no teste novo** (o
   banco temporário do sob medida): só o `tecido/nucleo/caminho.js` diz onde ele fica.
   O arquivo temporário passou a se chamar `sob-medida.db`.
+
+## Fase 10 — um sistema de almoxarifado (07/11/2026)
+
+- **O sob medida aponta o endereço pelo ESPELHO, e não pelo id do PCP.** As
+  tabelas armazem/haste/andar/nivel de lá ficaram, só que escritas apenas pela
+  porta (cópia do PCP). Rolo, sobra, plano, corte e "um rolo por nível"
+  continuam com o `nivel_id` local — nada do corte foi tocado, e a suíte do sob
+  medida roda igual. O nível do PCP vai ao lado, mantido por gatilho.
+- **A bancada continua criando o buraco novo** (R-SME-01), mas ele nasce no PCP
+  e chega pelo espelho. Renomear e desativar passou para a 501.
+- **A conferência da migração tem caso que a faz acusar** (um rolo apontado para
+  o nível errado): sem ele, a conferência "cega" passava verde, porque a
+  migração certa não tem divergência a mostrar.
+- **A simulação roda a migração em CÓPIAS dos dois bancos** (`db.backup`) e mostra
+  a conferência — a única forma de simular dois bancos sem transação entre eles.

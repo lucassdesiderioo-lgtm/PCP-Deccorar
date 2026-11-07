@@ -162,4 +162,71 @@ function conferirSaldo(db, componente_id){
   return { estoque:c ? c.estoque : null, volumes:s, bate: c && Math.abs((c.estoque || 0) - s) < 1e-6 };
 }
 
-module.exports = { Recusa, codigoNivel, nomeNivel, criarEnderecos, enderecos, acharNivel, noNivel, criarVolumes, ler, listar, mover, abrir, conferirSaldo, porCodigo, foraDoPcp:null };
+
+/* ── O SOB MEDIDA PELA PORTA (fase 10, R-CMP-50) ────────────────────────
+   O PCP e dono do ENDERECO; o sob medida, do rolo e da sobra. O que segue e o
+   que a porta dos dois lados precisa. */
+
+/* A arvore de um almoxarifado para o espelho do sob medida (o
+   `tecido/nucleo/enderecos_pcp.js` a copia). */
+function paraSobMedida(db, almoxarifado_id){
+  const a = db.prepare('SELECT nome FROM almoxarifado WHERE id=?').get(+almoxarifado_id);
+  if(!a) return { nome:null, hastes:[], andares:[], niveis:[] };
+  return { nome:a.nome,
+    hastes: db.prepare('SELECT id, nome, ativo FROM alm_haste WHERE almoxarifado_id=? ORDER BY ordem, nome').all(+almoxarifado_id),
+    andares: db.prepare('SELECT d.id, d.haste_id, d.nome, d.ativo FROM alm_andar d JOIN alm_haste h ON h.id=d.haste_id WHERE h.almoxarifado_id=? ORDER BY d.ordem, d.nome').all(+almoxarifado_id),
+    niveis: db.prepare('SELECT n.id, n.andar_id, n.nome, n.ativo FROM alm_nivel n JOIN alm_andar d ON d.id=n.andar_id JOIN alm_haste h ON h.id=d.haste_id WHERE h.almoxarifado_id=? ORDER BY n.ordem, n.nome').all(+almoxarifado_id) };
+}
+/* A bancada do sob medida cria o buraco novo da estante (R-SME-01 continua) —
+   aqui, no dono. Haste, ou haste+andar, ou haste+andar+nivel. */
+function criarParcial(db, b){
+  const a = db.prepare('SELECT id FROM almoxarifado WHERE id=?').get(+b.almoxarifado_id);
+  if(!a) throw new Recusa(404, 'almoxarifado não encontrado');
+  const h = txt(b.haste); if(!h) throw new Recusa(400, 'informe a haste');
+  db.transaction(() => {
+    db.prepare('INSERT OR IGNORE INTO alm_haste (almoxarifado_id, nome) VALUES (?,?)').run(a.id, h);
+    const hid = db.prepare('SELECT id FROM alm_haste WHERE almoxarifado_id=? AND nome=?').get(a.id, h).id;
+    const d = txt(b.andar); if(!d) return;
+    db.prepare('INSERT OR IGNORE INTO alm_andar (haste_id, nome) VALUES (?,?)').run(hid, d);
+    const did = db.prepare('SELECT id FROM alm_andar WHERE haste_id=? AND nome=?').get(hid, d).id;
+    const n = txt(b.nivel); if(!n) return;
+    db.prepare('INSERT OR IGNORE INTO alm_nivel (andar_id, nome) VALUES (?,?)').run(did, n);
+  })();
+  return {};
+}
+/* O nivel tem um volume do PCP? (para o "um so por nivel" valer do lado do
+   rolo do sob medida). */
+function ocupadoPorVolume(db, nivel_id){
+  const v = db.prepare("SELECT codigo FROM volume_material WHERE nivel_id=? AND situacao<>'encerrado' LIMIT 1").get(+nivel_id);
+  return v ? v.codigo : null;
+}
+/* Renomear e desativar haste, andar e nivel (o sob medida le daqui). */
+function renomear(db, tipo, id, b){
+  const T = { haste:'alm_haste', andar:'alm_andar', nivel:'alm_nivel' }[tipo];
+  if(!T) throw new Recusa(400, 'tipo de endereço inválido');
+  const r = db.prepare('SELECT id FROM ' + T + ' WHERE id=?').get(+id);
+  if(!r) throw new Recusa(404, 'endereço não encontrado');
+  const c = {};
+  if(Object.prototype.hasOwnProperty.call(b, 'nome')){ c.nome = txt(b.nome); if(!c.nome) throw new Recusa(400, 'o nome não pode ficar vazio'); }
+  if(Object.prototype.hasOwnProperty.call(b, 'ativo')) c.ativo = b.ativo ? 1 : 0;
+  const cols = Object.keys(c); if(!cols.length) return {};
+  try{ db.prepare('UPDATE ' + T + ' SET ' + cols.map(k => k + '=@' + k).join(',') + ' WHERE id=@id').run(Object.assign({ id:r.id }, c)); }
+  catch(e){ if(/UNIQUE/.test(e.message)) throw new Recusa(409, 'já existe um endereço com este nome no mesmo lugar'); throw e; }
+  return {};
+}
+/* O SALDO NUMA LISTA SO (R-CMP-50): por endereco, os volumes do PCP E os rolos
+   e sobras do sob medida (pela porta). Porta caida: o PCP lista o que e dele e
+   DIZ que o sob medida ficou de fora — nunca lista vazia calada. */
+function estoque(db, almoxarifado_id){
+  const vol = db.prepare(`SELECT v.codigo, v.saldo, v.nivel_id, c.nome material, c.unidade FROM volume_material v JOIN componente c ON c.id=v.componente_id
+    WHERE v.almoxarifado_id=? AND v.situacao<>'encerrado' ORDER BY v.nivel_id, v.codigo`).all(+almoxarifado_id)
+    .map(v => ({ origem:'PCP', codigo:v.codigo, item:v.material, saldo:v.saldo, unidade:v.unidade, nivel_id:v.nivel_id, endereco: v.nivel_id ? nomeNivel(db, v.nivel_id) : null }));
+  const SA = require('./sobmedida_almox');
+  const sm = SA.estoque();
+  const niveis = new Set(db.prepare('SELECT n.id FROM alm_nivel n JOIN alm_andar d ON d.id=n.andar_id JOIN alm_haste h ON h.id=d.haste_id WHERE h.almoxarifado_id=?').all(+almoxarifado_id).map(x => x.id));
+  const doSm = (sm.itens || []).filter(x => niveis.has(x.nivel_pcp_id)).map(x => ({ origem:'sob medida', codigo:x.codigo, item:x.item, saldo:x.saldo, unidade:x.unidade,
+    nivel_id:x.nivel_pcp_id, endereco: nomeNivel(db, x.nivel_pcp_id) || x.nivel_pcp_nome }));
+  return { itens: vol.concat(doSm).sort((a, b) => String(a.endereco || '~').localeCompare(String(b.endereco || '~'))), sob_medida_fora: sm.fora, motivo: sm.motivo };
+}
+
+module.exports = { paraSobMedida, criarParcial, ocupadoPorVolume, renomear, estoque, Recusa, codigoNivel, nomeNivel, criarEnderecos, enderecos, acharNivel, noNivel, criarVolumes, ler, listar, mover, abrir, conferirSaldo, porCodigo, foraDoPcp:(db, nivel_id) => require('./sobmedida_almox').rolosNoNivel(nivel_id) };

@@ -2949,3 +2949,11 @@ de clicar na quarta, mesmo quando já podia.
   `rolo.entrada` de sempre. O fornecedor é o do PCP: a tabela `fornecedor` daqui é
   o espelho (`fornecedor_pcp_id`, migração 40). O `tecido.db` continua sem ver o
   `dados.db`.
+- **Fase 10 — o endereço é do PCP (R-CMP-50).** Depois de `node
+  migrar_enderecos_sobmedida.js --aplicar` (na raiz do PCP), armazem/haste/andar/
+  nivel daqui são o ESPELHO do PCP (migração 41): só `nucleo/enderecos_pcp.js`
+  escreve nelas, copiando do PCP. A bancada cria o buraco novo pela porta (nasce
+  no PCP); renomear e desativar é na 501 do PCP. Rolo, sobra e corte continuam
+  aqui, com o `nivel_id` de sempre, e guardam o nível do PCP ao lado
+  (`nivel_pcp_id`, `nivel_pcp_nome`, por gatilho). Porta caída: a tela de rolos
+  diz "Endereços sem atualização" e mostra os últimos conhecidos — nunca vazio.

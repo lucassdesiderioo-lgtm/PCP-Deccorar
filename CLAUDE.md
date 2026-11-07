@@ -1474,6 +1474,7 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 | `almox_dominio.js` | o endereço (haste → andar → nível), o volume etiquetado, guardar, mover e abrir (fase 5) |
 | `contagem_material_dominio.js` | a contagem de material por almoxarifado (504), a tolerância, a aprovação, o consumo pela contagem e a média de compra (fase 6) |
 | `programada_dominio.js` | a compra programada: lista do mês e aviso pela data, o maior e nunca a soma (fase 7) |
+| `almox_dominio.js` (fase 10) | também a árvore para o espelho do sob medida, o endereço criado pela bancada de lá e o saldo numa lista só |
 | `nota_xml.js` | o leitor do XML da NF-e e o casamento sem adivinhar (fase 8; e a porta da nota baixada da Receita, fase 11) |
 | `recebimento_dominio.js` | a fila sem preço, a contagem cega, a pesagem, as réguas e as faixas, o retido, o custo por recebido, o fator real e o prazo medido (fase 3) |
 
@@ -1521,6 +1522,12 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 > material com `sm_tecido_id` recebido por volume cria o ROLO lá, pela porta
 > (`sobmedida_rolo.js`), e sem a porta o recebimento recusa. A entrada de rolo do
 > sob medida está aposentada. O fornecedor é um só, o do PCP (o de lá é espelho).
+>
+> ⚠️ **O ENDEREÇO É DO PCP; O ROLO, A SOBRA E O CORTE CONTINUAM NO `tecido.db`**
+> (R-CMP-50, fase 10). Depois da migração, armazem/haste/andar/nivel do sob medida
+> são ESPELHO (só a porta `tecido/nucleo/enderecos_pcp.js` escreve), e o rolo e a
+> sobra guardam o nível do PCP ao lado do `nivel_id` de sempre. **Não troque o
+> `nivel_id` pelo id do PCP**: o corte grava rolo, sobra e plano numa transação só.
 
 **Rode `node teste_material.js`, `node teste_pedido_compra.js`, `node
 teste_recebimento.js`, `node teste_nota_compra.js`, `node teste_almoxarifado.js`, `node teste_contagem_material.js`, `node teste_compra_programada.js`, `node teste_nota_xml.js`, `node teste_porta_sobmedida.js` (e `cd tecido && npm test`) e `node teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no

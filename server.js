@@ -221,12 +221,19 @@ try{
   const sm = require('./tecido/montar').montar(app, null, {
     permissoes: uid => [...app.locals.acesso.permissoesDe(uid)],
     pessoas: () => db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all(),
-    materiais: () => db.prepare('SELECT id,nome,unidade,marca,modelo FROM componente WHERE ativo=1 ORDER BY nome').all()
+    materiais: () => db.prepare('SELECT id,nome,unidade,marca,modelo FROM componente WHERE ativo=1 ORDER BY nome').all(),
+    /* COMPRAS-E-RECEBIMENTO fase 10 (R-CMP-50): o PCP e dono do ENDERECO; o sob
+       medida le a arvore, cria o buraco novo da bancada e pergunta se um volume
+       do PCP ocupa o nivel — tudo por aqui. */
+    enderecos: { niveis: id => require('./almox_dominio').paraSobMedida(db, id),
+                 criar: b => require('./almox_dominio').criarParcial(db, b),
+                 ocupado: id => require('./almox_dominio').ocupadoPorVolume(db, id) }
   });
   require('./sobmedida_material').ligar(sm && sm.consumoDeMaterial);
   /* A PORTA DO ROLO (COMPRAS-E-RECEBIMENTO fase 9): o recebimento do tecido do
      sob medida cria o rolo la, e o cadastro de material do PCP aponta o tecido. */
   require('./sobmedida_rolo').ligar(sm && { criarRolos:sm.criarRolosDoRecebimento, tecidos:sm.tecidosParaCompras });
+  require('./sobmedida_almox').ligar(sm && { estoque:sm.estoqueParaPcp });   // o saldo numa lista so (fase 10)
 }catch(e){
   console.error('[sobmedida] NAO SUBIU:',e);
   app.use('/sobmedida',(req,res)=>res.status(503).send(

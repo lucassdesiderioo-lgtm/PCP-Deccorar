@@ -270,9 +270,12 @@ async function cartaoValor(pai){
 
 // ── EM ESTOQUE ───────────────────────────────────────────────────────────
 async function telaEstoque(pai){
+  /* fase 10: o endereco e do PCP — se a ligacao caiu, a tela DIZ (nunca vazio) */
+  let est=null; try{ est=await api('/api/enderecos-pcp/estado'); }catch(e){}
   const rolos=await api('/api/rolos');
   const saldo=await api('/api/rolos/saldo');
   pai=limpar(pai);
+  if(est&&est.sem_atualizacao) pai.appendChild(el('div',{class:'vazio',texto:'Endereços sem atualização: '+(est.motivo||'a ligação com o PCP caiu')+'. Os endereços abaixo são os últimos conhecidos.'}));
   if(estado.nota) await cartaoNota(pai,rolos.find(r=>r.id===estado.nota.id)||estado.nota);
   await cartaoValor(pai);
 

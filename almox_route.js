@@ -18,6 +18,10 @@ module.exports = function(app, db){
   app.get('/api/almoxarifados/:id/enderecos', (req, res) => res.json(A.enderecos(db, req.params.id)));
   app.post('/api/almoxarifados/:id/enderecos', (req, res) => responder(res, () => A.criarEnderecos(db, req.params.id, req.body || {})));
   app.get('/api/enderecos/:codigo', (req, res) => responder(res, () => A.noNivel(db, req.params.codigo)));
+  /* fase 10: o saldo numa lista so (volumes do PCP + rolos e sobras do sob
+     medida, por endereco) e renomear/desativar endereco (o sob medida le daqui). */
+  app.get('/api/almoxarifados/:id/estoque', (req, res) => res.json(A.estoque(db, req.params.id)));
+  app.post('/api/enderecos/:tipo/:id', (req, res) => responder(res, () => A.renomear(db, req.params.tipo, req.params.id, req.body || {})));
   app.get('/api/volumes', (req, res) => res.json(A.listar(db, req.query || {})));
   app.get('/api/volumes/:codigo', (req, res) => responder(res, () => A.ler(db, req.params.codigo)));
   app.post('/api/volumes/:codigo/mover', (req, res) => responder(res, () => A.mover(db, req.params.codigo, req.body || {}, QUEM.pessoa(req))));

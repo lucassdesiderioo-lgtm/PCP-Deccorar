@@ -6,7 +6,7 @@ Situação: em construção (execução contínua das fases 1 a 11 autorizada pe
 Criada em: 06/11/2026
 Última atualização: 07/11/2026
 Fase atual: ver o diário de construção logo abaixo
-Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑  8 ☑  9 ☑  10 ☐  11 ☐
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑  8 ☑  9 ☑  10 ☑  11 ☐
 Decidido em 07/11/2026: fase 10 = o PCP é dono do endereço, o sob medida do rolo e
 da sobra (R-CMP-50) · fase 11 construída sem certificado, pronta para recebê-lo
 Risco: 🔴 (schema, estoque de material, custo, acesso, dado do sob medida)
@@ -309,6 +309,42 @@ entrando no PCP reprova; sem o espelho do fornecedor, 1; a entrada antiga aberta
 sem normalizar, 1; sem o preço, 1). O teste tinha uma expectativa errada (98 m de 100 m
 "fechando" o pedido) e foi corrigido: o pedido fica parcial, como deve.
 
+### Fase 10 — um sistema de almoxarifado (07/11/2026) ☑
+
+```
+📋 PLANO
+Tipo: FASE 10 da spec COMPRAS-E-RECEBIMENTO        Risco: 🔴
+O que vai ser feito: os endereços ROLO e SOBRA migram para o almoxarifado do PCP; o sob
+  medida os lê pela porta; rolo e sobra guardam o nível do PCP; o saldo numa lista só; a
+  entrada de rolo já aposentada na fase 9. Rolo, sobra e corte continuam no tecido.db.
+O que vou mudar: tecido/nucleo/schema.js (migração 41: espelho, nível do PCP no rolo e na
+  sobra, gatilhos) · tecido/nucleo/enderecos_pcp.js (novo, a porta) ·
+  tecido/dominio/endereco.js (criar pelo PCP, renomear recusado, árvore lendo o PCP) ·
+  tecido/dominio/rolo.js (o volume do PCP ocupa o nível) · tecido/dominio/estoque_pcp.js
+  (novo) · tecido/rotas/cadastros.js · tecido/public/telas/rolos.html ("sem atualização") ·
+  tecido/montar.js · almox_dominio.js e almox_route.js · sobmedida_almox.js (novo) ·
+  migrar_enderecos_sobmedida.js (novo: simula nas cópias, aplica com backup e confere) ·
+  compras_schema.js (origem_sm) · server.js · acesso.js · public/compras_abas.js
+Regra de negócio muda? SIM → antes: o sob medida era dono dos endereços dele. Depois: o PCP é
+  dono de todos; o sob medida, do rolo e da sobra (DECISOES.md 07/11)
+Como vou testar: teste_porta_almox.js (novo, antes do código, os dois módulos de verdade);
+  defeitos reintroduzidos; cd tecido && npm test (o corte igual); os dois scripts pela
+  linha de comando em bancos temporários
+Fica de fora: rodar a migração em produção (vai no roteiro de deploy)
+
+🔐 ALÇADA
+Telas novas: nenhuma · Ações novas: nenhuma (renomear endereço: almoxarifado.cadastrar)
+Setores novos: nenhum · Quem recebe: —
+```
+
+**Feito.** `teste_porta_almox.js` 25 casos; nove defeitos reintroduzidos (sem o gatilho do
+mover reprova 2; a conferência cega, 1 — o caso que a faz acusar entrou depois que ela passou
+verde; o rolo sem o nível do PCP, 6; sem ler o PCP, 4; a bancada criando só lá, reprova; o
+rolo ignorando o volume do PCP, 2; o volume ignorando o rolo, 1; a porta caída calada, 1;
+renomear lá, 1). `migrar_enderecos_sobmedida.js` e `migrar_fornecedor_sobmedida.js` rodados
+pela linha de comando em bancos temporários (simulação sem gravar; `--aplicar` com os dois
+backups). **A migração NÃO foi rodada em produção** — está no roteiro de deploy.
+
 ### Mudanças no caminho
 
 (decisões de construção que não mudam regra — nome de coluna, layout, ordem de campos)
@@ -397,6 +433,17 @@ sem normalizar, 1; sem o preço, 1). O teste tinha uma expectativa errada (98 m 
 - **Fase 9:** o tecido do sob medida não fica retido por contagem ≠ declarado (o rolo nasce lá).
 - **Fase 9:** o fornecedor que só existe no sob medida é criado no PCP pela migração, com a
   observação "veio do cadastro do sob medida"; o tipo fica para alguém completar.
+- **Fase 10:** as tabelas de endereço do sob medida não ficaram "só leitura" no sentido de
+  ninguém escrever: viraram ESPELHO, escritas só pela porta (cópia do PCP). É o que mantém
+  o `nivel_id` local de rolo, sobra e corte intocado.
+- **Fase 10:** a bancada do sob medida continua criando endereço (R-SME-01), pela porta, no PCP.
+  Renomear e desativar endereço passou para a 501 (aba Almoxarifados).
+- **Fase 10:** os almoxarifados migrados se chamam "Tecidos novos" (ROLO) e "Sobras de tecido"
+  (SOBRA), como a R-CMP-38 os nomeia; haste, andar e nível ficam com os nomes de antes.
+- **Fase 10:** "um só por nível" entre os dois lados olha só ROLO do sob medida (a sobra divide
+  nível, como sempre).
+- **Fase 10:** a simulação do script roda a migração em cópias dos dois bancos e mostra a
+  conferência.
 
 ### Achei no caminho (não mexi)
 

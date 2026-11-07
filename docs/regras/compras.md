@@ -446,6 +446,14 @@
 - Status:           em código desde 07/11/2026.
 - História:         fase 9.
 
+### R-CMP-50 · Um sistema de almoxarifado: o PCP é dono do endereço; o sob medida, do rolo e da sobra
+- Regra:            `node migrar_enderecos_sobmedida.js` (simula nas cópias dos dois bancos; `--aplicar` faz backup dos dois, aplica e confere) leva os armazéns ROLO e SOBRA do sob medida para o PCP como "Tecidos novos" e "Sobras de tecido", com os mesmos nomes de haste, andar e nível e o id antigo guardado (`origem_sm`, `origem_sm_id`). No sob medida, armazem/haste/andar/nivel viram o ESPELHO do PCP (`pcp_almox_id`, `pcp_id`, migração 41): a porta (`tecido/nucleo/enderecos_pcp.js`) copia nome e ativo do PCP a cada leitura da árvore; a bancada que cria o buraco novo o cria NO PCP (R-SME-01 continua, pelo dono); renomear e desativar lá é recusado (é no PCP, 501). O rolo e a sobra guardam o nível do PCP e o nome dele (`nivel_pcp_id`, `nivel_pcp_nome`), mantidos por gatilho quando o `nivel_id` muda — o `nivel_id` de sempre e o corte não mudaram. "Um só por nível" vale entre os dois lados (o volume do PCP não entra onde há rolo, e o rolo não entra onde há volume). O painel do almoxarifado (501) mostra os volumes do PCP e os rolos e sobras do sob medida, por endereço, numa lista só.
+- Por quê:          o corte grava rolo, sobra e plano numa transação só; separar isso em dois bancos faria um corte pela metade virar tecido sumido.
+- Exceções:         porta caída: o endereço não some (o nome fica gravado no rolo e na sobra), a tela diz "sem atualização", e criar endereço no sob medida recusa (não nasce de um lado só). O PCP lista o que é dele e diz que o sob medida ficou de fora.
+- Teste que trava:  `teste_porta_almox.js` (sem o gatilho do mover, reprova 2; a conferência cega, 1; o rolo sem o nível do PCP, 6; sem ler o PCP, 4; a bancada criando só lá, reprova; o rolo ignorando o volume do PCP, 2; o volume ignorando o rolo, 1; a porta caída calada, 1; renomear lá, 1); `cd tecido && npm test` (o corte igual)
+- Status:           em código desde 07/11/2026; a migração roda no deploy, depois da fase 9.
+- História:         fase 10.
+
 ---
 
 ## O que NÃO fazer
@@ -465,5 +473,7 @@
 - ❌ Dar consumo zero com uma contagem só (é `null`)
 - ❌ Somar o mínimo com o ponto pela data, ou esquecer o que está a caminho
 - ❌ Casar item da nota por nome parecido ou por valor: só código do fornecedor ou NCM único
+- ❌ Mudar rolo, sobra ou corte de banco, ou trocar o `nivel_id` do rolo pelo id do PCP: o PCP guarda o endereço, o sob medida aponta pelo espelho (R-CMP-50)
+- ❌ Criar ou renomear endereço só no sob medida depois da migração
 - ❌ Dar entrada de tecido do sob medida no estoque do PCP, ou reabrir a entrada de rolo do sob medida: o rolo nasce lá pelo Recebimento
 - ❌ Mexer no saldo de material por volume fora do volume (ele é a soma dos volumes não encerrados), ou encerrar volume sem a saída pelo livro

@@ -1103,6 +1103,8 @@ module.exports = function(app, db){
     /* COMPRAS-E-RECEBIMENTO fase 5: o endereco e o volume (R-CMP-38 a 41). */
     if(M !== 'GET' && /\/enderecos$/.test(p) && pre('/api/almoxarifados')) return 'almoxarifado.cadastrar';
     if(/\/enderecos$/.test(p) && pre('/api/almoxarifados')) return ['almoxarifado.cadastrar','volume.movimentar','compras.ver','contagem.contar','pedido.receber'];
+    if(M !== 'GET' && pre('/api/enderecos')) return 'almoxarifado.cadastrar';   // renomear/desativar (fase 10)
+    if(/\/estoque$/.test(p) && pre('/api/almoxarifados')) return ['volume.movimentar','almoxarifado.cadastrar','compras.ver','contagem.contar'];
     if(pre('/api/enderecos')) return ['volume.movimentar','almoxarifado.cadastrar','contagem.contar'];
     if(M !== 'GET' && pre('/api/volumes')) return 'volume.movimentar';
     if(pre('/api/volumes')) return ['volume.movimentar','pedido.receber','compras.ver','almoxarifado.cadastrar'];

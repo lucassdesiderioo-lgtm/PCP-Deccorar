@@ -486,11 +486,27 @@
     async function lista(){
       var id = $('#enAlm').value; if(!id){ $('#enLista').innerHTML = ''; return; }
       var e = await api('GET', '/api/almoxarifados/' + id + '/enderecos');
-      $('#enLista').innerHTML = (e.niveis || []).length ? '<div class="cmpRola"><table class="cmpTab"><thead><tr><th>Código</th><th>Endereço</th><th>Volumes</th></tr></thead><tbody>'
-        + e.niveis.map(function(n){ return '<tr><td class="code">' + esc(n.codigo) + '</td><td>' + esc(n.nome) + '</td><td>' + n.volumes + '</td></tr>'; }).join('') + '</tbody></table></div>'
+      $('#enLista').innerHTML = (e.niveis || []).length ? '<div class="cmpRola"><table class="cmpTab"><thead><tr><th>Código</th><th>Endereço</th><th>Volumes do PCP</th><th></th></tr></thead><tbody>'
+        + e.niveis.map(function(n){ return '<tr><td class="code">' + esc(n.codigo) + '</td><td>' + esc(n.nome) + (n.ativo ? '' : ' <span class="cmpChip">desativado</span>') + '</td><td>' + n.volumes + '</td>'
+          + '<td>' + (cad ? '<button class="ghost" data-en-ren="' + n.id + '" data-nome="' + esc(n.nivel) + '">renomear</button> <button class="ghost" data-en-at="' + n.id + '" data-v="' + (n.ativo ? 0 : 1) + '">' + (n.ativo ? 'desativar' : 'reativar') + '</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>'
         : '<div class="sub">Sem endereço ainda.</div>';
+      /* O SALDO NUMA LISTA SO (fase 10, R-CMP-50): os volumes do PCP e os rolos e
+         sobras do sob medida, por endereço. Sem a ligação, a tela DIZ. */
+      var st = await api('GET', '/api/almoxarifados/' + id + '/estoque');
+      $('#enLista').insertAdjacentHTML('beforeend', '<div style="margin-top:12px;font-weight:600">O que está guardado</div>'
+        + (st.sob_medida_fora ? '<div class="cmpAvi">' + esc(st.motivo) + '</div>' : '')
+        + ((st.itens || []).length ? '<div class="cmpRola"><table class="cmpTab"><thead><tr><th>Endereço</th><th>Código</th><th>O quê</th><th>Saldo</th><th>De</th></tr></thead><tbody>'
+          + st.itens.map(function(x){ return '<tr><td>' + esc(x.endereco || 'sem endereço') + '</td><td class="code">' + esc(x.codigo) + '</td><td>' + esc(x.item) + '</td><td>' + n3(x.saldo) + ' ' + esc(x.unidade || '') + '</td><td><span class="cmpChip">' + esc(x.origem) + '</span></td></tr>'; }).join('')
+          + '</tbody></table></div>' : '<div class="sub">Nada guardado.</div>'));
     }
     $('#enAlm').onchange = lista;
+    box.addEventListener('click', async function(ev){
+      var b = ev.target.closest('[data-en-ren]');
+      if(b){ var nm = prompt('Novo nome do nível', b.getAttribute('data-nome')); if(!nm) return;
+        var r = await api('POST', '/api/enderecos/nivel/' + b.getAttribute('data-en-ren'), { nome:nm }); if(r.erro) return alert(r.erro); return lista(); }
+      var a = ev.target.closest('[data-en-at]');
+      if(a){ var r2 = await api('POST', '/api/enderecos/nivel/' + a.getAttribute('data-en-at'), { ativo:a.getAttribute('data-v') === '1' }); if(r2.erro) return alert(r2.erro); return lista(); }
+    });
     var ok2 = $('#enOk'); if(ok2) ok2.onclick = async function(){
       var sp = function(v){ return String(v || '').split(',').map(function(x){ return x.trim(); }).filter(Boolean); };
       var r = await api('POST', '/api/almoxarifados/' + $('#enAlm').value + '/enderecos', { haste:$('#enH').value, andares:sp($('#enA').value), niveis:sp($('#enN').value) });
