@@ -58,7 +58,7 @@ require('./estoque_dominio').garantirSchema(db);
 const MODULOS = ['auth','admin_telas','sku_cad_route','ajuste_route','revisao_route','painel_route','exp_route',
   'mont_route','carreg_route','saida_route','backup_route','rel_route','alvo_route','est_route','plan_route',
   'modo_route','cruz_route','cont_route','inventario_route','etq_route','correcao_route','dev_route',
-  'devcaso_route','cad_route','sku_route','compras_route','ficha_route','pedido_route','receb_route',
+  'devcaso_route','cad_route','sku_route','compras_route','ficha_route','pedido_route','receb_route','material_route',
   'ger_route','st_route','pendencias_route','acesso','teste_route'];
 const deQuem = {};
 for(const m of MODULOS){

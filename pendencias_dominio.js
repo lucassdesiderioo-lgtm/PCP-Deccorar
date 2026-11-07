@@ -87,6 +87,11 @@ const LINHAS = [
       return { n:l.length, desde:maisAntiga(l.map(x => x.cancelada_em)),
                canceladas:l.filter(x => x.de === 'cancelada').map(x => x.id) };
     } },
+  /* COMPRAS-E-RECEBIMENTO fase 1 (R-CMP-05): material sem almoxarifado padrão
+     não sabe para onde vai no Recebimento nem em que contagem entra. */
+  { chave:'material_sem_almox', nome:'Material sem almoxarifado', perm:['componente.cadastrar'], onde:{ aba:'compras' },
+    ajuda:'material cadastrado sem o almoxarifado onde ele mora',
+    contar(db){ const r = require('./material_dominio').pendencias(db).sem_almoxarifado; return { n:r.n, desde:r.desde }; } },
   { chave:'devolucoes', nome:'Devoluções', perm:['devolucao.baixar'], onde:{ aba:'dv' },
     ajuda:'devoluções esperando a baixa com reputação e motivo',
     contar(db){

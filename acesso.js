@@ -304,6 +304,32 @@ module.exports = function(app, db){
     }
   }catch(e){ console.log('[acesso] seed de cancelamento.confirmar falhou: '+e.message); }
 
+  /* ── 3-C3. AS CHAVES DA COMPRAS-E-RECEBIMENTO (spec §7, 07/11/2026) ──
+     Chave nova em banco que ja existe nao chega a ninguem (#13). A spec diz
+     quem recebe cada uma: quem JA TEM a chave de origem, por setor ou por
+     excecao concedida. Uma marca por FASE (cada fase acrescenta as dela), e
+     cada uma roda uma vez so: quem desmarcar depois nao a ve voltar. As duas
+     intransferiveis (`alcada.definir`, `certificado.gerenciar`) nao entram:
+     so o Admin Geral, que passa por nivel. */
+  const CMP_BACKFILL = [
+    ['seed_cmp_f1', [['almoxarifado.cadastrar','componente.cadastrar']]]
+  ];
+  for(const [marca, pares] of CMP_BACKFILL){
+    try{
+      if(db.prepare('SELECT 1 FROM config WHERE chave=?').get(marca)) continue;
+      db.transaction(() => {
+        for(const [nova, de] of pares){
+          db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+            SELECT setor_id, ? FROM setor_permissao WHERE chave=?`).run(nova, de);
+          db.prepare(`INSERT OR IGNORE INTO usuario_excecao (usuario_id,chave,concede)
+            SELECT usuario_id, ?, 1 FROM usuario_excecao e WHERE chave=? AND concede=1
+              AND NOT EXISTS (SELECT 1 FROM usuario_excecao x WHERE x.usuario_id=e.usuario_id AND x.chave=?)`).run(nova, de, nova);
+        }
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES (?, '1')").run(marca);
+      })();
+    }catch(e){ console.log('[acesso] backfill ' + marca + ' falhou: ' + e.message); }
+  }
+
   /* ── 3-D. A CONFERENCIA EM TRES PAPEIS (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA,
      26/09/2026) ──
      Mesma razao do 3-B: chave nova em banco que ja existe nao chega a ninguem,
@@ -1062,6 +1088,11 @@ module.exports = function(app, db){
        que esta usa prefixo: a proxima leitura de formula ja nasce coberta. */
     if(pre('/api/formulas')) return 'compras.ver';
     if(M !== 'GET' && pre('/api/fornecedores')) return 'fornecedor.cadastrar';
+    /* COMPRAS-E-RECEBIMENTO fase 1: o almoxarifado (R-CMP-38). Ler e de quem
+       cadastra material, de quem compra, recebe ("levar para") e conta. */
+    if(M !== 'GET' && pre('/api/almoxarifados')) return 'almoxarifado.cadastrar';
+    if(pre('/api/almoxarifados')) return ['almoxarifado.cadastrar','componente.cadastrar','compras.ver','pedido.receber','contagem.contar'];
+    if(eq('/api/componentes/opcoes') || eq('/api/componentes/pendencias')) return ['componente.cadastrar','compras.ver'];
     if(M !== 'GET' && pre('/api/componentes')) return 'componente.cadastrar';
     if(M !== 'GET' && pre('/api/ofertas')) return 'preco.lancar';
     // Leituras de compras: preco de fornecedor nao e leitura de operacao. Quem

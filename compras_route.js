@@ -10,6 +10,7 @@
  */
 const CUSTO = require('./custo_dominio');
 const NEC   = require('./necessidade_dominio');
+const MAT   = require('./material_dominio');
 
 const QUEM = require('./quem');
 module.exports = function(app, db){
@@ -70,8 +71,11 @@ module.exports = function(app, db){
   });
 
   /* ── COMPONENTE ─────────────────────────────────────────────────────────── */
+  /* O nome do almoxarifado vai junto (fase 1 da COMPRAS-E-RECEBIMENTO): e o
+     "levar para" do Recebimento e o filtro da Contagem. */
   app.get('/api/componentes',(req,res)=>
-    res.json(db.prepare('SELECT * FROM componente ORDER BY ativo DESC, nome').all()));
+    res.json(db.prepare(`SELECT c.*, a.nome almoxarifado_nome FROM componente c
+      LEFT JOIN almoxarifado a ON a.id=c.almoxarifado_id ORDER BY c.ativo DESC, c.nome`).all()));
 
   /* ── O CADASTRO DE MATERIAL ────────────────────────────────────────────
      Cria (sem `id`) e edita (com `id`). Ate 24/09/2026 a rota CRIAVA e nenhuma
@@ -128,6 +132,15 @@ module.exports = function(app, db){
     for(const k of ['nome','codigo','unidade','familia','marca','modelo']) if(tem(k)) campos[k]=txt(b[k]);
     if(tem('cor')) campos.cor = txt(b.cor) && String(b.cor).toUpperCase();
     if(tem('sobra_aproveitavel')) campos.sobra_aproveitavel = b.sobra_aproveitavel?1:0;
+
+    /* As colunas da fase 1 da COMPRAS-E-RECEBIMENTO (R-CMP-01 a 10): o
+       material_dominio e o dono das regras delas — modo de saldo obrigatorio
+       para nascer, como_sai 'ficha' esperando a montagem, vai_ficha que nao se
+       desmarca com o material numa ficha, e a #33 inteira. */
+    const atual = editando ? db.prepare('SELECT * FROM componente WHERE id=?').get(+b.id) : null;
+    if(editando && !atual) return res.status(404).json({erro:'material não encontrado'});
+    try{ Object.assign(campos, MAT.lerCampos(db, b, atual)); }
+    catch(e){ if(e instanceof MAT.Recusa) return res.status(e.status).json({erro:e.message}); throw e; }
     if(tem('ativo')) campos.ativo = b.ativo?1:0;
 
     /* O nome e obrigatorio para NASCER, e so. Na edicao ele segue a regra de

@@ -247,7 +247,10 @@ module.exports = [
     rotulo:'Ver custo do produto', desc:'Custo por SKU e evolução',
     sensivel:true },
   { chave:'componente.cadastrar', grupo:'Compras', tela:501, nivel:'admin',
-    rotulo:'Cadastrar componente', desc:'Insumos e matérias-primas' },
+    rotulo:'Cadastrar material', desc:'Tudo que a empresa compra: matéria-prima, tecido, embalagem, limpeza, copa…' },
+  /* COMPRAS-E-RECEBIMENTO §7. Backfill: quem tem `componente.cadastrar`. */
+  { chave:'almoxarifado.cadastrar', grupo:'Compras', tela:501, nivel:'admin',
+    rotulo:'Cadastrar almoxarifado', desc:'Criar, renomear e desativar almoxarifado e os endereços dele' },
   /* `minimo.definir` SAIU em 26/10/2026 (fase 3 da ACESSOS-UNIFICADOS,
      divida 19): nenhuma rota a lia. Quem manda no mínimo e no ideal do card
      Materiais e `componente.cadastrar` (escrever) e `compras.ver` (ler), e a

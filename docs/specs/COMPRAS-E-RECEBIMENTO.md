@@ -6,7 +6,7 @@ Situação: em construção (execução contínua das fases 1 a 11 autorizada pe
 Criada em: 06/11/2026
 Última atualização: 07/11/2026
 Fase atual: ver o diário de construção logo abaixo
-Fases: 1 ☐  2 ☐  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐  9 ☐  10 ☐  11 ☐
+Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐  9 ☐  10 ☐  11 ☐
 Decidido em 07/11/2026: fase 10 = o PCP é dono do endereço, o sob medida do rolo e
 da sobra (R-CMP-50) · fase 11 construída sem certificado, pronta para recebê-lo
 Risco: 🔴 (schema, estoque de material, custo, acesso, dado do sob medida)
@@ -45,15 +45,59 @@ Tipo: REGRA + NOVIDADE
 | `sm_boleto` como formato das parcelas | `sm_boleto` guarda o valor em **centavos** (`valor_centavos`), vencimento `AAAA-MM-DD`, `pago_em`/`pago_por` | `pagamento_parcela` usa `valor_centavos` também, para o financeiro juntar sem tradução |
 | `armazem → haste → andar → nivel` do sob medida | `armazem` tem chave texto (`ROLO`, `SOBRA`), e `rolo.nivel_id`/`sobra.nivel_id` são chave estrangeira para `nivel` do `tecido.db` | a fase 10 guarda o nível do PCP AO LADO (`nivel_pcp_id`), e não troca a chave estrangeira |
 
+### Fase 1 — o cadastro de material (07/11/2026) ☑
+
+```
+📋 PLANO
+Tipo: FASE 1 da spec COMPRAS-E-RECEBIMENTO        Risco: 🔴
+O que vai ser feito: as colunas novas do material (R-CMP-01 a 10), o almoxarifado
+  (só o nome), a categoria, o backfill, a 404 filtrando vai_ficha e Pendências de cadastro.
+O que vou mudar: compras_schema.js (colunas, almoxarifado, backfill) · material_dominio.js
+  (novo, as regras) · material_route.js (novo) · compras_route.js (POST /api/componentes
+  chama o domínio) · ficha_route.js (recusa vai_ficha=0) · cad_route.js (categorias) ·
+  pendencias_dominio.js (linha nova) · acesso.js/permissoes.js/telas.js (almoxarifado.cadastrar)
+  · public/compras_abas.js (novo) e index.html (abas da 501, 404 filtrando)
+Regra de negócio muda? SIM → antes: material nascia só com nome; todo material ia para a
+  ficha. Depois: modo de saldo obrigatório; vai_ficha separa (DECISOES.md, 06/11/2026)
+Como vou testar: teste_material.js (novo, escrito antes) e teste_acesso_compras.js (novo);
+  teste_componentes.js; defeitos reintroduzidos; a tela aberta no navegador
+Fica de fora: endereço do almoxarifado (fase 5); o uso do modo de saldo no recebimento (fase 3)
+
+🔐 ALÇADA
+Telas novas: nenhuma (a 501 ganha abas: Materiais, Almoxarifados)
+Ações novas: almoxarifado.cadastrar · admin · 501 · não sensível
+Setores novos: nenhum
+Quem recebe: quem tem componente.cadastrar (backfill da spec §7); o resto, só o Admin Geral
+```
+
+**Feito.** `teste_material.js` 57 casos; cinco defeitos reintroduzidos um a um (sem o
+modo obrigatório reprova 1; desmarcar livre, 4; "ficha" escolhível, 2; ficha aceitando o
+café, 1; sem o backfill, 1). `teste_acesso_compras.js` 10. Tela aberta a 1440 px:
+abas, lista, formulário de material novo salvando.
+
 ### Mudanças no caminho
 
 (decisões de construção que não mudam regra — nome de coluna, layout, ordem de campos)
 
 - Dinheiro das parcelas em centavos inteiros (`valor_centavos`), como o `sm_boleto`.
+- **Fase 1:** a regra do material ficou num módulo próprio (`material_dominio.js`), e não
+  dentro do `compras_route.js`; a rota chama o domínio.
+- **Fase 1:** o teste é `teste_material.js` (novo, com banco e rotas de verdade), e não
+  um acréscimo ao `teste_componentes.js`, que usa um schema copiado à mão. O
+  `teste_componentes.js` passou a criar material "por quantidade" (o modo virou obrigatório).
+- **Fase 1:** o "Adicionar" do card de mínimos saiu (criaria material sem modo de saldo);
+  o material novo nasce no formulário "+ Material novo".
+- **Fase 1:** nascem os almoxarifados "Comandos e montagem" e "Expedição" (os da §3); os
+  dois do tecido vêm na fase 10, pela migração.
+- **Fase 1:** "sem dizer, o material nasce NA ficha" (`vai_ficha = 1`): a tela mostra o
+  campo, mas a rota precisa de um valor quando ele não vem.
+- **Fase 1:** as chaves novas da spec saem da comparação com o retrato do `teste_mapa`
+  pelo nome (`perfis_acesso.NASCERAM_DEPOIS`), como a `coleta.horario`: elas chegam a
+  quem já tinha a chave de origem, por decisão da spec §7.
 
 ### Achei no caminho (não mexi)
 
-(nada ainda)
+<!-- fim do diário -->
 
 
 > Nasceu da conversa no Projeto "PCP - Deccorar" em 06/11/2026.

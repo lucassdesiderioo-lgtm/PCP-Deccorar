@@ -111,7 +111,13 @@ const CHAVES_DEV = ['devolucao.registrar','devolucao.acompanhar','devolucao.lanc
    dele e de mais ninguém. Ela sai da comparação pelo NOME, uma a uma; a outra
    ponta (ninguém mais a recebe) é travada no `teste_acesso.js` e no teste da
    própria entrega. */
-const NASCERAM_DEPOIS = ['coleta.horario'];   // HORARIOS-DE-COLETA, 05/11/2026
+const NASCERAM_DEPOIS = ['coleta.horario',   // HORARIOS-DE-COLETA, 05/11/2026
+  /* COMPRAS-E-RECEBIMENTO (07/11/2026): estas chegam a quem JA TINHA a chave de
+     origem (backfill da spec §7) — e o setor Admin nativo nasce com toda chave
+     de nivel admin. Saem da comparacao pelo nome; quem recebe cada uma e
+     travado no teste_acesso.js. */
+  'almoxarifado.cadastrar','pedido.aprovar','nota.lancar','recebimento.liberar','volume.movimentar',
+  'alcada.definir','certificado.gerenciar'];
 function comparar(antes, agora){
   if(!antes) return 'sem retrato de antes';
   /* A 203 Subir PDF SAIU em 05/11/2026 (decisão do dono, D2): o endereço

@@ -75,7 +75,7 @@ const TELAS = [
   { n:404, nome:'Ficha técnica',         rota:'/admin/ficha',   nivel:'admin',      onde:'computador', perms:['modelo.cadastrar','custo.ver','compras.ver'], aba:'ficha' },
   // ── 500 · Compras ──
   { n:501, nome:'Compras',               rota:'/admin/compras', nivel:'admin',      onde:'computador',
-    perms:['compras.ver','fornecedor.cadastrar','preco.lancar','pedido.criar','pedido.pagar','componente.cadastrar'], aba:'compras' },
+    perms:['compras.ver','fornecedor.cadastrar','preco.lancar','pedido.criar','pedido.pagar','componente.cadastrar','almoxarifado.cadastrar'], aba:'compras' },
   { n:502, nome:'Recebimento',           rota:'/recebimento',   nivel:'operacao',   onde:'tablet',     perms:['pedido.receber'],        area:'recebimento' },
   // ── 600 · Sob medida: as telas moram em tecido/nucleo/telas.js (numero e nivel la) ──
   // ── 700 · Frota e 800 · Mercado Livre: reservados para as specs deles ──

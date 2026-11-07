@@ -47,7 +47,24 @@ const COLUNAS_COMPONENTE = [
      com id, nome e unidade. Vazio nunca trava nada: o campo so nao sai no
      papel. */
   ['marca',              'TEXT'],
-  ['modelo',             'TEXT']
+  ['modelo',             'TEXT'],
+  /* O CADASTRO DE MATERIAL (spec COMPRAS-E-RECEBIMENTO, fase 1, 07/11/2026):
+     componente passa a ser TUDO que a empresa compra (R-CMP-01). Nenhuma destas
+     colunas decide nada sozinha com o valor que ninguem escolheu (armadilha
+     #30): `modo_saldo` nasce NULL e a rota exige a escolha; os que ja existiam
+     recebem o que eles sao hoje no backfill de uma vez so, logo abaixo. */
+  ['categoria',          'TEXT'],                  // lista `categoria_material` (R-CMP-04)
+  ['vai_ficha',          'INTEGER'],               // a ficha so oferece = 1 (R-CMP-02)
+  ['modo_saldo',         'TEXT'],                  // sem | quantidade | volume (R-CMP-03)
+  ['almoxarifado_id',    'INTEGER'],               // onde ele mora (R-CMP-05)
+  ['um_por_nivel',       'INTEGER DEFAULT 0'],     // cada nivel guarda um volume (R-CMP-06)
+  ['peso_padrao_kg',     'REAL'],                  // peso de 1 unidade (R-CMP-07)
+  ['tol_aviso_pct',      'REAL DEFAULT 2'],
+  ['tol_retem_pct',      'REAL DEFAULT 5'],
+  ['ncm',                'TEXT'],                  // 8 digitos, casa o XML (R-CMP-08)
+  ['como_sai',           "TEXT DEFAULT 'contagem'"], // contagem | ficha (esperando a montagem, R-CMP-09)
+  ['contagem_dias',      'INTEGER DEFAULT 30'],    // frequencia da contagem (R-CMP-42)
+  ['margem_dias',        'INTEGER DEFAULT 5']      // folga do "pedir ate" (R-CMP-47)
 ];
 
 const COLUNAS_SKU = [
@@ -58,6 +75,31 @@ const COLUNAS_SKU = [
   ['tem_ficha',    'INTEGER DEFAULT 1'],
   ['custo_direto', 'REAL']                       // so quando tem_ficha = 0
 ];
+
+/* O BACKFILL DA FASE 1 (R-CMP-03): os materiais que ja existiam recebem o que
+   eles sao hoje — vao para a ficha e tem saldo por quantidade; o tecido (com
+   `familia`) e volume, um por nivel. UMA VEZ SO (marca em `config`): rodar de
+   novo desfaria o que alguem desmarcou depois. O `config` e criado aqui
+   tambem, porque este arquivo roda no boot do db.js, antes do modulo que o cria
+   (a licao do §17 e da armadilha #28). */
+function backfillMaterial(db){
+  try{
+    db.exec('CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT)');
+    if(db.prepare("SELECT 1 FROM config WHERE chave='cmp_material_backfill_1'").get()) return;
+    db.transaction(() => {
+      db.prepare('UPDATE componente SET vai_ficha=1 WHERE vai_ficha IS NULL').run();
+      db.prepare("UPDATE componente SET modo_saldo='volume', um_por_nivel=1 WHERE modo_saldo IS NULL AND familia IS NOT NULL").run();
+      db.prepare("UPDATE componente SET modo_saldo='quantidade' WHERE modo_saldo IS NULL").run();
+      db.prepare("UPDATE componente SET como_sai='contagem' WHERE como_sai IS NULL").run();
+      /* Os dois almoxarifados que a fabrica ja tem fora do sob medida (§3 da
+         spec). Os do tecido (ROLO e SOBRA) chegam pela migracao da fase 10. */
+      for(const [nome, fin] of [['Comandos e montagem','comando, emenda, limitador, fita crepe'],
+                                ['Expedição','parafuso, bucha, fita durex']])
+        db.prepare('INSERT OR IGNORE INTO almoxarifado (nome, finalidade) VALUES (?,?)').run(nome, fin);
+      db.prepare("INSERT INTO config (chave,valor) VALUES ('cmp_material_backfill_1','1')").run();
+    })();
+  }catch(e){ console.log('[compras] backfill do cadastro de material falhou: ' + e.message); }
+}
 
 function garantirSchemaCompras(db){
   db.exec(`
@@ -70,6 +112,21 @@ function garantirSchemaCompras(db){
       estoque   REAL DEFAULT 0,
       ativo     INTEGER DEFAULT 1,
       criado_em TEXT DEFAULT (datetime('now','localtime'))
+    );
+
+    /* ── ALMOXARIFADO (spec COMPRAS-E-RECEBIMENTO, R-CMP-38, fase 1) ─────────
+       Quantos a empresa quiser, criados pela tela (501, aba Almoxarifados). Na
+       fase 1 so o NOME (e onde o material mora); o endereco haste -> andar ->
+       nivel entra na fase 5. Com material dentro nao se apaga: desativa. */
+    CREATE TABLE IF NOT EXISTS almoxarifado (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      local       TEXT,
+      finalidade  TEXT,
+      ativo       INTEGER DEFAULT 1,
+      criado_em   TEXT DEFAULT (datetime('now','localtime')),
+      criado_por  TEXT,
+      criado_por_id INTEGER
     );
 
     /* ── FORNECEDOR (§9) ──────────────────────────────────────────────────── */
@@ -332,6 +389,7 @@ function garantirSchemaCompras(db){
     }
   };
   colunas('componente', COLUNAS_COMPONENTE);
+  backfillMaterial(db);
   colunas('skus', COLUNAS_SKU);
   /* §17: coluna nova entra no CREATE do modulo dono E no ALTER, no mesmo commit,
      acrescentada NO FIM — que e onde o SQLite a coloca, e e o que mantem a ordem

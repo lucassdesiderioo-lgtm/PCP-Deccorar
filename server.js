@@ -149,6 +149,9 @@ require('./compras_route')(app, db);
 require('./ficha_route')(app, db);
 require('./pedido_route')(app, db);
 require('./receb_route')(app, db);
+/* COMPRAS-E-RECEBIMENTO (07/11/2026): o almoxarifado e as opcoes do cadastro
+   de material (fase 1). Depois do compras_route, dono do `componente`. */
+require('./material_route')(app, db);
 app.get('/recebimento',(req,res)=>res.sendFile(path.join(__dirname,'public','recebimento.html')));
 require('./ger_route')(app, db);
 require('./st_route')(app, db);

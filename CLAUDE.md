@@ -1458,6 +1458,32 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 | Mínimos são placeholder | Foram semeados com um valor padrão ("depois eu edito"). Enquanto forem, o gatilho 1 vence quase sempre e a demanda quase não aparece na lista — não é bug da fase 6, é dado a revisar |
 | Modelo ACESSORIO sem ficha | Os dois kits têm venda e nenhuma linha de ficha. Ou lançam ficha, ou viram `tem_ficha=0` (revenda) com custo direto |
 
+
+## 7-C. Compras e Recebimento — a spec nova (desde 07/11/2026)
+
+> Spec `docs/specs/COMPRAS-E-RECEBIMENTO.md` (fases 1 a 11). **As regras estão em
+> [`docs/regras/compras.md`](docs/regras/compras.md)** (cartões R-CMP), e o porquê
+> em [`docs/historia/compras.md`](docs/historia/compras.md). A §2 da spec substitui
+> parte das decisões do `COMPRAS.md` (§7-B acima); o resto do §7-B continua.
+
+| Dono único | O quê |
+|---|---|
+| `material_dominio.js` | as regras das colunas novas do material e o almoxarifado (fase 1) |
+
+> ⚠️ **MATERIAL NOVO NÃO NASCE SEM O MODO DE SALDO** (R-CMP-03, armadilha #30):
+> o `POST /api/componentes` sem `modo_saldo` é 400. Os de antes receberam o modo
+> num backfill de uma vez só (`config.cmp_material_backfill_1`) — rodá-lo de novo
+> desfaria o que alguém mudou depois.
+>
+> ⚠️ **`como_sai = 'ficha'` É RECUSADO DE PROPÓSITO** até a montagem existir
+> (R-CMP-09): é a regra que diz que está esperando.
+>
+> ⚠️ **A FICHA RECUSA NO SERVIDOR o material com `vai_ficha = 0`** — esconder da
+> lista da 404 não basta (R-CMP-02).
+
+**Rode `node teste_material.js` e `node teste_acesso_compras.js` ao mexer no
+cadastro de material, no almoxarifado ou nas chaves de Compras.**
+
 ---
 
 ## 8. Horário de corte e despacho
