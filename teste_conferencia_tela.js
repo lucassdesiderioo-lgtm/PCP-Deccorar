@@ -57,7 +57,7 @@ app.locals.acesso = { podePermissao(u, c){ return !!(u && (PERMS[u.id] || []).in
 app.use((req, res, next) => { req.usuario = { id:QUEM, nome:NOMES[QUEM] }; next(); });
 app.get('/api/auth/eu', (req, res) => res.json({ logado:true, nome:NOMES[QUEM], destino:{} }));
 app.get('/api/auth/pessoas', (req, res) => res.json(db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all()));
-app.get('/api/teste', (req, res) => res.json({ ativo:false }));
+app.get('/api/teste/ativo', (req, res) => res.json({ ativo:false }));
 require('./exp_route')(app, db);
 require('./carreg_route')(app, db);
 require('./saida_route')(app, db);
