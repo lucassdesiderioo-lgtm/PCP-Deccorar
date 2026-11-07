@@ -42,3 +42,17 @@ tubos podem bater na contagem com material mais fino.
   Hoje ausente preserva.
 - **`nota.lancar` entrou na fase 2**, e não na 4: a poda das parcelas
   (R-CMP-27) já a pergunta.
+
+## Fase 3 — o recebimento (07/11/2026)
+
+- **A 502 virou contagem cega.** A tela antiga mostrava "Pedido: N" e já vinha
+  com o número preenchido — quem conferia só confirmava. Hoje quem conta digita.
+- **A régua do histórico entrou ao lado das duas da spec.** A R-CMP-35 diz que o
+  lote fora da média é divergência; a média dos fatores medidos virou a terceira
+  régua, e vale a pior das três. O teste da régua da nota sozinha teve de usar um
+  material sem histórico: com histórico, a terceira régua cobria a falta da
+  segunda, e o defeito reintroduzido passava verde.
+- **"Sem saldo" não guarda estoque.** O café entra e sai na mesma hora, e o
+  custo médio dele é a média de todas as compras — senão seria o preço da última.
+- **O redesenho da 502 guarda o digitado** (a lição do §12): os campos são lidos
+  na hora de confirmar, e um toque que redesenha devolve o que estava escrito.

@@ -192,6 +192,88 @@
 - Status:           em código desde 07/11/2026.
 - História:         fase 2.
 
+## E. Recebimento (fase 3)
+
+### R-CMP-28 · Quem recebe não vê preço
+- Regra:            a fila (`GET /api/recebimento/aguardando`) e a resposta do receber montam o JSON sem nenhum campo de preço, valor ou custo — escolhidos campo a campo no `recebimento_dominio.fila`.
+- Por quê:          quem confere vendo valor confirma o que está escrito.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_recebimento.js`
+- Status:           em código desde 07/11/2026 (mantida do COMPRAS.md).
+- História:         fase 3.
+
+### R-CMP-29 · O rigor depende do modo de saldo
+- Regra:            `sem`: mostra o pedido e o botão "chegou tudo" (ou digita o que veio). `quantidade`: contagem CEGA — a fila não traz o pedido nem o declarado. `volume`: um registro por volume, com a metragem da etiqueta do fornecedor (a etiqueta da casa e o endereço são da fase 5). O material "sem saldo" entra e sai na mesma hora (não guarda estoque), e o custo médio dele é a média ponderada de todas as compras.
+- Por quê:          café não se conta como tubo.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_recebimento.js` (a fila mostrando o pedido, reprova 1)
+- Status:           em código desde 07/11/2026.
+- História:         fase 3.
+
+### R-CMP-30 · Compra por kg: pesagem obrigatória e cega
+- Regra:            item comprado em `kg` exige o peso de 1 unidade e o peso de 10; sem os dois, o recebimento não fecha (400). A tela não mostra o peso esperado.
+- Por quê:          a contagem bate e o material é pior.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_recebimento.js` (pesagem opcional, reprova 16)
+- Status:           em código desde 07/11/2026.
+- História:         fase 3.
+
+### R-CMP-31 · As réguas do peso, e vale a pior
+- Regra:            medido = peso de 10 ÷ 10. Nota = kg do pedido (menos o que já chegou dele) ÷ contados. Cadastro = `peso_padrao_kg`. Histórico = a média dos fatores medidos antes (R-CMP-35). Vale o PIOR desvio.
+- Por quê:          a do cadastro pega quem fatura errado; a da nota funciona sem cadastro.
+- Exceções:         sem cadastro nem histórico, só a da nota.
+- Teste que trava:  `teste_recebimento.js` (só a régua do cadastro, reprova 3)
+- Status:           em código desde 07/11/2026.
+- História:         fase 3.
+
+### R-CMP-32 · Tolerância em três faixas
+- Regra:            até `tol_aviso_pct` entra normal; até `tol_retem_pct` entra no saldo e vai para ciência; acima — ou contagem diferente da quantidade declarada — RETÉM: não entra no saldo.
+- Por quê:          numa compra de R$ 40–50 mil o material pior não pode passar.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_recebimento.js` (sem a faixa de aviso, reprova; contagem ≠ declarado passando, reprova)
+- Status:           em código desde 07/11/2026.
+- História:         fase 3.
+
+### R-CMP-33 · O retido sai com um toque, nunca fica preso
+- Regra:            quem tem `recebimento.liberar` (501, aba Recebimento retido) escolhe aceitar, aceitar e reclamar, ou devolver, com motivo; grava quem e quando. Devolver não entra e continua a caminho. O aviso recebe "dar ciência". Retidos e avisos têm linha na central de Pendências.
+- Por quê:          trava que sabe liberar (armadilha #6).
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_recebimento.js` (retido entrando, reprova 8; sem motivo, 4); `teste_acesso_compras.js`
+- Status:           em código desde 07/11/2026.
+- História:         fase 3.
+
+### R-CMP-34 · O custo é por unidade recebida
+- Regra:            na compra por kg, o valor do item ÷ o que chegou contado (400 kg, 590 tubos: ÷ 590). Na entrega parcial depois da primeira, pelo declarado — a conta exata é da nota (fase 4). Fora do kg, o preço da embalagem ÷ o fator.
+- Por quê:          o tubo que faltou encarece os que vieram.
+- Exceções:         ver acima.
+- Teste que trava:  `teste_recebimento.js` (pelo declarado, reprova 1)
+- Status:           em código desde 07/11/2026.
+- História:         fase 3.
+
+### R-CMP-35 · O fator real vira histórico
+- Regra:            todo recebimento por kg grava `fator_real` (kg por unidade). A média dos últimos 10 é a terceira régua do peso e a sugestão de quantos kg pedir (fase 7).
+- Por quê:          lote fora da média é divergência.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_recebimento.js`
+- Status:           em código desde 07/11/2026.
+- História:         fase 3.
+
+### R-CMP-36 · O prazo do fornecedor é medido
+- Regra:            dias entre `comprado_em` e o primeiro recebimento de cada pedido, por fornecedor e por material, média das últimas 5. Com 3 recebimentos ou mais vale o medido; abaixo, o digitado (oferta ou fornecedor) — e a resposta diz qual (`fonte`).
+- Por quê:          o prazo digitado não era de ninguém medir.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_recebimento.js` (sempre o digitado, reprova 2)
+- Status:           em código desde 07/11/2026.
+- História:         fase 3.
+
+### R-CMP-37 · "Levar para"
+- Regra:            a fila mostra o almoxarifado padrão de cada item; quem recebe pode escolher outro, e o lugar real fica gravado (`recebimento_item.almoxarifado_id`). Não é trava.
+- Por quê:          o material mora em vários lugares.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_recebimento.js`
+- Status:           em código desde 07/11/2026.
+- História:         fase 3.
+
 ---
 
 ## O que NÃO fazer
@@ -203,3 +285,5 @@
 - ❌ Voltar a gravar `enviado` como status de pedido, ou pôr na fila do Recebimento pedido que não está comprado
 - ❌ Mandar Pix, banco ou conta do fornecedor, ou as parcelas, a quem não pode ver (a poda é no JSON)
 - ❌ Deixar a compra rápida passar por fora da alçada
+- ❌ Mandar à fila do Recebimento o pedido, o declarado ou o peso esperado do item por quantidade: a contagem é cega
+- ❌ Dar entrada no saldo do retido antes de alguém decidir

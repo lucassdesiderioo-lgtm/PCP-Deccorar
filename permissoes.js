@@ -236,6 +236,11 @@ module.exports = [
     rotulo:'Ver pedidos em aberto', desc:'O que está a caminho, sem preço' },
   { chave:'pedido.receber',       grupo:'Compras', tela:502, nivel:'operacao',
     rotulo:'Registrar recebimento', desc:'Conferir a entrega e dar entrada no estoque' },
+  /* COMPRAS-E-RECEBIMENTO R-CMP-33: decidir o retido (aceitar, aceitar e
+     reclamar, devolver) e dar ciencia do aviso. Backfill: quem tem pedido.criar. */
+  { chave:'recebimento.liberar',  grupo:'Compras', tela:501, nivel:'admin',
+    rotulo:'Liberar recebimento retido', desc:'Aceitar, aceitar e reclamar ou devolver a entrega retida; dar ciência do aviso de peso',
+    sensivel:true },
   { chave:'pedido.devolver',      grupo:'Compras', tela:502, nivel:'operacao',
     rotulo:'Devolver ao fornecedor', desc:'Recusar item na conferência, com motivo' },
   { chave:'pedido.pagar',         grupo:'Compras', tela:501, nivel:'admin',

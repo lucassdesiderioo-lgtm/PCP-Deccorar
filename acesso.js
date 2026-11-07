@@ -313,7 +313,8 @@ module.exports = function(app, db){
      so o Admin Geral, que passa por nivel. */
   const CMP_BACKFILL = [
     ['seed_cmp_f1', [['almoxarifado.cadastrar','componente.cadastrar']]],
-    ['seed_cmp_f2', [['pedido.aprovar','pedido.criar'], ['nota.lancar','pedido.pagar']]]
+    ['seed_cmp_f2', [['pedido.aprovar','pedido.criar'], ['nota.lancar','pedido.pagar']]],
+    ['seed_cmp_f3', [['recebimento.liberar','pedido.criar']]]
   ];
   for(const [marca, pares] of CMP_BACKFILL){
     try{
@@ -1110,6 +1111,10 @@ module.exports = function(app, db){
     // vem — e por isso a leitura NAO carrega preco (regra 14 do §13).
     // Recebimento (§8): a tela e as rotas de conferencia sao de OPERACAO e nao
     // carregam preco. Lancar o preco da nota e do Comprador.
+    /* COMPRAS-E-RECEBIMENTO fase 3: o retido e o aviso (R-CMP-33), o prazo medido. */
+    if(eq('/api/recebimento/retidos')) return ['recebimento.liberar','compras.ver'];
+    if(M !== 'GET' && pre('/api/recebimento/itens')) return 'recebimento.liberar';
+    if(eq('/api/compras/prazo')) return ['compras.ver','pedido.criar'];
     if(eq('/recebimento')) return 'pedido.receber';
     if(eq('/api/recebimento/aguardando')) return 'pedido.ver';
     if(M !== 'GET' && /\/preco$/.test(p) && pre('/api/recebimento')) return 'preco.lancar';

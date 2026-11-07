@@ -153,6 +153,7 @@ require('./receb_route')(app, db);
    de material (fase 1). Depois do compras_route, dono do `componente`. */
 require('./material_route')(app, db);
 require('./compra_route')(app, db);   // comprar, alcada, parcelas, anexos, compra rapida (fase 2)
+require('./recebimento_route')(app, db);   // retidos, decidir, ciencia, prazo medido (fase 3)
 app.get('/recebimento',(req,res)=>res.sendFile(path.join(__dirname,'public','recebimento.html')));
 require('./ger_route')(app, db);
 require('./st_route')(app, db);

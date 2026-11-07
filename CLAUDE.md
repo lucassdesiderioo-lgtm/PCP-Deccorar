@@ -1470,6 +1470,7 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 |---|---|
 | `material_dominio.js` | as regras das colunas novas do material e o almoxarifado (fase 1) |
 | `compra_dominio.js` | o caminho do pedido depois do rascunho, a alçada, as parcelas e a compra rápida (fase 2) |
+| `recebimento_dominio.js` | a fila sem preço, a contagem cega, a pesagem, as réguas e as faixas, o retido, o custo por recebido, o fator real e o prazo medido (fase 3) |
 
 > ⚠️ **MATERIAL NOVO NÃO NASCE SEM O MODO DE SALDO** (R-CMP-03, armadilha #30):
 > o `POST /api/componentes` sem `modo_saldo` é 400. Os de antes receberam o modo
@@ -1490,9 +1491,14 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 > ⚠️ **PARCELAS E DADOS DE PAGAMENTO DO FORNECEDOR SÃO PODADOS NO JSON** (R-CMP-12,
 > R-CMP-27): parcelas só a `custo.ver`, `nota.lancar` ou `pedido.pagar`; Pix, banco e
 > conta só a `pedido.pagar`.
+>
+> ⚠️ **A 502 É CONTAGEM CEGA** (R-CMP-29): a fila não traz o pedido, o declarado
+> nem o peso esperado do item por quantidade — e não é esquecimento. O retido
+> (peso acima da tolerância, ou contagem ≠ declarado) **não entra no saldo** até
+> alguém com `recebimento.liberar` decidir, com motivo (501, aba Recebimento retido).
 
-**Rode `node teste_material.js`, `node teste_pedido_compra.js` e `node
-teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no
+**Rode `node teste_material.js`, `node teste_pedido_compra.js`, `node
+teste_recebimento.js` e `node teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no
 pedido, no fornecedor ou nas chaves de Compras.**
 
 ---

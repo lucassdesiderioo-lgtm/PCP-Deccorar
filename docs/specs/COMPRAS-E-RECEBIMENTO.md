@@ -6,7 +6,7 @@ Situação: em construção (execução contínua das fases 1 a 11 autorizada pe
 Criada em: 06/11/2026
 Última atualização: 07/11/2026
 Fase atual: ver o diário de construção logo abaixo
-Fases: 1 ☑  2 ☑  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐  9 ☐  10 ☐  11 ☐
+Fases: 1 ☑  2 ☑  3 ☑  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐  9 ☐  10 ☐  11 ☐
 Decidido em 07/11/2026: fase 10 = o PCP é dono do endereço, o sob medida do rolo e
 da sobra (R-CMP-50) · fase 11 construída sem certificado, pronta para recebê-lo
 Risco: 🔴 (schema, estoque de material, custo, acesso, dado do sob medida)
@@ -108,6 +108,38 @@ alçada reprova 9; qualquer um aprovando, 4; sem motivo, 3; parcelas sem poda, 1
 poda, 1; pago sem derivar, 1; compra rápida furando a alçada, 2; sem a migração, 2; sem o
 nº externo, 12). `teste_acesso_compras.js` 30. Tela: pedido por kg comprado pela 501.
 
+### Fase 3 — o recebimento (07/11/2026) ☑
+
+```
+📋 PLANO
+Tipo: FASE 3 da spec COMPRAS-E-RECEBIMENTO        Risco: 🔴
+O que vai ser feito: a 502 nova — fila de comprados sem preço e sem o esperado, os três
+  modos, contagem cega, pesagem obrigatória por kg, as réguas e as três faixas, retenção e
+  liberação (501 e Pendências), custo por unidade recebida, fator real, prazo medido,
+  "levar para".
+O que vou mudar: compras_schema.js (recebimento_item) · recebimento_dominio.js e
+  recebimento_route.js (novos) · receb_route.js (a fila e o receber delegam ao domínio) ·
+  public/recebimento.html (o script inteiro) · public/compras_abas.js (aba Recebimento
+  retido, prazo na aba Fornecedores) · pendencias_dominio.js · acesso/permissoes
+Regra de negócio muda? SIM → antes: a 502 mostrava o pedido e entrava tudo. Depois:
+  contagem cega, pesagem por kg, retenção (DECISOES.md 06/11)
+Como vou testar: teste_recebimento.js (novo, antes do código); defeitos reintroduzidos;
+  a 502 e a aba nova abertas no navegador
+Fica de fora: a etiqueta e o endereço do volume (fase 5); o custo pela nota (fase 4)
+
+🔐 ALÇADA
+Telas novas: nenhuma (a 502 muda; a 501 ganha a aba Recebimento retido)
+Ações novas: recebimento.liberar · admin · 501 · sensível
+Setores novos: nenhum
+Quem recebe: quem tem pedido.criar (backfill da spec §7)
+```
+
+**Feito.** `teste_recebimento.js` 56 casos; nove defeitos reintroduzidos (a fila mostrando
+o pedido reprova 1; pesagem opcional, 16; só a régua do cadastro, 3; retido entrando, 8;
+custo pelo declarado, 1; contagem ≠ declarado passando, reprova; prazo sempre digitado, 2;
+decidir sem motivo, 4; sem a faixa de aviso, reprova). Tela: a 502 a 1024 px, sem
+rolagem de lado; a aba Recebimento retido mostrando o retido com as réguas.
+
 ### Mudanças no caminho
 
 (decisões de construção que não mudam regra — nome de coluna, layout, ordem de campos)
@@ -139,6 +171,20 @@ nº externo, 12). `teste_acesso_compras.js` 30. Tela: pedido por kg comprado pel
 - **Fase 2:** o `teste_quem.js` conferia que o `pedido_compra` terminava em
   `criado_por_id,pago_por_id`; as colunas da fase 2 entram depois, na mesma ordem no
   banco novo e no antigo, e o esperado passou a listá-las.
+- **Fase 3:** uma terceira régua do peso, a média dos fatores medidos (R-CMP-35: "lote fora
+  da média é divergência"); vale a pior das três.
+- **Fase 3:** na entrega parcial por kg, a régua da nota usa o kg do pedido menos o que já
+  chegou dele, e o custo da segunda entrega em diante é pelo declarado (a conta exata vem
+  com a nota, fase 4).
+- **Fase 3:** a contagem "diferente do declarado" é cumulativa (o que já chegou + o desta
+  entrega): a entrega parcial de propósito também fica retida, e sai com um toque.
+- **Fase 3:** o material "sem saldo" entra e sai no mesmo recebimento (motivo `consumo`), e o
+  custo médio dele é a média ponderada de todas as compras.
+- **Fase 3:** o item com entrega retida esperando decisão sai da fila do Recebimento até
+  alguém decidir (para não ser recebido duas vezes).
+- **Fase 3:** a decisão do retido grava `decidido_por_id` além do nome (a spec listava só o nome).
+- **Fase 3:** a tela antiga mandava "embalagens recebidas"; a rota ainda aceita (tablet com
+  cache), convertendo pelo fator.
 
 ### Achei no caminho (não mexi)
 

@@ -31,100 +31,19 @@ module.exports = function(app, db){
   };
   const num = v => { const n=parseFloat(String(v==null?'':v).replace(',','.')); return Number.isFinite(n)?n:null; };
 
-  /* ── O QUE ESTA A CAMINHO — a tela do Recebimento, SEM PRECO ─────────────── */
-  app.get('/api/recebimento/aguardando',(req,res)=>{
-    const pedidos=db.prepare(`SELECT p.id, p.numero, p.status, p.previsao, p.enviado_em, f.nome fornecedor
-      FROM pedido_compra p LEFT JOIN fornecedor f ON f.id=p.fornecedor_id
-      WHERE p.status IN ('comprado','parcial') ORDER BY COALESCE(p.comprado_em,p.enviado_em)`).all();
-    for(const p of pedidos){
-      /* Repare no SELECT: nem preco_unit, nem valor. O Recebimento nao recebe
-         preco nem pelo fio. */
-      p.itens=db.prepare(`SELECT i.id, COALESCE(c.nome, i.sku) item, c.unidade, i.embalagem, i.fator,
-          i.qtd_embalagem, i.qtd_consumo, i.qtd_recebida, i.status
-        FROM pedido_item i LEFT JOIN componente c ON c.id=i.componente_id
-        WHERE i.pedido_id=? AND i.status IN ('aberto','parcial') ORDER BY i.id`).all(p.id);
-      for(const i of p.itens){
-        i.falta_consumo = Math.max(0, (i.qtd_consumo||0) - (i.qtd_recebida||0));
-        i.falta_embalagem = i.fator ? i.falta_consumo / i.fator : i.falta_consumo;
-      }
-    }
-    res.json(pedidos.filter(p=>p.itens.length));
-  });
-
-  /* ── CONFERIR ────────────────────────────────────────────────────────────────
-     Corpo: { pedido_id, nota_fiscal, nota_data, itens:[{pedido_item_id,
-              embalagens_recebidas, embalagens_devolvidas, motivo_devolucao}] } */
+  /* ── A FILA E O RECEBER (COMPRAS-E-RECEBIMENTO fase 3) ─────────────────────
+     O recebimento_dominio.js e o dono: a fila sem preco e sem o esperado
+     (contagem cega), os tres modos, a pesagem cega da compra por kg, as reguas,
+     as faixas e a retencao. As rotas ficam aqui, no mesmo lugar e na mesma
+     ordem de registro de sempre. */
+  const RD = require('./recebimento_dominio');
+  app.get('/api/recebimento/aguardando',(req,res)=> res.json(RD.fila(db)));
   app.post('/api/recebimento',(req,res)=>{
-    const b=req.body||{};
-    const ped=db.prepare('SELECT id,numero,status FROM pedido_compra WHERE id=?').get(b.pedido_id);
-    if(!ped) return res.status(404).json({erro:'pedido não encontrado'});
-    if(ped.status!=='comprado' && ped.status!=='parcial')
-      return res.status(400).json({erro:'este pedido não está aguardando entrega ('+ped.status+')'});
-    const itens=Array.isArray(b.itens)?b.itens:[];
-    if(!itens.length) return res.status(400).json({erro:'informe o que chegou'});
-
-    const MOTIVOS=['fora_medida','defeito','veio_errado','qtd_a_mais'];
-    const prep=[];
-    for(const it of itens){
-      const pi=db.prepare(`SELECT i.*, c.nome componente_nome FROM pedido_item i
-        LEFT JOIN componente c ON c.id=i.componente_id WHERE i.id=? AND i.pedido_id=?`).get(it.pedido_item_id, ped.id);
-      if(!pi) return res.status(400).json({erro:'item '+it.pedido_item_id+' não é deste pedido'});
-      const rec=num(it.embalagens_recebidas)||0, dev=num(it.embalagens_devolvidas)||0;
-      if(rec<0||dev<0) return res.status(400).json({erro:'quantidade negativa em '+(pi.componente_nome||pi.sku)});
-      if(dev>0 && MOTIVOS.indexOf(it.motivo_devolucao)<0)
-        return res.status(400).json({erro:'devolução de '+(pi.componente_nome||pi.sku)+' precisa de motivo'});
-      if(rec===0 && dev===0) continue;
-      prep.push({pi, rec, dev, motivo: dev>0 ? it.motivo_devolucao : null});
-    }
-    if(!prep.length) return res.status(400).json({erro:'nada foi informado como recebido ou devolvido'});
-
-    let recId, entradas=0, devolvidos=0;
-    db.transaction(()=>{
-      const r=db.prepare(`INSERT INTO recebimento (pedido_id,nota_fiscal,nota_data,recebido_por,recebido_por_id)
-        VALUES (?,?,?,?,?)`).run(ped.id, (b.nota_fiscal||'').trim()||null,
-          (b.nota_data||'').trim()||null, usuario(req), QUEM.idDe(req));
-      recId=r.lastInsertRowid;
-      const insI=db.prepare(`INSERT INTO recebimento_item (recebimento_id,pedido_item_id,
-        qtd_embalagem,qtd_consumo,qtd_devolvida,motivo_devolucao,divergencia) VALUES (?,?,?,?,?,?,?)`);
-
-      for(const p of prep){
-        const qtdConsumo=p.rec*(p.pi.fator||1);
-        const devConsumo=p.dev*(p.pi.fator||1);
-        const recebidaTotal=(p.pi.qtd_recebida||0)+qtdConsumo;
-        const diverg=(recebidaTotal!==p.pi.qtd_consumo)?'quantidade':'nenhuma';
-        insI.run(recId, p.pi.id, p.rec, qtdConsumo, devConsumo, p.motivo, diverg);
-
-        if(qtdConsumo>0 && p.pi.componente_id){
-          /* Entra no estoque com o preco CONGELADO do pedido. Se a nota cobrar
-             diferente, o comprador lanca depois e o custo medio e corrigido —
-             tudo dentro de componente_dominio.js. */
-          DOM.entrada(db,{ componente_id:p.pi.componente_id, delta:qtdConsumo,
-            custo_unit:(p.pi.preco_unit||0)/(p.pi.fator||1),
-            referencia:ped.numero, usuario_nome:usuario(req), usuario_id:QUEM.idDe(req) });
-          entradas++;
-        }
-        if(devConsumo>0) devolvidos++;
-
-        /* Regra 15: parcial mantem o item ABERTO. E o saldo em aberto e o que
-           se cobra do fornecedor — sem ele a falta some do sistema e vira
-           conversa de memoria. O devolvido NAO conta como recebido. */
-        const st=(recebidaTotal>=p.pi.qtd_consumo)?'recebido':(recebidaTotal>0?'parcial':'aberto');
-        db.prepare('UPDATE pedido_item SET qtd_recebida=?, status=? WHERE id=?')
-          .run(recebidaTotal, st, p.pi.id);
-      }
-
-      const abertos=db.prepare(`SELECT COUNT(*) c FROM pedido_item
-        WHERE pedido_id=? AND status IN ('aberto','parcial')`).get(ped.id).c;
-      db.prepare('UPDATE pedido_compra SET status=? WHERE id=?')
-        .run(abertos?'parcial':'recebido', ped.id);
-    })();
-
-    auditar(req,'recebimento',ped.numero,
-      entradas+' entrada(s)'+(devolvidos?', '+devolvidos+' devolucao(oes)':'')
-      +(b.nota_fiscal?' · NF '+b.nota_fiscal:''));
-    const st=db.prepare('SELECT status FROM pedido_compra WHERE id=?').get(ped.id).status;
-    res.json({ok:true, recebimento_id:recId, status_pedido:st,
-      aviso: st==='parcial' ? 'O pedido continua aberto — o saldo segue contando como a caminho.' : null});
+    let r;
+    try{ r=RD.receber(db, req.body||{}, QUEM.pessoa(req)); }
+    catch(e){ if(e instanceof RD.Recusa) return res.status(e.status).json({erro:e.message}); throw e; }
+    auditar(req,'recebimento','pedido '+(req.body||{}).pedido_id, r.entradas+' entrada(s)'+(r.retidos?', '+r.retidos+' retido(s)':'')+(r.avisos?', '+r.avisos+' aviso(s)':''));
+    res.json(Object.assign({ok:true}, r));
   });
 
   /* ── PRECO DA NOTA — so o Comprador (§6) ─────────────────────────────────────

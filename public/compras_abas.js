@@ -227,11 +227,14 @@
         + 'Na compra de marketplace a loja vai como texto no pedido, sem cadastro. ' + (verPag ? 'Os dados de pagamento só aparecem a quem paga.' : '') + '</div>'
         + '<div class="cmpRola"><table class="cmpTab"><thead><tr>' + COLS.map(function(c){ return '<th>' + esc(c[1]) + '</th>'; }).join('') + '<th></th></tr></thead><tbody>'
         + l.map(function(f){ return '<tr' + (f.ativo ? '' : ' style="opacity:.55"') + '>' + COLS.map(function(c){ return '<td>' + campo(f, c[0]) + '</td>'; }).join('')
-            + '<td><span class="sub" data-fo-msg="' + f.id + '"></span></td></tr>'; }).join('')
+            + '<td><span class="sub" data-fo-prazo="' + f.id + '"></span> <span class="sub" data-fo-msg="' + f.id + '"></span></td></tr>'; }).join('')
         + '</tbody></table></div>'
         + '<div class="row-actions" style="margin-top:12px;gap:8px;align-items:flex-end;flex-wrap:wrap"><div><label class="sub">Fornecedor novo</label><br><input id="foNome"></div>'
         + '<div><label class="sub">Tipo</label><br><select id="foTipo">' + opt(o.tipos_fornecedor.map(function(t){ return { valor:t, nome:t }; }), '', '—') + '</select></div>'
         + '<button class="primary" data-perm="fornecedor.cadastrar" id="foAdd">Criar</button> <span class="msg" id="foMsg"></span></div></div>';
+      /* O PRAZO QUE VALE (R-CMP-36): o medido com 3 recebimentos, senao o digitado — e a tela diz qual. */
+      l.forEach(async function(f){ var pz = await api('GET', '/api/compras/prazo?fornecedor_id=' + f.id); var e = $('[data-fo-prazo="' + f.id + '"]');
+        if(e && pz && pz.dias != null) e.textContent = 'prazo valendo: ' + n3(pz.dias) + ' d (' + (pz.fonte === 'medido' ? 'medido em ' + pz.n + ' compras' : 'digitado — menos de 3 recebimentos') + ')'; });
       box.onchange = async function(ev){
         var e = ev.target; if(!e.matches('[data-fo]')) return;
         var r = await api('POST', '/api/fornecedores', { id:+e.getAttribute('data-id'), [e.getAttribute('data-fo')]:e.value });
@@ -367,6 +370,35 @@
       var t = ev.target.closest('[data-alc-tira]'); if(t){ r = await api('DELETE', '/api/compras/alcadas/' + t.getAttribute('data-alc-tira')); if(r.erro) return alert(r.erro); alcadas(box); }
     };
   }
+
+  /* ── RECEBIMENTO RETIDO E AVISOS (fase 3, R-CMP-32/33) ─────────────── */
+  registrar({ id:'retidos', nome:'Recebimento retido', perms:['recebimento.liberar','compras.ver'],
+    desenhar: async function(box){
+      var r = await api('GET', '/api/recebimento/retidos'); var it = (r && r.itens) || [], av = (r && r.avisos) || [];
+      var decide = pode('recebimento.liberar');
+      function pesos(x){ return x.peso_10_kg ? '10 un = ' + n3(x.peso_10_kg) + ' kg (' + n3(x.peso_10_kg / 10) + ' cada) · esperado pela nota ' + n3(x.esperado_nota_kg) + (x.esperado_cadastro_kg ? ' · pelo cadastro ' + n3(x.esperado_cadastro_kg) : '') + ' · desvio ' + n3(x.desvio_pct) + '%' : 'sem pesagem'; }
+      box.innerHTML = '<div class="card"><div style="font-weight:700">Entregas retidas</div>'
+        + '<div class="sub" style="margin:4px 0 10px">Não entraram no saldo: o peso passou da tolerância de reter, ou a contagem não bateu com o declarado. Sai com um toque — nunca fica preso.</div>'
+        + (it.length ? it.map(function(x){
+            return '<div class="card" style="background:transparent"><b>' + esc(x.item) + '</b> · ' + esc(x.numero) + ' · ' + esc(x.fornecedor || '—') + '<div class="sub">'
+              + 'contados ' + n3(x.qtd_contada) + ' ' + esc(x.unidade || '') + (x.qtd_declarada != null ? ' · declarado ' + n3(x.qtd_declarada) : '') + ' · ' + pesos(x)
+              + ' · recebido por ' + esc(x.recebido_por || '—') + ' em ' + data(x.criado_em) + '</div>'
+              + (decide ? '<div class="cmpG"><div style="grid-column:span 2"><label>Motivo (fica gravado)</label><input data-rt-mot="' + x.id + '"></div></div>'
+                + '<button class="primary" data-rt="' + x.id + '" data-d="aceitar">Aceitar</button> <button class="ghost" data-rt="' + x.id + '" data-d="aceitar_reclamar">Aceitar e reclamar com o fornecedor</button> '
+                + '<button class="ghost" data-rt="' + x.id + '" data-d="devolver">Devolver</button> <span class="msg" data-rt-msg="' + x.id + '"></span>' : '') + '</div>';
+          }).join('') : '<div class="sub">Nada retido.</div>') + '</div>'
+        + '<div class="card"><div style="font-weight:700">Avisos de peso (entraram no saldo)</div><div class="sub" style="margin:4px 0 10px">O peso ficou entre as duas tolerâncias. Dê ciência.</div>'
+        + (av.length ? av.map(function(x){ return '<div style="margin-bottom:8px"><b>' + esc(x.item) + '</b> · ' + esc(x.numero) + '<div class="sub">' + pesos(x) + '</div>'
+            + (decide ? '<button class="ghost" data-ci="' + x.id + '">Dar ciência</button> <span class="msg" data-ci-msg="' + x.id + '"></span>' : '') + '</div>'; }).join('') : '<div class="sub">Nenhum aviso esperando.</div>') + '</div>';
+      box.onclick = async function(ev){
+        var b = ev.target.closest('[data-rt]');
+        if(b){ var id = b.getAttribute('data-rt');
+          var res = await api('POST', '/api/recebimento/itens/' + id + '/decidir', { decisao:b.getAttribute('data-d'), motivo:$('[data-rt-mot="' + id + '"]').value });
+          if(res.erro) return msg($('[data-rt-msg="' + id + '"]'), res); return abrir('retidos'); }
+        var c = ev.target.closest('[data-ci]');
+        if(c){ var res2 = await api('POST', '/api/recebimento/itens/' + c.getAttribute('data-ci') + '/ciencia', {}); if(res2.erro) return msg($('[data-ci-msg="' + c.getAttribute('data-ci') + '"]'), res2); abrir('retidos'); }
+      };
+    } });
 
   /* ── COMPRA RAPIDA (fase 2, R-CMP-21) ───────────────────────────────── */
   registrar({ id:'rapida', nome:'Compra rápida', perms:['pedido.criar'],

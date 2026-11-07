@@ -348,7 +348,14 @@ function garantirSchemaCompras(db){
       qtd_devolvida    REAL DEFAULT 0,
       motivo_devolucao TEXT,       -- fora_medida|defeito|veio_errado|qtd_a_mais
       preco_pago       REAL,       -- lancado DEPOIS, pelo comprador
-      divergencia      TEXT        -- nenhuma|quantidade|preco|ambos
+      divergencia      TEXT,       -- nenhuma|quantidade|preco|ambos
+      /* COMPRAS-E-RECEBIMENTO fase 3 (R-CMP-29 a 37), na ordem do ALTER (§17):
+         a contagem cega, os dois pesos, as reguas, a faixa, a decisao de quem
+         libera, o fator real (kg por unidade), o lugar real e o custo da
+         unidade recebida. */
+      qtd_contada REAL, peso_1_kg REAL, peso_10_kg REAL, esperado_nota_kg REAL, esperado_cadastro_kg REAL,
+      desvio_pct REAL, faixa TEXT, decisao TEXT, decidido_por TEXT, decidido_por_id INTEGER, decidido_em TEXT,
+      motivo_decisao TEXT, fator_real REAL, almoxarifado_id INTEGER, custo_unit REAL
     );
     CREATE INDEX IF NOT EXISTS idx_receb_devol
       ON recebimento_item(motivo_devolucao) WHERE qtd_devolvida > 0;
@@ -464,6 +471,9 @@ function garantirSchemaCompras(db){
   colunas('pedido_compra', [['canal','TEXT'],['loja','TEXT'],['numero_externo','TEXT'],['comprado_em','TEXT'],
     ['comprado_por','TEXT'],['comprado_por_id','INTEGER'],['aprovacao','TEXT'],['aprovado_por','TEXT'],
     ['aprovado_por_id','INTEGER'],['aprovado_em','TEXT'],['motivo_aprovacao','TEXT'],['rapida','INTEGER DEFAULT 0']]);
+  colunas('recebimento_item', [['qtd_contada','REAL'],['peso_1_kg','REAL'],['peso_10_kg','REAL'],['esperado_nota_kg','REAL'],
+    ['esperado_cadastro_kg','REAL'],['desvio_pct','REAL'],['faixa','TEXT'],['decisao','TEXT'],['decidido_por','TEXT'],
+    ['decidido_por_id','INTEGER'],['decidido_em','TEXT'],['motivo_decisao','TEXT'],['fator_real','REAL'],['almoxarifado_id','INTEGER'],['custo_unit','REAL']]);
   colunas('pedido_item', [['unidade_compra','TEXT'],['qtd_compra','REAL'],['preco_unid_compra','REAL'],['qtd_declarada','REAL']]);
   /* R-CMP-15: o status `enviado` passa a se chamar COMPRADO. Nada real foi
      lancado, mas a migracao e feita assim mesmo, uma vez so: a data da compra

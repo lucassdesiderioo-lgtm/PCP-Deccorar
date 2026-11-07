@@ -95,6 +95,14 @@ const LINHAS = [
   { chave:'pedido_aprovacao', nome:'Pedido de compra aguardando aprovação', perm:['pedido.aprovar'], onde:{ aba:'compras' },
     ajuda:'pedido acima da alçada de quem o criou (R-CMP-17)',
     contar(db){ const r = require('./compra_dominio').pendencias(db).aguardando_aprovacao; return { n:r.n, desde:r.desde }; } },
+  /* COMPRAS-E-RECEBIMENTO fase 3 (R-CMP-32/33): o retido nao entra no saldo
+     ate alguem decidir; o aviso entrou e espera a ciencia. */
+  { chave:'recebimento_retido', nome:'Recebimento retido', perm:['recebimento.liberar'], onde:{ aba:'compras' },
+    ajuda:'entrega que não bateu o peso ou a quantidade declarada: aceitar, aceitar e reclamar, ou devolver',
+    contar(db){ const r = require('./recebimento_dominio').pendencias(db).retido; return { n:r.n, desde:r.desde }; } },
+  { chave:'recebimento_aviso', nome:'Recebimento com aviso de peso', perm:['recebimento.liberar'], onde:{ aba:'compras' },
+    ajuda:'entrou no saldo com o peso entre as duas tolerâncias: dar ciência',
+    contar(db){ const r = require('./recebimento_dominio').pendencias(db).aviso; return { n:r.n, desde:r.desde }; } },
   { chave:'devolucoes', nome:'Devoluções', perm:['devolucao.baixar'], onde:{ aba:'dv' },
     ajuda:'devoluções esperando a baixa com reputação e motivo',
     contar(db){
