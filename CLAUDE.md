@@ -1635,11 +1635,14 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 >   seis criados no PCP (#6 a #11: Ação, CKS Brasil, J Serrano, Mova, Sosten,
 >   Wiler K); a segunda rodada diz "já ligado" em todos.
 >
-> ⚠️ **"AÇÃO" (#6) PODE SER O "AC" (#2) QUE O PCP JÁ TINHA** — o script só junta o
-> mesmo nome. Se for o mesmo fornecedor, são dois cadastros dele, e quem decide
-> qual fica é o dono. Também ficaram como fornecedor o "ML" (#3) e o "SHOPI" (#5),
-> que pela R-CMP-13 são **canal**, não fornecedor: os pedidos antigos continuam
-> apontando para eles, e isso é decisão do dono, não conserto.
+> ⚠️ **"AÇÃO" (#6) ERA O "AC" (#2), E "ML" (#3) E "SHOPI" (#5) SÃO CANAL** (o dono,
+> 07/11/2026, linha em `docs/DECISOES.md`). `node arrumar_fornecedores_cmp.js`
+> simula e `--aplicar` grava, com backup dos dois bancos: o #6 é juntado ao #2
+> (toda linha que o cita, nos dois bancos, passa ao #2; o #2 fica com o nome
+> "Ação" e é completado com o que só o #6 tinha; o #6 é **desativado, não
+> apagado**); os pedidos antigos do ML e da SHOPI sem canal ganham o canal (e a
+> loja escrita), e os dois cadastros são desativados. Oferta repetida nos dois
+> recusa tudo. `node teste_arrumar_fornecedores.js` (19).
 >
 > Nada disto está provado com dado real ainda:
 > - quem recebe as cinco chaves novas, marcado na tela de Acessos;
