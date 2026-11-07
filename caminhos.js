@@ -44,5 +44,8 @@ module.exports = {
   /* Os anexos das devolucoes em andamento (spec DEVOLUCOES-ACOMPANHAMENTO,
      R21): etiqueta de coleta, comprovante, a foto do comprador. FORA de
      lotes/, que o cron apaga em 7 dias — o anexo e prova, e prova nao expira. */
-  DEVOLUCOES: de('PCP_DEVOLUCOES_DIR', 'devolucoes')
+  DEVOLUCOES: de('PCP_DEVOLUCOES_DIR', 'devolucoes'),
+  /* Os anexos das compras (spec COMPRAS-E-RECEBIMENTO, R-CMP-20): orcamento,
+     nota em PDF ou foto, XML, comprovante. FORA de lotes/, pela mesma razao. */
+  ANEXOS_COMPRAS: de('PCP_ANEXOS_COMPRAS_DIR', 'anexos_compras')
 };

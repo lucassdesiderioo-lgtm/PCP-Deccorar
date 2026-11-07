@@ -35,7 +35,7 @@ module.exports = function(app, db){
   app.get('/api/recebimento/aguardando',(req,res)=>{
     const pedidos=db.prepare(`SELECT p.id, p.numero, p.status, p.previsao, p.enviado_em, f.nome fornecedor
       FROM pedido_compra p LEFT JOIN fornecedor f ON f.id=p.fornecedor_id
-      WHERE p.status IN ('enviado','parcial') ORDER BY p.enviado_em`).all();
+      WHERE p.status IN ('comprado','parcial') ORDER BY COALESCE(p.comprado_em,p.enviado_em)`).all();
     for(const p of pedidos){
       /* Repare no SELECT: nem preco_unit, nem valor. O Recebimento nao recebe
          preco nem pelo fio. */
@@ -58,7 +58,7 @@ module.exports = function(app, db){
     const b=req.body||{};
     const ped=db.prepare('SELECT id,numero,status FROM pedido_compra WHERE id=?').get(b.pedido_id);
     if(!ped) return res.status(404).json({erro:'pedido não encontrado'});
-    if(ped.status!=='enviado' && ped.status!=='parcial')
+    if(ped.status!=='comprado' && ped.status!=='parcial')
       return res.status(400).json({erro:'este pedido não está aguardando entrega ('+ped.status+')'});
     const itens=Array.isArray(b.itens)?b.itens:[];
     if(!itens.length) return res.status(400).json({erro:'informe o que chegou'});

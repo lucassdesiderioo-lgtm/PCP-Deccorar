@@ -6,7 +6,7 @@ Situação: em construção (execução contínua das fases 1 a 11 autorizada pe
 Criada em: 06/11/2026
 Última atualização: 07/11/2026
 Fase atual: ver o diário de construção logo abaixo
-Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐  9 ☐  10 ☐  11 ☐
+Fases: 1 ☑  2 ☑  3 ☐  4 ☐  5 ☐  6 ☐  7 ☐  8 ☐  9 ☐  10 ☐  11 ☐
 Decidido em 07/11/2026: fase 10 = o PCP é dono do endereço, o sob medida do rolo e
 da sobra (R-CMP-50) · fase 11 construída sem certificado, pronta para recebê-lo
 Risco: 🔴 (schema, estoque de material, custo, acesso, dado do sob medida)
@@ -75,6 +75,39 @@ modo obrigatório reprova 1; desmarcar livre, 4; "ficha" escolhível, 2; ficha a
 café, 1; sem o backfill, 1). `teste_acesso_compras.js` 10. Tela aberta a 1440 px:
 abas, lista, formulário de material novo salvando.
 
+### Fase 2 — fornecedor e pedido (07/11/2026) ☑
+
+```
+📋 PLANO
+Tipo: FASE 2 da spec COMPRAS-E-RECEBIMENTO        Risco: 🔴
+O que vai ser feito: fornecedor com tipo e dados de pagamento; canal e loja; status
+  comprado (com nº externo e data); alçada; compra por kg com declarado; parcelas;
+  anexos; compra rápida.
+O que vou mudar: compras_schema.js (colunas, 3 tabelas, migração enviado→comprado) ·
+  compra_dominio.js e compra_route.js (novos) · pedido_route.js (kg, poda das parcelas,
+  /enviar aposentado, /pagar por parcela) · receb_route.js e compras_route.js (o status
+  comprado; fornecedor pela #33 e com poda) · caminhos.js (ANEXOS_COMPRAS) ·
+  pendencias_dominio.js · acesso/permissoes · public/compras_abas.js
+Regra de negócio muda? SIM → antes: rascunho→enviado, sem aprovação, pago era marca.
+  Depois: comprado com canal/nº/data, alçada por pessoa, parcelas (DECISOES.md 06/11)
+Como vou testar: teste_pedido_compra.js (novo, antes do código), teste_acesso_compras.js,
+  teste_caminhos.js; defeitos reintroduzidos; tela no navegador
+Fica de fora: o recebimento novo (fase 3); a nota (fase 4)
+
+🔐 ALÇADA
+Telas novas: nenhuma (a 501 ganha Fornecedores, Pedidos, Compra rápida)
+Ações novas: pedido.aprovar · admin · 501 · sensível
+             nota.lancar · admin · 501 · não sensível (adiantada da fase 4)
+             alcada.definir · admin_geral · 501 · sensível, intransferível
+Setores novos: nenhum
+Quem recebe: pedido.aprovar ← pedido.criar; nota.lancar ← pedido.pagar; alcada.definir só o Admin Geral
+```
+
+**Feito.** `teste_pedido_compra.js` 64 casos; dez defeitos reintroduzidos um a um (sem a
+alçada reprova 9; qualquer um aprovando, 4; sem motivo, 3; parcelas sem poda, 1; Pix sem
+poda, 1; pago sem derivar, 1; compra rápida furando a alçada, 2; sem a migração, 2; sem o
+nº externo, 12). `teste_acesso_compras.js` 30. Tela: pedido por kg comprado pela 501.
+
 ### Mudanças no caminho
 
 (decisões de construção que não mudam regra — nome de coluna, layout, ordem de campos)
@@ -94,9 +127,27 @@ abas, lista, formulário de material novo salvando.
 - **Fase 1:** as chaves novas da spec saem da comparação com o retrato do `teste_mapa`
   pelo nome (`perfis_acesso.NASCERAM_DEPOIS`), como a `coleta.horario`: elas chegam a
   quem já tinha a chave de origem, por decisão da spec §7.
+- **Fase 2:** os três dados da compra (canal, nº, data) são pedidos já no "Comprado",
+  também quando o pedido vai para a aprovação; o aprovador só aprova, com motivo.
+- **Fase 2:** `nota.lancar` entrou aqui, e não na fase 4, porque a poda das parcelas
+  (R-CMP-27) já a lê. Backfill de quem tem `pedido.pagar`, como a §7 manda.
+- **Fase 2:** a alçada não deixa a pessoa ser aprovadora de si mesma.
+- **Fase 2:** o "marcar pago" de antes continua: sem parcela, grava uma parcela paga do
+  valor do pedido; com parcelas, paga as abertas.
+- **Fase 2:** parcelas e "anexos" do pedido aparecem no detalhe do pedido (aba Pedidos);
+  as parcelas em N vezes são repartidas na tela, mês a mês a partir do 1º vencimento.
+- **Fase 2:** o `teste_quem.js` conferia que o `pedido_compra` terminava em
+  `criado_por_id,pago_por_id`; as colunas da fase 2 entram depois, na mesma ordem no
+  banco novo e no antigo, e o esperado passou a listá-las.
 
 ### Achei no caminho (não mexi)
 
+- **Fase 2:** `GET /api/pedidos/zumbis` (os parciais esquecidos) nunca responde: o
+  `GET /api/pedidos/:id` do `pedido_route.js` é registrado antes e pega "zumbis" como id
+  (404 "pedido não encontrado"). Defeito antigo, de antes desta spec.
+- **Fase 2:** o cadastro de fornecedor (`POST /api/fornecedores`) apagava campo
+  ausente (#33). Consertado aqui porque a fase pedia os campos de pagamento e o teste
+  do Pix mostrou o defeito — anotado como conserto dentro do plano.
 <!-- fim do diário -->
 
 

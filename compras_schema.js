@@ -129,6 +129,49 @@ function garantirSchemaCompras(db){
       criado_por_id INTEGER
     );
 
+    /* ── ALCADA POR PESSOA (COMPRAS-E-RECEBIMENTO R-CMP-17) ─────────────────
+       Pedido acima do limite de quem o criou espera o aprovador (ou o Admin
+       Geral). Quem nao tem linha aqui nao tem limite. */
+    CREATE TABLE IF NOT EXISTS compra_alcada (
+      usuario_id   INTEGER PRIMARY KEY,
+      limite       REAL NOT NULL,
+      aprovador_id INTEGER,
+      definido_por TEXT, definido_por_id INTEGER,
+      definido_em  TEXT DEFAULT (datetime('now','localtime'))
+    );
+
+    /* ── PARCELAS (R-CMP-19): o formato do sm_boleto do sob medida — valor
+       em CENTAVOS, vencimento AAAA-MM-DD, pago_em/pago_por —, para o
+       financeiro futuro juntar a pagar e a receber sem traducao. NAO e contas a
+       pagar: nao ha lista do que vence, nem aviso. */
+    CREATE TABLE IF NOT EXISTS pagamento_parcela (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      pedido_id      INTEGER REFERENCES pedido_compra(id),
+      nota_id        INTEGER,
+      numero         INTEGER NOT NULL,
+      forma          TEXT NOT NULL,      -- pix|boleto|cartao|dinheiro|transferencia
+      valor_centavos INTEGER NOT NULL,
+      vencimento     TEXT,
+      pago_em        TEXT, pago_por TEXT, pago_por_id INTEGER,
+      obs            TEXT,
+      criado_em      TEXT DEFAULT (datetime('now','localtime')),
+      criado_por     TEXT, criado_por_id INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_parcela_pedido ON pagamento_parcela(pedido_id);
+
+    /* ── ANEXOS (R-CMP-20): o arquivo mora em caminhos.ANEXOS_COMPRAS, fora de
+       lotes/ (o cron apaga). Aqui so o nome dele no disco. */
+    CREATE TABLE IF NOT EXISTS compra_anexo (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      pedido_id      INTEGER, nota_id INTEGER, recebimento_id INTEGER,
+      tipo           TEXT NOT NULL,      -- orcamento|nota_pdf|nota_foto|xml|comprovante|outro
+      nome           TEXT,               -- o nome original, so para mostrar
+      arquivo        TEXT NOT NULL,      -- o nome no disco, gerado aqui
+      tamanho        INTEGER,
+      criado_em      TEXT DEFAULT (datetime('now','localtime')),
+      criado_por     TEXT, criado_por_id INTEGER
+    );
+
     /* ── FORNECEDOR (§9) ──────────────────────────────────────────────────── */
     CREATE TABLE IF NOT EXISTS fornecedor (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -145,7 +188,10 @@ function garantirSchemaCompras(db){
       whatsapp      TEXT,             -- §8: pedido vai em PDF e texto de WhatsApp
       observacao    TEXT,
       ativo         INTEGER DEFAULT 1,
-      criado_em     TEXT DEFAULT (datetime('now','localtime'))
+      criado_em     TEXT DEFAULT (datetime('now','localtime')),
+      /* COMPRAS-E-RECEBIMENTO R-CMP-12: o tipo e os dados de pagamento, que so
+         viajam a quem tem pedido.pagar. */
+      tipo TEXT, pix TEXT, banco TEXT, agencia TEXT, conta TEXT
     );
 
     /* ── OFERTA: fornecedor x item x embalagem (§4) ───────────────────────────
@@ -242,7 +288,11 @@ function garantirSchemaCompras(db){
       data           TEXT DEFAULT (date('now','localtime')),
       teste          INTEGER DEFAULT 0,
       criado_por_id INTEGER,
-      pago_por_id INTEGER    -- quem fez, pelo id (QUEM-FEZ-E-REVISAO fase 7)
+      pago_por_id INTEGER,   -- quem fez, pelo id (QUEM-FEZ-E-REVISAO fase 7)
+      /* COMPRAS-E-RECEBIMENTO fase 2 (R-CMP-13 a 21), na ordem do ALTER (§17) */
+      canal TEXT, loja TEXT, numero_externo TEXT, comprado_em TEXT, comprado_por TEXT,
+      comprado_por_id INTEGER, aprovacao TEXT, aprovado_por TEXT, aprovado_por_id INTEGER,
+      aprovado_em TEXT, motivo_aprovacao TEXT, rapida INTEGER DEFAULT 0
     );
 
     /* Regra 9 do §13: o pedido CONGELA embalagem, fator e preco no momento em
@@ -262,7 +312,11 @@ function garantirSchemaCompras(db){
       qtd_recebida   REAL DEFAULT 0,
       preco_pago     REAL,
       motivo_escolha TEXT,   -- regra 11: escolher fora do melhor preco exige motivo
-      status         TEXT DEFAULT 'aberto'    -- aberto|parcial|recebido|cancelado
+      status         TEXT DEFAULT 'aberto',   -- aberto|parcial|recebido|cancelado
+      /* COMPRAS-E-RECEBIMENTO R-CMP-18: a unidade em que se COMPROU (kg, un, m,
+         cx), a quantidade e o preco nela, e o que o fornecedor declara na
+         unidade da casa ("400 kg ≈ 600 tubos"). */
+      unidade_compra TEXT, qtd_compra REAL, preco_unid_compra REAL, qtd_declarada REAL
     );
     CREATE INDEX IF NOT EXISTS idx_pedido_item_aberto ON pedido_item(componente_id, status);
 
@@ -406,6 +460,22 @@ function garantirSchemaCompras(db){
   colunas('custo_sku_historico', [['usuario_id','INTEGER']]);
   colunas('pedido_compra', [['criado_por_id','INTEGER'], ['pago_por_id','INTEGER']]);
   colunas('recebimento', [['recebido_por_id','INTEGER']]);
+  colunas('fornecedor', [['tipo','TEXT'],['pix','TEXT'],['banco','TEXT'],['agencia','TEXT'],['conta','TEXT']]);
+  colunas('pedido_compra', [['canal','TEXT'],['loja','TEXT'],['numero_externo','TEXT'],['comprado_em','TEXT'],
+    ['comprado_por','TEXT'],['comprado_por_id','INTEGER'],['aprovacao','TEXT'],['aprovado_por','TEXT'],
+    ['aprovado_por_id','INTEGER'],['aprovado_em','TEXT'],['motivo_aprovacao','TEXT'],['rapida','INTEGER DEFAULT 0']]);
+  colunas('pedido_item', [['unidade_compra','TEXT'],['qtd_compra','REAL'],['preco_unid_compra','REAL'],['qtd_declarada','REAL']]);
+  /* R-CMP-15: o status `enviado` passa a se chamar COMPRADO. Nada real foi
+     lancado, mas a migracao e feita assim mesmo, uma vez so: a data da compra
+     de quem ja estava `enviado` e o `enviado_em`. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='cmp_status_comprado_1'").get()){
+      db.transaction(() => {
+        db.prepare("UPDATE pedido_compra SET status='comprado', comprado_em=COALESCE(comprado_em, enviado_em), aprovacao=COALESCE(aprovacao,'nao_precisa') WHERE status='enviado'").run();
+        db.prepare("INSERT INTO config (chave,valor) VALUES ('cmp_status_comprado_1','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[compras] migracao do status comprado falhou: ' + e.message); }
   colunas('ficha_formula', [
     ['corte_largura','TEXT'], ['corte_altura','TEXT'], ['corte_unidade','TEXT']
   ]);

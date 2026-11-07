@@ -1469,6 +1469,7 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 | Dono único | O quê |
 |---|---|
 | `material_dominio.js` | as regras das colunas novas do material e o almoxarifado (fase 1) |
+| `compra_dominio.js` | o caminho do pedido depois do rascunho, a alçada, as parcelas e a compra rápida (fase 2) |
 
 > ⚠️ **MATERIAL NOVO NÃO NASCE SEM O MODO DE SALDO** (R-CMP-03, armadilha #30):
 > o `POST /api/componentes` sem `modo_saldo` é 400. Os de antes receberam o modo
@@ -1480,9 +1481,19 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 >
 > ⚠️ **A FICHA RECUSA NO SERVIDOR o material com `vai_ficha = 0`** — esconder da
 > lista da 404 não basta (R-CMP-02).
+>
+> ⚠️ **O STATUS `enviado` NÃO EXISTE MAIS: É `comprado`** (R-CMP-15), migrado uma
+> vez só (`config.cmp_status_comprado_1`). "Comprado" exige canal, nº do pedido no
+> fornecedor e data; acima da alçada de quem criou, espera o aprovador. O `POST
+> /api/pedidos/:id/enviar` só responde 400 dizendo o caminho novo.
+>
+> ⚠️ **PARCELAS E DADOS DE PAGAMENTO DO FORNECEDOR SÃO PODADOS NO JSON** (R-CMP-12,
+> R-CMP-27): parcelas só a `custo.ver`, `nota.lancar` ou `pedido.pagar`; Pix, banco e
+> conta só a `pedido.pagar`.
 
-**Rode `node teste_material.js` e `node teste_acesso_compras.js` ao mexer no
-cadastro de material, no almoxarifado ou nas chaves de Compras.**
+**Rode `node teste_material.js`, `node teste_pedido_compra.js` e `node
+teste_acesso_compras.js` ao mexer no cadastro de material, no almoxarifado, no
+pedido, no fornecedor ou nas chaves de Compras.**
 
 ---
 

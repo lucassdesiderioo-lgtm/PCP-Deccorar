@@ -312,7 +312,8 @@ module.exports = function(app, db){
      intransferiveis (`alcada.definir`, `certificado.gerenciar`) nao entram:
      so o Admin Geral, que passa por nivel. */
   const CMP_BACKFILL = [
-    ['seed_cmp_f1', [['almoxarifado.cadastrar','componente.cadastrar']]]
+    ['seed_cmp_f1', [['almoxarifado.cadastrar','componente.cadastrar']]],
+    ['seed_cmp_f2', [['pedido.aprovar','pedido.criar'], ['nota.lancar','pedido.pagar']]]
   ];
   for(const [marca, pares] of CMP_BACKFILL){
     try{
@@ -1114,6 +1115,18 @@ module.exports = function(app, db){
     if(M !== 'GET' && /\/preco$/.test(p) && pre('/api/recebimento')) return 'preco.lancar';
     if(M !== 'GET' && eq('/api/recebimento')) return 'pedido.receber';
     if(eq('/api/recebimento/devolucoes')) return 'compras.ver';
+    /* COMPRAS-E-RECEBIMENTO fase 2: aprovar (alcada), parcelas, anexos, compra
+       rapida, alcadas. Antes do generico de /api/pedidos. */
+    if(M !== 'GET' && /\/aprovar$/.test(p) && pre('/api/pedidos')) return 'pedido.aprovar';
+    if(/\/parcelas$/.test(p) && pre('/api/pedidos')) return M === 'GET' ? ['custo.ver','nota.lancar','pedido.pagar'] : ['pedido.criar','pedido.pagar'];
+    if(M !== 'GET' && /\/pagar$/.test(p) && pre('/api/parcelas')) return 'pedido.pagar';
+    if(M === 'DELETE' && pre('/api/parcelas')) return ['pedido.criar','pedido.pagar'];
+    if(eq('/api/compras/opcoes')) return ['compras.ver','pedido.criar','pedido.receber','componente.cadastrar'];
+    if(M !== 'GET' && pre('/api/compras/alcadas')) return 'alcada.definir';
+    if(pre('/api/compras/alcadas')) return ['alcada.definir','pedido.aprovar','pedido.criar'];
+    if(M !== 'GET' && eq('/api/compras/anexos')) return ['pedido.criar','pedido.pagar','nota.lancar','pedido.receber'];
+    if(pre('/api/compras/anexos')) return ['compras.ver','pedido.criar','pedido.pagar','nota.lancar'];
+    if(M !== 'GET' && eq('/api/compras/rapida')) return 'pedido.criar';
     if(M !== 'GET' && /\/fechar$/.test(p) && pre('/api/pedidos')) return 'pedido.criar';
     if(eq('/api/pedidos/zumbis')) return 'compras.ver';
     if(M !== 'GET' && pre('/api/pedidos') && /\/pagar$/.test(p)) return 'pedido.pagar';

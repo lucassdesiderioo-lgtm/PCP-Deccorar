@@ -31,7 +31,8 @@ for(const c of ['componente.cadastrar','pedido.criar','pedido.pagar','pedido.rec
 const oper = db.prepare("INSERT INTO setores (nome, nivel) VALUES ('Receber','operacao')").run().lastInsertRowid;
 db.prepare("INSERT OR IGNORE INTO setor_permissao (setor_id,chave) VALUES (?, 'pedido.receber')").run(oper);
 const u = db.prepare("INSERT INTO usuarios (nome,pin_hash,salt,areas) VALUES ('Bia','x','y','')").run().lastInsertRowid;
-db.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?, 'componente.cadastrar', 1)").run(u);
+for(const c of ['componente.cadastrar','pedido.criar','pedido.pagar','pedido.receber'])
+  db.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?, ?, 1)").run(u, c);
 db.prepare("DELETE FROM config WHERE chave LIKE 'seed_cmp_%'").run();
 const app = appFalso();
 require('./acesso')(app, db);
@@ -41,7 +42,10 @@ const temSetor = (s, c) => !!db.prepare('SELECT 1 FROM setor_permissao WHERE set
 
 /* chave nova · nivel · de quem ela vem (null = so o Admin Geral) */
 const CHAVES = [
-  ['almoxarifado.cadastrar', 'admin', 'componente.cadastrar']
+  ['almoxarifado.cadastrar', 'admin', 'componente.cadastrar'],
+  ['pedido.aprovar', 'admin', 'pedido.criar'],
+  ['nota.lancar', 'admin', 'pedido.pagar'],
+  ['alcada.definir', 'admin_geral', null]
 ];
 for(const [chave, nivel, de] of CHAVES){
   const p = PERM.find(x => x.chave === chave);
@@ -69,8 +73,20 @@ const ROTAS = [
   ['DELETE', '/api/almoxarifados/3', 'almoxarifado.cadastrar'],
   ['GET', '/api/almoxarifados', 'pedido.receber'],
   ['GET', '/api/componentes/opcoes', 'compras.ver'],
-  ['GET', '/api/componentes/pendencias', 'componente.cadastrar']
+  ['GET', '/api/componentes/pendencias', 'componente.cadastrar'],
+  ['POST', '/api/pedidos/4/comprar', 'pedido.criar'],
+  ['POST', '/api/pedidos/4/aprovar', 'pedido.aprovar'],
+  ['GET', '/api/pedidos/4/parcelas', 'nota.lancar'],
+  ['POST', '/api/pedidos/4/parcelas', 'pedido.pagar'],
+  ['POST', '/api/parcelas/9/pagar', 'pedido.pagar'],
+  ['POST', '/api/compras/alcadas', 'alcada.definir'],
+  ['POST', '/api/compras/rapida', 'pedido.criar'],
+  ['POST', '/api/compras/anexos', 'pedido.criar'],
+  ['GET', '/api/compras/anexos/3', 'compras.ver']
 ];
+/* A excecao de Bia (componente.cadastrar) e o setor Compras da casa
+   (pedido.criar, pedido.pagar) tem de levar as chaves certas — e o setor que
+   so recebe nao leva nenhuma das de admin. */
 for(const [m, r, chave] of ROTAS){
   const d = AC.permDaRota(r, m);
   const lista = Array.isArray(d) ? d : [d];

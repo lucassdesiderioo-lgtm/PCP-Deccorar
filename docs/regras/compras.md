@@ -102,6 +102,96 @@
 - Status:           em código desde 07/11/2026 (o endereço haste → andar → nível é da fase 5).
 - História:         fase 1.
 
+## B e C. Fornecedor e pedido (fase 2)
+
+### R-CMP-11 · Um cadastro de fornecedor só
+- Regra:            o de `dados.db`. O do sob medida migra na fase 9.
+- Por quê:          dois cadastros do mesmo fornecedor divergem.
+- Exceções:         até a fase 9, o rolo do sob medida guarda o fornecedor em texto.
+- Teste que trava:  (fase 9)
+- Status:           fase 9.
+- História:         fase 9.
+
+### R-CMP-12 · Tipo do fornecedor e dados de pagamento
+- Regra:            `fornecedor.tipo` = indústria · distribuidor · loja · importador. Pix, banco, agência e conta só viajam no JSON a quem tem `pedido.pagar`, e só ele grava. O cadastro do fornecedor passou a seguir a #33: campo ausente preserva.
+- Por quê:          pronto para o financeiro, sem mostrar conta bancária a quem só compra.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_pedido_compra.js`
+- Status:           em código desde 07/11/2026.
+- História:         fase 2.
+
+### R-CMP-13 · Marketplace é canal, não fornecedor
+- Regra:            todo pedido comprado tem `canal` (Mercado Livre, Shopee, Amazon, loja física, direto). Na compra de marketplace a loja vai em texto (`pedido_compra.loja`) e o fornecedor pode ficar vazio.
+- Por quê:          a bucha e o café não justificam cadastro.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_pedido_compra.js`
+- Status:           em código desde 07/11/2026.
+- História:         fase 2.
+
+### R-CMP-14 · O preço médio é do material
+- Regra:            o custo médio é do `componente`, venha de onde vier; a comparação entre fornecedores continua por oferta.
+- Por quê:          a bucha tem um preço médio, comprada em qualquer loja.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_nota_compra.js` (fase 4)
+- Status:           fase 4.
+- História:         fase 4.
+
+### R-CMP-15 · O caminho do pedido
+- Regra:            rascunho → aguardando_aprovacao (só acima da alçada) → comprado → parcial → recebido; cancelado de qualquer um antes de recebido. O `enviado` de antes foi renomeado para `comprado` uma vez só (`config.cmp_status_comprado_1`), com a data da compra = `enviado_em`. O `POST /api/pedidos/:id/enviar` responde 400 dizendo o caminho novo.
+- Por quê:          o pedido "enviado" não dizia se foi comprado.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_pedido_compra.js` (sem a migração, reprova 2)
+- Status:           em código desde 07/11/2026.
+- História:         fase 2.
+
+### R-CMP-16 · "Comprado" exige canal, número do pedido no fornecedor e data
+- Regra:            `POST /api/pedidos/:id/comprar` recusa sem os três (data em AAAA-MM-DD, nunca no futuro) e grava `comprado_por`/`comprado_por_id`. Só pedido comprado (ou parcial) aparece na fila do Recebimento e conta como a caminho.
+- Por quê:          a data da compra mede o prazo do fornecedor.
+- Exceções:         a compra rápida, sem data, usa hoje.
+- Teste que trava:  `teste_pedido_compra.js` (sem o número, reprova 12)
+- Status:           em código desde 07/11/2026.
+- História:         fase 2.
+
+### R-CMP-17 · Alçada por pessoa
+- Regra:            `compra_alcada` (pessoa, limite em R$, aprovador). Pedido acima do limite de quem o CRIOU vai para `aguardando_aprovacao`; só o aprovador dessa pessoa ou o Admin Geral (`pedido.aprovar` na rota) passa para comprado, com motivo, e fica gravado quem, quando e por quê. Quem não tem alçada não tem limite. Só o Admin Geral define (`alcada.definir`, intransferível); a pessoa não aprova as próprias compras.
+- Por quê:          a compra grande precisa de segundo olho; pronta e sem uso enquanto só o dono compra.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_pedido_compra.js` (sem a alçada, reprova 9; qualquer um aprovando, 4; sem motivo, 3); `teste_acesso_compras.js`
+- Status:           em código desde 07/11/2026.
+- História:         fase 2.
+
+### R-CMP-18 · Compra por kg com quantidade declarada
+- Regra:            o item guarda `unidade_compra`, `qtd_compra`, `preco_unid_compra` e `qtd_declarada` (na unidade da casa). O pedido vale qtd_compra × preço; o "a caminho" é o declarado; o fator = declarado ÷ comprado.
+- Por quê:          400 kg ≈ 600 tubos.
+- Exceções:         a conversão fixa (barra de 6 m) continua pela oferta.
+- Teste que trava:  `teste_pedido_compra.js`
+- Status:           em código desde 07/11/2026.
+- História:         fase 2.
+
+### R-CMP-19 · Pagamento em parcelas, mesmo quando é uma
+- Regra:            `pagamento_parcela` no formato do `sm_boleto` (valor em centavos, vencimento AAAA-MM-DD, `pago_em`, `pago_por`). `pedido_compra.pago_em` é derivado: todas pagas. Parcela paga não se apaga nem se paga de novo (409). O "marcar pago" de antes grava uma parcela paga do valor do pedido. Não é contas a pagar.
+- Por quê:          saber como cada compra foi paga, pronto para o financeiro.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_pedido_compra.js` (sem derivar o pago, reprova 1)
+- Status:           em código desde 07/11/2026.
+- História:         fase 2.
+
+### R-CMP-20 · Anexos fora de `lotes/`
+- Regra:            orçamento, nota em PDF/foto, XML, comprovante em `caminhos.ANEXOS_COMPRAS` (`PCP_ANEXOS_COMPRAS_DIR`), gravado na transação da linha; o nome no disco é gerado pelo servidor, o nome mandado só é mostrado. Opcional sempre.
+- Por quê:          o cron apaga `lotes/` em 7 dias; anexo é prova.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_pedido_compra.js`, `teste_caminhos.js`
+- Status:           em código desde 07/11/2026.
+- História:         fase 2.
+
+### R-CMP-21 · Compra rápida
+- Regra:            material, quantidade, valor total, canal, loja e número: nasce comprada (`rapida = 1`) e passa pela alçada igual.
+- Por quê:          o caminho da bucha e do café.
+- Exceções:         nenhuma.
+- Teste que trava:  `teste_pedido_compra.js` (furando a alçada, reprova 2)
+- Status:           em código desde 07/11/2026.
+- História:         fase 2.
+
 ---
 
 ## O que NÃO fazer
@@ -110,3 +200,6 @@
 - ❌ Ligar `como_sai = 'ficha'` antes de a montagem existir
 - ❌ Deixar a ficha aceitar material com `vai_ficha = 0`, ou desmarcar `vai_ficha` com o material numa ficha
 - ❌ Apagar almoxarifado: desativa
+- ❌ Voltar a gravar `enviado` como status de pedido, ou pôr na fila do Recebimento pedido que não está comprado
+- ❌ Mandar Pix, banco ou conta do fornecedor, ou as parcelas, a quem não pode ver (a poda é no JSON)
+- ❌ Deixar a compra rápida passar por fora da alçada

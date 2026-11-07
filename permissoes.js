@@ -239,8 +239,19 @@ module.exports = [
   { chave:'pedido.devolver',      grupo:'Compras', tela:502, nivel:'operacao',
     rotulo:'Devolver ao fornecedor', desc:'Recusar item na conferência, com motivo' },
   { chave:'pedido.pagar',         grupo:'Compras', tela:501, nivel:'admin',
-    rotulo:'Marcar pedido como pago', desc:'Fecha o ciclo — não é contas a pagar',
+    rotulo:'Pagar pedido (parcelas)', desc:'Registrar e baixar as parcelas do pedido — não é contas a pagar',
     sensivel:true },
+  /* COMPRAS-E-RECEBIMENTO §7. pedido.aprovar: backfill de quem tem pedido.criar.
+     nota.lancar: de quem tem pedido.pagar (entra na fase 2 porque a poda das
+     parcelas ja a pergunta, R-CMP-27). alcada.definir: so o Admin Geral. */
+  { chave:'pedido.aprovar',       grupo:'Compras', tela:501, nivel:'admin',
+    rotulo:'Aprovar pedido acima da alçada', desc:'Passar para comprado o pedido de quem tem você como aprovador',
+    sensivel:true },
+  { chave:'nota.lancar',          grupo:'Compras', tela:501, nivel:'admin',
+    rotulo:'Lançar nota fiscal de compra', desc:'Nota, itens, impostos e custo pago/líquido' },
+  { chave:'alcada.definir',       grupo:'Compras', tela:501, nivel:'admin_geral',
+    rotulo:'Definir alçada de compra', desc:'O limite de cada pessoa e quem aprova acima dele',
+    sensivel:true, intransferivel:true },
   // Custo do produto e a informacao mais estrategica do sistema — mais que
   // produtividade nominal. Nao vaza por padrao e todo acesso vai para a auditoria.
   { chave:'custo.ver',            grupo:'Compras', tela:404, nivel:'admin',

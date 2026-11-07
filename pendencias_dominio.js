@@ -92,6 +92,9 @@ const LINHAS = [
   { chave:'material_sem_almox', nome:'Material sem almoxarifado', perm:['componente.cadastrar'], onde:{ aba:'compras' },
     ajuda:'material cadastrado sem o almoxarifado onde ele mora',
     contar(db){ const r = require('./material_dominio').pendencias(db).sem_almoxarifado; return { n:r.n, desde:r.desde }; } },
+  { chave:'pedido_aprovacao', nome:'Pedido de compra aguardando aprovação', perm:['pedido.aprovar'], onde:{ aba:'compras' },
+    ajuda:'pedido acima da alçada de quem o criou (R-CMP-17)',
+    contar(db){ const r = require('./compra_dominio').pendencias(db).aguardando_aprovacao; return { n:r.n, desde:r.desde }; } },
   { chave:'devolucoes', nome:'Devoluções', perm:['devolucao.baixar'], onde:{ aba:'dv' },
     ajuda:'devoluções esperando a baixa com reputação e motivo',
     contar(db){

@@ -27,3 +27,18 @@ tubos podem bater na contagem com material mais fino.
 - O `teste_componentes.js` (a #33) passou a criar material "por quantidade": o
   modo de saldo virou obrigatório, e a recusa dessa falta é travada no
   `teste_material.js`.
+
+## Fase 2 — fornecedor e pedido (07/11/2026)
+
+- **`enviado` virou `comprado`**, e "comprado" exige canal, número do pedido no
+  fornecedor e a data da compra. Nenhum pedido real tinha sido lançado, mas a
+  migração foi feita mesmo assim, uma vez só.
+- **A alçada é de quem criou o pedido.** O pedido já guardava `criado_por_id`
+  (QUEM-FEZ fase 7), e é por ele que se acha o limite e o aprovador. Os três dados
+  da compra são pedidos já no "Comprado": quem passa o pedido adiante sabe o
+  número; o aprovador só diz sim, com motivo.
+- **O cadastro de fornecedor apagava campo ausente** — o mesmo defeito da #33.
+  Apareceu escrevendo o teste do Pix: editar o telefone apagaria a chave Pix.
+  Hoje ausente preserva.
+- **`nota.lancar` entrou na fase 2**, e não na 4: a poda das parcelas
+  (R-CMP-27) já a pergunta.

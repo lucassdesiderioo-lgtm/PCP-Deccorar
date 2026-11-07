@@ -22,7 +22,7 @@ const igual=(veio,esperado,oque)=>{ if(veio!==esperado)
    com o cache do require, o segundo caso leria a resposta do primeiro. */
 function comAmbiente(vars){
   const antes={};
-  for(const k of ['PCP_DIR','PCP_DB','PCP_LOTES','PCP_COLETAS_DIR','PCP_BACKUPS','PCP_DEVOLUCOES_DIR']){
+  for(const k of ['PCP_DIR','PCP_DB','PCP_LOTES','PCP_COLETAS_DIR','PCP_BACKUPS','PCP_DEVOLUCOES_DIR','PCP_ANEXOS_COMPRAS_DIR']){
     antes[k]=process.env[k];
     if(vars[k]===undefined) delete process.env[k]; else process.env[k]=vars[k];
   }
@@ -76,6 +76,12 @@ caso('os nomes que treze scripts JA liam continuam valendo', ()=>{
      "certas", cada uma na sua (armadilha #12). */
 });
 
+caso('a pasta dos anexos das compras (spec COMPRAS-E-RECEBIMENTO, R-CMP-20)', ()=>{
+  igual(comAmbiente({}).ANEXOS_COMPRAS,'/opt/expedicao/anexos_compras','o padrao');
+  igual(comAmbiente({PCP_DIR:'/tmp/pcp-teste'}).ANEXOS_COMPRAS,'/tmp/pcp-teste/anexos_compras','o PCP_DIR a move');
+  igual(comAmbiente({PCP_DIR:'/tmp/pcp-teste', PCP_ANEXOS_COMPRAS_DIR:'/x/ac'}).ANEXOS_COMPRAS,'/x/ac','e a especifica ganha');
+  if(comAmbiente({}).ANEXOS_COMPRAS.indexOf(comAmbiente({}).LOTES) === 0) throw new Error('a pasta dos anexos caiu dentro de lotes/');
+});
 caso('a pasta dos anexos das devolucoes (spec DEVOLUCOES-ACOMPANHAMENTO, R21)', ()=>{
   igual(comAmbiente({}).DEVOLUCOES,'/opt/expedicao/devolucoes','o padrao, ao lado das coletas');
   igual(comAmbiente({PCP_DIR:'/tmp/pcp-teste'}).DEVOLUCOES,'/tmp/pcp-teste/devolucoes','o PCP_DIR a move');
