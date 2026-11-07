@@ -842,9 +842,18 @@ vazios; se não saírem, é defeito. `--sku CODIGO`, `--todos`, `--json`.
 `exp_route.js` ou no `tarjaEstoque` do `embalagem.html`.** E **abra a tela**: a
 frase é texto montado.
 
-> ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** o deploy e a tela da bancada com um SKU
-> que tem alguma peça, mas não para todas, mostrando a tarja antes do bipe. Prova
-> que não foi feita se escreve como não feita.
+> ✅ **NO AR EM 07/11/2026** (PR #302): o dono fez o backup, o deploy (o `node
+> --check` do `tarja_estoque.js` passou) e o teste de segurança (telas 302, API
+> 401, `/login` 200). O primeiro deploy rodou antes do merge e subiu o `main` sem
+> o arquivo — o `node --check` acusou, e o segundo, depois do merge, pegou.
+>
+> ⚠️ **AINDA NÃO PROVADO COM DADO REAL.** O `diagnosticar_tarja_estoque.js`
+> rodou depois do deploy num **sábado, sem fila: 0 SKUs**. Zero ali não é "tudo
+> certo", é "nada para conferir". A prova é o primeiro dia útil com fila: o
+> diagnóstico com "tarja faltando" e "tarja em parte" vazios **e com SKUs na
+> conta**, e a tela da bancada mostrando a tarja antes do bipe num SKU que tem
+> alguma peça, mas não para todas. Prova que não foi feita se escreve como não
+> feita.
 
 Ferramentas que só leem: `node rastrear.js --lote` (os sete degraus do PDF até a
 tela), `node rastrear.js --auditar [dias]`, `node conferir_nf.js --pdf` e `node
