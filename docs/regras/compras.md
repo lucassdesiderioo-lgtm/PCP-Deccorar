@@ -31,10 +31,10 @@
 - História:         fase 1.
 
 ### R-CMP-03 · O modo de saldo é escolha obrigatória para nascer
-- Regra:            `componente.modo_saldo` = `sem` · `quantidade` · `volume`. Sem a escolha, o cadastro recusa (400). Na edição ele não se apaga. Os materiais de antes receberam `quantidade` (tecido com família: `volume`, um por nível) num backfill de uma vez só (`config.cmp_material_backfill_1`).
-- Por quê:          regra que nasce com o valor que ninguém escolheu fica inerte em silêncio (armadilha #30).
+- Regra:            `componente.modo_saldo` = `sem` · `quantidade` · `volume`. Sem a escolha, o cadastro recusa (400). Na edição ele não se apaga, e **com saldo ele não muda** (400, dizendo o caminho). Os materiais de antes receberam `quantidade` num backfill de uma vez só (`config.cmp_material_backfill_1`); o tecido com família **e sem saldo** recebeu `volume`, um por nível. **O tecido com saldo de antes fica `quantidade`** até alguém com `contagem.aprovar` etiquetar os rolos na 504 (aba "Tecido de antes: etiquetar os rolos"): cada rolo vira volume com a metragem medida, o material passa a `volume` e o saldo vira a soma deles — a diferença entra no livro como `contagem`, com quem (decisão do dono, 07/11/2026).
+- Por quê:          regra que nasce com o valor que ninguém escolheu fica inerte em silêncio (armadilha #30); e um material "por volume" sem volume nenhum teria o saldo sem os rolos que o compõem (R-CMP-39).
 - Exceções:         nenhuma.
-- Teste que trava:  `teste_material.js` (sem o "obrigatório", reprova 1; sem o backfill, 1)
+- Teste que trava:  `teste_material.js` (sem o "obrigatório", reprova 1; sem o backfill, 1; o tecido com saldo virando volume, 1); `teste_revisao_compras.js` (a troca com saldo e o etiquetar na 504)
 - Status:           em código desde 07/11/2026.
 - História:         fase 1.
 
@@ -195,10 +195,10 @@
 ## E. Recebimento (fase 3)
 
 ### R-CMP-28 · Quem recebe não vê preço
-- Regra:            a fila (`GET /api/recebimento/aguardando`) e a resposta do receber montam o JSON sem nenhum campo de preço, valor ou custo — escolhidos campo a campo no `recebimento_dominio.fila`.
+- Regra:            a fila (`GET /api/recebimento/aguardando`) e a resposta do receber montam o JSON sem nenhum campo de preço, valor ou custo — escolhidos campo a campo no `recebimento_dominio.fila`. **O pedido também**: `GET /api/pedidos` e `/api/pedidos/:id` a quem não tem `compras.ver`, `pedido.criar`, `pedido.aprovar`, `pedido.pagar`, `nota.lancar` nem `custo.ver` saem sem dinheiro, sem o declarado e sem a alçada (a poda é pelo nome: `valor*`, `preco*`, `desembolso*`, `frete*`, `desconto*`, `custo*`, `qtd_*`, `alcada*`), e o texto de WhatsApp (que tem preço) é 403 (revisão do PR #305).
 - Por quê:          quem confere vendo valor confirma o que está escrito.
 - Exceções:         nenhuma.
-- Teste que trava:  `teste_recebimento.js`
+- Teste que trava:  `teste_recebimento.js`; `teste_revisao_compras.js` (o pedido pelo fio a quem só recebe)
 - Status:           em código desde 07/11/2026 (mantida do COMPRAS.md).
 - História:         fase 3.
 
@@ -227,10 +227,10 @@
 - História:         fase 3.
 
 ### R-CMP-32 · Tolerância em três faixas
-- Regra:            até `tol_aviso_pct` entra normal; até `tol_retem_pct` entra no saldo e vai para ciência; acima — ou contagem diferente da quantidade declarada — RETÉM: não entra no saldo.
-- Por quê:          numa compra de R$ 40–50 mil o material pior não pode passar.
+- Regra:            até `tol_aviso_pct` entra normal; até `tol_retem_pct` entra no saldo e vai para ciência; acima — ou contagem **acima** da quantidade declarada — RETÉM: não entra no saldo. **A entrega abaixo do declarado entra** (o pedido fica parcial, o resto a caminho), e a diferença só é cobrada **no fechamento**: o "fechar pedido parcial" põe na aba Recebimento retido uma linha "fechamento" (o que chegou × o declarado), que se decide com aceitar ou aceitar e reclamar e **não mexe no saldo** (decisão do dono, 07/11/2026). O peso é conferido a cada entrega, e a régua da nota é proporcional: o kg que falta ÷ as unidades declaradas que faltam.
+- Por quê:          numa compra de R$ 40–50 mil o material pior não pode passar; e a compra por kg chega em partes no caso normal — reter toda parcial era a trava que dispara no caso normal (armadilha #6).
 - Exceções:         nenhuma.
-- Teste que trava:  `teste_recebimento.js` (sem a faixa de aviso, reprova; contagem ≠ declarado passando, reprova)
+- Teste que trava:  `teste_recebimento.js` (sem a faixa de aviso, reprova; contagem acima do declarado passando, reprova); `teste_revisao_compras.js` (a parcial retida, a régua dobrada e a diferença sem ir para quem libera, reprovam)
 - Status:           em código desde 07/11/2026.
 - História:         fase 3.
 
@@ -243,7 +243,7 @@
 - História:         fase 3.
 
 ### R-CMP-34 · O custo é por unidade recebida
-- Regra:            na compra por kg, o valor do item ÷ o que chegou contado (400 kg, 590 tubos: ÷ 590). Na entrega parcial depois da primeira, pelo declarado — a conta exata é da nota (fase 4). Fora do kg, o preço da embalagem ÷ o fator.
+- Regra:            na compra por kg, o valor do item ÷ o que chegou contado (400 kg, 590 tubos: ÷ 590). A entrega parcial (abaixo do declarado) custa pelo declarado; quando o pedido fecha com falta e o kg inteiro chegou, o custo vira o valor ÷ o contado (`fecharComFalta`). A nota lançada depois corrige pelo líquido ÷ o que ela cobra (quantidade × fator), ou ÷ o recebido quando o item já fechou. Fora do kg, o preço da embalagem ÷ o fator.
 - Por quê:          o tubo que faltou encarece os que vieram.
 - Exceções:         ver acima.
 - Teste que trava:  `teste_recebimento.js` (pelo declarado, reprova 1)
@@ -317,20 +317,20 @@
 - História:         fase 4.
 
 ### R-CMP-27 · Quem vê nota, impostos e parcelas
-- Regra:            só `custo.ver` ou `nota.lancar` (as parcelas, também `pedido.pagar`). As rotas `/api/notas` pedem essas chaves, e o pedido completo poda as notas no JSON.
+- Regra:            só `custo.ver` ou `nota.lancar` (as parcelas, também `pedido.pagar`). As rotas `/api/notas` pedem essas chaves, e o pedido completo poda as notas no JSON. **Os anexos da nota** (XML, PDF e foto da nota, ou anexo ligado a uma nota) também: a lista não os mostra e o download é 403 a quem não tem uma das duas — o orçamento continua de quem vê compras.
 - Por quê:          regra 14 do §13: não é a tela que esconde.
 - Exceções:         nenhuma.
-- Teste que trava:  `teste_nota_compra.js` (notas sem poda, reprova 1); `teste_acesso_compras.js`
+- Teste que trava:  `teste_nota_compra.js` (notas sem poda, reprova 1); `teste_acesso_compras.js`; `teste_revisao_compras.js` (o XML baixado por quem só vê compras, 2)
 - Status:           em código desde 07/11/2026.
 - História:         fase 4.
 
 ## F. Almoxarifado e volumes (fase 5)
 
 ### R-CMP-39 · Volume é a peça física etiquetada
-- Regra:            `volume_material` (código `M-000001`, material, recebimento de origem, quantidade inicial, saldo, nível, situação `guardado` · `aberto` · `encerrado`). Nasce no recebimento do material por volume, na mesma transação da entrada, um por volume. O saldo de um material por volume é a soma dos volumes não encerrados. Cada movimento fica em `volume_evento`, com quem.
+- Regra:            `volume_material` (código `M-000001`, material, recebimento de origem, quantidade inicial, saldo, nível, situação `guardado` · `aberto` · `encerrado`). Nasce no recebimento do material por volume, na mesma transação da entrada, um por volume. O saldo de um material por volume é a soma dos volumes não encerrados. Cada movimento fica em `volume_evento`, com quem. O item **retido** guarda os volumes (`recebimento_item.volumes_json`) e eles nascem quando quem libera aceita; o tecido do sob medida retido e aceito vira rolo lá (R-CMP-49), nunca estoque no PCP.
 - Por quê:          o rolo e a caixa têm endereço e etiqueta.
 - Exceções:         nenhuma.
-- Teste que trava:  `teste_almoxarifado.js` (sem o volume no recebimento, reprova)
+- Teste que trava:  `teste_almoxarifado.js` (sem o volume no recebimento, reprova); `teste_porta_sobmedida.js` (o retido aceito sem volume, 1; o tecido retido virando estoque no PCP, 2)
 - Status:           em código desde 07/11/2026.
 - História:         fase 5.
 
@@ -365,7 +365,7 @@
 - Por quê:          a contagem de material ganhou spec própria.
 - Exceções:         material por volume nunca é ajustado aqui: o saldo dele é a soma dos volumes; a diferença vai para ciência, e corrige-se na 503.
 - Teste que trava:  `teste_contagem_material.js` (saldo vazando, reprova 1; aplicando tudo sozinho, reprova; quem contou aprovando, 1; o saldo do "terminei", 2)
-- Status:           em código desde 07/11/2026. A contagem de material antiga da 302 continua.
+- Status:           em código desde 07/11/2026. **A contagem de material antiga da 302 foi aposentada** (decisão do dono, 07/11/2026): o card saiu e o `POST /api/contagem/componente` responde 410 apontando a 504. Material se conta só aqui.
 - História:         fase 6.
 
 ### R-CMP-43 · Tubo cortado ainda é material
@@ -421,10 +421,10 @@
 ## Nota por XML (fase 8)
 
 ### R-CMP-08 (fase 8) · O XML casa sem adivinhar
-- Regra:            anexar o XML da NF-e (layout 4.00, com ou sem `nfeProc` e namespace) preenche nota e itens com os valores e impostos como vieram. O item casa com o do pedido pelo código do fornecedor da oferta (`codigo_fornec` = `cProd`) ou, se um só item do pedido tem aquele NCM, pelo NCM. Dois candidatos, ou nenhum, ficam para escolher na tela; a nota só se lança com todo item decidido ("não é deste pedido" é uma escolha). A mesma chave não entra duas vezes (409). Origem `xml`.
+- Regra:            anexar o XML da NF-e (layout 4.00, com ou sem `nfeProc` e namespace) preenche nota e itens com os valores e impostos como vieram. O item casa com o do pedido pelo código do fornecedor da oferta (`codigo_fornec` = `cProd`) ou, se um só item do pedido tem aquele NCM **e um só item da nota casaria por ele**, pelo NCM — dois itens da nota disputando o mesmo NCM ficam para escolher. Dois candidatos, ou nenhum, ficam para escolher na tela; a nota só se lança com todo item decidido ("não é deste pedido" é uma escolha). A mesma chave não entra duas vezes (409). Origem `xml`.
 - Por quê:          digitar nota é onde o erro entra; adivinhar é onde ele se esconde.
 - Exceções:         nenhuma.
-- Teste que trava:  `teste_nota_xml.js` (NCM ambíguo adivinhado, reprova 1; lançar sem decidir, reprova; a chave duas vezes, 1; sem tirar o namespace, reprova)
+- Teste que trava:  `teste_nota_xml.js` (NCM ambíguo adivinhado, reprova 1; lançar sem decidir, reprova; a chave duas vezes, 1; sem tirar o namespace, reprova); `teste_dfe.js` (o NCM disputado por dois itens da nota, 1)
 - Status:           em código desde 07/11/2026. ⚠️ Os XML do teste foram montados no layout da Receita, não vieram de fornecedor: a prova com XML real é o primeiro que o dono anexar.
 - História:         fase 8.
 
@@ -439,10 +439,10 @@
 - História:         fase 9.
 
 ### R-CMP-49 · Uma porta de entrada para o tecido do sob medida
-- Regra:            o material do PCP que é tecido do sob medida aponta o tecido de lá (`componente.sm_tecido_id`, conferido pela porta). Comprado pela 501 e recebido pela 502 por volume, o rolo NASCE no sob medida pela porta (`sobmedida_rolo.js` → `montar().criarRolosDoRecebimento`), um por volume, pelo `rolo.entrada` de sempre, com o tecido, a largura da bobina do cadastro, a nota, o fornecedor do PCP (pelo espelho) e o preço por m² (custo da unidade ÷ largura). Nada entra no estoque do PCP. Sem a porta, o recebimento desse tecido recusa (503) e nada é gravado. A entrada de rolo do sob medida (aba "Entrada de rolo", `POST /api/rolos`) está aposentada e recusa dizendo o caminho.
+- Regra:            o material do PCP que é tecido do sob medida aponta o tecido de lá (`componente.sm_tecido_id`, conferido pela porta). Comprado pela 501 e recebido pela 502 por volume, o rolo NASCE no sob medida pela porta (`sobmedida_rolo.js` → `montar().criarRolosDoRecebimento`), um por volume, pelo `rolo.entrada` de sempre, com o tecido, a largura da bobina do cadastro, a nota, o fornecedor do PCP (pelo espelho) e o preço por m² (custo da unidade ÷ largura). Nada entra no estoque do PCP. Sem a porta, o recebimento desse tecido recusa (503) e nada é gravado. **Os rolos de todos os tecidos de um recebimento nascem numa chamada só, no fim da transação do PCP**, e numa transação só do lado de lá: a recusa de qualquer um desfaz os dois lados — não sobra rolo órfão (revisão do PR #305). A entrada de rolo do sob medida (aba "Entrada de rolo", `POST /api/rolos`) está aposentada e recusa dizendo o caminho.
 - Por quê:          tecido tinha duas portas de entrada e dois cadastros de fornecedor.
 - Exceções:         o tecido do sob medida não fica retido pela contagem ≠ declarado: o rolo nasce lá, e lá se acerta (R9).
-- Teste que trava:  `teste_porta_sobmedida.js` (o tecido entrando no PCP, reprova; sem o espelho do fornecedor, 1; a entrada antiga aberta, 1; sem o preço, 1)
+- Teste que trava:  `teste_porta_sobmedida.js` (o tecido entrando no PCP, reprova; sem o espelho do fornecedor, 1; a entrada antiga aberta, 1; sem o preço, 1; o rolo órfão, 1)
 - Status:           em código desde 07/11/2026.
 - História:         fase 9.
 
@@ -473,26 +473,26 @@
 - História:         fase 11.
 
 ### R-CMP-53 · A busca das notas na Receita
-- Regra:            com certificado válido, o servidor consulta a distribuição de DF-e do Ambiente Nacional (`NFeDistribuicaoDFe`, `distNSU`) pelo próprio relógio (`dfe_route.js`, olha a cada 5 min se já passou a `proxima_consulta`; sem cron), guardando o último NSU lido. `cStat 138` com mais a ler volta em 2 min; `137` (nada novo) e `656` (consumo indevido) esperam **pelo menos uma hora**, seja qual for o `config.dfe_intervalo_min` (padrão 60). Cada nota emitida contra o CNPJ aparece em 501 → Notas → **Notas recebidas da Receita**, com emitente, valor e data. O Admin Geral pode "Consultar a Receita agora".
+- Regra:            com certificado válido, o servidor consulta a distribuição de DF-e do Ambiente Nacional (`NFeDistribuicaoDFe`, `distNSU`) pelo próprio relógio (`dfe_route.js`, olha a cada 5 min se já passou a `proxima_consulta`; sem cron), guardando o último NSU lido. `cStat 138` com mais a ler (`ultNSU < maxNSU`) volta em 2 min; `138` com tudo lido, `137` (nada novo) e `656` (consumo indevido) esperam **pelo menos uma hora**, seja qual for o `config.dfe_intervalo_min` (padrão 60; valor que não é número vira 60) — e depois de 137/656 o "consultar agora" também espera. Cada documento do lote entra sozinho: o que não abre vira linha "não entrou", com o motivo, e o NSU só anda depois do lote. Cada nota emitida contra o CNPJ aparece em 501 → Notas → **Notas recebidas da Receita**, com emitente, valor e data. O Admin Geral pode "Consultar a Receita agora".
 - Por quê:          a nota chega antes da mercadoria, e a Receita bloqueia quem consulta demais.
 - Exceções:         `PCP_DFE_AUTOMATICO=0` desliga o relógio (é o que os testes usam).
-- Teste que trava:  `teste_dfe.js` (o 137 sem esperar a hora, reprova 1)
+- Teste que trava:  `teste_dfe.js` (o 137 sem esperar a hora, reprova 1; o "consultar agora" depois do 137, 1; o 138 sem mais nada, 1; o documento estragado derrubando o lote, 4)
 - Status:           em código desde 07/11/2026. ⚠️ As respostas da Receita do teste foram gravadas no layout dela, não vieram dela: a prova é a primeira consulta de verdade.
 - História:         fase 11.
 
 ### R-CMP-54 · Só a ciência da operação é automática
 - Regra:            para cada resumo (`resNFe`) o sistema envia o evento 210210 (ciência da operação), assinado (XMLDSig, C14N, RSA-SHA1) com a chave do certificado, que sai do `.pfx` só em memória, pelo `openssl` do servidor. 135, 136 e 573 contam como feita. Confirmação, desconhecimento e operação não realizada **não existem** no sistema.
 - Por quê:          a Receita só entrega o XML completo depois da ciência, e a ciência não confirma nem nega a compra.
-- Exceções:         sem `openssl` no servidor, ou a Receita recusando, a ciência fica pendente e a nota diz por quê (não trava nada).
-- Teste que trava:  `teste_dfe.js` (sem a ciência, reprova 1; o evento conferido contra a chave pública do certificado)
+- Exceções:         sem `openssl` no servidor, ou a Receita recusando, a ciência fica pendente e a nota diz por quê (não trava nada); a pendente é tentada de novo a cada consulta seguinte.
+- Teste que trava:  `teste_dfe.js` (sem a ciência, reprova 1; o evento conferido contra a chave pública do certificado; a ciência que falhou sem nova tentativa, 1)
 - Status:           em código desde 07/11/2026. ⚠️ A assinatura foi conferida pela chave pública, não pela Receita.
 - História:         fase 11.
 
 ### R-CMP-55 · A nota baixada vira a nota da fase 8, sem adivinhar
-- Regra:            o XML completo (`procNFe`) fica guardado em `ANEXOS_COMPRAS/dfe/` e entra pelo leitor da fase 8 (`nota_xml.js`, origem `dfe`). Lança sozinho **só** quando o emitente tem UM pedido comprado e todo item casa; com dois pedidos, ou item que não casa, fica "escolha o pedido e os itens" na tela; sem pedido do emitente, **"nota sem pedido"** — e isso é linha na central de Pendências (`nota.lancar`).
+- Regra:            o XML completo (`procNFe`) fica guardado em `ANEXOS_COMPRAS/dfe/` e entra pelo leitor da fase 8 (`nota_xml.js`, origem `dfe`). Lança sozinho **só** quando o emitente tem UM pedido, ele está **a caminho** (comprado ou parcial — o já recebido não recebe nota sozinho) e todo item casa; com dois pedidos, pedido já recebido, ou item que não casa, fica "escolha o pedido e os itens" na tela (e o motivo do lançamento que não deu fica escrito); sem pedido do emitente, **"nota sem pedido"** — e isso é linha na central de Pendências (`nota.lancar`). A nota sem pedido é olhada de novo a cada consulta (o pedido pode aparecer), e quem tem `nota.lancar` pode marcá-la **"ciente, sem pedido"**, com motivo, quem e quando — aí ela sai das Pendências.
 - Por quê:          a regra da fase 8 (R-CMP-08): o que se adivinha é onde o erro se esconde.
 - Exceções:         nenhuma.
-- Teste que trava:  `teste_dfe.js` (dois pedidos adivinhados, reprova 2)
+- Teste que trava:  `teste_dfe.js` (dois pedidos adivinhados, reprova 2; o pedido já recebido, 1; o "ciente" sem motivo, 1; a reavaliação, 1)
 - Status:           em código desde 07/11/2026.
 - História:         fase 11.
 

@@ -119,6 +119,8 @@ module.exports = function(app, db){
         fechado_em=datetime('now','localtime'), motivo_fecho=? WHERE id=?`).run(motivo,req.params.id);
       db.prepare(`UPDATE pedido_item SET status=? WHERE pedido_id=? AND status IN ('aberto','parcial')`)
         .run(motivo===OK[0]?'recebido':'cancelado', req.params.id);
+      /* A diferenca do declarado e cobrada AQUI (decisao do dono, 07/11/2026). */
+      require('./recebimento_dominio').fecharComFalta(db, req.params.id, QUEM.pessoa(req));
     })();
     auditar(req,'pedido_parcial_fechado',p.numero,motivo);
     res.json({ok:true});

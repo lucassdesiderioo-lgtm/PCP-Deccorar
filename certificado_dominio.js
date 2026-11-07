@@ -88,14 +88,22 @@ function receber(db, b, quem){
   if(info.validade && info.validade < new Date().toISOString().slice(0, 10)) throw new Recusa(400, 'este certificado venceu em ' + info.validade);
   const arq = 'certificado-' + Date.now() + '.pfx';
   fs.mkdirSync(pasta(), { recursive:true, mode:0o700 });
-  db.transaction(() => {
-    for(const v of db.prepare('SELECT arquivo FROM certificado WHERE ativo=1').all())
-      try{ fs.unlinkSync(path.join(pasta(), path.basename(v.arquivo))); }catch(e){}
-    db.prepare('UPDATE certificado SET ativo=0 WHERE ativo=1').run();
-    db.prepare(`INSERT INTO certificado (cnpj, titular, validade, arquivo, senha_cifrada, enviado_por, enviado_por_id, ativo)
-      VALUES (?,?,?,?,?,?,?,1)`).run(info.cnpj, info.titular, info.validade, arq, cifrar(senha), quem && quem.nome || null, quem && quem.id || null);
-    fs.writeFileSync(path.join(pasta(), arq), pfx, { mode:0o600 });
-  })();
+  /* O NOVO PRIMEIRO, O VELHO SO DEPOIS (revisao do PR #305): o arquivo novo e
+     gravado antes, o banco troca numa transacao, e so com ela feita o arquivo
+     de antes e apagado. A troca que falha no meio deixa o que valia de pe. */
+  const antigos = db.prepare('SELECT arquivo FROM certificado WHERE ativo=1').all();
+  fs.writeFileSync(path.join(pasta(), arq), pfx, { mode:0o600 });
+  try{
+    db.transaction(() => {
+      db.prepare('UPDATE certificado SET ativo=0 WHERE ativo=1').run();
+      db.prepare(`INSERT INTO certificado (cnpj, titular, validade, arquivo, senha_cifrada, enviado_por, enviado_por_id, ativo)
+        VALUES (?,?,?,?,?,?,?,1)`).run(info.cnpj, info.titular, info.validade, arq, cifrar(senha), quem && quem.nome || null, quem && quem.id || null);
+    })();
+  }catch(e){
+    try{ fs.unlinkSync(path.join(pasta(), arq)); }catch(x){}
+    throw e;
+  }
+  for(const v of antigos) try{ fs.unlinkSync(path.join(pasta(), path.basename(v.arquivo))); }catch(e){}
   /* a busca recomeca do ultimo NSU lido (se houver), sem esperar */
   try{ db.prepare("UPDATE dfe_controle SET proxima_consulta=NULL, ultimo_erro=NULL WHERE id=1").run(); }catch(e){}
   return estado(db);

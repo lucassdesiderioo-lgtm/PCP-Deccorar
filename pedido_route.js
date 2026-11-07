@@ -109,6 +109,33 @@ module.exports = function(app, db){
   });
 
   /* ── LER ─────────────────────────────────────────────────────────────────── */
+  /* QUEM SÓ RECEBE NÃO LÊ O PEDIDO INTEIRO (revisão do PR #305, R-CMP-28/29/30):
+     o setor Recebimento tem pedido.ver, e esta rota entregava preço, o
+     declarado, os kg e a alçada — a contagem e a pesagem cegas da 502 deixavam
+     de ser cegas. Quem vê o pedido inteiro é quem compra, aprova, paga, lança
+     nota ou vê custo; os outros recebem o pedido sem dinheiro nem quantidade. */
+  const INTEIRO = ['compras.ver','pedido.criar','pedido.aprovar','pedido.pagar','nota.lancar','custo.ver'];
+  const veInteiro = req => INTEIRO.some(c => { try{ return !!app.locals.acesso.podePermissao(req.usuario, c); }catch(e){ return false; } });
+  const CEGO = /^(valor|preco|desembolso|frete|desconto|custo|qtd_|alcada)/;
+  function podar(o){
+    if(Array.isArray(o)) return o.map(podar);
+    if(!o || typeof o !== 'object') return o;
+    const n = {};
+    for(const k of Object.keys(o)) if(!CEGO.test(k)) n[k] = podar(o[k]);
+    return n;
+  }
+  app.get('/api/pedidos',(req,res,next)=>{
+    if(veInteiro(req)) return next();
+    const j = res.json.bind(res); res.json = c => j(podar(c)); next();
+  });
+  app.get('/api/pedidos/:id',(req,res,next)=>{
+    if(veInteiro(req)) return next();
+    const j = res.json.bind(res); res.json = c => j(podar(c)); next();
+  });
+  app.get('/api/pedidos/:id/whatsapp',(req,res,next)=>{
+    if(veInteiro(req)) return next();
+    res.status(403).json({ erro:'o texto do pedido tem preço: só para quem compra' });
+  });
   app.get('/api/pedidos',(req,res)=>{
     const w=[], p=[];
     if(req.query.status){ w.push('p.status=?'); p.push(req.query.status); }

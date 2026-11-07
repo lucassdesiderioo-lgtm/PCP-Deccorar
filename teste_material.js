@@ -30,7 +30,8 @@ process.env.PCP_DIR = require('fs').mkdtempSync(require('path').join(require('os
     INSERT INTO componente (nome,unidade) VALUES ('Parafuso antigo','un');`);
   pre.exec(`ALTER TABLE componente ADD COLUMN familia TEXT; ALTER TABLE componente ADD COLUMN cor TEXT;
     ALTER TABLE componente ADD COLUMN largura_bobina_cm INTEGER;
-    INSERT INTO componente (nome,unidade,familia,cor,largura_bobina_cm) VALUES ('Blackout bege 3,20','m','BLACKOUT','BEGE',320);`);
+    INSERT INTO componente (nome,unidade,familia,cor,largura_bobina_cm) VALUES ('Blackout bege 3,20','m','BLACKOUT','BEGE',320);
+    INSERT INTO componente (nome,unidade,familia,cor,largura_bobina_cm,estoque) VALUES ('Blackout cinza 2,80','m','BLACKOUT','CINZA',280,40);`);
   pre.close();
 }
 const dirAntes = process.env.PCP_DIR;
@@ -51,7 +52,11 @@ const SO_LER = { id:7, nome:'Leitor', permissoes:['compras.ver'] };
   const antes = db.prepare("SELECT * FROM componente ORDER BY id").all();
   ok('quem existia vai para a ficha (vai_ficha = 1)', antes.every(c => c.vai_ficha === 1), () => JSON.stringify(antes.map(c => c.vai_ficha)));
   ok('quem existia sem familia vira "quantidade"', antes.filter(c => !c.familia).every(c => c.modo_saldo === 'quantidade'));
-  ok('o tecido (com familia) vira "volume" e um por nivel', antes.filter(c => c.familia).every(c => c.modo_saldo === 'volume' && c.um_por_nivel === 1));
+  ok('o tecido (com familia) SEM saldo vira "volume" e um por nivel', antes.filter(c => c.familia && !(c.estoque > 0)).every(c => c.modo_saldo === 'volume' && c.um_por_nivel === 1));
+  /* DECISAO DO DONO (07/11/2026, revisao do PR #305): o tecido com saldo de
+     antes fica "quantidade" ate ser contado e etiquetado na 504 — virar volume
+     sem volume nenhum deixaria o saldo sem os rolos que o compoem (R-CMP-39). */
+  ok('o tecido COM saldo de antes fica "quantidade" (ate a contagem na 504)', antes.filter(c => c.familia && c.estoque > 0).every(c => c.modo_saldo === 'quantidade') && antes.some(c => c.familia && c.estoque > 0), () => JSON.stringify(antes.filter(c => c.familia)));
   ok('o backfill roda uma vez so (marca em config)', !!db.prepare("SELECT 1 FROM config WHERE chave='cmp_material_backfill_1'").get());
   db.prepare("UPDATE componente SET vai_ficha=0 WHERE nome='Parafuso antigo'").run();
   require('./compras_schema').garantirSchemaCompras(db);

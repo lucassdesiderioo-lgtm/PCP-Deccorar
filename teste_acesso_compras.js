@@ -40,36 +40,27 @@ const AC = app.locals.acesso;
 const PERM = require('./permissoes');
 const temSetor = (s, c) => !!db.prepare('SELECT 1 FROM setor_permissao WHERE setor_id=? AND chave=?').get(s, c);
 
-/* chave nova · nivel · de quem ela vem (null = so o Admin Geral) */
+/* chave nova · nivel. DECISÃO DO DONO (07/11/2026, revisão do PR #305): a
+   R-ALC-06 vale sobre a spec §7 — TODA chave nova nasce só para o Admin Geral,
+   e quem recebe é decidido na tela de Acessos. Nada de backfill: nem o setor
+   que tinha a chave "parecida", nem a exceção, nem o setor Admin do banco novo. */
 const CHAVES = [
-  ['almoxarifado.cadastrar', 'admin', 'componente.cadastrar'],
-  ['pedido.aprovar', 'admin', 'pedido.criar'],
-  ['nota.lancar', 'admin', 'pedido.pagar'],
-  ['alcada.definir', 'admin_geral', null],
-  ['recebimento.liberar', 'admin', 'pedido.criar'],
-  ['volume.movimentar', 'operacao', 'pedido.receber'],
-  ['certificado.gerenciar', 'admin_geral', null]
+  ['almoxarifado.cadastrar', 'admin'],
+  ['pedido.aprovar', 'admin'],
+  ['nota.lancar', 'admin'],
+  ['alcada.definir', 'admin_geral'],
+  ['recebimento.liberar', 'admin'],
+  ['volume.movimentar', 'operacao'],
+  ['certificado.gerenciar', 'admin_geral']
 ];
-for(const [chave, nivel, de] of CHAVES){
+for(const [chave, nivel] of CHAVES){
   const p = PERM.find(x => x.chave === chave);
   ok(chave + ': esta no permissoes.js com nivel ' + nivel + ', tela e rotulo', p && p.nivel === nivel && p.tela && p.rotulo, JSON.stringify(p));
-  if(de){
-    ok(chave + ': o setor que tinha ' + de + ' recebeu', temSetor(sid, chave));
-    ok(chave + ': a excecao concedida de ' + de + ' virou excecao da nova',
-       !!db.prepare('SELECT 1 FROM usuario_excecao WHERE usuario_id=? AND chave=? AND concede=1').get(u, chave));
-    if(de !== 'pedido.receber') ok(chave + ': o setor que NAO tinha ' + de + ' nao recebeu', !temSetor(oper, chave));
-    else ok(chave + ': o setor de quem recebe (operacao) recebeu', temSetor(oper, chave));
-  }else{
-    const fora = db.prepare("SELECT s.nome FROM setor_permissao sp JOIN setores s ON s.id=sp.setor_id WHERE sp.chave=? AND s.nome<>'Admin Geral'").all(chave);
-    ok(chave + ': so o Admin Geral (nenhum outro setor a tem)', fora.length === 0, JSON.stringify(fora));
-    ok(chave + ': e intransferivel', p && p.intransferivel === true);
-  }
+  const fora = db.prepare("SELECT s.nome FROM setor_permissao sp JOIN setores s ON s.id=sp.setor_id WHERE sp.chave=? AND s.nome<>'Admin Geral'").all(chave);
+  ok(chave + ': nasce so para o Admin Geral (nenhum outro setor a tem, nem o Admin nativo)', fora.length === 0, JSON.stringify(fora));
+  ok(chave + ': nenhuma excecao foi criada sozinha', !db.prepare('SELECT 1 FROM usuario_excecao WHERE chave=?').get(chave));
+  if(nivel === 'admin_geral') ok(chave + ': e intransferivel', p && p.intransferivel === true);
 }
-
-/* A segunda volta nao repete: desmarcou, nao volta. */
-db.prepare("DELETE FROM setor_permissao WHERE setor_id=? AND chave='almoxarifado.cadastrar'").run(sid);
-require('./acesso')(appFalso(), db);
-ok('o backfill roda uma vez so: quem desmarcar nao a ve voltar', !temSetor(sid, 'almoxarifado.cadastrar'));
 
 /* As rotas — a ponta do permDaRota. */
 const ROTAS = [
@@ -110,6 +101,8 @@ const ROTAS = [
   ['GET', '/api/contagem-material/pendentes', 'contagem.aprovar'],
   ['POST', '/api/contagem-material/itens/4/aprovar', 'contagem.aprovar'],
   ['GET', '/contagem-material', 'contagem.contar'],
+  ['GET', '/api/contagem-material/a-etiquetar', 'contagem.aprovar'],
+  ['POST', '/api/contagem-material/etiquetar', 'contagem.aprovar'],
   ['GET', '/api/compras/programada', 'compras.ver'],
   ['POST', '/api/compras/programada/pedido', 'pedido.criar'],
   ['POST', '/api/notas/xml/ler', 'nota.lancar'],
@@ -130,6 +123,32 @@ for(const [m, r, chave] of ROTAS){
   const lista = Array.isArray(d) ? d : [d];
   ok(m + ' ' + r + ' pede ' + chave, lista.indexOf(chave) >= 0, JSON.stringify(d));
 }
+
+/* O LADO "NÃO PODE" (revisão do PR #305): quem conta material não lê o saldo
+   por porta nenhuma (R-CMP-42, a contagem cega), e a chave da 503 lê o que a
+   tela dela precisa. */
+const NAO = [
+  ['GET', '/api/almoxarifados/2/estoque', 'contagem.contar'],
+  ['GET', '/api/enderecos/E-000001', 'contagem.contar'],
+  /* etiquetar o tecido de antes muda o saldo: nao e de quem so conta */
+  ['POST', '/api/contagem-material/etiquetar', 'contagem.contar']
+];
+for(const [m, r, chave] of NAO){
+  const d = AC.permDaRota(r, m);
+  const lista = Array.isArray(d) ? d : [d];
+  ok(m + ' ' + r + ' NÃO aceita ' + chave, lista.indexOf(chave) < 0, JSON.stringify(d));
+}
+{ const d = AC.permDaRota('/api/almoxarifados', 'GET');
+  ok('GET /api/almoxarifados aceita volume.movimentar (a 503 escolhe o endereço)', (Array.isArray(d) ? d : [d]).indexOf('volume.movimentar') >= 0, JSON.stringify(d)); }
+
+/* QUEM TEM SÓ A CHAVE DA 503 CHEGA NA 503 (revisão do PR #305): sem a área,
+   o destino depois do PIN era o /login — o defeito do vendedor (§20). */
+{ const uid = db.prepare("INSERT INTO usuarios (nome,pin_hash,salt,areas,nivel) VALUES ('Vol','x','y','','operacao')").run().lastInsertRowid;
+  db.prepare("INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?, 'volume.movimentar', 1)").run(uid);
+  AC.sincronizarAreas(uid);
+  const areas = (db.prepare('SELECT areas FROM usuarios WHERE id=?').get(uid).areas || '').split(',').filter(Boolean);
+  const dst = require('./destino').destino(areas);
+  ok('só com volume.movimentar, depois do PIN vai para a 503 (e não para o login)', dst.inicial === '/almoxarifado', JSON.stringify({ areas, dst })); }
 
 console.log('');
 console.log(falhas ? (falhas + ' de ' + n + ' FALHARAM') : ('todos os ' + n + ' casos passaram'));

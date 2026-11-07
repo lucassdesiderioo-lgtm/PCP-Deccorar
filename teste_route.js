@@ -91,7 +91,22 @@ module.exports=function(app, db){
     // foto restaura; sem esta cobertura, "apagar tudo" deixaria o pedido de pe
     // descrevendo uma devolucao que nao existe mais. As duas ja tem `teste`.
     {nome:'fim_dia',              pk:'id', rotulo:'fim do dia da Conferencia'},
-    {nome:'cancelamento_caixa',   pk:'id', rotulo:'vendas canceladas na Conferencia'}
+    {nome:'cancelamento_caixa',   pk:'id', rotulo:'vendas canceladas na Conferencia'},
+    /* COMPRAS-E-RECEBIMENTO (07/11/2026, revisao do PR #305). O volume e a
+       historia dele, a contagem de material da 504, a nota de compra, as
+       parcelas e os anexos: o que nasce em teste sai no "apagar tudo", e o
+       saldo do material volta pela foto do componente.
+       ⚠️ A NOTA BAIXADA DA RECEITA (dfe_documento) FICA DE FORA, de proposito:
+       a consulta avanca o ultimo NSU, e a nota apagada nao se baixa de novo. */
+    {nome:'volume_material',         pk:'id', rotulo:'volumes de material'},
+    {nome:'volume_evento',           pk:'id', rotulo:'volumes (historia)'},
+    {nome:'contagem_material',       pk:'id', rotulo:'contagem de material (504)'},
+    {nome:'contagem_material_item',  pk:'id', rotulo:'contagem de material (itens)'},
+    {nome:'contagem_material_linha', pk:'id', rotulo:'contagem de material (linhas)'},
+    {nome:'nota_compra',             pk:'id', rotulo:'notas de compra'},
+    {nome:'nota_compra_item',        pk:'id', rotulo:'notas de compra (itens)'},
+    {nome:'pagamento_parcela',       pk:'id', rotulo:'parcelas de pagamento'},
+    {nome:'compra_anexo',            pk:'id', rotulo:'anexos de compra'}
   ];
 
   // Fase 3: foto_estoque saiu da cobertura; limpa o trigger antigo em bancos

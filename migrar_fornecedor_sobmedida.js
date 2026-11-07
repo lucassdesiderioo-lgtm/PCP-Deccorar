@@ -59,22 +59,35 @@ async function principal(){
   const BANCO_SM = require('./tecido/nucleo/caminho').BANCO;
   const fs = require('fs');
   if(!fs.existsSync(BANCO_SM)){ console.log('o banco do sob medida não existe em ' + BANCO_SM + ' — nada a migrar'); return; }
-  const pcp = new Database(caminhos.BANCO), sm = new Database(BANCO_SM);
-  require('./tecido/nucleo/schema').aplicar(sm);   // a coluna fornecedor_pcp_id (migracao 40)
   const aplicarAgora = process.argv.indexOf('--aplicar') >= 0;
-  const plano = planejar(pcp, sm);
-  console.log((aplicarAgora ? 'APLICANDO' : 'SIMULAÇÃO (nada gravado — rode com --aplicar)') + ': ' + plano.length + ' fornecedor(es) do sob medida');
-  for(const p of plano) console.log('  · ' + p.nome + ' → ' + (p.acao === 'ja_ligado' ? 'já ligado ao PCP #' + p.pcp_id : p.acao === 'ligar' ? 'ligar ao PCP #' + p.pcp_id + ' (' + p.pcp_nome + ')' : 'criar no PCP'));
+  /* ⚠️ A SIMULACAO NAO TOCA OS BANCOS DE VERDADE (revisao do PR #305): ela
+     roda numa COPIA do sob medida, onde a migracao 40 (a coluna
+     fornecedor_pcp_id) pode ser aplicada sem mudar o banco real. */
+  let pcp = new Database(caminhos.BANCO, aplicarAgora ? {} : { readonly:true }), sm, tmp = null;
   if(aplicarAgora){
+    sm = new Database(BANCO_SM);
     fs.mkdirSync(caminhos.BACKUPS, { recursive:true });
     const carimbo = new Date().toISOString().replace(/[:.]/g, '-');
     await pcp.backup(path.join(caminhos.BACKUPS, 'dados-antes-fornecedor-sm-' + carimbo + '.db'));
     await sm.backup(path.join(caminhos.BACKUPS, 'tecido-antes-fornecedor-sm-' + carimbo + '.db'));
     console.log('backup dos dois bancos em ' + caminhos.BACKUPS);
+  }else{
+    const os = require('os');
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sim-forn-'));
+    const real = new Database(BANCO_SM, { readonly:true });
+    await real.backup(path.join(tmp, 'sob-medida.db')); real.close();
+    sm = new Database(path.join(tmp, 'sob-medida.db'));
+  }
+  require('./tecido/nucleo/schema').aplicar(sm);   // a coluna fornecedor_pcp_id (migracao 40): na copia, ou depois do backup
+  const plano = planejar(pcp, sm);
+  console.log((aplicarAgora ? 'APLICANDO' : 'SIMULAÇÃO (nada gravado — rode com --aplicar)') + ': ' + plano.length + ' fornecedor(es) do sob medida');
+  for(const p of plano) console.log('  · ' + p.nome + ' → ' + (p.acao === 'ja_ligado' ? 'já ligado ao PCP #' + p.pcp_id : p.acao === 'ligar' ? 'ligar ao PCP #' + p.pcp_id + ' (' + p.pcp_nome + ')' : 'criar no PCP'));
+  if(aplicarAgora){
     const r = aplicar(pcp, sm);
     console.log('feito: ' + r.filter(x => x.acao !== 'ja_ligado').length + ' ligado(s)/criado(s); rode de novo para conferir (tem que dizer "já ligado" em todos)');
   }
   pcp.close(); sm.close();
+  if(tmp) fs.rmSync(tmp, { recursive:true, force:true });
 }
 
 if(require.main === module) principal().catch(e => { console.error(e); process.exit(1); });

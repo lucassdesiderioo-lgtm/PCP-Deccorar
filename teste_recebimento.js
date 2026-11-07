@@ -90,12 +90,14 @@ function chaves(o, acc){ acc = acc || new Set(); if(Array.isArray(o)) o.forEach(
   secao('o custo e por unidade RECEBIDA (R-CMP-34)');
   ok('R$ 5.000 / 600 = R$ 8,3333 por tubo', Math.abs(saldo(tubo).custo_medio - 5000 / 600) < 1e-4, () => saldo(tubo).custo_medio);
 
-  /* pedido E: 400 kg, declarados 600, mas chegam 590 — retem (contagem ≠ declarado) */
+  /* pedido E: 400 kg, declarados 600, mas chegam 610 — retem (passou do declarado).
+     A entrega ABAIXO do declarado entra e so e cobrada no fechamento (decisao do
+     dono, 07/11/2026): esse caminho e o do teste_revisao_compras.js. */
   const pE = await pedir([{ oferta_id:ofT, necessidade:600, unidade_compra:'kg', qtd_compra:400, preco_unid_compra:12.5, qtd_declarada:600 }]);
   const iE = db.prepare('SELECT id FROM pedido_item WHERE pedido_id=?').get(pE).id;
-  r = await post('/api/recebimento', { pedido_id:pE, itens:[{ pedido_item_id:iE, qtd_contada:590, peso_1_kg:0.678, peso_10_kg:6.78 }] }, REC);
+  r = await post('/api/recebimento', { pedido_id:pE, itens:[{ pedido_item_id:iE, qtd_contada:610, peso_1_kg:0.656, peso_10_kg:6.56 }] }, REC);
   ri = db.prepare('SELECT * FROM recebimento_item WHERE pedido_item_id=?').get(iE);
-  ok('contagem diferente do declarado: RETEM', ri.faixa === 'retido', () => JSON.stringify(ri));
+  ok('contagem acima do declarado: RETEM', ri.faixa === 'retido', () => JSON.stringify(ri));
   ok('o retido NAO entra no saldo', saldo(tubo).estoque === 600);
   ok('a resposta a quem recebe diz que ficou retido, sem numero de desvio', r.corpo.retidos === 1);
   ok('o pedido continua aberto (o item nao foi recebido)', db.prepare('SELECT status FROM pedido_compra WHERE id=?').get(pE).status !== 'recebido');
@@ -134,17 +136,17 @@ function chaves(o, acc){ acc = acc || new Set(); if(Array.isArray(o)) o.forEach(
   ok('decidir sem motivo e recusado', r.status === 400 && /motivo/i.test(r.corpo.erro));
   r = await post('/api/recebimento/itens/' + idE + '/decidir', { decisao:'ignorar', motivo:'x' }, LIB);
   ok('decisao fora da lista e recusada', r.status === 400);
-  r = await post('/api/recebimento/itens/' + idE + '/decidir', { decisao:'aceitar', motivo:'10 a menos, aceito' }, LIB);
-  ok('aceitar entra no saldo: +590', r.status === 200 && saldo(tubo).estoque === 1790, () => JSON.stringify(r.corpo) + ' ' + saldo(tubo).estoque);
+  r = await post('/api/recebimento/itens/' + idE + '/decidir', { decisao:'aceitar', motivo:'10 a mais, aceito' }, LIB);
+  ok('aceitar entra no saldo: +610', r.status === 200 && saldo(tubo).estoque === 1810, () => JSON.stringify(r.corpo) + ' ' + saldo(tubo).estoque);
   const dE = db.prepare('SELECT * FROM recebimento_item WHERE id=?').get(idE);
   ok('grava quem, quando e o motivo', dE.decisao === 'aceitar' && dE.decidido_por === 'Beto' && dE.decidido_por_id === LIB.id && dE.decidido_em && dE.motivo_decisao);
   const custoE = db.prepare("SELECT custo_unit FROM movimento_componente WHERE componente_id=? ORDER BY id DESC").get(tubo).custo_unit;
-  ok('e o custo do aceito e por RECEBIDO: R$ 5.000 / 590 (nao / 600)', Math.abs(custoE - 5000 / 590) < 1e-6, () => custoE);
+  ok('e o custo do aceito e por RECEBIDO: R$ 5.000 / 610 (nao / 600)', Math.abs(custoE - 5000 / 610) < 1e-6, () => custoE);
   r = await post('/api/recebimento/itens/' + idE + '/decidir', { decisao:'aceitar', motivo:'de novo' }, LIB);
   ok('decidir de novo e recusado (409)', r.status === 409);
   const idG = (ret.itens.find(x => x.pedido_item_id === iG) || {}).id;
   r = await post('/api/recebimento/itens/' + idG + '/decidir', { decisao:'devolver', motivo:'tubo fino', motivo_devolucao:'defeito' }, LIB);
-  ok('devolver: nada entra, e o item fica devendo (a caminho)', r.status === 200 && saldo(tubo).estoque === 1790
+  ok('devolver: nada entra, e o item fica devendo (a caminho)', r.status === 200 && saldo(tubo).estoque === 1810
      && db.prepare('SELECT qtd_devolvida FROM recebimento_item WHERE id=?').get(idG).qtd_devolvida === 600
      && db.prepare("SELECT status FROM pedido_item WHERE id=?").get(iG).status !== 'recebido');
   const idH = (ret.itens.find(x => x.pedido_item_id === iH) || {}).id;
@@ -153,7 +155,7 @@ function chaves(o, acc){ acc = acc || new Set(); if(Array.isArray(o)) o.forEach(
      && db.prepare('SELECT decisao FROM recebimento_item WHERE id=?').get(idH).decisao === 'aceitar_reclamar');
   const idF = (ret.avisos.find(x => x.pedido_item_id === iF) || {}).id;
   r = await post('/api/recebimento/itens/' + idF + '/ciencia', { motivo:'' }, LIB);
-  ok('dar ciencia do aviso: grava quem e quando, e nao mexe no saldo', r.status === 200 && saldo(tubo).estoque === 1790 && db.prepare('SELECT decisao FROM recebimento_item WHERE id=?').get(idF).decisao === 'ciente');
+  ok('dar ciencia do aviso: grava quem e quando, e nao mexe no saldo', r.status === 200 && saldo(tubo).estoque === 1810 && db.prepare('SELECT decisao FROM recebimento_item WHERE id=?').get(idF).decisao === 'ciente');
   const L = require('./pendencias_dominio').LINHAS;
   ok('a central conta retidos e avisos pela conta do dominio (zerados agora)', L.find(l => l.chave === 'recebimento_retido').contar(db).n === 0 && L.find(l => l.chave === 'recebimento_aviso').contar(db).n === 0);
   r = await post('/api/recebimento/itens/' + idF + '/decidir', { decisao:'aceitar', motivo:'x' }, null);

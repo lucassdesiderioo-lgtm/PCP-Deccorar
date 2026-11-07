@@ -38,6 +38,13 @@ function espelharFornecedor(f){
          preco_m2, usuario_nome } — devolve os rolos criados. TUDO numa
    transacao: um recebimento de tres rolos nao vira dois. */
 function criarRolos(a){
+  /* UMA LISTA, UMA TRANSACAO (revisao do PR #305): o recebimento de dois
+     tecidos do sob medida chama a porta UMA vez. Chamada a chamada, o segundo
+     recusado deixava o primeiro rolo aqui com o PCP desfeito — rolo orfao. */
+  if(Array.isArray(a)) return db.transaction(()=>a.map(x=>criarUm(x)))();
+  return criarUm(a);
+}
+function criarUm(a){
   const t=dTecido.porId(a.tecido_id);
   exigir(t,'tecido_inexistente','O tecido do sob medida '+a.tecido_id+' nao existe.');
   exigir(Array.isArray(a.volumes)&&a.volumes.length,'sem_volume','O recebimento nao trouxe rolo nenhum.');

@@ -27,6 +27,11 @@
       return c;
     }catch(e){ return { erro:'sem conexão com o servidor — tente de novo' }; }
   }
+  /* Leitura que falhou nao vira lista vazia (revisao do PR #305): "Nenhum pedido"
+     com a rota respondendo 403 diz uma coisa falsa. */
+  function falhou(box, r){
+    box.innerHTML = '<div class="card"><div class="cmpAvi">Não consegui ler esta lista: ' + esc((r && r.erro) || 'sem resposta') + '.</div></div>';
+  }
   function msg(el, r, okTxt){
     if(!el) return;
     if(r && r.erro){ el.style.color = 'var(--red)'; el.textContent = r.erro; }
@@ -65,7 +70,7 @@
   async function abrir(id){
     await perms();
     var cab = $('#cmpAbas'); if(!cab) return;
-    var vis = ABAS.filter(function(a){ return !a.perms || pode.apply(null, a.perms); });
+    var vis = ABAS.filter(function(a){ return (!a.perms || pode.apply(null, a.perms)) && (!a.le || pode.apply(null, a.le)); });
     if(!vis.length) return;
     try{ if(!id) id = localStorage.getItem('cmpAba'); }catch(e){}
     var a = vis.find(function(x){ return x.id === id; }) || vis[0];
@@ -88,11 +93,11 @@
 
   /* ── MATERIAIS (fase 1, R-CMP-01 a 10) ───────────────────────────────── */
   var OPC = null, ALM = [];
-  registrar({ id:'materiais', nome:'Materiais', perms:['compras.ver','componente.cadastrar'], velho:['cmpVelhoMateriais'],
+  registrar({ id:'materiais', nome:'Materiais', perms:['compras.ver','componente.cadastrar'], le:['compras.ver'], velho:['cmpVelhoMateriais'],
     desenhar: async function(box){
       OPC = await api('GET', '/api/componentes/opcoes');
       ALM = await api('GET', '/api/almoxarifados'); if(!Array.isArray(ALM)) ALM = [];
-      var comps = await api('GET', '/api/componentes'); if(!Array.isArray(comps)) comps = [];
+      var comps = await api('GET', '/api/componentes'); if(!Array.isArray(comps)) return falhou(box, comps);
       var pend = await api('GET', '/api/componentes/pendencias');
       var filtro = '';
       function linhas(){
@@ -174,7 +179,7 @@
   /* ── ALMOXARIFADOS (fase 1, R-CMP-38) ───────────────────────────────── */
   registrar({ id:'almox', nome:'Almoxarifados', perms:['almoxarifado.cadastrar','componente.cadastrar','compras.ver'],
     desenhar: async function(box){
-      var l = await api('GET', '/api/almoxarifados'); if(!Array.isArray(l)) l = [];
+      var l = await api('GET', '/api/almoxarifados'); if(!Array.isArray(l)) return falhou(box, l);
       box.innerHTML = '<div class="card"><div style="font-weight:700">Almoxarifados</div>'
         + '<div class="sub" style="margin:4px 0 10px">Os lugares da fábrica onde o material mora. Criar, renomear e desativar é aqui, sem código. '
         + 'Almoxarifado com material dentro <b>não se apaga</b>: desativa, e volta pelo "Reativar".</div>'
@@ -212,10 +217,10 @@
   /* ── FORNECEDORES (fase 2, R-CMP-11 e 12) ──────────────────────────── */
   var OPCC = null;
   async function opcoes(){ if(!OPCC) OPCC = await api('GET', '/api/compras/opcoes'); return OPCC; }
-  registrar({ id:'fornecedores', nome:'Fornecedores', perms:['compras.ver','fornecedor.cadastrar'],
+  registrar({ id:'fornecedores', nome:'Fornecedores', perms:['compras.ver','fornecedor.cadastrar'], le:['compras.ver'],
     desenhar: async function(box){
       var o = await opcoes();
-      var l = await api('GET', '/api/fornecedores'); if(!Array.isArray(l)) l = [];
+      var l = await api('GET', '/api/fornecedores'); if(!Array.isArray(l)) return falhou(box, l);
       var verPag = pode('pedido.pagar');
       var COLS = [['nome','Nome'],['tipo','Tipo'],['cnpj','CNPJ'],['contato','Contato'],['telefone','Telefone'],['whatsapp','WhatsApp'],['prazo_entrega','Prazo digitado (dias)']]
         .concat(verPag ? [['pix','Chave Pix'],['banco','Banco'],['agencia','Agência'],['conta','Conta']] : []);
@@ -252,10 +257,10 @@
   var NOME_ST = { rascunho:'rascunho', aguardando_aprovacao:'aguardando aprovação', comprado:'comprado', parcial:'parcial', recebido:'recebido', cancelado:'cancelado' };
   var COR_ST = { rascunho:'', aguardando_aprovacao:'am', comprado:'am', parcial:'am', recebido:'vd', cancelado:'vm' };
   function nomeCanal(o, v){ var c = (o.canais || []).find(function(x){ return x.valor === v; }); return c ? c.nome : (v || '—'); }
-  registrar({ id:'pedidos', nome:'Pedidos', perms:['compras.ver','pedido.criar','pedido.pagar','pedido.aprovar'],
+  registrar({ id:'pedidos', nome:'Pedidos', perms:['compras.ver','pedido.criar','pedido.pagar','pedido.aprovar'], le:['pedido.ver'],
     desenhar: async function(box){
       var o = await opcoes();
-      var l = await api('GET', '/api/pedidos'); if(!Array.isArray(l)) l = [];
+      var l = await api('GET', '/api/pedidos'); if(!Array.isArray(l)) return falhou(box, l);
       box.innerHTML = '<div class="card"><div style="font-weight:700">Pedidos de compra</div>'
         + '<div class="sub" style="margin:4px 0 10px">rascunho → <b>comprado</b> (com canal, nº do pedido no fornecedor e data) → parcial → recebido. '
         + 'Acima da alçada de quem criou, o pedido espera o aprovador. Só pedido <b>comprado</b> aparece na fila do Recebimento.</div>'
@@ -406,8 +411,8 @@
   registrar({ id:'notas', nome:'Notas', perms:['nota.lancar','custo.ver'],
     desenhar: async function(box){
       var reg = await api('GET', '/api/notas/regime');
-      var notas = await api('GET', '/api/notas'); if(!Array.isArray(notas)) notas = [];
-      var peds = await api('GET', '/api/pedidos'); if(!Array.isArray(peds)) peds = [];
+      var notas = await api('GET', '/api/notas'); if(!Array.isArray(notas)) return falhou(box, notas);
+      var peds = await api('GET', '/api/pedidos'); var pedsFalhou = !Array.isArray(peds); if(pedsFalhou) peds = [];
       var nomeReg = function(v){ var x = (reg.regimes || []).find(function(r){ return r.valor === v; }); return x ? x.nome : v; };
       box.innerHTML = '<div class="card"><div style="font-weight:700">Notas fiscais de compra</div>'
         + '<div class="sub" style="margin:4px 0 10px"><b>Custo pago</b> = produto − desconto + frete + seguro + outras + IPI + ICMS-ST. <b>Custo líquido</b> = pago − os créditos que o regime aproveita. '
@@ -418,7 +423,7 @@
               + '<td class="code">' + esc(n.pedido_numero || '—') + '</td><td>' + esc(n.emitente_nome || '—') + '</td><td>' + data(n.emissao) + '</td><td>' + esc(nomeReg(n.regime)) + '</td><td>' + brl(n.total_nota) + '</td><td>' + brl(liq) + '</td></tr>'; }).join('')
           : '<tr><td colspan="7" class="sub">Nenhuma nota lançada.</td></tr>') + '</tbody></table></div></div>'
         + (pode('nota.lancar') ? '<div class="card"><div style="font-weight:700">Lançar nota</div><div class="cmpG"><div style="grid-column:span 2"><label>Pedido</label><select id="ntPed">'
-            + opt(peds.filter(function(p){ return p.status !== 'cancelado' && p.status !== 'rascunho'; }).map(function(p){ return { valor:p.id, nome:p.numero + ' · ' + (p.fornecedor_nome || p.loja || '—') }; }), '', '— escolha —') + '</select></div></div><div id="ntForm"></div></div>' : '')
+            + opt(peds.filter(function(p){ return p.status !== 'cancelado' && p.status !== 'rascunho'; }).map(function(p){ return { valor:p.id, nome:p.numero + ' · ' + (p.fornecedor_nome || p.loja || '—') }; }), '', '— escolha —') + '</select></div></div>' + (pedsFalhou ? '<div class="cmpAvi">Não consegui ler os pedidos: a lista acima pode estar faltando.</div>' : '') + '<div id="ntForm"></div></div>' : '')
         + '<div id="ntDfe"></div><div id="ntXml"></div><div id="ntRegras"></div>';
       var sel = $('#ntPed'); if(sel) sel.onchange = function(){ formNota(+this.value); };
       regrasCredito($('#ntRegras'), reg);
@@ -455,13 +460,14 @@
   }
 
   function regrasCredito(box, reg){
+    var nomeReg = function(v){ var x = (reg.regimes || []).find(function(r){ return r.valor === v; }); return x ? x.nome : v; };
     if(!box) return;
     var ag = pode('alcada.definir');
     box.innerHTML = '<div class="card"><div style="font-weight:700">Regime e tabela de crédito</div>'
       + '<div class="sub" style="margin:4px 0 10px">O crédito de ICMS e IPI vem desta tabela, e não do código. Mudar o regime não dá crédito retroativo: cada nota guarda o regime dela. '
       + (ag ? '' : 'Só o Admin Geral muda.') + '</div>'
       + '<table class="cmpTab"><thead><tr><th>Regime</th><th>Imposto</th><th>Aproveita?</th><th>Desde</th></tr></thead><tbody>'
-      + (reg.regras || []).map(function(r){ return '<tr><td>' + esc(r.regime) + '</td><td>' + esc(r.imposto) + '</td><td>' + (r.aproveita ? 'sim' : 'não') + '</td><td>' + data(r.vigente_desde) + '</td></tr>'; }).join('') + '</tbody></table>'
+      + (reg.regras || []).map(function(r){ return '<tr><td>' + esc(nomeReg(r.regime)) + '</td><td>' + esc(String(r.imposto || '').toUpperCase().replace('_', '-')) + '</td><td>' + (r.aproveita ? 'sim' : 'não') + '</td><td>' + data(r.vigente_desde) + '</td></tr>'; }).join('') + '</tbody></table>'
       + (ag ? '<div class="cmpG"><div><label>Regime vigente</label><select id="rgVig">' + opt(reg.regimes, reg.vigente) + '</select></div></div><button class="ghost" id="rgOk">Mudar regime</button> <span class="msg" id="rgMsg"></span>'
         + '<div class="cmpG"><div><label>Regime</label><select id="rcReg">' + opt(reg.regimes, 'real') + '</select></div><div><label>Imposto</label><select id="rcImp"><option value="icms">ICMS</option><option value="ipi">IPI</option></select></div>'
         + '<div><label>Aproveita?</label><select id="rcAp"><option value="1">sim</option><option value="0">não</option></select></div><div><label>Desde</label><input id="rcDesde" type="date"></div></div>'
@@ -648,7 +654,7 @@
   window.CMP.dfe = async function(box){
     if(!box) return;
     var r = await api('GET', '/api/dfe'); if(r.erro || !r.documentos) return;
-    var SIT = { aguardando_xml:'esperando o XML completo', escolher:'escolha o pedido e os itens', sem_pedido:'NOTA SEM PEDIDO', lancada:'lançada' };
+    var SIT = { aguardando_xml:'esperando o XML completo', escolher:'escolha o pedido e os itens', sem_pedido:'NOTA SEM PEDIDO', lancada:'lançada', ciente:'sem pedido — ciente', erro:'não entrou' };
     box.innerHTML = '<div class="card"><div style="font-weight:700">Notas recebidas da Receita</div>'
       + (!r.certificado.tem ? '<div class="sub">' + esc(r.certificado.mensagem) + ' — a busca automática liga quando o Admin Geral enviar o certificado (aba Certificado).</div>' : '')
       + (r.certificado.tem && r.certificado.vencido ? '<div class="cmpAvi">O certificado digital venceu em ' + data(r.certificado.validade) + ': a busca na Receita parou até o Admin Geral enviar um novo.</div>'
@@ -656,10 +662,22 @@
       + (r.documentos.length ? '<div class="cmpRola"><table class="cmpTab"><thead><tr><th>Emitente</th><th>Emissão</th><th>Valor</th><th>Ciência</th><th>Situação</th><th></th></tr></thead><tbody>'
         + r.documentos.map(function(d){ return '<tr><td>' + esc(d.emitente_nome || d.emitente_cnpj || '—') + '<div class="sub code">' + esc(d.chave || '') + '</div></td><td>' + data(d.emissao) + '</td><td>' + brl(d.valor) + '</td>'
           + '<td>' + (d.ciencia_em ? data(d.ciencia_em) : (d.ciencia_erro ? '<span style="color:var(--amber)">' + esc(d.ciencia_erro) + '</span>' : '—')) + '</td>'
-          + '<td><span class="cmpChip ' + (d.situacao === 'sem_pedido' ? 'vm' : d.situacao === 'lancada' ? 'vd' : 'am') + '">' + esc(SIT[d.situacao] || d.situacao) + '</span></td>'
-          + '<td>' + (d.situacao === 'escolher' || d.situacao === 'sem_pedido' ? '<button class="ghost" data-dfe="' + d.id + '">Abrir</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>'
+          + '<td><span class="cmpChip ' + (d.situacao === 'sem_pedido' || d.situacao === 'erro' ? 'vm' : d.situacao === 'lancada' ? 'vd' : 'am') + '">' + esc(SIT[d.situacao] || d.situacao) + '</span>'
+          + (d.erro ? '<div class="sub">' + esc(d.erro) + '</div>' : '') + (d.ciente_motivo ? '<div class="sub">' + esc(d.ciente_motivo) + ' — ' + esc(d.ciente_por || '') + '</div>' : '') + '</td>'
+          + '<td>' + (d.situacao === 'escolher' || d.situacao === 'sem_pedido' ? '<button class="ghost" data-dfe="' + d.id + '">Abrir</button>' : '')
+          + (d.situacao === 'sem_pedido' && pode('nota.lancar') ? ' <button class="ghost" data-dfe-ciente="' + d.id + '">Ciente, sem pedido</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>'
         : '<div class="sub">Nenhuma nota baixada ainda.</div>') + '<div id="dfeDet"></div></div>';
     box.onclick = async function(ev){
+      /* a nota sem pedido: quem lanca nota diz por que ela nao tem pedido, e ela
+         sai das Pendencias (revisao do PR #305) */
+      var c = ev.target.closest('[data-dfe-ciente]');
+      if(c){
+        var mot = prompt('Por que esta nota não tem pedido? (ex.: comprado no balcão) — o motivo fica gravado');
+        if(mot === null) return;
+        var rc = await api('POST', '/api/dfe/' + c.getAttribute('data-dfe-ciente') + '/ciente', { motivo:mot });
+        if(rc.erro) return alert(rc.erro);
+        return abrir('notas');
+      }
       var b = ev.target.closest('[data-dfe]'); if(!b) return;
       var id = b.getAttribute('data-dfe'), x = await api('GET', '/api/dfe/' + id + '/ler');
       if(x.erro) return alert(x.erro);

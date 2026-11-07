@@ -33,6 +33,7 @@ const NS = 'http://www.portalfiscal.inf.br/nfe';
 const valor = (x, tag) => { const m = String(x || '').match(new RegExp('<(?:\\w+:)?' + tag + '(?:\\s[^>]*)?>([\\s\\S]*?)</(?:\\w+:)?' + tag + '>')); return m ? m[1].trim() : null; };
 function agora(){ const t = new Date(), z = n => String(n).padStart(2, '0'); return t.getFullYear() + '-' + z(t.getMonth() + 1) + '-' + z(t.getDate()) + ' ' + z(t.getHours()) + ':' + z(t.getMinutes()) + ':' + z(t.getSeconds()); }
 function mais(min){ const t = new Date(Date.now() + min * 60000), z = n => String(n).padStart(2, '0'); return t.getFullYear() + '-' + z(t.getMonth() + 1) + '-' + z(t.getDate()) + ' ' + z(t.getHours()) + ':' + z(t.getMinutes()) + ':' + z(t.getSeconds()); }
+function intervaloMin(db){ const v = parseFloat(config(db, 'dfe_intervalo_min', 60)); return Number.isFinite(v) && v > 0 ? v : 60; }
 function config(db, k, padrao){ const r = db.prepare('SELECT valor FROM config WHERE chave=?').get(k); return r && r.valor != null && r.valor !== '' ? r.valor : padrao; }
 
 function controle(db){
@@ -98,28 +99,59 @@ async function consultar(db, opcoes){
   const cert = CERT.carregar(db);
   if(!cert) return { consultou:false, motivo:'o arquivo do certificado não está no servidor: envie de novo' };
   const ctl = controle(db);
+  const intervalo = intervaloMin(db);
+  /* DEPOIS DE UM 137/656 A RECEITA SO E CONSULTADA DE NOVO DEPOIS DA HORA, e o
+     "consultar agora" da tela tambem espera (R-CMP-53, revisao do PR #305): o
+     656 de "consumo indevido" bloqueia o CNPJ por uma hora. */
+  if((ctl.ultimo_cstat === '137' || ctl.ultimo_cstat === '656') && ctl.proxima_consulta && ctl.proxima_consulta > agora())
+    return { consultou:false, motivo:'a Receita pediu para esperar (' + ctl.ultimo_cstat + '): a próxima consulta é depois de ' + ctl.proxima_consulta.slice(11, 16) };
   let resp;
   try{ resp = await transporte(cert, URL_DIST, envelopeDist(cert.cnpj, cuf, ctl.ultimo_nsu)); }
   catch(e){
-    db.prepare('UPDATE dfe_controle SET ultima_consulta=?, proxima_consulta=?, ultimo_erro=? WHERE id=1').run(agora(), mais(+config(db, 'dfe_intervalo_min', 60)), 'a Receita não respondeu: ' + e.message);
+    db.prepare('UPDATE dfe_controle SET ultima_consulta=?, proxima_consulta=?, ultimo_erro=? WHERE id=1').run(agora(), mais(intervalo), 'a Receita não respondeu: ' + e.message);
     return { consultou:false, motivo:'a Receita não respondeu: ' + e.message };
   }
   const cStat = valor(resp, 'cStat'), xMotivo = valor(resp, 'xMotivo');
   const ult = valor(resp, 'ultNSU'), max = valor(resp, 'maxNSU');
-  const intervalo = +config(db, 'dfe_intervalo_min', 60);
   const docs = [];
   const re = /<(?:\w+:)?docZip\s+NSU="(\d+)"\s+schema="([^"]+)"\s*>([^<]+)<\/(?:\w+:)?docZip>/g; let m;
-  while((m = re.exec(resp))) docs.push({ nsu:m[1], schema:m[2], xml:zlib.gunzipSync(Buffer.from(m[3].trim(), 'base64')).toString('utf8') });
-  /* O LIMITE DA RECEITA: sem documento novo (137) ou consumo indevido (656),
-     espera-se uma hora antes de perguntar de novo. Com mais a ler, volta logo. */
+  while((m = re.exec(resp))){
+    let xml = null, erro = null;
+    try{ xml = zlib.gunzipSync(Buffer.from(m[3].trim(), 'base64')).toString('utf8'); }catch(e){ erro = 'não consegui abrir o documento da Receita: ' + e.message; }
+    docs.push({ nsu:m[1], schema:m[2], xml, erro });
+  }
+  /* O LIMITE DA RECEITA: sem documento novo (137), consumo indevido (656) ou
+     tudo lido (138 com ultNSU = maxNSU), espera-se uma hora antes de perguntar
+     de novo. So com mais a ler (ultNSU < maxNSU) volta logo. */
   let prox;
   if(cStat === '138' && ult && max && ult < max) prox = mais(2);
-  else if(cStat === '137' || cStat === '656') prox = mais(Math.max(60, intervalo));
+  else if(cStat === '137' || cStat === '656' || cStat === '138') prox = mais(Math.max(60, intervalo));
   else prox = mais(intervalo);
-  db.prepare('UPDATE dfe_controle SET ultimo_nsu=COALESCE(?, ultimo_nsu), ultima_consulta=?, proxima_consulta=?, ultimo_erro=? WHERE id=1')
-    .run(ult || null, agora(), prox, (cStat === '137' || cStat === '138') ? null : (cStat + ' ' + (xMotivo || '')));
-  const r = { consultou:true, cStat, xMotivo, documentos:0, ciencias:0, lancadas:0 };
-  for(const d of docs){ const x = await guardar(db, d, cert, transporte, opcoes); r.documentos++; if(x.ciencia) r.ciencias++; if(x.lancada) r.lancadas++; }
+  const r = { consultou:true, cStat, xMotivo, documentos:0, ciencias:0, lancadas:0, erros:0 };
+  /* UM DOCUMENTO POR VEZ (revisao do PR #305): o que estraga vira linha de
+     erro, com o motivo, e os outros entram. O NSU so anda DEPOIS do lote —
+     se o servidor cair no meio, a proxima consulta pede o lote de novo (o
+     INSERT OR IGNORE pelo NSU nao duplica). */
+  for(const d of docs){
+    try{
+      if(d.erro) throw new Error(d.erro);
+      const x = await guardar(db, d, cert, transporte, opcoes);
+      r.documentos++; if(x.ciencia) r.ciencias++; if(x.lancada) r.lancadas++;
+    }catch(e){
+      r.erros++;
+      db.prepare("INSERT OR IGNORE INTO dfe_documento (nsu, tipo, situacao, erro) VALUES (?, 'erro', 'erro', ?)").run(d.nsu, String(e && e.message || e).slice(0, 500));
+      db.prepare("UPDATE dfe_documento SET erro=COALESCE(erro, ?) WHERE nsu=?").run(String(e && e.message || e).slice(0, 500), d.nsu);
+    }
+  }
+  db.prepare('UPDATE dfe_controle SET ultimo_nsu=COALESCE(?, ultimo_nsu), ultima_consulta=?, proxima_consulta=?, ultimo_erro=?, ultimo_cstat=? WHERE id=1')
+    .run(ult || null, agora(), prox, (cStat === '137' || cStat === '138') ? (r.erros ? r.erros + ' documento(s) da Receita não entraram: veja a lista' : null) : (cStat + ' ' + (xMotivo || '')), cStat || null);
+  /* a ciencia que falhou e tentada de novo, e a nota sem pedido e olhada de
+     novo: o pedido pode ter aparecido (revisao do PR #305) */
+  const desteLote = new Set(docs.map(d => d.nsu));
+  const sem = db.prepare("SELECT * FROM dfe_documento WHERE tipo='resumo' AND ciencia_em IS NULL AND ciencia_erro IS NOT NULL ORDER BY id LIMIT 20").all()
+    .filter(d => !desteLote.has(d.nsu));
+  for(const doc of sem){ try{ if(await ciencia(db, doc, cert, transporte)) r.ciencias++; }catch(e){} }
+  r.lancadas += reavaliar(db);
   return r;
 }
 
@@ -133,6 +165,8 @@ async function guardar(db, d, cert, transporte, opcoes){
     if(doc && !doc.ciencia_em) out.ciencia = await ciencia(db, doc, cert, transporte, opcoes);
   }else if(/^procNFe/.test(d.schema)){
     const nota = X.ler(d.xml);
+    /* a chave vira nome de arquivo: so 44 digitos (revisao do PR #305) */
+    if(!/^\d{44}$/.test(String(nota.chave || ''))) throw new Error('a chave da nota não tem 44 dígitos: ' + String(nota.chave || '').slice(0, 60));
     const pasta = path.join(CAMINHOS.ANEXOS_COMPRAS, 'dfe');
     fs.mkdirSync(pasta, { recursive:true });
     fs.writeFileSync(path.join(pasta, nota.chave + '.xml'), d.xml);
@@ -170,18 +204,44 @@ function ligar(db, chave){
   const nota = X.ler(xml);
   const peds = X.pedidosDoEmitente(db, nota.emitente_cnpj);
   if(!peds.length){ db.prepare("UPDATE dfe_documento SET situacao='sem_pedido' WHERE id=?").run(doc.id); return false; }
-  if(peds.length === 1){
-    const c = X.casar(db, peds[0].id, nota);
+  const abertos = X.pedidosAbertosDoEmitente(db, nota.emitente_cnpj);
+  if(abertos.length === 1 && peds.length === abertos.length){
+    const c = X.casar(db, abertos[0].id, nota);
     if(c.every(x => x.pedido_item_id)){
       try{
-        const r = X.lancar(db, { xml, pedido_id:peds[0].id, origem:'dfe' }, { nome:'busca automática da Receita' });
+        const r = X.lancar(db, { xml, pedido_id:abertos[0].id, origem:'dfe' }, { nome:'busca automática da Receita' });
         db.prepare("UPDATE dfe_documento SET situacao='lancada', nota_compra_id=? WHERE id=?").run(r.id, doc.id);
         return true;
-      }catch(e){ /* cai para escolher */ }
+      }catch(e){
+        /* cai para escolher, mas DIZ POR QUE (revisao do PR #305) */
+        db.prepare("UPDATE dfe_documento SET situacao='escolher', erro=? WHERE id=?").run('não lancei sozinho: ' + String(e && e.message || e).slice(0, 400), doc.id);
+        return false;
+      }
     }
   }
   db.prepare("UPDATE dfe_documento SET situacao='escolher' WHERE id=?").run(doc.id);
   return false;
+}
+/* A nota sem pedido e olhada de novo a cada consulta: o pedido pode ter
+   aparecido. A marcada "ciente" nao volta. */
+function reavaliar(db){
+  let n = 0;
+  for(const d of db.prepare("SELECT chave FROM dfe_documento WHERE situacao='sem_pedido' AND xml IS NOT NULL").all())
+    try{ if(ligar(db, d.chave)) n++; }catch(e){}
+  return n;
+}
+/* "CIENTE" DA NOTA SEM PEDIDO (revisao do PR #305): quem lanca nota diz por que
+   ela nao tem pedido (comprado no balcao, devolucao do fornecedor...). Ela sai
+   das Pendencias, com quem, quando e o motivo. */
+function ciente(db, id, b, quem){
+  const doc = db.prepare('SELECT * FROM dfe_documento WHERE id=?').get(+id);
+  if(!doc) throw new X.Recusa(404, 'nota da Receita não encontrada');
+  if(doc.situacao !== 'sem_pedido') throw new X.Recusa(409, 'esta nota não está como "sem pedido" (' + doc.situacao + ')');
+  const motivo = String((b && b.motivo) || '').trim();
+  if(!motivo) throw new X.Recusa(400, 'diga por que esta nota não tem pedido — o motivo fica gravado');
+  db.prepare("UPDATE dfe_documento SET situacao='ciente', ciente_motivo=?, ciente_por=?, ciente_por_id=?, ciente_em=? WHERE id=?")
+    .run(motivo, quem && quem.nome || null, quem && quem.id || null, agora(), doc.id);
+  return {};
 }
 /* Lancar pela tela a que ficou para escolher (as escolhas da fase 8). */
 function lancarEscolhida(db, id, b, quem){
@@ -194,7 +254,7 @@ function lancarEscolhida(db, id, b, quem){
   return r;
 }
 function listar(db){
-  return db.prepare('SELECT id, nsu, chave, tipo, emitente_cnpj, emitente_nome, valor, emissao, ciencia_em, ciencia_erro, situacao, nota_compra_id, criado_em FROM dfe_documento WHERE tipo<>\'evento\' ORDER BY id DESC LIMIT 300').all();
+  return db.prepare('SELECT id, nsu, chave, tipo, emitente_cnpj, emitente_nome, valor, emissao, ciencia_em, ciencia_erro, situacao, nota_compra_id, criado_em, erro, ciente_motivo, ciente_por, ciente_em FROM dfe_documento WHERE tipo<>\'evento\' ORDER BY id DESC LIMIT 300').all();
 }
 function lerXml(db, id){
   const doc = db.prepare('SELECT * FROM dfe_documento WHERE id=?').get(+id);
@@ -215,4 +275,4 @@ async function talvezConsultar(db, opcoes){
   return consultar(db, opcoes);
 }
 
-module.exports = { consultar, talvezConsultar, guardar, ligar, lancarEscolhida, listar, lerXml, pendencias, controle, assinarEvento, envelopeCiencia, envelopeDist, URL_DIST, URL_EVENTO };
+module.exports = { consultar, talvezConsultar, guardar, ligar, reavaliar, ciente, lancarEscolhida, listar, lerXml, pendencias, controle, assinarEvento, envelopeCiencia, envelopeDist, URL_DIST, URL_EVENTO };

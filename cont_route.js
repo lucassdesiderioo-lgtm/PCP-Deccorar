@@ -260,16 +260,20 @@ module.exports=function(app,db){
 
   /* Lista de materiais para a tela de contagem. Nome, unidade e saldo — NUNCA
      preco: quem opera nao ve preco em lugar nenhum (regra 14 do §13). */
-  app.get('/api/contagem/componentes',(req,res)=>{
-    res.json(db.prepare(`SELECT id,codigo,nome,COALESCE(unidade,'un') unidade,COALESCE(estoque,0) estoque
-      FROM componente WHERE ativo=1 ORDER BY nome`).all());
-  });
+  /* A CONTAGEM ANTIGA DE MATERIAL SAIU (revisão do PR #305, decisão do dono,
+     07/11/2026): material se conta só na 504, por almoxarifado e às cegas
+     (R-CMP-42). Esta lista mostrava o saldo a quem conta. As duas portas
+     respondem 410 dizendo onde contar; a aprovação das contagens antigas que
+     ainda esperam (contagem_pendente) continua logo abaixo. */
+  const NA_504 = {erro:'a contagem de material é na tela 504 (Contagem de material), por almoxarifado e às cegas'};
+  app.get('/api/contagem/componentes',(req,res)=>res.status(410).json(NA_504));
 
   /* Lancamento de material. SOMA a quantidade, igual ao bipe soma 1 — contou
      duas prateleiras, lanca duas vezes. Zero e um lancamento valido: e assim que
      um material que ACABOU entra na contagem em vez de ficar de fora dela. */
   app.post('/api/contagem/componente',(req,res)=>{
     const q0=QUEM.exigir(req,res); if(!q0) return;
+    return res.status(410).json(NA_504);
     const b=req.body||{};
     const id=+b.componente_id, ses=String(b.sessao||'').trim();
     const q=b.quantidade===''||b.quantidade==null ? NaN : +b.quantidade;

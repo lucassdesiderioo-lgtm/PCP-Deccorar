@@ -53,7 +53,11 @@ function setoresNativos(){
      nasce no setor Admin: em producao o setor ja existe e nao a recebe, e o
      dono a da pela tela de Acessos a quem decide (o Financeiro). Banco novo
      igual a producao (§17). */
-  const SO_PELA_TELA = ['devolucao.dinheiro'];
+  /* E as chaves da COMPRAS-E-RECEBIMENTO (07/11/2026): decisão do dono na
+     revisão do PR #305 — a R-ALC-06 vale sobre a spec §7. Nascem só para o
+     Admin Geral, e quem recebe é marcado na tela de Acessos. */
+  const SO_PELA_TELA = ['devolucao.dinheiro',
+    'almoxarifado.cadastrar','pedido.aprovar','nota.lancar','recebimento.liberar'];
   const admin = PERMISSOES.filter(p => p.nivel === 'admin' && SO_PELA_TELA.indexOf(p.chave) < 0).map(p => p.chave);
   return [
     { nome:'Operador / Revisão',             nivel:'operacao',
@@ -304,34 +308,11 @@ module.exports = function(app, db){
     }
   }catch(e){ console.log('[acesso] seed de cancelamento.confirmar falhou: '+e.message); }
 
-  /* ── 3-C3. AS CHAVES DA COMPRAS-E-RECEBIMENTO (spec §7, 07/11/2026) ──
-     Chave nova em banco que ja existe nao chega a ninguem (#13). A spec diz
-     quem recebe cada uma: quem JA TEM a chave de origem, por setor ou por
-     excecao concedida. Uma marca por FASE (cada fase acrescenta as dela), e
-     cada uma roda uma vez so: quem desmarcar depois nao a ve voltar. As duas
-     intransferiveis (`alcada.definir`, `certificado.gerenciar`) nao entram:
-     so o Admin Geral, que passa por nivel. */
-  const CMP_BACKFILL = [
-    ['seed_cmp_f1', [['almoxarifado.cadastrar','componente.cadastrar']]],
-    ['seed_cmp_f2', [['pedido.aprovar','pedido.criar'], ['nota.lancar','pedido.pagar']]],
-    ['seed_cmp_f3', [['recebimento.liberar','pedido.criar']]],
-    ['seed_cmp_f5', [['volume.movimentar','pedido.receber']]]
-  ];
-  for(const [marca, pares] of CMP_BACKFILL){
-    try{
-      if(db.prepare('SELECT 1 FROM config WHERE chave=?').get(marca)) continue;
-      db.transaction(() => {
-        for(const [nova, de] of pares){
-          db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
-            SELECT setor_id, ? FROM setor_permissao WHERE chave=?`).run(nova, de);
-          db.prepare(`INSERT OR IGNORE INTO usuario_excecao (usuario_id,chave,concede)
-            SELECT usuario_id, ?, 1 FROM usuario_excecao e WHERE chave=? AND concede=1
-              AND NOT EXISTS (SELECT 1 FROM usuario_excecao x WHERE x.usuario_id=e.usuario_id AND x.chave=?)`).run(nova, de, nova);
-        }
-        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES (?, '1')").run(marca);
-      })();
-    }catch(e){ console.log('[acesso] backfill ' + marca + ' falhou: ' + e.message); }
-  }
+  /* ── 3-C3. AS CHAVES DA COMPRAS-E-RECEBIMENTO (07/11/2026) ──
+     NÃO HÁ BACKFILL, de propósito. A spec §7 mandava dar cada chave nova a
+     quem já tinha a de origem; na revisão do PR #305 o dono decidiu pela
+     R-ALC-06: tudo novo nasce só para o Admin Geral, e quem recebe é marcado
+     na tela de Acessos depois do deploy (linha em docs/DECISOES.md). */
 
   /* ── 3-D. A CONFERENCIA EM TRES PAPEIS (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA,
      26/09/2026) ──
@@ -1103,6 +1084,8 @@ module.exports = function(app, db){
     /* COMPRAS-E-RECEBIMENTO fase 6: a contagem de material (R-CMP-42 a 45),
        pelas chaves de contagem que ja existem. */
     if(eq('/api/contagem-material/pendentes')) return ['contagem.aprovar','contagem.ajustar'];
+    /* o tecido de antes etiquetado na 504 muda o saldo: e de quem aprova a contagem */
+    if(eq('/api/contagem-material/a-etiquetar') || eq('/api/contagem-material/etiquetar')) return 'contagem.aprovar';
     if(M !== 'GET' && pre('/api/contagem-material/itens')) return 'contagem.aprovar';
     if(eq('/api/contagem-material/consumo')) return ['compras.ver','contagem.aprovar','contagem.contar'];
     if(pre('/api/contagem-material')) return 'contagem.contar';
@@ -1110,14 +1093,16 @@ module.exports = function(app, db){
     if(M !== 'GET' && /\/enderecos$/.test(p) && pre('/api/almoxarifados')) return 'almoxarifado.cadastrar';
     if(/\/enderecos$/.test(p) && pre('/api/almoxarifados')) return ['almoxarifado.cadastrar','volume.movimentar','compras.ver','contagem.contar','pedido.receber'];
     if(M !== 'GET' && pre('/api/enderecos')) return 'almoxarifado.cadastrar';   // renomear/desativar (fase 10)
-    if(/\/estoque$/.test(p) && pre('/api/almoxarifados')) return ['volume.movimentar','almoxarifado.cadastrar','compras.ver','contagem.contar'];
-    if(pre('/api/enderecos')) return ['volume.movimentar','almoxarifado.cadastrar','contagem.contar'];
+    /* SEM contagem.contar (revisão do PR #305): o estoque traz o saldo, e a
+       contagem da 504 é cega (R-CMP-42). */
+    if(/\/estoque$/.test(p) && pre('/api/almoxarifados')) return ['volume.movimentar','almoxarifado.cadastrar','compras.ver'];
+    if(pre('/api/enderecos')) return ['volume.movimentar','almoxarifado.cadastrar'];
     if(M !== 'GET' && pre('/api/volumes')) return 'volume.movimentar';
     if(pre('/api/volumes')) return ['volume.movimentar','pedido.receber','compras.ver','almoxarifado.cadastrar'];
     /* COMPRAS-E-RECEBIMENTO fase 1: o almoxarifado (R-CMP-38). Ler e de quem
        cadastra material, de quem compra, recebe ("levar para") e conta. */
     if(M !== 'GET' && pre('/api/almoxarifados')) return 'almoxarifado.cadastrar';
-    if(pre('/api/almoxarifados')) return ['almoxarifado.cadastrar','componente.cadastrar','compras.ver','pedido.receber','contagem.contar'];
+    if(pre('/api/almoxarifados')) return ['almoxarifado.cadastrar','componente.cadastrar','compras.ver','pedido.receber','contagem.contar','volume.movimentar'];
     if(eq('/api/componentes/opcoes') || eq('/api/componentes/pendencias')) return ['componente.cadastrar','compras.ver'];
     if(M !== 'GET' && pre('/api/componentes')) return 'componente.cadastrar';
     if(M !== 'GET' && pre('/api/ofertas')) return 'preco.lancar';
@@ -1346,6 +1331,8 @@ module.exports = function(app, db){
     ['devolucao.acompanhar','devolucao_casos'], ['devolucao.lancar','devolucao_casos'], ['devolucao.dinheiro','devolucao_casos'],
     ['painel.ver','painel'], ['relatorios.ver','relatorios'], ['necessidade.ver','necessidade'],
     ['pedido.receber','recebimento'],
+    // A 503 (revisão do PR #305): sem a área, quem só tem esta chave voltava ao login.
+    ['volume.movimentar','almoxarifado'],
     /* A tela de conferencia (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA). A area
        existe para a tela ficar na lista protegida do auth.js (armadilha #3) e
        para o fallback do modelo antigo; quem decide e a chave. Duas chaves

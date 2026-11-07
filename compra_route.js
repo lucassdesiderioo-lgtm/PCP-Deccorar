@@ -62,11 +62,19 @@ module.exports = function(app, db){
      O arquivo vem em base64 (como o anexo das devolucoes) e e gravado DENTRO
      da transacao da linha: disco recusou, a linha nao existe. O nome no disco
      e gerado aqui — o nome mandado so e mostrado, nunca vira caminho. */
+  /* O ANEXO DA NOTA SÓ PARA QUEM VÊ A NOTA (revisão do PR #305, R-CMP-27): o
+     XML, o PDF e a foto da nota trazem impostos e valores que o JSON poda para
+     quem não tem custo.ver nem nota.lancar — o arquivo não pode contornar a poda. */
+  const DA_NOTA = ['xml', 'nota_pdf', 'nota_foto'];
+  const podeAcesso = (req, c) => { try{ return !!app.locals.acesso.podePermissao(req.usuario, c); }catch(e){ return false; } };
+  const veNota = req => podeAcesso(req, 'custo.ver') || podeAcesso(req, 'nota.lancar');
+  const anexoDeNota = a => DA_NOTA.indexOf(a.tipo) >= 0 || !!a.nota_id;
   app.get('/api/compras/anexos', (req, res) => {
     const w = [], p = [];
     for(const k of ['pedido_id', 'nota_id', 'recebimento_id']) if(req.query[k]){ w.push(k + '=?'); p.push(+req.query[k]); }
     if(!w.length) return res.json([]);
-    res.json(db.prepare('SELECT id, pedido_id, nota_id, recebimento_id, tipo, nome, tamanho, criado_em, criado_por FROM compra_anexo WHERE ' + w.join(' AND ') + ' ORDER BY id').all(...p));
+    const l = db.prepare('SELECT id, pedido_id, nota_id, recebimento_id, tipo, nome, tamanho, criado_em, criado_por FROM compra_anexo WHERE ' + w.join(' AND ') + ' ORDER BY id').all(...p);
+    res.json(veNota(req) ? l : l.filter(a => !anexoDeNota(a)));
   });
   app.post('/api/compras/anexos', (req, res) => {
     const b = req.body || {};
@@ -96,6 +104,7 @@ module.exports = function(app, db){
   app.get('/api/compras/anexos/:id', (req, res) => {
     const a = db.prepare('SELECT * FROM compra_anexo WHERE id=?').get(+req.params.id);
     if(!a) return res.status(404).json({ erro:'anexo não encontrado' });
+    if(anexoDeNota(a) && !veNota(req)) return res.status(403).json({ erro:'o anexo da nota é de quem lança nota ou vê custo' });
     const f = path.join(CAMINHOS.ANEXOS_COMPRAS, path.basename(a.arquivo));
     if(!fs.existsSync(f)) return res.status(404).json({ erro:'o arquivo do anexo não está no disco' });
     const ext = (a.arquivo.split('.').pop() || '').toLowerCase();

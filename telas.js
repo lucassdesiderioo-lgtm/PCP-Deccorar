@@ -77,8 +77,8 @@ const TELAS = [
   { n:501, nome:'Compras',               rota:'/admin/compras', nivel:'admin',      onde:'computador',
     perms:['compras.ver','fornecedor.cadastrar','preco.lancar','pedido.criar','pedido.pagar','componente.cadastrar','almoxarifado.cadastrar','certificado.gerenciar'], aba:'compras' },
   { n:502, nome:'Recebimento',           rota:'/recebimento',   nivel:'operacao',   onde:'tablet',     perms:['pedido.receber'],        area:'recebimento' },
-  // COMPRAS-E-RECEBIMENTO fase 5: guardar, mover e abrir volume por bipe (nasce so para quem tem a chave — backfill da spec §7)
-  { n:503, nome:'Almoxarifado',          rota:'/almoxarifado',  nivel:'operacao',   onde:'tablet',     perms:['volume.movimentar'] },
+  // COMPRAS-E-RECEBIMENTO fase 5: guardar, mover e abrir volume por bipe (a chave nasce só para o Admin Geral, R-ALC-06)
+  { n:503, nome:'Almoxarifado',          rota:'/almoxarifado',  nivel:'operacao',   onde:'tablet',     perms:['volume.movimentar'],  area:'almoxarifado' },
   // COMPRAS-E-RECEBIMENTO fase 6: a contagem de material por almoxarifado (as chaves de contagem que ja existem)
   { n:504, nome:'Contagem de material',  rota:'/contagem-material', nivel:'operacao', onde:'tablet',  perms:['contagem.contar'] },
   // ── 600 · Sob medida: as telas moram em tecido/nucleo/telas.js (numero e nivel la) ──
@@ -94,7 +94,7 @@ const TELAS = [
    alcança decide. É a ordem que existia no `PADRAO`, e mudá-la mudaria para
    onde cada pessoa vai de manhã — por isso ela é uma lista própria, e não a
    ordem do mapa. O Admin (a porta '/admin') vem primeiro, como sempre. */
-const CHEGADA = [105, 101, 102, 201, 202, 103, 904, 401, 502, 303, 251, 252];   // a 103 no lugar da 203 (05/11/2026)
+const CHEGADA = [105, 101, 102, 201, 202, 103, 904, 401, 502, 303, 251, 252, 503];   // a 503 no fim: quem só tem volume.movimentar (revisão do PR #305)   // a 103 no lugar da 203 (05/11/2026)
 
 const NIVEIS = ['operacao', 'supervisor', 'admin', 'admin_geral'];
 const NOME_NIVEL = { operacao:'Operação', supervisor:'Supervisor', admin:'Admin', admin_geral:'Admin Geral' };

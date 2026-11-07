@@ -420,7 +420,7 @@ async function telaEntrada(pai){
   if(!podeEntrar()){ limpar(pai).appendChild(el('div',{class:'vazio',texto:'Sem permissao para dar entrada.'})); return; }
   /* APOSENTADA (COMPRAS-E-RECEBIMENTO fase 9): rolo novo nasce pelo
      Recebimento do PCP (502), que o cria aqui com fornecedor, nota e preco. */
-  limpar(pai).appendChild(el('div',{class:'vazio',texto:'Rolo novo agora nasce pelo Recebimento do PCP (tela 502): a compra e conferida la, e o rolo entra aqui sozinho, com o fornecedor, a nota e o preço por m². Para guardar ou mover o rolo, use a aba Em estoque.'}));
+  limpar(pai).appendChild(el('div',{class:'vazio',texto:'Rolo novo agora nasce pelo Recebimento do PCP (tela 502): a compra é conferida lá, e o rolo entra aqui sozinho, com o fornecedor, a nota e o preço por m². Para guardar ou mover o rolo, use a aba Em estoque.'}));
   return;
   estado.tecidos=await api('/api/tecidos');
   estado.arvore=await api('/api/enderecos/ROLO');

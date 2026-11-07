@@ -17,6 +17,8 @@ module.exports = function(app, db){
   app.get('/api/contagem-material/pendentes', (req, res) => res.json(C.pendentes(db)));
   app.get('/api/contagem-material/consumo', (req, res) => responder(res, () => C.consumo(db, (req.query || {}).componente_id)));
   app.get('/api/contagem-material/a-contar', (req, res) => res.json(C.aContar(db, (req.query || {}).almoxarifado_id)));
+  app.get('/api/contagem-material/a-etiquetar', (req, res) => res.json(C.aEtiquetar(db)));
+  app.post('/api/contagem-material/etiquetar', (req, res) => responder(res, () => C.etiquetar(db, req.body || {}, QUEM.pessoa(req))));
   app.get('/api/contagem-material/abertas', (req, res) => res.json(db.prepare(`SELECT c.id, c.almoxarifado_id, a.nome almoxarifado, c.usuario_nome, c.aberta_em
     FROM contagem_material c LEFT JOIN almoxarifado a ON a.id=c.almoxarifado_id WHERE c.situacao='aberta' ORDER BY c.id`).all()));
   app.post('/api/contagem-material/abrir', (req, res) => responder(res, () => C.abrir(db, (req.body || {}).almoxarifado_id, QUEM.pessoa(req))));

@@ -91,7 +91,7 @@ function backfillMaterial(db){
     if(db.prepare("SELECT 1 FROM config WHERE chave='cmp_material_backfill_1'").get()) return;
     db.transaction(() => {
       db.prepare('UPDATE componente SET vai_ficha=1 WHERE vai_ficha IS NULL').run();
-      db.prepare("UPDATE componente SET modo_saldo='volume', um_por_nivel=1 WHERE modo_saldo IS NULL AND familia IS NOT NULL").run();
+      db.prepare("UPDATE componente SET modo_saldo='volume', um_por_nivel=1 WHERE modo_saldo IS NULL AND familia IS NOT NULL AND COALESCE(estoque,0) <= 0").run();   // com saldo, fica quantidade ate a 504 (decisao do dono, 07/11/2026)
       db.prepare("UPDATE componente SET modo_saldo='quantidade' WHERE modo_saldo IS NULL").run();
       db.prepare("UPDATE componente SET como_sai='contagem' WHERE como_sai IS NULL").run();
       /* Os dois almoxarifados que a fabrica ja tem fora do sob medida (§3 da
@@ -300,7 +300,8 @@ function garantirSchemaCompras(db){
       ativo INTEGER DEFAULT 1, removido_em TEXT
     );
     CREATE TABLE IF NOT EXISTS dfe_controle (
-      id INTEGER PRIMARY KEY, ultimo_nsu TEXT, ultima_consulta TEXT, proxima_consulta TEXT, ultimo_erro TEXT
+      id INTEGER PRIMARY KEY, ultimo_nsu TEXT, ultima_consulta TEXT, proxima_consulta TEXT, ultimo_erro TEXT,
+      ultimo_cstat TEXT   -- o cStat da ultima consulta: depois de 137/656 o "consultar agora" tambem espera (revisao do PR #305)
     );
     CREATE TABLE IF NOT EXISTS dfe_documento (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -308,7 +309,10 @@ function garantirSchemaCompras(db){
       emitente_cnpj TEXT, emitente_nome TEXT, valor REAL, emissao TEXT,
       ciencia_em TEXT, ciencia_erro TEXT, xml TEXT, nsu_xml TEXT,
       situacao TEXT,                                    -- aguardando_xml | escolher | sem_pedido | lancada | evento
-      nota_compra_id INTEGER, criado_em TEXT DEFAULT (datetime('now','localtime'))
+      nota_compra_id INTEGER, criado_em TEXT DEFAULT (datetime('now','localtime')),
+      /* revisao do PR #305: o motivo do documento que nao entrou (erro) e o
+         "ciente" da nota sem pedido — quem, quando e por que */
+      erro TEXT, ciente_motivo TEXT, ciente_por TEXT, ciente_por_id INTEGER, ciente_em TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_dfe_chave ON dfe_documento(chave);
 
@@ -495,7 +499,8 @@ function garantirSchemaCompras(db){
          unidade recebida. */
       qtd_contada REAL, peso_1_kg REAL, peso_10_kg REAL, esperado_nota_kg REAL, esperado_cadastro_kg REAL,
       desvio_pct REAL, faixa TEXT, decisao TEXT, decidido_por TEXT, decidido_por_id INTEGER, decidido_em TEXT,
-      motivo_decisao TEXT, fator_real REAL, almoxarifado_id INTEGER, custo_unit REAL
+      motivo_decisao TEXT, fator_real REAL, almoxarifado_id INTEGER, custo_unit REAL,
+      volumes_json TEXT   -- os volumes do item RETIDO, para nascerem quando aceito (revisao do PR #305)
     );
     CREATE INDEX IF NOT EXISTS idx_receb_devol
       ON recebimento_item(motivo_devolucao) WHERE qtd_devolvida > 0;
@@ -615,7 +620,9 @@ function garantirSchemaCompras(db){
   for(const t of ['alm_haste','alm_andar','alm_nivel']) colunas(t, [['origem_sm_id','INTEGER']]);
   colunas('recebimento_item', [['qtd_contada','REAL'],['peso_1_kg','REAL'],['peso_10_kg','REAL'],['esperado_nota_kg','REAL'],
     ['esperado_cadastro_kg','REAL'],['desvio_pct','REAL'],['faixa','TEXT'],['decisao','TEXT'],['decidido_por','TEXT'],
-    ['decidido_por_id','INTEGER'],['decidido_em','TEXT'],['motivo_decisao','TEXT'],['fator_real','REAL'],['almoxarifado_id','INTEGER'],['custo_unit','REAL']]);
+    ['decidido_por_id','INTEGER'],['decidido_em','TEXT'],['motivo_decisao','TEXT'],['fator_real','REAL'],['almoxarifado_id','INTEGER'],['custo_unit','REAL'],['volumes_json','TEXT']]);
+  colunas('dfe_controle', [['ultimo_cstat','TEXT']]);
+  colunas('dfe_documento', [['erro','TEXT'],['ciente_motivo','TEXT'],['ciente_por','TEXT'],['ciente_por_id','INTEGER'],['ciente_em','TEXT']]);
   colunas('pedido_item', [['unidade_compra','TEXT'],['qtd_compra','REAL'],['preco_unid_compra','REAL'],['qtd_declarada','REAL']]);
   /* R-CMP-25: o Simples Nacional nao aproveita credito — a tabela nasce com
      isso, uma vez so. Os outros regimes o contador lanca pela tela. */

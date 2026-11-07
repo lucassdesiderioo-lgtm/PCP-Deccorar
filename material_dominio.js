@@ -49,6 +49,14 @@ function lerCampos(db, b, atual){
     if(!m) throw new Recusa(400, nascer ? 'escolha o modo de saldo do material: sem saldo, por quantidade ou por volume'
                                         : 'o modo de saldo não pode ficar vazio — escolha um dos três');
     if(MODOS.indexOf(m) < 0) throw new Recusa(400, 'o modo de saldo tem que ser um destes: ' + MODOS.join(', ') + ' — veio "' + m + '"');
+    /* COM SALDO O MODO NAO MUDA (revisao do PR #305): virar "por volume" sem
+       volume nenhum deixaria o saldo sem os rolos que o compoem (R-CMP-39), e
+       virar "sem saldo" apagaria o que esta na prateleira. O tecido de antes
+       vira volume ETIQUETADO na 504 (decisao do dono, 07/11/2026). */
+    if(!nascer && atual.modo_saldo && m !== atual.modo_saldo && (+atual.estoque || 0) > 0)
+      throw new Recusa(400, 'este material tem saldo: o modo não muda pelo cadastro. ' + (m === 'volume'
+        ? 'Para passar a "por volume", etiquete os rolos na 504 (Contagem de material).'
+        : 'Zere o saldo pela contagem antes de trocar o modo.'));
     c.modo_saldo = m;
   }else if(nascer){
     throw new Recusa(400, 'escolha o modo de saldo do material: sem saldo, por quantidade ou por volume');

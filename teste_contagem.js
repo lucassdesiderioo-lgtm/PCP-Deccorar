@@ -172,7 +172,9 @@ eq('`lancar` continua SOMANDO ao saldo de agora (7+2)', saldo('BK120120BEGE'), 9
 
 console.log('\n=== 2. A MESMA REGRA VALE PARA MATERIAL ===\n');
 
-chamar('POST','/api/contagem/componente',{sessao:'s4',componente_id:1,quantidade:8});
+/* A porta de LANÇAR material saiu (revisão do PR #305: a contagem de material é
+   só pela 504). A sessão antiga, de antes do deploy, ainda é aprovada daqui. */
+db.prepare("INSERT INTO contagem (codigo,sessao,tipo,componente_id,qtd) VALUES ('Tubo 32 mm','s4','componente',1,8)").run();
 chamar('POST','/api/contagem/ajustar',{sessao:'s4',itens:[{tipo:'componente',componente_id:1,codigo:'Tubo 32 mm'}]},{id:2,nome:'Joao'});
 pend = pendentes();
 eq('material tambem guarda o saldo do momento', pend[0].sistema_era, 10);
@@ -219,13 +221,26 @@ eq('a contagem pendente continua registrada depois de aprovada', reg.length, 1);
 eq('   marcada como aprovada', reg[0].aprovado, 1);
 /* O caminho DIRETO de material tambem deixa registro, ja aprovado. */
 TEM_AJUSTAR = true;
-chamar('POST','/api/contagem/componente',{sessao:'s9',componente_id:1,quantidade:4});
+db.prepare("INSERT INTO contagem (codigo,sessao,tipo,componente_id,qtd) VALUES ('Tubo 32 mm','s9','componente',1,4)").run();
 chamar('POST','/api/contagem/ajustar',{sessao:'s9',itens:[{tipo:'componente',componente_id:1,codigo:'Tubo 32 mm'}]},{id:1,nome:'Ana'});
 const direto = db.prepare("SELECT * FROM contagem_pendente WHERE tipo='componente' ORDER BY id").all();
 eq('o caminho DIRETO de material deixa registro', direto.length, 2);
 eq('   e ele ja nasce aprovado', direto[1].aprovado, 1);
 ok('   assinado por quem aplicou', direto[1].aprovado_por === 'Ana', 'veio: '+direto[1].aprovado_por);
 eq('   e o saldo do material e o contado', material(), 4);
+
+console.log('\n=== 8. A CONTAGEM ANTIGA DE MATERIAL SAIU (revisão do PR #305) ===\n');
+/* Decisão do dono: a contagem de material é só pela 504, às cegas. A porta
+   antiga mostrava o saldo a quem conta e deixava contar por fora da 504. */
+let x = chamar('GET','/api/contagem/componentes');
+eq('a lista antiga (com o saldo) não responde mais', x.status, 410);
+ok('   e diz onde contar', /504/.test(JSON.stringify(x.body)), JSON.stringify(x.body));
+const antesN = db.prepare('SELECT COUNT(*) n FROM contagem').get().n;
+x = chamar('POST','/api/contagem/componente',{sessao:'s10',componente_id:1,quantidade:3});
+eq('lançar material pela porta antiga é recusado', x.status, 410);
+eq('   e nada é gravado', db.prepare('SELECT COUNT(*) n FROM contagem').get().n, antesN);
+const idx = fs.readFileSync(path.join(__dirname,'public','index.html'),'utf8');
+ok('o card antigo de contar material saiu da 302', idx.indexOf('id="ctComp"') < 0 && idx.indexOf('ctLancarComp()') < 0);
 
 console.log('\n' + (falhas ? 'FALHARAM ' + falhas + ' de ' + n : 'TODOS OS ' + n + ' CASOS PASSARAM') + '\n');
 db.close(); fs.rmSync(tmp, {recursive:true, force:true});

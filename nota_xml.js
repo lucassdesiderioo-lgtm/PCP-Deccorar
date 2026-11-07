@@ -55,10 +55,20 @@ function ler(xmlTexto){
 function casar(db, pedido_id, nota){
   const its = db.prepare(`SELECT i.id, i.componente_id, c.nome, c.ncm, o.codigo_fornec FROM pedido_item i
     LEFT JOIN componente c ON c.id=i.componente_id LEFT JOIN oferta o ON o.id=i.oferta_id WHERE i.pedido_id=? ORDER BY i.id`).all(+pedido_id);
+  const ncmDe = d => String(d.ncm || '').replace(/\D/g, '');
+  const porCodDe = d => d.codigo_fornecedor ? its.filter(i => i.codigo_fornec && String(i.codigo_fornec).trim().toUpperCase() === String(d.codigo_fornecedor).trim().toUpperCase()) : [];
+  /* O NCM DISPUTADO NAO CASA (R-CMP-08, revisao do PR #305): dois itens da nota
+     que so casariam pelo mesmo NCM iriam para o MESMO item do pedido — o
+     sistema estaria adivinhando qual e qual. Os dois ficam para escolher. */
+  const disputa = {};
+  for(const d of nota.itens) if(porCodDe(d).length === 0 && ncmDe(d)) disputa[ncmDe(d)] = (disputa[ncmDe(d)] || 0) + 1;
   return nota.itens.map(d => {
-    const porCod = d.codigo_fornecedor ? its.filter(i => i.codigo_fornec && String(i.codigo_fornec).trim().toUpperCase() === String(d.codigo_fornecedor).trim().toUpperCase()) : [];
+    const porCod = porCodDe(d);
     if(porCod.length === 1) return { n:d.n, pedido_item_id:porCod[0].id, por:'codigo_fornecedor', item:porCod[0].nome };
-    const porNcm = d.ncm ? its.filter(i => i.ncm && i.ncm === String(d.ncm).replace(/\D/g, '')) : [];
+    const porNcm = d.ncm ? its.filter(i => i.ncm && i.ncm === ncmDe(d)) : [];
+    if(porNcm.length === 1 && porCod.length === 0 && disputa[ncmDe(d)] > 1)
+      return { n:d.n, pedido_item_id:null, por:null, candidatos:porNcm.map(i => ({ pedido_item_id:i.id, item:i.nome })),
+        motivo:'mais de um item da nota tem este NCM e nenhum tem o código do fornecedor — escolha na tela' };
     if(porNcm.length === 1 && porCod.length === 0) return { n:d.n, pedido_item_id:porNcm[0].id, por:'ncm', item:porNcm[0].nome };
     const cand = (porCod.length > 1 ? porCod : porNcm).map(i => ({ pedido_item_id:i.id, item:i.nome }));
     return { n:d.n, pedido_item_id:null, por:null, candidatos:cand,
@@ -73,6 +83,12 @@ function pedidosDoEmitente(db, cnpj){
   if(!d) return [];
   return db.prepare(`SELECT p.id, p.numero, p.status FROM pedido_compra p JOIN fornecedor f ON f.id=p.fornecedor_id
     WHERE REPLACE(REPLACE(REPLACE(COALESCE(f.cnpj,''),'.',''),'/',''),'-','')=? AND p.status IN ('comprado','parcial','recebido') ORDER BY p.id DESC`).all(d);
+}
+/* So o pedido A CAMINHO recebe nota sozinha (R-CMP-55, revisao do PR #305): o
+   ja recebido aparece na tela para escolher, mas nao e adivinhado. */
+function pedidosAbertosDoEmitente(db, cnpj){
+  const A = require('./compra_dominio').A_CAMINHO;
+  return pedidosDoEmitente(db, cnpj).filter(p => A.indexOf(p.status) >= 0);
 }
 
 /* Lanca a nota lida, com as escolhas da tela: cada item da nota com um
@@ -103,4 +119,4 @@ function lancar(db, b, quem){
   return Object.assign(r, { itens:itens.length });
 }
 
-module.exports = { Recusa, ler, casar, pedidosDoEmitente, lancar };
+module.exports = { Recusa, ler, casar, pedidosDoEmitente, pedidosAbertosDoEmitente, lancar };

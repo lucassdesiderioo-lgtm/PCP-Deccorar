@@ -182,4 +182,36 @@ function pendencias(db){
   return { n:l.length, desde:l.map(x => x.contado_em).filter(Boolean).sort()[0] || null };
 }
 
-module.exports = { Recusa, abrir, ler, linha, tirarLinha, terminar, pendentes, decidir, consumo, mediaDeCompra, aContar, pendencias };
+/* ── O TECIDO DE ANTES VIRA VOLUME NA 504 (decisao do dono, 07/11/2026) ─────
+   O tecido que ja tinha saldo antes da fase 1 ficou "por quantidade" (o
+   backfill nao inventa rolo). Aqui quem aprova a contagem registra cada rolo
+   com a metragem da etiqueta: o material passa a "por volume", nascem os
+   volumes, e o saldo vira a soma deles — a diferenca entra no livro como
+   contagem, com quem. A lista nao mostra o saldo (a contagem e cega). */
+function aEtiquetar(db){
+  return db.prepare(`SELECT c.id, c.nome, c.unidade, c.almoxarifado_id, a.nome almoxarifado FROM componente c
+    LEFT JOIN almoxarifado a ON a.id=c.almoxarifado_id
+    WHERE c.ativo=1 AND c.modo_saldo='quantidade' AND c.familia IS NOT NULL AND COALESCE(c.estoque,0) > 0 ORDER BY c.nome`).all();
+}
+function etiquetar(db, b, quem){
+  const c = db.prepare('SELECT * FROM componente WHERE id=?').get(+(b && b.componente_id));
+  if(!c || !c.ativo) throw new Recusa(404, 'material não encontrado');
+  if(c.modo_saldo !== 'quantidade') throw new Recusa(400, c.nome + ' já não é por quantidade: não há o que etiquetar');
+  const vs = Array.isArray(b.volumes) ? b.volumes : [];
+  if(!vs.length) throw new Recusa(400, 'registre cada rolo, com a metragem da etiqueta');
+  const volumes = vs.map((v, k) => { const m = parseFloat(String(v && v.metragem).replace(',', '.'));
+    if(!(m > 0)) throw new Recusa(400, 'a metragem do rolo ' + (k + 1) + ' tem que ser maior que zero');
+    return { metragem: Math.round(m * 1000) / 1000, codigo_fornecedor: (v && v.codigo_fornecedor) || null }; });
+  const total = Math.round(volumes.reduce((s2, v) => s2 + v.metragem, 0) * 1000) / 1000;
+  let criados;
+  db.transaction(() => {
+    const delta = Math.round((total - (+c.estoque || 0)) * 1000) / 1000;
+    if(delta !== 0) DOM.movimentar(db, { componente_id:c.id, delta, motivo:'contagem',
+      referencia:'504: etiquetado em ' + volumes.length + ' volume(s)', usuario_nome:quem && quem.nome, usuario_id:quem && quem.id });
+    db.prepare("UPDATE componente SET modo_saldo='volume', um_por_nivel=1 WHERE id=?").run(c.id);
+    criados = require('./almox_dominio').criarVolumes(db, { componente_id:c.id, recebimento_item_id:null, volumes, almoxarifado_id:c.almoxarifado_id, quem });
+  })();
+  return { volumes:criados };
+}
+
+module.exports = { Recusa, abrir, ler, linha, tirarLinha, terminar, pendentes, decidir, consumo, mediaDeCompra, aContar, pendencias, aEtiquetar, etiquetar };

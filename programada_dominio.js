@@ -28,9 +28,13 @@ function diaDaLista(db){
   const d = r ? parseInt(r.valor, 10) : 1;
   return d >= 1 && d <= 28 ? d : 1;
 }
+/* A caminho e a regua do compra_dominio (A_CAMINHO): o pedido esperando
+   aprovacao ainda nao foi comprado e nem aparece na fila do Recebimento
+   (revisao do PR #305). */
 function aCaminho(db, componente_id){
+  const st = require('./compra_dominio').A_CAMINHO;
   const r = db.prepare(`SELECT COALESCE(SUM(MAX(0, i.qtd_consumo - i.qtd_recebida)),0) q FROM pedido_item i JOIN pedido_compra p ON p.id=i.pedido_id
-    WHERE i.componente_id=? AND p.status IN ('comprado','parcial','aguardando_aprovacao') AND i.status IN ('aberto','parcial')`).get(componente_id);
+    WHERE i.componente_id=? AND p.status IN (${st.map(() => '?').join(',')}) AND i.status IN ('aberto','parcial')`).get(componente_id, ...st);
   return r3(r.q || 0);
 }
 /* A embalagem da ULTIMA compra do material: o fator (unidades da casa por

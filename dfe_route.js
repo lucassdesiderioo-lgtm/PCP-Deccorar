@@ -49,6 +49,7 @@ module.exports = function(app, db){
     res.json({ nota, pedidos_do_emitente:peds, casamento: req.query.pedido_id ? X.casar(db, req.query.pedido_id, nota) : null,
       pedido_itens: req.query.pedido_id ? db.prepare('SELECT i.id, COALESCE(c.nome, i.sku) item FROM pedido_item i LEFT JOIN componente c ON c.id=i.componente_id WHERE i.pedido_id=? ORDER BY i.id').all(+req.query.pedido_id) : [] });
   });
+  app.post('/api/dfe/:id/ciente', (req, res) => responder(res, () => DFE.ciente(db, req.params.id, req.body || {}, QUEM.pessoa(req))));
   app.post('/api/dfe/:id/lancar', (req, res) => responder(res, () => DFE.lancarEscolhida(db, req.params.id, req.body || {}, QUEM.pessoa(req))));
 
   if(process.env.PCP_DFE_AUTOMATICO !== '0'){

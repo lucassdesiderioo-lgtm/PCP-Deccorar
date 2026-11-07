@@ -5,7 +5,7 @@ STATUS
 Situação: em código, falta subir (as onze fases construídas em 07/11/2026; o deploy e as migrações das fases 9 e 10 esperam o dono)
 Criada em: 06/11/2026
 Última atualização: 07/11/2026
-Fase atual: todas em código · PR aberto, não mesclado · roteiro de deploy no PR
+Fase atual: todas em código · revisão do PR #305 feita (07/11/2026, 4 decisões do dono) · PR aberto, não mesclado · roteiro de deploy no PR
 Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑  7 ☑  8 ☑  9 ☑  10 ☑  11 ☑
 Decidido em 07/11/2026: fase 10 = o PCP é dono do endereço, o sob medida do rolo e
 da sobra (R-CMP-50) · fase 11 construída sem certificado, pronta para recebê-lo
@@ -399,12 +399,15 @@ repositório.**
 - **Fase 1:** "sem dizer, o material nasce NA ficha" (`vai_ficha = 1`): a tela mostra o
   campo, mas a rota precisa de um valor quando ele não vem.
 - **Fase 1:** as chaves novas da spec saem da comparação com o retrato do `teste_mapa`
-  pelo nome (`perfis_acesso.NASCERAM_DEPOIS`), como a `coleta.horario`: elas chegam a
-  quem já tinha a chave de origem, por decisão da spec §7.
+  pelo nome (`perfis_acesso.NASCERAM_DEPOIS`), como a `coleta.horario`. ~~Elas chegam a
+  quem já tinha a chave de origem, por decisão da spec §7.~~ **Revisão do PR #305
+  (decisão do dono, 07/11/2026): nascem só para o Admin Geral, sem backfill** — a R-ALC-06
+  vale sobre a §7; quem recebe é marcado na tela de Acessos depois do deploy.
 - **Fase 2:** os três dados da compra (canal, nº, data) são pedidos já no "Comprado",
   também quando o pedido vai para a aprovação; o aprovador só aprova, com motivo.
 - **Fase 2:** `nota.lancar` entrou aqui, e não na fase 4, porque a poda das parcelas
-  (R-CMP-27) já a lê. Backfill de quem tem `pedido.pagar`, como a §7 manda.
+  (R-CMP-27) já a lê. ~~Backfill de quem tem `pedido.pagar`, como a §7 manda.~~ (sem
+  backfill desde a revisão do PR #305)
 - **Fase 2:** a alçada não deixa a pessoa ser aprovadora de si mesma.
 - **Fase 2:** o "marcar pago" de antes continua: sem parcela, grava uma parcela paga do
   valor do pedido; com parcelas, paga as abertas.
@@ -416,10 +419,16 @@ repositório.**
 - **Fase 3:** uma terceira régua do peso, a média dos fatores medidos (R-CMP-35: "lote fora
   da média é divergência"); vale a pior das três.
 - **Fase 3:** na entrega parcial por kg, a régua da nota usa o kg do pedido menos o que já
-  chegou dele, e o custo da segunda entrega em diante é pelo declarado (a conta exata vem
-  com a nota, fase 4).
-- **Fase 3:** a contagem "diferente do declarado" é cumulativa (o que já chegou + o desta
-  entrega): a entrega parcial de propósito também fica retida, e sai com um toque.
+  chegou dele, e o custo ~~da segunda entrega em diante~~ de toda entrega abaixo do
+  declarado é pelo declarado; no fechamento com falta, com o kg inteiro chegado, vira o
+  valor ÷ o contado (R-CMP-34).
+- **Fase 3:** ~~a contagem "diferente do declarado" é cumulativa (o que já chegou + o desta
+  entrega): a entrega parcial de propósito também fica retida, e sai com um toque.~~
+  **Revisão do PR #305 (decisão do dono, 07/11/2026):** a entrega abaixo do declarado
+  ENTRA; a que passa do declarado retém na hora; a diferença abaixo é cobrada no
+  "fechar pedido parcial", como linha "fechamento" para quem libera, sem mexer no saldo.
+  A régua da nota passou a ser o kg que falta ÷ as unidades declaradas que faltam (antes
+  dividia pelo que chegou na entrega, e dobrava o esperado na entrega em partes).
 - **Fase 3:** o material "sem saldo" entra e sai no mesmo recebimento (motivo `consumo`), e o
   custo médio dele é a média ponderada de todas as compras.
 - **Fase 3:** o item com entrega retida esperando decisão sai da fila do Recebimento até
@@ -988,7 +997,12 @@ Cada chave nova tem as três pontas: `permissoes.js`, `permDaRota()` e **quem j�
 (backfill de uma vez, marcado em `config`, armadilha #13). Rota sem permissão nasce
 negada (#29).
 
-| Chave nova | Nível | Quem recebe no backfill |
+> ⚠️ **A COLUNA "QUEM RECEBE NO BACKFILL" FOI SUBSTITUÍDA** na revisão do PR #305
+> (decisão do dono, 07/11/2026): a R-ALC-06 vale sobre esta tabela — **toda chave nova
+> nasce só para o Admin Geral**, e quem recebe é marcado na tela de Acessos depois do
+> deploy (`docs/DECISOES.md`). A coluna fica como registro do que a spec pedia.
+
+| Chave nova | Nível | Quem recebe no backfill (substituído: só o Admin Geral) |
 |---|---|---|
 | `pedido.aprovar` | admin · **sensível** | quem tem `pedido.criar` hoje |
 | `nota.lancar` | admin | quem tem `pedido.pagar` |

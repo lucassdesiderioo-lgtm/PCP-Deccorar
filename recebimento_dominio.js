@@ -75,8 +75,10 @@ function custoUnit(pi, contadaAgora, db){
     /* Primeira entrega do item: o valor inteiro ÷ o que chegou contado. Entrega
        parcial depois da primeira: pelo declarado (a conta exata so fecha com a
        nota, na fase 4). */
-    if(!(pi.qtd_recebida > 0) && contadaAgora > 0) return valor / contadaAgora;
     const base = pi.qtd_declarada || pi.qtd_consumo;
+    /* A entrega PARCIAL (menos que o declarado) custa pelo declarado; a conta
+       pelo contado fecha no fechamento (decisao do dono, 07/11/2026). */
+    if(!(pi.qtd_recebida > 0) && contadaAgora > 0 && !(base > 0 && contadaAgora < base - 1e-9)) return valor / contadaAgora;
     return base > 0 ? valor / base : null;
   }
   return pi.preco_unit != null ? pi.preco_unit / (pi.fator || 1) : null;
@@ -92,9 +94,7 @@ function darEntrada(db, pi, comp, qtd, custo, ref, quem){
   if(comp && comp.modo_saldo === 'sem'){
     DOM.movimentar(db, { componente_id:pi.componente_id, delta:-qtd, motivo:'consumo', referencia:ref + ' (sem saldo: consumido na entrada)',
       usuario_nome:quem && quem.nome, usuario_id:quem && quem.id });
-    const m = db.prepare(`SELECT SUM(delta*custo_unit) v, SUM(delta) q FROM movimento_componente
-      WHERE componente_id=? AND motivo='recebimento' AND custo_unit IS NOT NULL AND delta>0`).get(pi.componente_id);
-    if(m && m.q > 0) db.prepare('UPDATE componente SET custo_medio=? WHERE id=?').run(Math.round(m.v / m.q * 1e6) / 1e6, pi.componente_id);
+    DOM.recalcularMediaSemSaldo(db, pi.componente_id);
   }
 }
 
@@ -162,7 +162,8 @@ function receber(db, b, quem){
   if(!prep.length) throw new Recusa(400, 'nada foi informado como recebido ou devolvido');
 
   let recId, retidos = 0, avisos = 0, entradas = 0;
-  const volumesCriados = [], rolosCriados = [];
+  const volumesCriados = [], rolosCriados = [], rolosPedir = [];
+  const fornPed = db.prepare('SELECT f.id, f.nome FROM pedido_compra p LEFT JOIN fornecedor f ON f.id=p.fornecedor_id WHERE p.id=?').get(ped.id);
   db.transaction(() => {
     recId = db.prepare('INSERT INTO recebimento (pedido_id, nota_fiscal, nota_data, recebido_por, recebido_por_id) VALUES (?,?,?,?,?)')
       .run(ped.id, b.nota_fiscal || null, b.nota_data || null, quem && quem.nome || null, quem && quem.id || null).lastInsertRowid;
@@ -175,7 +176,11 @@ function receber(db, b, quem){
         /* kg da nota: o do pedido, menos o que ja chegou dele (entrega parcial) */
         const jaKg = db.prepare('SELECT COALESCE(SUM(qtd_consumo*fator_real),0) k FROM recebimento_item WHERE pedido_item_id=? AND fator_real>0 AND COALESCE(decisao,\'\')<>\'devolver\'').get(pi.id).k;
         const kgNota = Math.max(0, (pi.qtd_compra || 0) - jaKg);
-        espN = kgNota > 0 ? r6(kgNota / x.qtd) : null;
+        /* A regua da nota e PROPORCIONAL: o kg que falta ÷ as unidades
+           declaradas que faltam. Dividir pelo que chegou nesta entrega dobrava
+           o esperado na entrega em partes (revisao do PR #305). */
+        const declRest = pi.qtd_declarada != null ? (pi.qtd_declarada - (pi.qtd_recebida || 0)) : null;
+        espN = kgNota > 0 ? r6(declRest > 0 ? kgNota / declRest : kgNota / x.qtd) : null;
         espC = pi.peso_padrao_kg > 0 ? pi.peso_padrao_kg : null;
         const hist = fatorMedio(db, pi.componente_id);
         const d = [espN, espC, hist && hist.kg_por_unidade].filter(e => e > 0).map(e => Math.abs(medido - e) / e * 100);
@@ -183,25 +188,27 @@ function receber(db, b, quem){
         const av = pi.tol_aviso_pct != null ? pi.tol_aviso_pct : 2, rt = pi.tol_retem_pct != null ? pi.tol_retem_pct : 5;
         if(desvio != null) faixa = desvio <= av ? 'ok' : (desvio <= rt ? 'aviso' : 'retido');
       }
-      /* Contagem diferente da quantidade declarada RETEM (R-CMP-32). O tecido do
-         sob medida nao retem: o rolo nasce la, e la e que se acerta (R9). */
-      if(!x.sm && pi.qtd_declarada != null && x.qtd > 0 && Math.abs((pi.qtd_recebida || 0) + x.qtd - pi.qtd_declarada) > 1e-9) faixa = 'retido';
+      /* Contagem diferente da quantidade declarada RETEM (R-CMP-32) — mas so no
+         FECHAMENTO (decisao do dono, 07/11/2026): a entrega em partes entra; a
+         que passa do declarado retem na hora; a que fica abaixo e cobrada quando
+         o pedido fecha com falta (fecharComFalta). O tecido do sob medida nao
+         retem: o rolo nasce la, e la e que se acerta (R9). */
+      if(!x.sm && pi.qtd_declarada != null && x.qtd > 0 && (pi.qtd_recebida || 0) + x.qtd - pi.qtd_declarada > 1e-9) faixa = 'retido';
       const ri = db.prepare(`INSERT INTO recebimento_item (recebimento_id, pedido_item_id, qtd_embalagem, qtd_consumo, qtd_devolvida, motivo_devolucao,
           divergencia, qtd_contada, peso_1_kg, peso_10_kg, esperado_nota_kg, esperado_cadastro_kg, desvio_pct, faixa, fator_real, almoxarifado_id)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(recId, pi.id, pi.fator ? x.qtd / pi.fator : x.qtd, x.qtd, x.dev, x.motivoDev,
           faixa === 'ok' ? 'nenhuma' : 'quantidade', x.qtd, x.p1, x.p10, espN, espC, desvio, faixa, fator, x.alm).lastInsertRowid;
-      if(faixa === 'retido'){ retidos++; continue; }
+      if(faixa === 'retido'){
+        /* Os volumes do retido ficam guardados: aceito, eles nascem com a metragem
+           de cada etiqueta (revisao do PR #305 — antes o aceito entrava sem volume). */
+        if(x.volumes) db.prepare('UPDATE recebimento_item SET volumes_json=? WHERE id=?').run(JSON.stringify(x.volumes), ri);
+        retidos++; continue;
+      }
       if(faixa === 'aviso') avisos++;
       const custo = custoUnit(pi, x.qtd, db);
       db.prepare('UPDATE recebimento_item SET custo_unit=? WHERE id=?').run(custo, ri);
       if(x.sm){
-        const larg = pi.largura_bobina_cm / 100;
-        const f = db.prepare('SELECT f.id, f.nome FROM pedido_compra p LEFT JOIN fornecedor f ON f.id=p.fornecedor_id WHERE p.id=?').get(ped.id);
-        let r;
-        try{ r = require('./sobmedida_rolo').criarRolos({ tecido_id:pi.sm_tecido_id, largura:larg, volumes:x.volumes, nf:b.nota_fiscal || null,
-          fornecedor: f && f.id ? { id:f.id, nome:f.nome } : null, preco_m2: custo != null ? custo / larg : null, usuario_nome:quem && quem.nome }); }
-        catch(e){ throw new Recusa(503, 'o rolo do sob medida não foi criado: ' + ((e && (e.mensagem || e.message)) || e)); }
-        rolosCriados.push.apply(rolosCriados, r || []);
+        rolosPedir.push(pedidoDeRolo(pi, x.volumes, b.nota_fiscal, fornPed, custo, quem));
         somarRecebido(db, pi, x.qtd);
         entradas++;
         continue;
@@ -212,6 +219,10 @@ function receber(db, b, quem){
       if(x.volumes && module.exports.criarVolumes) volumesCriados.push.apply(volumesCriados, module.exports.criarVolumes(db, { componente_id:pi.componente_id, recebimento_item_id:ri, volumes:x.volumes, almoxarifado_id:x.alm, quem }));
     }
     fecharStatusPedido(db, ped.id);
+    /* O ROLO DO SOB MEDIDA NASCE POR ULTIMO, NUMA CHAMADA SO (revisao do PR #305):
+       qualquer recusa antes dela desfaz o PCP sem ter tocado o tecido.db; a
+       recusa dela desfaz os dois lados. */
+    if(rolosPedir.length) rolosCriados.push.apply(rolosCriados, criarRolosSm(rolosPedir));
   })();
   const st = db.prepare('SELECT status FROM pedido_compra WHERE id=?').get(ped.id).status;
   /* A resposta a quem recebe NAO traz desvio nem esperado: so o que fazer. */
@@ -220,10 +231,23 @@ function receber(db, b, quem){
            st === 'parcial' ? 'O pedido continua aberto — o saldo segue contando como a caminho.' : null };
 }
 
+/* O pedido de rolo ao sob medida, e a chamada UNICA a porta. */
+function pedidoDeRolo(pi, volumes, nf, f, custo, quem){
+  const larg = pi.largura_bobina_cm / 100;
+  return { tecido_id:pi.sm_tecido_id, largura:larg, volumes, nf:nf || null,
+    fornecedor: f && f.id ? { id:f.id, nome:f.nome } : null, preco_m2: custo != null ? custo / larg : null, usuario_nome:quem && quem.nome };
+}
+function criarRolosSm(lista){
+  let r;
+  try{ r = require('./sobmedida_rolo').criarRolos(lista); }
+  catch(e){ throw new Recusa(503, 'o rolo do sob medida não foi criado: ' + ((e && (e.mensagem || e.message)) || e)); }
+  return [].concat.apply([], r || []);
+}
+
 /* ── RETIDOS E AVISOS (para quem libera) ─────────────────────────────────── */
 function retidos(db){
   const sel = faixa => db.prepare(`SELECT ri.id, ri.pedido_item_id, ri.qtd_contada, ri.peso_1_kg, ri.peso_10_kg, ri.esperado_nota_kg, ri.esperado_cadastro_kg,
-      ri.desvio_pct, ri.faixa, r.criado_em, r.recebido_por, p.numero, p.id pedido_id, pi.qtd_declarada, COALESCE(c.nome, pi.sku) item, c.unidade, f.nome fornecedor
+      ri.desvio_pct, ri.faixa, ri.divergencia, r.criado_em, r.recebido_por, p.numero, p.id pedido_id, pi.qtd_declarada, COALESCE(c.nome, pi.sku) item, c.unidade, f.nome fornecedor
     FROM recebimento_item ri JOIN recebimento r ON r.id=ri.recebimento_id JOIN pedido_item pi ON pi.id=ri.pedido_item_id
     JOIN pedido_compra p ON p.id=r.pedido_id LEFT JOIN componente c ON c.id=pi.componente_id LEFT JOIN fornecedor f ON f.id=p.fornecedor_id
     WHERE ri.faixa=? AND ri.decisao IS NULL ORDER BY ri.id`).all(faixa);
@@ -240,7 +264,16 @@ function decidir(db, id, b, quem){
   const motivo = String(b.motivo || '').trim();
   if(!motivo) throw new Recusa(400, 'diga o motivo da decisão — ele fica gravado');
   if(d === 'devolver' && b.motivo_devolucao && MOTIVOS_DEV.indexOf(b.motivo_devolucao) < 0) throw new Recusa(400, 'motivo de devolução fora da lista: ' + MOTIVOS_DEV.join(', '));
-  const pi = db.prepare('SELECT i.*, c.modo_saldo FROM pedido_item i LEFT JOIN componente c ON c.id=i.componente_id WHERE i.id=?').get(ri.pedido_item_id);
+  const pi = db.prepare('SELECT i.*, c.modo_saldo, c.sm_tecido_id, c.largura_bobina_cm FROM pedido_item i LEFT JOIN componente c ON c.id=i.componente_id WHERE i.id=?').get(ri.pedido_item_id);
+  let vols = [], rolos = [];
+  /* A DIFERENCA COBRADA NO FECHAMENTO: o que chegou ja entrou; a decisao e
+     sobre o fornecedor (aceitar, ou aceitar e reclamar), e nao mexe no saldo. */
+  if(ri.divergencia === 'fechamento'){
+    if(d === 'devolver') throw new Recusa(400, 'o que chegou deste pedido já entrou: aqui a decisão é aceitar, ou aceitar e reclamar com o fornecedor');
+    db.prepare("UPDATE recebimento_item SET decisao=?, decidido_por=?, decidido_por_id=?, decidido_em=datetime('now','localtime'), motivo_decisao=? WHERE id=?")
+      .run(d, quem && quem.nome || null, quem && quem.id || null, motivo, ri.id);
+    return { decisao:d, volumes:[], rolos:[] };
+  }
   db.transaction(() => {
     db.prepare("UPDATE recebimento_item SET decisao=?, decidido_por=?, decidido_por_id=?, decidido_em=datetime('now','localtime'), motivo_decisao=? WHERE id=?")
       .run(d, quem && quem.nome || null, quem && quem.id || null, motivo, ri.id);
@@ -250,13 +283,61 @@ function decidir(db, id, b, quem){
     }else{
       const custo = custoUnit(pi, ri.qtd_contada, db);
       db.prepare('UPDATE recebimento_item SET custo_unit=? WHERE id=?').run(custo, ri.id);
+      let volumes = null; try{ volumes = ri.volumes_json ? JSON.parse(ri.volumes_json) : null; }catch(e){ volumes = null; }
+      if(pi.sm_tecido_id && pi.modo_saldo === 'volume'){
+        /* O tecido do sob medida aceito vira ROLO la, nunca estoque no PCP (R-CMP-49). */
+        if(!volumes || !volumes.length) throw new Recusa(409, 'este tecido do sob medida foi retido sem a metragem dos rolos: receba de novo pela 502');
+        if(!(pi.largura_bobina_cm > 0)) throw new Recusa(400, 'falta a largura da bobina no cadastro do material');
+        const rec = db.prepare('SELECT r.nota_fiscal FROM recebimento r JOIN recebimento_item ri ON ri.recebimento_id=r.id WHERE ri.id=?').get(ri.id);
+        const fornPed = db.prepare('SELECT f.id, f.nome FROM pedido_compra p LEFT JOIN fornecedor f ON f.id=p.fornecedor_id WHERE p.id=?').get(ri.pedido_id);
+        somarRecebido(db, pi, ri.qtd_contada);
+        fecharStatusPedido(db, ri.pedido_id);
+        rolos = criarRolosSm([pedidoDeRolo(pi, volumes, rec && rec.nota_fiscal, fornPed, custo, quem)]);
+        return;
+      }
       darEntrada(db, pi, { modo_saldo:pi.modo_saldo }, ri.qtd_contada, custo, ri.numero + ' (liberado)', quem);
       somarRecebido(db, pi, ri.qtd_contada);
+      if(volumes && volumes.length) vols = module.exports.criarVolumes(db, { componente_id:pi.componente_id, recebimento_item_id:ri.id, volumes, almoxarifado_id:ri.almoxarifado_id, quem });
     }
     fecharStatusPedido(db, ri.pedido_id);
   })();
-  return { decisao:d };
+  return { decisao:d, volumes:vols, rolos };
 }
+/* ── O FECHAMENTO COM FALTA (decisao do dono, 07/11/2026) ───────────────────
+   Chamado DENTRO da transacao do "fechar pedido parcial". Para cada item com
+   quantidade declarada que fechou abaixo dela, a diferenca vai para quem libera
+   (uma linha retida, divergencia 'fechamento', sem saldo). E, se o kg inteiro
+   chegou, a unidade passa a custar o valor ÷ o contado (R-CMP-34). */
+function fecharComFalta(db, pedido_id, quem){
+  const itens = db.prepare(`SELECT i.*, c.modo_saldo FROM pedido_item i LEFT JOIN componente c ON c.id=i.componente_id
+    WHERE i.pedido_id=? AND i.qtd_declarada IS NOT NULL AND i.qtd_recebida > 0 AND i.qtd_recebida < i.qtd_declarada - 1e-9`).all(+pedido_id);
+  if(!itens.length) return 0;
+  const recId = db.prepare('INSERT INTO recebimento (pedido_id, recebido_por, recebido_por_id) VALUES (?,?,?)')
+    .run(+pedido_id, quem && quem.nome || null, quem && quem.id || null).lastInsertRowid;
+  for(const pi of itens){
+    db.prepare(`INSERT INTO recebimento_item (recebimento_id, pedido_item_id, qtd_embalagem, qtd_consumo, qtd_devolvida, divergencia, qtd_contada, faixa)
+      VALUES (?,?,0,0,0,'fechamento',?,'retido')`).run(recId, pi.id, pi.qtd_recebida);
+    if(!(pi.qtd_compra > 0 && pi.preco_unid_compra != null) || !pi.componente_id) continue;
+    const kg = db.prepare("SELECT COALESCE(SUM(qtd_consumo*fator_real),0) k FROM recebimento_item WHERE pedido_item_id=? AND fator_real>0 AND COALESCE(decisao,'')<>'devolver'").get(pi.id).k;
+    const tol = 2 / 100;
+    if(String(pi.unidade_compra || '').toLowerCase() === 'kg' && kg >= pi.qtd_compra * (1 - tol)){
+      const nota = require('./nota_dominio');
+      if(nota.liquidoDoItem(db, pi.id)) nota.corrigirPeloLiquido(db, pi);
+      else{
+        const rec = db.prepare(`SELECT SUM(qtd_contada) q, SUM(qtd_contada*custo_unit) v FROM recebimento_item
+          WHERE pedido_item_id=? AND custo_unit IS NOT NULL AND faixa<>'retido'`).get(pi.id);
+        if(rec && rec.q > 0){
+          const novo = pi.qtd_compra * pi.preco_unid_compra / pi.qtd_recebida;
+          if(pi.modo_saldo !== 'sem') DOM.corrigirCustoPago(db, { componente_id:pi.componente_id, quantidade:rec.q, custo_antigo:rec.v / rec.q, custo_novo:novo });
+          db.prepare("UPDATE recebimento_item SET custo_unit=? WHERE pedido_item_id=? AND custo_unit IS NOT NULL").run(r6(novo), pi.id);
+          if(pi.modo_saldo === 'sem') DOM.recalcularMediaSemSaldo(db, pi.componente_id);
+        }
+      }
+    }
+  }
+  return itens.length;
+}
+
 function ciencia(db, id, quem){
   const ri = db.prepare('SELECT * FROM recebimento_item WHERE id=?').get(+id);
   if(!ri) throw new Recusa(404, 'recebimento não encontrado');
@@ -298,7 +379,7 @@ function prazo(db, q){
   return { dias:dig, fonte: dig != null ? 'digitado' : null, n:total };
 }
 
-module.exports = { Recusa, DECISOES, MOTIVOS_DEV, fila, receber, retidos, decidir, ciencia, pendencias, prazo, fatorMedio, custoUnit,
+module.exports = { Recusa, DECISOES, MOTIVOS_DEV, fila, receber, retidos, decidir, ciencia, pendencias, prazo, fatorMedio, custoUnit, fecharComFalta,
   /* O volume nasce NA MESMA transacao da entrada (fase 5, R-CMP-39). Um gancho,
      e nao um require no topo: o almox_dominio tambem le o componente_dominio,
      e a ordem de carga fica de um lado so. */

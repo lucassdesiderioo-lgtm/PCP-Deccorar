@@ -16,12 +16,18 @@ module.exports = function(app, db){
     catch(e){ if(e instanceof A.Recusa) return res.status(e.status).json({ erro:e.message }); throw e; }
   };
   app.get('/api/almoxarifados/:id/enderecos', (req, res) => res.json(A.enderecos(db, req.params.id)));
-  app.post('/api/almoxarifados/:id/enderecos', (req, res) => responder(res, () => A.criarEnderecos(db, req.params.id, req.body || {})));
+  /* O ENDEREÇO NÃO TEM COLUNA DE AUTOR: criar, renomear e desativar viram linha
+     na auditoria, com quem (revisão do PR #305; §10, "toda escrita grava quem
+     fez"). Só aqui, e não no módulo inteiro: guardar e mover volume já gravam
+     quem no volume_evento, e auditar cada bipe enterraria a auditoria. */
+  const auditado = (req, rota, fn) => { const r = fn();
+    QUEM.auditar(app, req, 'almoxarifado', 'POST ' + rota, String(req.params.id || ''), JSON.stringify(req.body || {}).slice(0, 200)); return r; };
+  app.post('/api/almoxarifados/:id/enderecos', (req, res) => responder(res, () => auditado(req, '/api/almoxarifados/:id/enderecos', () => A.criarEnderecos(db, req.params.id, req.body || {}))));
   app.get('/api/enderecos/:codigo', (req, res) => responder(res, () => A.noNivel(db, req.params.codigo)));
   /* fase 10: o saldo numa lista so (volumes do PCP + rolos e sobras do sob
      medida, por endereco) e renomear/desativar endereco (o sob medida le daqui). */
   app.get('/api/almoxarifados/:id/estoque', (req, res) => res.json(A.estoque(db, req.params.id)));
-  app.post('/api/enderecos/:tipo/:id', (req, res) => responder(res, () => A.renomear(db, req.params.tipo, req.params.id, req.body || {})));
+  app.post('/api/enderecos/:tipo/:id', (req, res) => responder(res, () => auditado(req, '/api/enderecos/:tipo/:id', () => A.renomear(db, req.params.tipo, req.params.id, req.body || {}))));
   app.get('/api/volumes', (req, res) => res.json(A.listar(db, req.query || {})));
   app.get('/api/volumes/:codigo', (req, res) => responder(res, () => A.ler(db, req.params.codigo)));
   app.post('/api/volumes/:codigo/mover', (req, res) => responder(res, () => A.mover(db, req.params.codigo, req.body || {}, QUEM.pessoa(req))));

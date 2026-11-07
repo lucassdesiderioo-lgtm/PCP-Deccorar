@@ -92,11 +92,13 @@ function render(){
   p.itens.forEach(function(i){
     h+='<div class="item"><div class="nome">'+esc(i.item)+'</div>';
     if(i.modo_saldo==='sem'){
-      var tudo=CHEGOU[i.id]!==false;
+      /* NADA NASCE MARCADO (revisao do PR #305): com "Chegou tudo" ja marcado, o
+         toque em "Receber" de quem nem olhou o cafe dava entrada nele inteiro. */
+      var tudo=CHEGOU[i.id]===true, faltou=CHEGOU[i.id]===false;
       h+='<div class="ped-lin">Pedido: '+n3(i.pedido)+' '+esc(i.unidade)+'</div>'
         +'<div class="ops"><button class="b'+(tudo?' on':'')+'" data-tudo="'+i.id+'" data-v="1">'+(tudo?'✓ ':'')+'Chegou tudo</button>'
-        +'<button class="b'+(!tudo?' on':'')+'" data-tudo="'+i.id+'" data-v="0">'+(!tudo?'✓ ':'')+'Faltou algo</button></div>'
-        +(tudo?'':'<div class="lb" style="margin-top:12px">O que veio ('+esc(i.unidade)+')</div><input type="text" inputmode="decimal" data-qtd="'+i.id+'" autocomplete="off">');
+        +'<button class="b'+(faltou?' on':'')+'" data-tudo="'+i.id+'" data-v="0">'+(faltou?'✓ ':'')+'Faltou algo</button></div>'
+        +(!faltou?'':'<div class="lb" style="margin-top:12px">O que veio ('+esc(i.unidade)+')</div><input type="text" inputmode="decimal" data-qtd="'+i.id+'" autocomplete="off">');
     }else if(i.modo_saldo==='volume'){
       var vs=VOL[i.id]||(VOL[i.id]=[{}]);
       h+='<div class="ped-lin">Um registro por volume (rolo, caixa), com a metragem da etiqueta do fornecedor.</div>'
@@ -147,7 +149,7 @@ document.addEventListener('click',async function(ev){
     var itens=p.itens.map(function(i){
       var o={pedido_item_id:i.id};
       var a=$('[data-alm="'+i.id+'"]'); if(a && a.value) o.almoxarifado_id=+a.value;
-      if(i.modo_saldo==='sem' && CHEGOU[i.id]!==false) o.chegou_tudo=true;
+      if(i.modo_saldo==='sem' && CHEGOU[i.id]===true) o.chegou_tudo=true;
       else if(i.modo_saldo==='volume'){
         o.volumes=$$('[data-vol="'+i.id+'"]').map(function(e){ var c=$('[data-volcod="'+i.id+'"][data-k="'+e.getAttribute('data-k')+'"]');
           return {metragem:numero(e.value), codigo_fornecedor:c?c.value:null}; }).filter(function(v){return v.metragem!=null;});

@@ -70,7 +70,7 @@ module.exports = function(app, db){
     if(campos.tipo && TIPOS.indexOf(campos.tipo)<0)
       return res.status(400).json({erro:'o tipo do fornecedor tem que ser: '+TIPOS.join(', ')+' — veio "'+campos.tipo+'"'});
     if(PAGAMENTO.some(k=>tem(k)) && !podeP(req,'pedido.pagar'))
-      return res.status(403).json({erro:'os dados de pagamento do fornecedor são de quem tem "Marcar pedido como pago"'});
+      return res.status(403).json({erro:'os dados de pagamento do fornecedor são de quem tem "Pagar pedido (parcelas)"'});
     if(b.id){
       if(tem('nome') && !campos.nome) return res.status(400).json({erro:'o nome não pode ficar vazio'});
       const cols=Object.keys(campos);

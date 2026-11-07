@@ -84,6 +84,16 @@ const CAMINHOS = require('./caminhos');
   ok('pedir o arquivo da 404', g.status === 404);
   ok('o .gitignore tem a pasta do certificado', /^certificado\/$/m.test(fs.readFileSync(path.join(__dirname, '.gitignore'), 'utf8')));
 
+  secao('revisao do PR #305: a troca que falha nao apaga o certificado que valia');
+  db.exec("CREATE TRIGGER t_falha BEFORE INSERT ON certificado BEGIN SELECT RAISE(ABORT, 'disco cheio de mentira'); END");
+  let erroT = null;
+  try{ r = await post('/api/certificado', { base64:PERTO, senha:SENHA }, AG); }catch(x){ erroT = x; }
+  ok('a troca falhou', erroT || r.status >= 400);
+  ok('e o arquivo do certificado que valia continua la', fs.existsSync(arq));
+  ok('e ele continua o ativo', db.prepare('SELECT arquivo FROM certificado WHERE ativo=1').get().arquivo === linha.arquivo);
+  ok('sem arquivo novo largado na pasta', fs.readdirSync(CAMINHOS.CERTIFICADO).filter(f => /\.pfx$/.test(f)).length === 1, () => fs.readdirSync(CAMINHOS.CERTIFICADO).join(','));
+  db.exec('DROP TRIGGER t_falha');
+
   secao('a validade (R-CMP-52)');
   r = await post('/api/certificado', { base64:PERTO, senha:SENHA }, AG);
   ok('trocar o certificado: o novo vale, o anterior sai (e o arquivo dele some)', r.status === 200 && db.prepare('SELECT COUNT(*) n FROM certificado WHERE ativo=1').get().n === 1 && !fs.existsSync(arq));

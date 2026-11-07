@@ -155,9 +155,20 @@ function corrigirPeloLiquido(db, pi){
   if(!rec || !(rec.q > 0)) return;
   const liq = liquidoDoItem(db, pi.id);
   if(!liq) return;
-  const antigo = rec.v / rec.q, novo = liq.valor / rec.q;
-  DOM.corrigirCustoPago(db, { componente_id:pi.componente_id, quantidade:rec.q, custo_antigo:antigo, custo_novo:novo });
+  /* A UNIDADE CUSTA O LIQUIDO ÷ O QUE A NOTA COBRA (revisao do PR #305): a nota
+     do pedido inteiro com metade recebida dividia pelo recebido e dobrava o
+     custo. Com o item todo recebido vale o contado (R-CMP-34: 400 kg com 590
+     tubos, cada tubo custa valor ÷ 590). */
+  const atual = db.prepare('SELECT * FROM pedido_item WHERE id=?').get(pi.id) || pi;
+  const completo = atual.status === 'recebido';
+  const daNota = (liq.quantidade || 0) * (atual.fator || 1);
+  const base = completo ? (atual.qtd_recebida || rec.q) : (daNota > 0 ? daNota : rec.q);
+  const antigo = rec.v / rec.q, novo = liq.valor / base;
+  const comp = db.prepare('SELECT modo_saldo FROM componente WHERE id=?').get(pi.componente_id);
+  if(!(comp && comp.modo_saldo === 'sem'))
+    DOM.corrigirCustoPago(db, { componente_id:pi.componente_id, quantidade:rec.q, custo_antigo:antigo, custo_novo:novo });
   db.prepare('UPDATE recebimento_item SET custo_unit=? WHERE pedido_item_id=? AND custo_unit IS NOT NULL').run(r6(novo), pi.id);
+  if(comp && comp.modo_saldo === 'sem') DOM.recalcularMediaSemSaldo(db, pi.componente_id);
 }
 
 function listar(db, q){

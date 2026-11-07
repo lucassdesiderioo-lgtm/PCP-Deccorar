@@ -118,18 +118,23 @@ async function principal(){
   const BANCO_SM = require('./tecido/nucleo/caminho').BANCO;
   if(!fs.existsSync(BANCO_SM)){ console.log('o banco do sob medida não existe em ' + BANCO_SM + ' — nada a migrar'); return; }
   const aplicarAgora = process.argv.indexOf('--aplicar') >= 0;
-  let pcp = new Database(caminhos.BANCO), sm = new Database(BANCO_SM);
-  require('./compras_schema').garantirSchemaCompras(pcp);
-  require('./tecido/nucleo/schema').aplicar(sm);
-  const plano = planejar(pcp, sm);
-  console.log('O QUE VAI SER MIGRADO:');
-  for(const p of plano) console.log('  · ' + p.chave + ' (' + p.nome_sm + ') → almoxarifado "' + p.almoxarifado + '"' + (p.ja ? ' (já migrado)' : '') + ': ' + p.hastes + ' haste(s), ' + p.niveis + ' nível(is), ' + p.rolos + ' rolo(s) e ' + p.sobras + ' sobra(s) com endereço');
+  /* ⚠️ A SIMULACAO NAO TOCA OS BANCOS DE VERDADE (revisao do PR #305): eles
+     abrem so para leitura, e o schema (garantirSchemaCompras e as migracoes do
+     sob medida) roda nas COPIAS. Antes rodava aqui, nos dois bancos reais,
+     antes de olhar o --aplicar. */
+  const ro = aplicarAgora ? {} : { readonly:true };
+  let pcp = new Database(caminhos.BANCO, ro), sm = new Database(BANCO_SM, ro);
+  const esquema = (p, m) => { require('./compras_schema').garantirSchemaCompras(p); require('./tecido/nucleo/schema').aplicar(m); };
+  const mostrar = plano => { console.log('O QUE VAI SER MIGRADO:');
+    for(const p of plano) console.log('  · ' + p.chave + ' (' + p.nome_sm + ') → almoxarifado "' + p.almoxarifado + '"' + (p.ja ? ' (já migrado)' : '') + ': ' + p.hastes + ' haste(s), ' + p.niveis + ' nível(is), ' + p.rolos + ' rolo(s) e ' + p.sobras + ' sobra(s) com endereço'); };
   if(!aplicarAgora){
     /* A SIMULACAO roda a migracao em COPIAS (db.backup), e confere. */
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sim-almox-'));
     await pcp.backup(path.join(tmp, 'dados.db')); await sm.backup(path.join(tmp, 'sob-medida.db'));
     pcp.close(); sm.close();
     const p2 = new Database(path.join(tmp, 'dados.db')), s2 = new Database(path.join(tmp, 'sob-medida.db'));
+    esquema(p2, s2);
+    mostrar(planejar(p2, s2));
     const r = aplicar(p2, s2);
     console.log('SIMULAÇÃO (nas cópias, nada gravado): ' + r.conferidos + ' rolo(s)/sobra(s) conferido(s), ' + r.divergencias.length + ' divergência(s)');
     r.divergencias.slice(0, 30).forEach(d => console.log('  ✗ ' + d));
@@ -143,6 +148,8 @@ async function principal(){
   await pcp.backup(path.join(caminhos.BACKUPS, 'dados-antes-almox-' + carimbo + '.db'));
   await sm.backup(path.join(caminhos.BACKUPS, 'tecido-antes-almox-' + carimbo + '.db'));
   console.log('backup dos dois bancos em ' + caminhos.BACKUPS + ' (…-antes-almox-' + carimbo + '.db)');
+  esquema(pcp, sm);   // so depois do backup
+  mostrar(planejar(pcp, sm));
   const r = aplicar(pcp, sm);
   console.log('APLICADO: ' + r.conferidos + ' rolo(s)/sobra(s) conferido(s), ' + r.divergencias.length + ' divergência(s)');
   r.divergencias.slice(0, 30).forEach(d => console.log('  ✗ ' + d));

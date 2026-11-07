@@ -122,15 +122,96 @@ const transporte = async (cert, url, corpo) => {
   r = await post('/api/dfe/' + d3.id + '/lancar', { pedido_id:pid2, escolhas:{ '1':db.prepare('SELECT id FROM pedido_item WHERE pedido_id=?').get(pid2).id, '2':false } }, AG);
   ok('escolhido na tela, lanca com origem dfe', r.status === 200 && db.prepare('SELECT situacao FROM dfe_documento WHERE id=?').get(d3.id).situacao === 'lancada', () => JSON.stringify(r.corpo));
 
+  secao('revisao do PR #305: o pedido ja RECEBIDO nao recebe nota sozinho');
+  const fR = (await post('/api/fornecedores', { nome:'Recebido Ltda', cnpj:'11.111.111/0001-91' }, AG)).corpo.id;
+  const ofRT = (await post('/api/ofertas', { fornecedor_id:fR, componente_id:tubo, embalagem:'barra', fator:1, preco:8, codigo_fornec:'TB-38-6000' }, AG)).corpo.id;
+  const ofRB = (await post('/api/ofertas', { fornecedor_id:fR, componente_id:base, embalagem:'un', fator:1, preco:5 }, AG)).corpo.id;
+  const pR = (await post('/api/pedidos', { itens:[{ oferta_id:ofRT, necessidade:600 }, { oferta_id:ofRB, necessidade:100 }] }, AG)).corpo.pedidos[0].id;
+  await post('/api/pedidos/' + pR + '/comprar', { canal:'direto', numero_externo:'OC-R', comprado_em:'2026-11-01' }, AG);
+  const itsR = db.prepare('SELECT id, qtd_consumo q FROM pedido_item WHERE pedido_id=? ORDER BY id').all(pR);
+  await post('/api/recebimento', { pedido_id:pR, itens:itsR.map(i => ({ pedido_item_id:i.id, qtd_contada:i.q })) }, AG);
+  ok('o pedido da Recebido Ltda esta recebido', db.prepare('SELECT status FROM pedido_compra WHERE id=?').get(pR).status === 'recebido');
+  const CHR = '43261111111111000191550010000077771000077777';
+  const XML_R = XML_METAL.replace(/43261112345678000199550010000012341000012345/g, CHR).replace(/<emit><CNPJ>12345678000199<\/CNPJ>/, '<emit><CNPJ>11111111000191</CNPJ>');
+  db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
+  fila = [ret('138', '000000000000006', '000000000000006', [['000000000000006', 'procNFe_v4.00.xsd', XML_R]])];
+  await DFE.consultar(db, { transporte });
+  const dR = db.prepare('SELECT * FROM dfe_documento WHERE chave=?').get(CHR);
+  ok('com o unico pedido ja recebido, fica "para escolher" (nao lanca em pedido fechado)', dR && dR.situacao === 'escolher' && !dR.nota_compra_id, () => JSON.stringify(dR));
+
+  secao('revisao do PR #305: dois itens da nota pelo MESMO NCM nao casam sozinhos');
+  const nota2 = { itens:[{ n:1, ncm:'76169900', descricao:'base A' }, { n:2, ncm:'76169900', descricao:'base B' }] };
+  const cas = require('./nota_xml').casar(db, pid2, nota2);
+  ok('os dois ficam para escolher (o NCM do pedido nao serve aos dois)', cas.every(c => !c.pedido_item_id), () => JSON.stringify(cas));
+
+  secao('revisao do PR #305: um documento estragado nao derruba a consulta nem perde os outros');
+  db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
+  const CH7 = '43261122333444000155550010000000071000000077';
+  fila = [ret('138', '000000000000008', '000000000000008', [['000000000000007', 'procNFe_v4.00.xsd', '<nfeProc>lixo</nfeProc>'],
+    ['000000000000008', 'resNFe_v1.01.xsd', resNFe(CH7, '22333444000155', 'OUTRA LOJA', '50.00')]])];
+  let erroC = null;
+  try{ r = await DFE.consultar(db, { transporte }); }catch(e){ erroC = e; }
+  ok('a consulta termina', !erroC, () => erroC && erroC.message);
+  ok('o documento bom (NSU 8) entrou', !!db.prepare('SELECT 1 FROM dfe_documento WHERE chave=?').get(CH7));
+  const dErr = db.prepare("SELECT * FROM dfe_documento WHERE nsu='000000000000007'").get();
+  ok('o estragado (NSU 7) fica gravado como erro, com o motivo', dErr && dErr.situacao === 'erro' && dErr.erro, () => JSON.stringify(dErr));
+  ok('e o NSU andou ate o 8', DFE.controle(db).ultimo_nsu === '000000000000008');
+
+  secao('revisao do PR #305: a ciencia que falhou e tentada de novo na consulta seguinte');
+  const CH9 = '43261133444555000166550010000000091000000099';
+  let recusar = true;
+  const transp2 = async (cert, url, corpo) => { if(url === DFE.URL_EVENTO){ if(recusar){ recusar = false; throw new Error('timeout'); } return okEvento; } return fila.shift(); };
+  db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
+  fila = [ret('138', '000000000000009', '000000000000009', [['000000000000009', 'resNFe_v1.01.xsd', resNFe(CH9, '33444555000166', 'MAIS UMA', '10.00')]])];
+  await DFE.consultar(db, { transporte:transp2 });
+  ok('a primeira ciencia falhou e ficou o erro', !!db.prepare('SELECT ciencia_erro FROM dfe_documento WHERE chave=?').get(CH9).ciencia_erro);
+  db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
+  fila = [ret('138', '000000000000009', '000000000000009', [])];
+  await DFE.consultar(db, { transporte:transp2 });
+  ok('na consulta seguinte, a ciencia sai', !!db.prepare('SELECT ciencia_em FROM dfe_documento WHERE chave=?').get(CH9).ciencia_em);
+
+  secao('revisao do PR #305: a nota sem pedido se resolve (ciente com motivo, ou o pedido que aparece)');
+  const dSem = db.prepare('SELECT * FROM dfe_documento WHERE chave=?').get(CH_FORA);
+  r = await post('/api/dfe/' + dSem.id + '/ciente', { motivo:'' }, AG);
+  ok('"ciente" sem motivo e recusado', r.status === 400);
+  /* a loja sem pedido ganha pedido: a nota sai de "sem pedido" na consulta seguinte */
+  const fL = (await post('/api/fornecedores', { nome:'Loja sem pedido', cnpj:'99.888.777/0001-66' }, AG)).corpo.id;
+  const ofLT = (await post('/api/ofertas', { fornecedor_id:fL, componente_id:tubo, embalagem:'barra', fator:1, preco:8, codigo_fornec:'TB-38-6000' }, AG)).corpo.id;
+  const ofLB = (await post('/api/ofertas', { fornecedor_id:fL, componente_id:base, embalagem:'un', fator:1, preco:5 }, AG)).corpo.id;
+  const pL = (await post('/api/pedidos', { itens:[{ oferta_id:ofLT, necessidade:600 }, { oferta_id:ofLB, necessidade:100 }] }, AG)).corpo.pedidos[0].id;
+  await post('/api/pedidos/' + pL + '/comprar', { canal:'direto', numero_externo:'OC-L', comprado_em:'2026-11-03' }, AG);
+  db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
+  fila = [ret('138', '000000000000009', '000000000000009', [])];
+  await DFE.consultar(db, { transporte });
+  ok('o pedido apareceu: a nota foi lancada nele', db.prepare('SELECT situacao FROM dfe_documento WHERE id=?').get(dSem.id).situacao === 'lancada', () => db.prepare('SELECT situacao FROM dfe_documento WHERE id=?').get(dSem.id).situacao);
+  const CHX = '43261155444333000122550010000000101000000101';
+  const XML_X = XML_FORA.replace(new RegExp(CH_FORA, 'g'), CHX).replace('<emit><CNPJ>99888777000166</CNPJ>', '<emit><CNPJ>55444333000122</CNPJ>');
+  db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
+  db.prepare("INSERT INTO config (chave,valor) VALUES ('dfe_intervalo_min','5') ON CONFLICT(chave) DO UPDATE SET valor='5'").run();
+  fila = [ret('138', '000000000000010', '000000000000010', [['000000000000010', 'procNFe_v4.00.xsd', XML_X]])];
+  await DFE.consultar(db, { transporte });
+  const dX = db.prepare('SELECT * FROM dfe_documento WHERE chave=?').get(CHX);
+  ok('outra nota sem pedido', dX && dX.situacao === 'sem_pedido', () => JSON.stringify(dX));
+  r = await post('/api/dfe/' + dX.id + '/ciente', { motivo:'comprado no balcao, sem pedido' }, AG);
+  const dX2 = db.prepare('SELECT * FROM dfe_documento WHERE id=?').get(dX.id);
+  ok('"ciente" com motivo: grava quem e o motivo, e sai das Pendencias', r.status === 200 && dX2.situacao === 'ciente' && dX2.ciente_motivo && dX2.ciente_por === 'Lucas'
+     && require('./pendencias_dominio').LINHAS.find(l => l.chave === 'nota_sem_pedido').contar(db).n === 0, () => JSON.stringify(r) + JSON.stringify(dX2));
+
+  secao('revisao do PR #305: 138 sem mais nada a ler tambem espera a hora');
+  ok('ultNSU = maxNSU: a proxima consulta fica para daqui a uma hora ou mais', (() => { const c = DFE.controle(db); return (Date.parse(String(c.proxima_consulta).replace(' ', 'T')) - Date.now()) / 60000 >= 59; })(), () => DFE.controle(db).proxima_consulta);
+
   secao('sem documento novo: espera uma hora');
   db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
   /* intervalo de 5 min: o 137 tem que esperar a hora mesmo assim */
   db.prepare("INSERT INTO config (chave,valor) VALUES ('dfe_intervalo_min','5') ON CONFLICT(chave) DO UPDATE SET valor='5'").run();
-  fila = [ret('137', '000000000000005', '000000000000005', [])];
+  fila = [ret('137', '000000000000010', '000000000000010', [])];
   r = await DFE.consultar(db, { transporte });
   const ctl = DFE.controle(db);
   const espera = ctl.proxima_consulta ? (Date.parse(String(ctl.proxima_consulta).replace(' ', 'T')) - Date.now()) / 60000 : 0;
   ok('cStat 137: a proxima consulta fica para daqui a uma hora (ou mais)', espera >= 59, () => ctl.proxima_consulta);
-  ok('o NSU continua o mesmo', ctl.ultimo_nsu === '000000000000005');
+  ok('o NSU continua o mesmo', ctl.ultimo_nsu === '000000000000010', () => ctl.ultimo_nsu);
+  let chamou = false;
+  r = await DFE.consultar(db, { transporte:async () => { chamou = true; return ret('137', '000000000000010', '000000000000010', []); } });
+  ok('depois do 137, o "consultar agora" tambem espera a hora (e diz ate quando)', !r.consultou && !chamou && /espera|hora|depois/i.test(r.motivo || ''), () => JSON.stringify(r));
   fim();
 })().catch(e => { console.error(e); process.exit(1); });

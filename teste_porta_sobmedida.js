@@ -79,6 +79,53 @@ const MIG = require('./migrar_fornecedor_sobmedida');
   ok('a resposta diz os rolos criados', (r.corpo.rolos || []).length === 2 && /^R-/.test(r.corpo.rolos[0].codigo), () => JSON.stringify(r.corpo));
   ok('chegaram 98 m de 100 m: o pedido fica parcial (o resto segue a caminho)', db.prepare('SELECT status FROM pedido_compra WHERE id=?').get(pid).status === 'parcial');
 
+  secao('revisao do PR #305: o recebimento que falha no meio nao deixa rolo orfao no sob medida');
+  const cor2 = smdb.prepare("INSERT INTO cor(nome) VALUES('Cinza')").run().lastInsertRowid;
+  const tec2 = smdb.prepare("INSERT INTO tecido(codigo,linha_id,abertura_id,cor_id) VALUES('ROLO-BK-CINZA',?,?,?)").run(lin, ab, cor2).lastInsertRowid;
+  const comp2 = (await post('/api/componentes', { nome:'Blackout bege 2,80 (sob medida)', unidade:'m', modo_saldo:'volume', familia:'BK', cor:'BEGE', largura_bobina_cm:280, sm_tecido_id:tec2 }, AG)).corpo.id;
+  const of2 = (await post('/api/ofertas', { fornecedor_id:pcpTextil, componente_id:comp2, embalagem:'rolo 50 m', fator:50, preco:800 }, AG)).corpo.id;
+  const pidO = (await post('/api/pedidos', { itens:[{ oferta_id:of, necessidade:50 }, { oferta_id:of2, necessidade:50 }] }, AG)).corpo.pedidos[0].id;
+  await post('/api/pedidos/' + pidO + '/comprar', { canal:'direto', numero_externo:'T9', comprado_em:'2026-11-03' }, AG);
+  const itsO = db.prepare('SELECT id, componente_id FROM pedido_item WHERE pedido_id=? ORDER BY id').all(pidO);
+  smdb.prepare('UPDATE tecido SET ativo=0 WHERE id=?').run(tec2);   // o segundo rolo vai ser recusado LA
+  const rolosAntes = smdb.prepare('SELECT COUNT(*) n FROM rolo').get().n;
+  r = await post('/api/recebimento', { pedido_id:pidO, nota_fiscal:'9001', itens:itsO.map(i => ({ pedido_item_id:i.id, volumes:[{ metragem:50 }] })) }, AG);
+  ok('o segundo tecido recusado la derruba o recebimento', r.status >= 400, () => JSON.stringify(r));
+  ok('e o PRIMEIRO rolo tambem nao ficou no sob medida (nada de rolo orfao)', smdb.prepare('SELECT COUNT(*) n FROM rolo').get().n === rolosAntes, () => smdb.prepare('SELECT COUNT(*) n FROM rolo').get().n + ' vs ' + rolosAntes);
+  ok('nem recebimento no PCP', db.prepare('SELECT COUNT(*) n FROM recebimento WHERE pedido_id=?').get(pidO).n === 0);
+  smdb.prepare('UPDATE tecido SET ativo=1 WHERE id=?').run(tec2);
+
+  secao('revisao do PR #305: o tecido do sob medida RETIDO, quando aceito, vira rolo la (e nao estoque no PCP)');
+  db.prepare('UPDATE componente SET peso_padrao_kg=0.4 WHERE id=?').run(comp);
+  const pidK = (await post('/api/pedidos', { itens:[{ oferta_id:of, necessidade:50, unidade_compra:'kg', qtd_compra:20, preco_unid_compra:45 }] }, AG)).corpo.pedidos[0].id;
+  await post('/api/pedidos/' + pidK + '/comprar', { canal:'direto', numero_externo:'T10', comprado_em:'2026-11-03' }, AG);
+  const itK = db.prepare('SELECT id FROM pedido_item WHERE pedido_id=?').get(pidK).id;
+  r = await post('/api/recebimento', { pedido_id:pidK, nota_fiscal:'9002', itens:[{ pedido_item_id:itK, volumes:[{ metragem:30 }, { metragem:20 }], peso_1_kg:0.9, peso_10_kg:9 }] }, AG);
+  ok('pesado fora da tolerancia: fica retido', r.status === 200 && r.corpo.retidos === 1, () => JSON.stringify(r.corpo));
+  const riK = db.prepare("SELECT ri.id FROM recebimento_item ri WHERE ri.pedido_item_id=? AND ri.faixa='retido'").get(itK).id;
+  const rolosK = smdb.prepare('SELECT COUNT(*) n FROM rolo').get().n;
+  r = await post('/api/recebimento/itens/' + riK + '/decidir', { decisao:'aceitar', motivo:'conferido na balanca' }, AG);
+  ok('aceitar responde', r.status === 200, () => JSON.stringify(r));
+  ok('nasceram os DOIS rolos la, com a metragem de cada volume', smdb.prepare('SELECT COUNT(*) n FROM rolo').get().n === rolosK + 2
+     && smdb.prepare('SELECT metragem_inicial m FROM rolo ORDER BY id DESC LIMIT 2').all().map(x => x.m).sort().join(',') === '20,30');
+  ok('e NADA entrou no estoque do PCP', db.prepare('SELECT estoque FROM componente WHERE id=?').get(comp).estoque === 0, () => db.prepare('SELECT estoque FROM componente WHERE id=?').get(comp).estoque);
+
+  secao('revisao do PR #305: o material por volume RETIDO, quando aceito, nasce com os volumes etiquetados');
+  const alm = db.prepare('SELECT id FROM almoxarifado LIMIT 1').get().id;
+  const compV = (await post('/api/componentes', { nome:'Cordao 2mm', unidade:'m', modo_saldo:'volume', almoxarifado_id:alm }, AG)).corpo.id;
+  const ofV = (await post('/api/ofertas', { fornecedor_id:pcpTextil, componente_id:compV, embalagem:'carretel', fator:100, preco:50 }, AG)).corpo.id;
+  const pidV = (await post('/api/pedidos', { itens:[{ oferta_id:ofV, necessidade:200, unidade_compra:'carretel', qtd_compra:2, preco_unid_compra:50, qtd_declarada:200 }] }, AG)).corpo.pedidos[0].id;
+  await post('/api/pedidos/' + pidV + '/comprar', { canal:'direto', numero_externo:'T11', comprado_em:'2026-11-03' }, AG);
+  const itV = db.prepare('SELECT id FROM pedido_item WHERE pedido_id=?').get(pidV).id;
+  r = await post('/api/recebimento', { pedido_id:pidV, itens:[{ pedido_item_id:itV, volumes:[{ metragem:100 }, { metragem:105 }] }] }, AG);
+  ok('chegou 205 de 200 declarados: retido', r.status === 200 && r.corpo.retidos === 1, () => JSON.stringify(r.corpo));
+  const riV = db.prepare("SELECT id FROM recebimento_item WHERE pedido_item_id=? AND faixa='retido'").get(itV).id;
+  r = await post('/api/recebimento/itens/' + riV + '/decidir', { decisao:'aceitar', motivo:'veio um pedaco a mais, aceito' }, AG);
+  ok('aceitar responde', r.status === 200, () => JSON.stringify(r));
+  const vols = db.prepare("SELECT saldo m FROM volume_material WHERE componente_id=? ORDER BY id").all(compV);
+  ok('nasceram os DOIS volumes, com a metragem de cada um', vols.length === 2 && vols.map(v => v.m).join(',') === '100,105', () => JSON.stringify(vols));
+  ok('e o saldo e a soma dos volumes (205)', Math.abs(db.prepare('SELECT estoque FROM componente WHERE id=?').get(compV).estoque - 205) < 1e-6);
+
   secao('sem a porta, o tecido do sob medida nao e recebido');
   const pid2 = (await post('/api/pedidos', { itens:[{ oferta_id:of, necessidade:50 }] }, AG)).corpo.pedidos[0].id;
   await post('/api/pedidos/' + pid2 + '/comprar', { canal:'direto', numero_externo:'T2', comprado_em:'2026-11-03' }, AG);

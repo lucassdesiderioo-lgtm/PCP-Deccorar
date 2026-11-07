@@ -177,7 +177,8 @@ const retratoB = () => JSON.stringify(['contagem','contagem_pendente','component
   .map(t => dbB.prepare('SELECT * FROM '+t).all()));
 
 console.log('\n── B1. sem login, toda escrita da contagem responde 401 e nada muda ──');
-B('POST /api/contagem/componente', { componente_id:tubo, sessao:'S0', quantidade:3 }, ANA);   // uma sessão em andamento
+/* uma sessão em andamento, de antes do deploy (a porta de lançar material saiu: 504) */
+dbB.prepare("INSERT INTO contagem (codigo,sessao,tipo,componente_id,qtd,usuario_id,usuario_nome) VALUES ('Tubo 32 mm','S0','componente',?,3,7,'Ana')").run(tubo);
 const antesB = retratoB();
 const escritasB = Object.keys(rB).filter(k => /^(POST|DELETE) \/api\/contagem/.test(k));
 ok('as 7 escritas da contagem estão na conta', escritasB.length === 7, escritasB.join(' | '));
@@ -199,7 +200,7 @@ r = B('POST /api/contagem/pendentes/aprovar', { ids:[pend.id] }, BIA);
 const pend2 = dbB.prepare('SELECT * FROM contagem_pendente WHERE id=?').get(pend.id) || {};
 ok('contagem_pendente.aprovado_por_id = quem aprovou', r.status === 200 && pend2.aprovado_por_id === 8 && pend2.aprovado_por === 'Bia', pend2.aprovado_por_id + '/' + pend2.aprovado_por);
 AJUSTA = true;
-B('POST /api/contagem/componente', { componente_id:tubo, sessao:'S1', quantidade:2 }, BIA);
+dbB.prepare("INSERT INTO contagem (codigo,sessao,tipo,componente_id,qtd,usuario_id,usuario_nome) VALUES ('Tubo 32 mm','S1','componente',?,2,8,'Bia')").run(tubo);
 r = B('POST /api/contagem/ajustar', { sessao:'S1', itens:[{ tipo:'componente', componente_id:tubo }] }, BIA);
 const dir = dbB.prepare('SELECT * FROM contagem_pendente ORDER BY id DESC').get() || {};
 ok('o caminho direto grava os dois ids', r.status === 200 && dir.contado_por_id === 8 && dir.aprovado_por_id === 8, JSON.stringify(dir));

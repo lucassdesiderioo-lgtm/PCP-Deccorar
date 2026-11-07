@@ -235,7 +235,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
 
     </div>
     <div id="cmpVelhoMateriais">
-    <div class="card"><div style="font-weight:700;margin-bottom:4px">Materiais</div>
+    <div class="card"><div style="font-weight:700;margin-bottom:4px">Ponto de pedido (mínimo e ideal)</div>
       <div class="sub" style="margin-bottom:12px">Os insumos que a ficha consome e que a lista de compras pede.
         <b>Mínimo</b> é quando disparar; <b>ideal</b> é até onde encher.
         O <b>estoque</b> não se edita aqui — ele entra pelo Recebimento e se corrige pela Contagem.</div>
@@ -251,28 +251,10 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   <div class="card" id="invAprov" style="display:none"></div>
   <div class="card" id="invConf" style="display:none"></div>
   <div class="card" id="invRel" style="display:none"></div>
-  <div class="card">
-    <div style="font-weight:700;margin-bottom:4px">Material</div>
-    <div class="sub" style="margin-bottom:12px">Pe&ccedil;a n&atilde;o se conta mais aqui: ela se conta &agrave;s cegas na tela
-      <a href="/inventario" style="color:#4493f8">Invent&aacute;rio</a>, e quem aprova &eacute; outra pessoa. Esta parte conta s&oacute; material.</div>
-    <div class="sub" style="margin-bottom:10px">Material n&atilde;o tem etiqueta: escolha na lista e digite quanto tem. Cada lan&ccedil;amento SOMA &mdash; contou duas prateleiras, lance duas vezes. <b>Zero vale</b>: &eacute; assim que um material que acabou entra na contagem.</div>
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <select id="ctComp" onchange="ctCompUnidade()" style="flex:1;min-width:260px;padding:12px;font-size:15px"></select>
-      <input id="ctCompQtd" type="number" min="0" step="0.001" placeholder="quanto tem" style="width:150px;padding:12px;font-size:15px;text-align:center">
-      <span class="sub" id="ctCompUn" style="min-width:64px"></span>
-      <button class="ghost" onclick="ctLancarComp()">Lan&ccedil;ar na contagem</button>
-    </div>
-    <div id="ctCompUlt" style="margin-top:10px;font-size:15px"></div>
-    <div id="ctUlt" style="margin-top:6px;font-size:15px"></div>
-    <!-- Os botoes que aplicam vem DEPOIS de contar: e a ordem em que se usa. -->
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid #30363d">
-      <button class="primary" onclick="ctLancar()">Lancar no estoque (soma)</button><button class="ghost" onclick="ctAjustar()">Ajustar (substitui)</button>
-      <button class="ghost" onclick="ctNova()">Nova contagem</button>
-    </div>
-  </div>
-  <div class="card">
-    <table><thead><tr><th>Item</th><th>Sistema</th><th>Contado</th><th>Diferenca</th></tr></thead><tbody id="ctLista"></tbody></table>
-  </div>
+  <!-- A contagem antiga de MATERIAL saiu (revisão do PR #305, 07/11/2026):
+       material se conta só na 504, por almoxarifado e às cegas. -->
+  <div class="card"><div style="font-weight:700;margin-bottom:4px">Material</div>
+    <div class="sub">Material se conta na tela <a href="/contagem-material" style="color:#4493f8">504 Contagem de material</a>, por almoxarifado e às cegas. A aprovação dela fica no alto desta tela.</div></div>
   <div class="card" id="ctAlertas"></div>
   <div class="card" id="ctPend" style="display:none"></div>
 </div>
@@ -1404,7 +1386,9 @@ async function verPedidos(){
       +'<td class="sub">'+esc(String(p.criado_em||'').slice(0,16))+'</td>'
       +'<td><button class="ghost small pdWa" data-id="'+p.id+'">WhatsApp</button> '
       +'<button class="ghost small pdImp" data-id="'+p.id+'">imprimir</button>'
-      +(p.status==='rascunho'?' <button class="primary small pdEnv" data-perm="pedido.criar" data-id="'+p.id+'">enviar</button>':'')
+      /* "enviar" saiu (R-CMP-15): o rascunho vira "comprado" na aba Pedidos,
+         com canal, nº do pedido no fornecedor e data (revisao do PR #305) */
+      +(p.status==='rascunho'?' <button class="primary small pdComprar" data-perm="pedido.criar">comprar →</button>':'')
       +(p.status!=='cancelado'&&p.status!=='recebido'?' <button class="del pdCanc" data-perm="pedido.criar" data-id="'+p.id+'">cancelar</button>':'')
       +'</td></tr>').join('')+'</tbody></table>';
 }
@@ -1499,6 +1483,7 @@ document.addEventListener('click',async function(e){
   }
   const imp=t.closest&&t.closest('.pdImp');
   if(imp){ imprimirPedido(imp.dataset.id); return; }
+  if(t.closest&&t.closest('.pdComprar')){ if(window.CMP) window.CMP.abrir('pedidos'); return; }
   const env=t.closest&&t.closest('.pdEnv');
   if(env){
     if(!confirm('Marcar como enviado? A partir daí estes itens contam como "a caminho" e saem da lista de compras.')) return;
@@ -2887,43 +2872,8 @@ async function ctBipar(cod){
 // Mesma sessao, mesma tabela, mesma fila de aprovacao das pecas. A unica coisa
 // diferente e a forma de entrar: lista + quantidade, porque material nao tem
 // etiqueta e nem sempre e inteiro.
-var CTCOMPS=[];
-async function ctComponentes(){
-  var s=document.getElementById('ctComp'); if(!s) return;
-  try{ CTCOMPS=await (await fetch('/api/contagem/componentes')).json(); }catch(e){ CTCOMPS=[]; }
-  if(!CTCOMPS.length){ s.innerHTML='<option value="">nenhum material cadastrado</option>'; return; }
-  var h='<option value="">escolha o material</option>';
-  for(var i=0;i<CTCOMPS.length;i++){
-    var c=CTCOMPS[i];
-    h+='<option value="'+c.id+'">'+c.nome+' ('+c.unidade+')</option>';
-  }
-  s.innerHTML=h; ctCompUnidade();
-}
-function ctCompAtual(){
-  var s=document.getElementById('ctComp'); if(!s||!s.value) return null;
-  for(var i=0;i<CTCOMPS.length;i++) if(String(CTCOMPS[i].id)===String(s.value)) return CTCOMPS[i];
-  return null;
-}
-function ctCompUnidade(){
-  var c=ctCompAtual(), el=document.getElementById('ctCompUn');
-  if(el) el.textContent=c?c.unidade:'';
-}
-async function ctLancarComp(){
-  var c=ctCompAtual();
-  if(!c){ alert('Escolha o material.'); return; }
-  var q=document.getElementById('ctCompQtd');
-  if(!q||q.value===''){ alert('Digite quanto tem. Se acabou, digite 0.'); return; }
-  var n=Number(q.value);
-  if(!isFinite(n)||n<0){ alert('Quantidade invalida.'); return; }
-  var r=await (await fetch('/api/contagem/componente',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({componente_id:c.id,quantidade:n,sessao:ctSessao()})})).json();
-  var u=document.getElementById('ctCompUlt');
-  if(r.erro){ if(u) u.innerHTML='<b style="color:#ff6b6b">'+r.erro+'</b>'; return; }
-  if(u) u.innerHTML='<b style="color:#2ea043">'+r.nome+'</b> - contado '+r.contado+' '+r.unidade+' (sistema: '+r.estoque+' '+r.unidade+')';
-  q.value=''; q.focus();
-  ctLista();
-}
 async function ctLista(){
+  if(!document.getElementById('ctLista')) return;   // a contagem antiga de material saiu (504)
   var d={linhas:[],desconhecidos:[],naoContados:[]};
   try{ d=await (await fetch('/api/contagem/'+ctSessao())).json(); }catch(e){}
   var h='';
@@ -2971,10 +2921,7 @@ async function ctAjustar(){
 // nunca muda por UPDATE, passa pelo dono unico (regra 10).
 function ctItem(l){ return {tipo:l.tipo||'sku', codigo:l.codigo, componente_id:l.componente_id||null}; }
 document.addEventListener('DOMContentLoaded',function(){
-  if(naTela('ct')) ctComponentes();
   if(naTela('ct') && window.CMP && window.CMP.contagemAprov) window.CMP.contagemAprov(document.getElementById('cmAprov'));
-  var q=document.getElementById('ctCompQtd');
-  if(q) q.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); ctLancarComp(); } });
   var b=document.getElementById('ctBipe');
   if(!b) return;
   b.addEventListener('keydown',function(e){
