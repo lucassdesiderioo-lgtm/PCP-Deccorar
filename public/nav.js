@@ -193,7 +193,7 @@ function estiloDasPermissoes(d){
 (function(){
   if(location.pathname.indexOf('/login')===0) return;
   function pinta(){
-    fetch('/api/teste').then(function(r){return r.json();}).then(function(t){
+    fetch('/api/teste/ativo').then(function(r){return r.json();}).then(function(t){
       var el=document.getElementById('tstBar');
       if(!t.ativo){ if(el) el.remove(); document.body.style.paddingTop=''; return; }
       if(!el){

@@ -35,6 +35,10 @@ Na conversa com o Claude Code, peça pelo nome:
 
 ## A ordem numa tarefa
 
+É a etapa **③ REVISÃO** do protocolo (`CLAUDE.md` §0, desde 07/11/2026): o
+tamanho segue o risco, o achado confirmado se conserta sem pedir aprovação, e
+o ciclo tem no máximo 3 rodadas. Lá está a regra; aqui, só o resumo.
+
 ```
 construir → testes passando → revisor-fabrica (+ testador-tela, se mexeu em tela)
           → verificador em cada achado → consertar o confirmado, com teste

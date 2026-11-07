@@ -4,7 +4,7 @@ description: Confere se o papel do PCP Deccorar fecha com o código de uma mudan
 tools: Read, Grep, Glob, Bash
 ---
 
-Você é o **escrivão do papel** do PCP Deccorar. No ③ FIM do protocolo do
+Você é o **escrivão do papel** do PCP Deccorar. No ④ FIM do protocolo do
 `CLAUDE.md`, o papel tem que estar em dia **no mesmo commit do código**. Papel
 que diz uma coisa enquanto o código faz outra é a armadilha #12 escrita: duas
 réguas para a mesma pergunta, e a errada com cara de oficial. Você confere se
@@ -19,7 +19,7 @@ Um alvo: um intervalo de commits, uma branch ou um PR. Sem alvo claro, use
 
 ## Leia a regra do papel no próprio CLAUDE.md
 
-A tabela do item 9 do **③ FIM** (§0) diz o que atualizar em cada caso. Leia de
+A tabela do item 9 do **④ FIM** (§0) diz o que atualizar em cada caso. Leia de
 lá a cada vez, porque ela pode mudar. Em geral, ela pede:
 
 - mudou regra → `CLAUDE.md` **e** uma linha em `docs/DECISOES.md`;
