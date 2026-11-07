@@ -80,7 +80,7 @@ Etiqueta de Venda ────┤
 - **Por quê:** contar a coleta no relógio da agência deixaria a tela vermelha por caixa que não vai no carro; e 99% das vendas são de coleta, que não tinha pressa nenhuma na tela.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_horario_coleta.js` (seção 6, a agência).
-- **Status:** no ar desde 10/09/2026 · o relógio da coleta em código em 05/11/2026, falta subir.
+- **Status:** no ar desde 10/09/2026 · o relógio da coleta no ar desde 05/11/2026 (PRs #292 e #293, CLAUDE.md §8); ainda não provado com dado real.
 
 ## Os horários de saída (spec HORARIOS-DE-COLETA, 05/11/2026)
 
@@ -170,7 +170,7 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 - **Por quê:** são dois lugares físicos. `carregado_em` na coleta é a hora em que a caixa foi pro canto; a hora em que o caminhão levou é `retirado_em`.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_carga.js` (a lista única com as duas modalidades misturadas, executada).
-- **Status:** no ar desde 10/09/2026 · lista única em código em 03/11/2026, falta subir.
+- **Status:** no ar desde 10/09/2026 · lista única no ar desde 04/11/2026 (PRs #261 e #263, CLAUDE.md §8-B).
 
 ### R-COL-04 · O caminhão leva antes da data, e o canto cheio de caixa futura é normal
 - **Regra:** `AGUARDA_CAMINHAO` **não filtra pela data de despacho**: a caixa de coleta impressa e bipada pro canto vai no próximo caminhão, mesmo com despacho semanas à frente. Por isso ela sai da faixa azul do Carregamento (que só conta o `embalado` futuro na prateleira) e o painel "Pra despachar depois" (que só lista o `pendente`) some quando as etiquetas futuras já foram impressas.
@@ -344,14 +344,14 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 - **Por quê:** número que não zera vira paisagem.
 - **Exceções:** a caixa de várias com um item cancelado não entra (o lugar dela é a Etiqueta de Venda, e o card da Mesa a mostra).
 - **Teste que trava:** `teste_sobra.js`.
-- **Status:** no ar desde 22/10/2026 (PR #222) · duas partes em código desde 03/11/2026, falta subir.
+- **Status:** no ar desde 22/10/2026 (PR #222) · duas partes no ar desde 04/11/2026 (PRs #261 e #263, CLAUDE.md §8-B); ainda não provado com dado real.
 
 ### R-REC-06 · A venda cancelada só volta ao estoque na confirmação, de outra pessoa
 - **Regra:** a caixa separada vira um pedido em `cancelamento_caixa` (`cancel_conf.js`, dono único: quem marcou, o volume como estava, as peças). Quem tem **`cancelamento.confirmar`** (sensível, nível `supervisor`; backfill de uma vez para os setores Supervisor e Admin) **confirma** (`POST /api/carregamento/cancelada/confirmar`): a caixa fica decidida por ele, e o saldo volta **+1 por peça** se já tinha baixado (`baixa_dominio.devolver`), numa transação — confirmar duas vezes não soma duas. Ou **recusa** (`…/recusar`, motivo obrigatório): a caixa volta para onde estava, e a de agência que estava no carro volta à **área, conferida**. A cancelada pelo relatório do ML, recusada, continua cancelada e volta a esperar a separação.
 - **Por quê:** decisão do dono (03/11/2026). Confirmar devolve peça sem venda na frente — a natureza do `estoque.editar`.
 - **Exceções:** **quem separou não confirma nem recusa**, nem o Admin Geral (R-EST-18). Sob medida é confirmado e não mexe em saldo. A chave é conferida no portão e na rota (403).
 - **Teste que trava:** `teste_conferencia_expedicao.js` (92) · `teste_conferencia_tela.js` (38, navegador) · `teste_sobra.js`.
-- **Status:** em código em 03/11/2026, falta subir.
+- **Status:** no ar desde 04/11/2026 (PRs #261 e #263, CLAUDE.md §8-B); ainda não provado com dado real.
 - **História:** spec `CONFERENCIA-EXPEDICAO` fase 4.
 
 ### R-REC-07 · "+1 por peça" só se a caixa já baixou
@@ -370,7 +370,7 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 - **Por quê:** decisão do dono (03/11/2026): ninguém sabia se a caixa que ficou era atraso ou cancelamento.
 - **Exceções:** **registrar não muda estágio, saída nem estoque.** Caixa **sem** marcação continua na lista, sem selo — "não saiu", **nunca** "cancelada". Cancelar é a outra porta (R-REC-06).
 - **Teste que trava:** `teste_conferencia_expedicao.js` · `teste_conferencia_tela.js`.
-- **Status:** em código em 03/11/2026, falta subir.
+- **Status:** no ar desde 04/11/2026 (PRs #261 e #263, CLAUDE.md §8-B); ainda não provado com dado real.
 
 ---
 

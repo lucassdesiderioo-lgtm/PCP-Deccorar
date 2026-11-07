@@ -18,11 +18,13 @@
 ### O dono fala em dois momentos, e só neles
 
 ```
-  ① COMEÇO ─────────▶ ✋ "pode seguir" ─────────▶ ② MEIO ─────────▶ ③ FIM ─────────▶ ✋ "pode subir"
-  entender e planejar   (aprova o plano)          construir         deixar em ordem    (aprova merge/deploy)
+  ① COMEÇO ──▶ ✋ "pode seguir" ──▶ ② MEIO ──▶ ③ REVISÃO ──▶ ④ FIM ──▶ ✋ "pode subir"
+  entender e    (aprova o plano)    construir   outros olhos   deixar      (aprova merge/deploy)
+  planejar                          e testar    procuram furo  em ordem
 ```
 
-Entre um ✋ e outro, trabalhe sozinho. **Fora deles, só interrompa por um motivo:
+Entre um ✋ e outro, trabalhe sozinho — **inclusive na ③ REVISÃO: o achado
+confirmado se conserta sem pedir aprovação**, a não ser que o conserto mude regra. **Fora deles, só interrompa por um motivo:
 apareceu uma regra de negócio que precisa mudar.**
 
 ### Como o dono abre uma tarefa
@@ -91,7 +93,45 @@ Quem recebe: só o Admin Geral, até o dono marcar
 7. **Precisa mudar uma regra que não estava no plano?** Pare e pergunte. Nunca decida sozinho,
    mesmo que pareça bug óbvio — metade das regras deste arquivo *parecem* bug.
 
-### ③ FIM — só termina com tudo em ordem
+### ③ REVISÃO — outros olhos procuram o furo que os seus testes não pegaram
+
+> Decisão do dono, 07/11/2026 (linha em `docs/DECISOES.md`): *"depois da
+> construção e validação com os seus testes deveríamos ter uma nova etapa onde
+> fazemos uma revisão do que foi feito para encontrar algum furo"*. Os testes de
+> quem construiu provam que o código faz o que **ele entendeu**; a revisão
+> procura o que ele não entendeu.
+
+Os agentes moram em **`.claude/agents/`** (o README de lá diz quando usar cada
+um). Nenhum deles sabe regra de cor: leem este arquivo e `docs/regras/` a cada
+uso. Nenhum edita, faz commit ou deploy.
+
+**O tamanho da revisão segue o risco do semáforo:**
+
+| | Revisão |
+|---|---|
+| 🟢 | não precisa (texto, cor, papel) |
+| 🟡 | `revisor-fabrica` + `verificador` em cada achado; `testador-tela` se mexeu em tela |
+| 🔴 | o mesmo, com o revisor dividido por área quando o diff é grande (estoque, acesso, dados), e o `testador-tela` sempre que houver tela, rota de tela ou permissão |
+
+**O ciclo, sem parar para o dono:**
+
+R1. Testes passando (os seus, os do diff e a suíte da área).
+R2. **`revisor-fabrica` recebe só o que mudou — nunca a sua explicação** do que
+    foi feito. Quem lê a explicação tende a concordar com ela.
+R3. **`verificador` em cada achado.** Só o CONFIRMADO vira trabalho. O NÃO
+    CONFIRMADO vai ao FECHAMENTO com o motivo; o PLAUSÍVEL vai ao FECHAMENTO
+    como dúvida, dizendo o que faltou para confirmar.
+R4. **Achado confirmado no que você construiu: conserte sozinho, sem perguntar**,
+    do jeito do risco — teste escrito antes, que reprova o defeito, depois o
+    conserto. **Exceções, e só estas:** o conserto muda regra de negócio → pare e
+    pergunte (item 7); o achado está **fora** do que você construiu → é "achei no
+    caminho" (item 6), não se conserta junto.
+R5. Rode os testes de novo e **passe o revisor outra vez só no que consertou**.
+    No máximo **3 rodadas**; o que não fechar vai escrito no FECHAMENTO, com o
+    porquê. Ciclo que não termina esconde o problema em vez de resolver.
+R6. `escrivao-papel` antes do commit final.
+
+### ④ FIM — só termina com tudo em ordem
 
 8. Testes rodando e passando.
 9. Papel em dia, **no mesmo commit do código**:
@@ -117,6 +157,7 @@ Papel em dia: CLAUDE.md §… · DECISOES.md · spec … · README das specs
 Commit/PR: …   Falta mesclar? …
 Deploy: não precisa  |  precisa → comandos · melhor horário
 Alçada conferida: telas, ações e setores novos com nível e lugar · só o Admin Geral recebe  |  nada novo
+Revisão: quem revisou · N achados → N confirmados (consertados, com o teste) · N descartados (por quê) · N em dúvida  |  🟢, não precisa
 Achei no caminho (não mexi): …
 ```
 
@@ -3172,6 +3213,18 @@ incluí-la nessa lista: trigger, contagem, limpeza e "manter" saem dali.
 > não existem, o `try/catch` engole o erro e o modo teste volta a sujar dado real
 > **sem avisar**.
 
+> ⚠️ **A TARJA PERGUNTA AO `GET /api/teste/ativo`, E NÃO AO PAINEL** (CONSERTO
+> de 07/11/2026). O `GET /api/teste` traz as contagens de cada tabela e é de
+> `teste.operar`, e o `nav.js` perguntava a ele: levava 403 de quem não tem a chave — o operador e o Supervisor — e a
+> tarja **nunca acendia para a bancada**: com o modo teste ligado, ela trabalhava
+> sem saber. O `/ativo` devolve **só** `{ativo}`, é `@logado` e só para GET —
+> **também no modo de acesso antigo** (a chave de emergência da tela de
+> Acessos), onde o `auth.js` o deixa passar antes da lista `API_ADMIN`.
+> **E ela mora na BASE da tela**: no topo, fixa, cobria a barra de sessão (☰ Menu,
+> Trocar setor, Sair — §20), o que ninguém via enquanto só o Admin Geral a
+> enxergava. A página ganha o espaço dela embaixo. Os dois foram achados pelo
+> `testador-tela`. `node teste_tarja_modo_teste.js` (26).
+
 **Se um trigger falhar**, a tabela entra em `naoCobertas` no `GET /api/teste` e a
 aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não silenciosa.
 
@@ -3562,7 +3615,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (60), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (246), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (10), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (246), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |

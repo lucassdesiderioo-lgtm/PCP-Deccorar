@@ -901,6 +901,8 @@ module.exports = function(app, db){
     if(eq('/api/telas/minhas')) return '@logado';
     if(eq('/baixar-backup')) return '@ag';
     // ── acoes/admin por API ──
+    // A tarja do modo teste aparece para todos (§11): so o booleano, so leitura.
+    if(M === 'GET' && eq('/api/teste/ativo')) return '@logado';
     if(pre('/api/teste')) return 'teste.operar';
     if(pre('/api/usuarios')) return 'pessoas.gerenciar';
     if(pre('/api/acesso/setores')) return 'setores.gerenciar';

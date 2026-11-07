@@ -39,7 +39,7 @@
 - **Regra:** o fim da embalagem soma +1 por um movimento `embalagem` no livro. As quatro escritas (`montagem`, `fila`, `skus`, `producao`) entram juntas ou nenhuma entra.
 - **Por quê:** é o primeiro momento em que a persiana está pronta e ensacada. Escrita pela metade deixava a peça na prateleira e em lugar nenhum do sistema.
 - **Exceções:** sob medida (R-EST-05).
-- **Teste que trava:** `teste_montagem.js` (42) · `teste_livro.js` (60).
+- **Teste que trava:** `teste_montagem.js` (64) · `teste_livro.js` (65).
 - **Status:** no ar desde 17/09/2026.
 - **História:** armadilha #26.
 
@@ -47,7 +47,7 @@
 - **Regra:** imprimir a etiqueta de venda **não mexe no saldo**: a caixa fica `embalado` sem `baixado_em` e **reserva** as persianas dela. A baixa (−1 de cada persiana, uma linha `conferencia` por SKU, referência `lote:<id>`) acontece **uma vez só**, quando a caixa é conferida — no bipe da área ou do canto (`carreg_route.js`), ou, se ela saiu sem ninguém conferir, no "foi no caminhão" do fechamento da saída (`saida_route.js`). `baixa_dominio.js` é o dono único da baixa, da reserva e do **livre** (saldo − reservado). Sem peça **livre**, não imprime.
 - **Por quê:** decisão do dono (22/10/2026, spec `CONFERENCIA-E-BAIXA`, D1): a venda cancelada entre a impressão e o caminhão deixava o saldo baixo até alguém lembrar de devolver. Baixar uma numa caixa de três continua deixando duas peças fora do sistema — a conta segue por PEÇA (#23).
 - **Exceções:** sob medida (R-EST-05): não reserva e não baixa, mas a caixa fica marcada como baixada. As caixas impressas **antes** de 22/10/2026 baixaram na impressão: a **virada** (`config.virada_baixa_conferencia`, uma vez só) deu a elas `baixado_em = embalado_em`, e a conferência não baixa de novo. A caixa que **sobrou** (R-REC-01) volta +1 por peça pelo mesmo dono (`baixa_dominio.devolver`, movimento `sobra`), e só se já tinha baixado.
-- **Teste que trava:** `teste_baixa_conferencia.js` (69) · `teste_etiqueta.js` (68) · `teste_livro.js` (65).
+- **Teste que trava:** `teste_baixa_conferencia.js` (69) · `teste_etiqueta.js` (84) · `teste_livro.js` (65).
 - **Status:** no ar desde 22/10/2026 (fase 2-A, PR #218) · ✅ a primeira caixa conferida baixou o estoque no mesmo dia (relato do dono) · antes disso a etiqueta baixava.
 - **História:** CLAUDE.md §2 e §5, armadilha #23 · spec `CONFERENCIA-E-BAIXA`.
 
@@ -71,7 +71,7 @@
 - **Regra:** `estoque_dominio.js` é o único que escreve em `skus.estoque`, sempre junto com uma linha em `movimento_estoque`, na mesma transação. O movimento guarda o **delta**, nunca o saldo. `SUM(delta) = skus.estoque` para todo SKU.
 - **Por quê:** o saldo tinha sete donos e, quando errava, não sobrava rastro de quem mexeu. `skus.estoque` continua existindo como cache que as telas leem.
 - **Exceções:** a restauração da foto do modo teste, que mora **dentro** do domínio (`restaurarFoto`).
-- **Teste que trava:** `teste_livro.js` (60; exige a soma depois de cada passo e varre o código recusando `UPDATE skus SET estoque` fora do domínio).
+- **Teste que trava:** `teste_livro.js` (65; exige a soma depois de cada passo e varre o código recusando `UPDATE skus SET estoque` fora do domínio).
 - **Status:** no ar desde 21/09/2026.
 - **História:** "O LIVRO DE MOVIMENTOS".
 
@@ -302,7 +302,7 @@
 - **Regra:** a aba Estoque, a tela azul, a TV e o gerencial leem a falta do `demanda_dominio.js` (`comprometido + alvo − estoque`, com o alvo calculado ao vivo). O alvo salvo aparece ao lado, em âmbar, quando diverge.
 - **Por quê:** duas telas diziam "a repor" com números diferentes, as duas certas cada uma na sua régua.
 - **Exceções:** na TV, "falta hoje" (ordens do dia, R-REV-05) e "precisa" (estoque) são duas colunas e não se somam.
-- **Teste que trava:** `teste_estoque.js` (72).
+- **Teste que trava:** `teste_estoque.js` (86).
 - **Status:** no ar desde 01/09/2026.
 - **História:** armadilha #12.
 

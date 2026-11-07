@@ -150,6 +150,14 @@ module.exports=function(app, db){
     return o;
   };
 
+  /* So o "esta ligado?", para a tarja do nav.js em TODA tela (CLAUDE.md §11).
+     O painel acima traz as contagens e e de `teste.operar`; este traz so o
+     booleano, e e de qualquer pessoa logada — sem ele a tarja nao acendia para
+     quem nao tem a chave (CONSERTO de 07/11/2026). */
+  app.get('/api/teste/ativo',function(req,res){
+    res.json({ativo:get('modo_teste')==='1'});
+  });
+
   app.get('/api/teste',function(req,res){
     res.json({ativo:get('modo_teste')==='1', desde:get('teste_desde')||null,
               itens:conta(), rotulos:rotulos(), naoCobertas:FALHOU});
