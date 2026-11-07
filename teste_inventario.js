@@ -314,6 +314,9 @@ ok('no dia seguinte ele está na lista, degrau 0, do zero', volta && volta.degra
 console.log('\n── a quinzenal ──');
 // base da quinzenal: a do deploy (o primeiro garantirSchema). Pondo a base 15 dias atrás, ela abre hoje.
 db.prepare("UPDATE config SET valor='2026-11-01' WHERE chave='quinzenal_base'").run();
+/* Dois SKUs ZERADOS e parados (saldo 0, nenhum movimento): ate 07/11/2026 a
+   quinzenal e a geral os deixavam de fora, e o zero nunca era conferido. */
+db.exec(`INSERT INTO skus (codigo,descricao,estoque,modelo_id) VALUES ('BKZERO1','Rolo',0,1),('BKZERO2','Rolo',0,1)`);
 RELOGIO.fixar('2026-11-16 07:05:00');      // segunda: 15 dias depois de 01/11
 hoje(ANA);
 const q = db.prepare("SELECT * FROM inventario_ciclo WHERE tipo='quinzenal'").get();
@@ -321,7 +324,7 @@ ok('a quinzenal abriu sozinha no 15º dia', q && q.data === '2026-11-16');
 eq('prazo de 3 dias úteis (seg, ter, qua)', q.prazo, '2026-11-18');
 eq('a diária fica suspensa (nenhuma diária no dia)', db.prepare("SELECT COUNT(*) n FROM inventario_ciclo WHERE tipo='diario' AND data='2026-11-16'").get().n, 0);
 const nq = db.prepare('SELECT COUNT(*) n FROM inventario_item WHERE ciclo_id=?').get(q.id).n;
-ok('ela passa por todos os SKUs com saldo (14) e nenhum sob medida/inativo', nq === 14 &&
+ok('ela passa por todos os SKUs ativos (14 com saldo + 2 zerados) e nenhum sob medida/inativo', nq === 16 &&
    !db.prepare("SELECT 1 FROM inventario_item WHERE ciclo_id=? AND codigo IN ('SOBMEDIDA','BKVELHOINATIVO')").get(q.id), 'veio ' + nq);
 ok('a tarja diz "quinzenal" e o prazo', /quinzenal: faltam .* — prazo quarta 18\/11/.test((chamar('GET','/api/inventario/tarja',null,
    db.prepare('SELECT usuario_id id, usuario_nome nome FROM inventario_escala WHERE ciclo_id=? LIMIT 1').get(q.id)).tarja||{}).texto||''));
@@ -342,18 +345,38 @@ const rel = chamar('GET','/api/inventario/relatorio',null,LUCAS);
 ok('o relatório lista os não conferidos da quinzenal', rel.nao_conferidos.some(x => x.tipo === 'quinzenal'));
 
 console.log('\n── a geral: expedição parada, e zero só com as duas pessoas ──');
+db.exec(`INSERT INTO skus (codigo,descricao,estoque,modelo_id) VALUES ('BKZERO3','Rolo',0,1),('BKZERO4','Rolo',0,1)`);
 eq('abrir a geral sem confirmar é recusado', chamar('POST','/api/inventario/geral/abrir',{},LUCAS).motivo, 'confirmar');
 r = chamar('POST','/api/inventario/geral/abrir',{confirmar:true},LUCAS);
 ok('confirmando, abre', r.ok && r.itens > 0, JSON.stringify(r));
 const g = r.ciclo_id;
-const gsku = db.prepare("SELECT codigo FROM inventario_item WHERE ciclo_id=? ORDER BY codigo LIMIT 1").get(g).codigo;
+const naGeral = c => !!db.prepare('SELECT 1 FROM inventario_item WHERE ciclo_id=? AND codigo=?').get(g, c);
+ok('o SKU zerado e parado ENTRA na geral (os dois)', naGeral('BKZERO3') && naGeral('BKZERO4'));
+ok('sob medida e inativo continuam fora da geral', !naGeral('SOBMEDIDA') && !naGeral('BKVELHOINATIVO'));
+const lCaio = hoje(CAIO).itens;
+const iz = lCaio.find(i => i.codigo === 'BKZERO3'), ic = lCaio.find(i => i.codigo !== 'BKZERO3' && i.codigo !== 'BKZERO4');
+ok('na tela de quem conta o zerado aparece, sem saldo no JSON', !!iz && varreSaldo(lCaio).length === 0);
+eq('e o zerado tem as mesmas chaves que um SKU com saldo (nada diz que está zerado)',
+   iz && Object.keys(iz).sort(), ic && Object.keys(ic).sort());
+const gsku = db.prepare(`SELECT i.codigo FROM inventario_item i JOIN skus s ON s.codigo=i.codigo
+  WHERE i.ciclo_id=? AND s.estoque>0 AND i.status='a_contar' ORDER BY i.codigo LIMIT 1`).get(g).codigo;
 const antesG = saldo(gsku);
-let p = chamar('POST','/api/inventario/geral/terminar-prateleira',{},CAIO);
-ok('"terminei a prateleira" primeiro pergunta, com quantos SKUs', p.confirmar && p.n > 0);
-chamar('POST','/api/inventario/geral/terminar-prateleira',{confirmar:true},CAIO);
-eq('a zero de UMA pessoa não mexe no saldo', saldo(gsku), antesG);
-chamar('POST','/api/inventario/geral/terminar-prateleira',{confirmar:true},BIA);
-eq('as duas confirmaram zero: o SKU vira zero', saldo(gsku), 0);
+let p = chamar('POST','/api/inventario/geral/terminar-prateleira',{confirmar:true},CAIO);
+eq('"terminei a prateleira" saiu: a rota recusa (410)', p.__st, 410);
+eq('e não zerou nada', saldo(gsku), antesG);
+const movAntes = db.prepare('SELECT COUNT(*) n FROM movimento_estoque').get().n;
+contarN(CAIO, 'BKZERO3', 0); r = term(CAIO, 'BKZERO3', {nenhuma:true});
+eq('"não encontrei" num zerado: confirmado', item('BKZERO3').status, 'confirmado');
+eq('sem movimento no livro', db.prepare('SELECT COUNT(*) n FROM movimento_estoque').get().n, movAntes);
+ok('e o zerado ganha a data de conferência', !!INV.conferencias(db)['BKZERO3']);
+contarN(CAIO, 'BKZERO4', 5); term(CAIO, 'BKZERO4');
+eq('achou 5 num zerado: pede a 2ª contagem, sem mexer no saldo', [item('BKZERO4').status, saldo('BKZERO4')], ['recontar', 0]);
+contarN(BIA, 'BKZERO4', 5); term(BIA, 'BKZERO4');
+eq('a 2ª pessoa também achou 5: o saldo vira 5 sozinho', saldo('BKZERO4'), 5);
+contarN(CAIO, gsku, 0); term(CAIO, gsku, {nenhuma:true});
+eq('"não encontrei" num SKU com saldo: uma pessoa só não mexe no saldo', [item(gsku).status, saldo(gsku)], ['recontar', antesG]);
+contarN(BIA, gsku, 0); term(BIA, gsku, {nenhuma:true});
+eq('as duas não encontraram: o SKU vira zero', saldo(gsku), 0);
 
 console.log('\n── o relatório de furos ──');
 PERMS[4].add('contagem.relatorio');

@@ -3648,7 +3648,7 @@ async function invQuinzenal(){
   invAndamento();
 }
 async function invGeral(){
-  if(!confirm('CONTAGEM GERAL — com a EXPEDIÇÃO PARADA.\n\nEnquanto ela roda, ninguém embala nem imprime etiqueta de venda. Entra todo SKU com saldo ou com movimento nos últimos 30 dias, e cada SKU é contado por duas pessoas.\n\nAbrir agora?')) return;
+  if(!confirm('CONTAGEM GERAL — com a EXPEDIÇÃO PARADA.\n\nEnquanto ela roda, ninguém embala nem imprime etiqueta de venda. Entra todo SKU ativo, inclusive o que o sistema diz que está zerado. Quem conta bipa o que achar e, onde não achar nenhuma, toca \"Não encontrei — está zerado\". Se a contagem der diferença, outra pessoa conta de novo.\n\nAbrir agora?')) return;
   var r=await fetch('/api/inventario/geral/abrir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmar:true})});
   var d={}; try{ d=await r.json(); }catch(e){}
   if(!r.ok||d.ok===false){ alert(d.erro||('falhou ('+r.status+')')); return; }

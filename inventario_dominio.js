@@ -318,22 +318,14 @@ function sugestao(db, qtd){
     .slice(0, n).map(l => ({ codigo:l.codigo, degrau:l.degrau, por_que:DEGRAUS[l.degrau] }));
 }
 
-/* O que entra num inventario GERAL ou QUINZENAL: todo SKU com saldo, ou com
-   movimento nos ultimos 30 dias. Sob medida e inativo, nao. */
+/* O que entra num inventario GERAL ou QUINZENAL: TODO SKU ativo, inclusive o
+   que o sistema diz que esta ZERADO e parado (spec INVENTARIO-CONFERIR-ZERADOS,
+   07/11/2026). Ate ali so entrava o com saldo ou com movimento em 30 dias, e o
+   zero nunca era conferido: 5 pecas na prateleira com o sistema em zero so
+   apareciam se alguem lembrasse de bipar. Lista unica e cega (R-EST-17): nada
+   diz a quem conta quais estao zerados. Sob medida e inativo, nao. */
 function universoGeral(db){
-  const filtroAtivo = temColuna(db, 'skus', 'ativo') ? ' AND COALESCE(s.ativo,1)=1' : '';
-  const desde = RELOGIO.somarDias(RELOGIO.hoje(), -30);
-  let linhas = [];
-  try{
-    linhas = db.prepare(`SELECT s.codigo FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id
-      WHERE COALESCE(m.sob_medida,0)=0 ${filtroAtivo} AND (COALESCE(s.estoque,0)<>0 OR EXISTS(
-        SELECT 1 FROM movimento_estoque v WHERE v.codigo=s.codigo AND v.tipo<>'abertura'
-          AND v.criado_em >= ?))
-      ORDER BY s.codigo`).all(desde);
-  }catch(e){
-    linhas = db.prepare(`SELECT codigo FROM skus s WHERE COALESCE(estoque,0)<>0 ${filtroAtivo} ORDER BY codigo`).all();
-  }
-  return linhas.map(l => l.codigo);
+  return skusConferiveis(db);
 }
 
 function erro(status, mensagem, extra){
@@ -750,21 +742,6 @@ function terminar(db, { codigo, nenhuma, quem, pode }){
   return { codigo:cod, registrado:true };
 }
 
-/* NA GERAL, O QUE NAO FOI BIPADO E ZERO DELA (§6.4). Sem `confirmar` so diz
-   quantos e quais; confirmando, cada SKU que a pessoa podia contar e nao bipou
-   vira uma contagem ZERO dela. O estoque so vira zero se as DUAS confirmarem. */
-function terminarPrateleira(db, { quem, pode, confirmar }){
-  pode = pode || todas;
-  const geral = db.prepare("SELECT * FROM inventario_ciclo WHERE tipo='geral' AND status='aberto' ORDER BY id DESC LIMIT 1").get();
-  if(!geral) throw erro(409, 'nao ha contagem geral aberta', { motivo:'sem_geral' });
-  const itens = db.prepare(`SELECT * FROM inventario_item WHERE ciclo_id=? AND status IN ('a_contar','recontar','terceira') ORDER BY codigo`).all(geral.id)
-    .filter(i => i.rascunho == null && !porQueNao(db, i, geral, quem, pode));
-  if(!confirmar) return { confirmar:true, n:itens.length, codigos:itens.map(i => i.codigo),
-    pergunta: itens.length + ' SKU(s) da lista você não bipou. Esses não têm nenhuma peça?' };
-  itens.forEach(i => terminar(db, { codigo:i.codigo, nenhuma:true, quem, pode }));
-  return { zerados:itens.length };
-}
-
 /* Fecha o ciclo quando nada mais anda nele. A diaria de HOJE e a quinzenal
    ficam abertas mesmo sem nada a contar: a lista e a tarja leem delas, e a
    quinzenal suspende a diaria ate o PRAZO, e nao ate acabar (§6.2). A diaria
@@ -1098,5 +1075,5 @@ function diferencaPorMotivo(db, opcoes){
 module.exports = { ABERTOS, CONFERIU, MOTIVOS, DEGRAUS, garantirSchema, garantirRecusa, registrarRecusa,
   pendencias, acuracidade, diferencaPorMotivo, conferencias, sugestao, abrir, abrirQuinzenal, encerrar,
   garantirDia, cicloDoDia, candidatos, rodizio, marcarRodizio, abertoParaTodos,
-  contar, terminar, terminarPrateleira, hoje, tarja, aprovacao, aprovar, rejeitar, andamento, relatorio,
+  contar, terminar, hoje, tarja, aprovacao, aprovar, rejeitar, andamento, relatorio,
   itemAberto, erro };

@@ -1,7 +1,11 @@
 # Inventário — conferir também o que o sistema diz que está zerado
 
-> **STATUS — rascunho, 07/11/2026.** Esperando o ok do dono nas decisões D1 a D3.
-> Tipo `REGRA` · risco 🔴 (estoque). Nada construído.
+> **STATUS — em código, 07/11/2026; falta subir.** O dono aprovou as três
+> recomendações (D1 sim, D2 tirar, D3 o nome novo). Tipo `REGRA` · risco 🔴
+> (estoque). `teste_inventario.js` (108) e `teste_regras_estoque.js` (97) com os
+> casos novos, escritos antes do código. ⚠️ **A tela `/inventario` ainda não foi
+> aberta com uma geral de verdade** — a prova é a próxima contagem geral ou
+> quinzenal trazendo os SKUs zerados na lista.
 
 ## 1. O problema
 

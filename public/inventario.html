@@ -115,12 +115,12 @@ function desenhar(){
       '<div class="acoes">'+
         '<span class="qtd"><input id="qtd" type="number" min="0" step="1" inputmode="numeric" placeholder="qtd"><button class="b" onclick="somarQtd()">Somar</button></span>'+
         '<button class="b" onclick="recomecar()">Recomeçar este SKU</button>'+
-        (n===0?'<button class="b zero" onclick="terminar(true)">Não tem nenhuma</button>':'')+
+        (n===0?'<button class="b zero" onclick="terminar(true)">Não encontrei — está zerado</button>':'')+
         '<button class="b pri" onclick="terminar(false)">Terminei este SKU</button>'+
       '</div></div>';
   } else {
     el('atual').innerHTML = ITENS.length ? '<div class="atual"><div class="peca" style="font-size:22px">Bipe a etiqueta de SKU de uma caixa</div>'+
-      '<div class="numl" style="margin-top:6px">ou toque num SKU da lista para começar a contar — e, se não tiver nenhuma, toque "Não tem nenhuma"</div></div>' : '';
+      '<div class="numl" style="margin-top:6px">ou toque num SKU da lista para começar a contar — e, se não encontrar nenhuma, toque "Não encontrei — está zerado"</div></div>' : '';
   }
   el('lt').textContent='Para você contar agora ('+ITENS.length+')';
   if(!ITENS.length){
@@ -137,7 +137,9 @@ function desenhar(){
       d.onclick=function(){ abrirSku(d.getAttribute('data-c')); };
     });
   }
-  el('geral').innerHTML = INFO.geral ? '<button class="b" style="width:100%" onclick="prateleira()">Terminei a prateleira (contagem geral)</button>' : '';
+  /* O "Terminei a prateleira" saiu em 07/11/2026: na geral entra todo SKU
+     ativo, e cada um sem peça se assinala um a um (spec INVENTARIO-CONFERIR-ZERADOS). */
+  el('geral').innerHTML = INFO.geral ? '<div class="vazio">Contagem geral: todo SKU da lista precisa de uma resposta. Achou caixas, bipe; não achou nenhuma, toque "Não encontrei — está zerado".</div>' : '';
 }
 function erroDe(d){ return (d&&d.erro)||('falhou ('+(d&&d.__status)+')'); }
 /* Tocar no SKU abre a contagem dele: o servidor marca o INÍCIO, e é contra ele
@@ -182,15 +184,6 @@ async function terminar(nenhuma){
   if(d.ok===false){ msg('err', erroDe(d)); return; }
   msg('ok', cod+': contagem registrada ('+(nenhuma?'nenhuma':n)+'). Pode seguir para o próximo.');
   ATUAL=null; await carregar(); foco();
-}
-async function prateleira(){
-  var d=await post('/api/inventario/geral/terminar-prateleira',{}); if(!d) return;
-  if(d.ok===false){ msg('err', erroDe(d)); return; }
-  if(!d.n){ msg('ok','Todos os SKUs que você podia contar já foram bipados.'); return; }
-  if(!confirm(d.pergunta+'\n\n'+(d.codigos||[]).slice(0,30).join(', ')+((d.codigos||[]).length>30?' …':''))) return;
-  var r=await post('/api/inventario/geral/terminar-prateleira',{confirmar:true}); if(!r) return;
-  if(r.ok===false){ msg('err', erroDe(r)); return; }
-  msg('ok', r.zerados+' SKU(s) registrados como "não tem nenhuma" por você.'); ATUAL=null; await carregar();
 }
 el('scan').addEventListener('keydown',function(e){
   if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); var v=el('scan').value.replace(/[^A-Za-z0-9]/g,'').toUpperCase(); el('scan').value=''; bipar(v); }
