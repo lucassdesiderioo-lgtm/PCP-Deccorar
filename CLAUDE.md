@@ -1623,6 +1623,37 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 > ⚠️ **A NOTA BAIXADA DA RECEITA (`dfe_documento`) FICA FORA DO MODO TESTE**: a
 > consulta avança o último NSU, e a nota apagada não se baixa de novo.
 
+> ✅ **NO AR DESDE 07/11/2026** (PR #305, junto com o #309): o dono fez o backup,
+> o deploy e o teste de segurança (telas 302, inclusive `/admin/compras`,
+> `/almoxarifado`, `/contagem-material` e `/recebimento`; API 401; `/login` 200).
+>
+> ✅ **AS DUAS MIGRAÇÕES RODARAM E FORAM CONFERIDAS COM DADO REAL:**
+> - **endereços (fase 10):** 16 rolos em "Tecidos novos" (2 hastes, 61 níveis) e
+>   139 sobras em "Sobras de tecido" (3 hastes, 17 níveis) — **159 conferidos, 0
+>   divergência**, e a segunda rodada diz "(já migrado)" e "Tudo bate";
+> - **fornecedores (fase 9):** 7 do sob medida — o JP ligado ao JP do PCP (#1) e
+>   seis criados no PCP (#6 a #11: Ação, CKS Brasil, J Serrano, Mova, Sosten,
+>   Wiler K); a segunda rodada diz "já ligado" em todos.
+>
+> ⚠️ **"AÇÃO" (#6) ERA O "AC" (#2), E "ML" (#3) E "SHOPI" (#5) SÃO CANAL** (o dono,
+> 07/11/2026, linha em `docs/DECISOES.md`). `node arrumar_fornecedores_cmp.js`
+> simula e `--aplicar` grava, com backup dos dois bancos: o #6 é juntado ao #2
+> (toda linha que o cita, nos dois bancos, passa ao #2; o #2 fica com o nome
+> "Ação" e é completado com o que só o #6 tinha; o #6 é **desativado, não
+> apagado**); os pedidos antigos do ML e da SHOPI sem canal ganham o canal (e a
+> loja escrita), e os dois cadastros são desativados. Oferta repetida nos dois
+> recusa tudo. `node teste_arrumar_fornecedores.js` (19).
+>
+> Nada disto está provado com dado real ainda:
+> - quem recebe as cinco chaves novas, marcado na tela de Acessos;
+> - a primeira compra por kg recebida em partes, e o "fechar com falta" dela;
+> - o primeiro tecido de antes etiquetado na 504;
+> - o primeiro rolo do sob medida nascendo pela 502;
+> - a primeira nota baixada da Receita — que só começa depois de o certificado
+>   ser enviado pela 501.
+>
+> Prova que não foi feita se escreve como não feita.
+
 **Rode `node teste_revisao_compras.js` e `node teste_migrar_simula.js` (a simulação
 das duas migrações não toca os bancos de verdade), além de `node teste_material.js`,
 `node teste_pedido_compra.js`, `node
