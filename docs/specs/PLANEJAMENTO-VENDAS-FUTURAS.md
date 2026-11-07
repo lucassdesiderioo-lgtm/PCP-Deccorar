@@ -1,6 +1,22 @@
 # PLANEJAMENTO-VENDAS-FUTURAS — o Planejamento diz o que produzir primeiro
 
-> **STATUS · 07/11/2026 — PLANEJADO** · nenhuma fase construída.
+> **STATUS · 07/11/2026 — AS QUATRO FASES EM CÓDIGO, falta subir** (branch
+> `claude/quirky-shannon-iyiixj`). O que mudou na construção, com o dono:
+> - **O relatório real dá 228 linhas · 239 peças ainda na fábrica, e não
+>   235 · 246** como o §3 escrevia; e **40 estados** (26 no pós-venda), não 38.
+>   O dono, 07/11/2026: *"vale 239, os 26 no grupo 4"*.
+> - **A3 confirmado por construção** (a peça conferida sai do saldo e fica no
+>   comprometido até a próxima planilha; a coluna Atrasada estica isso). O dono
+>   escolheu **(a)**: construir assim, e a correção vira plano à parte.
+> - A chave da fase 4 só é ligada pelo **nível Admin Geral** (o §7 não cria ação
+>   nova; a rota confere o nível). A fase 3 vale a partir do deploy.
+> - "Pronto para coleta… segunda-feira" num relatório de segunda é o mesmo dia;
+>   sem dia na Descrição, dia seguinte "a confirmar".
+> - A simulação (`simular_ritmo.js`, 22 dias avaliados): falta **2.207 → 1.625**
+>   peças, sobra **1.942 → 2.855**.
+> - Regras que parecem bug no `CLAUDE.md` §3; cartões R-PLN-01 a 05 e R-REV-03.
+> - Falta: o deploy, a prova da fase 1 com dado real (a aba batendo com a
+>   bancada por alguns dias) e o dono ligar a fase 4.
 > Desenhado no Projeto com o dono em 07/11/2026, a partir do relatório real do
 > ML de 07/11/2026 09:59 (3.326 linhas, 07/09 a 07/11, 246 peças com envio futuro).
 > Onde esta spec e o `CLAUDE.md` divergirem, vale o `CLAUDE.md` (§13).

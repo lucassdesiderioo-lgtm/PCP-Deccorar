@@ -11,7 +11,8 @@
  * comprometido = vendas com data de envio futura (coluna Estado da planilha).
  */
 const express = require('express');
-const { lerPlanilha, parseDataVenda, parseDataEnvio } = require('./planilha');
+const { lerPlanilha, parseDataVenda } = require('./planilha');
+const ESTADO = require('./planilha_estado');
 const DEMANDA = require('./demanda_dominio');
 const FLUXO = require('./fluxo_estoque');
 const MEDIA = require('./media_dominio');
@@ -32,7 +33,11 @@ module.exports = function(app, db){
     data_envio   TEXT,
     importado_em TEXT DEFAULT (datetime('now','localtime')),
     teste        INTEGER DEFAULT 0,
-    cancelada    INTEGER DEFAULT 0
+    cancelada    INTEGER DEFAULT 0,
+    unidades     INTEGER DEFAULT 1,
+    grupo        TEXT,
+    estado       TEXT,
+    data_confirmar INTEGER DEFAULT 0
   );`);
   // 'cancelada' entrou depois de a tabela ja existir em producao. O ALTER
   // acrescenta a coluna no fim (mesma ordem do CREATE) so quando falta, com
@@ -40,6 +45,13 @@ module.exports = function(app, db){
   try{
     var vfCols = db.prepare("PRAGMA table_info(venda_futura)").all().map(function(c){return c.name;});
     if(vfCols.indexOf('cancelada') < 0) db.exec("ALTER TABLE venda_futura ADD COLUMN cancelada INTEGER DEFAULT 0");
+    /* PLANEJAMENTO-VENDAS-FUTURAS fase 1 (07/11/2026): a peca (coluna Unidades),
+       o grupo da tabela §3-B do dono, o Estado como veio e a marca "data a
+       confirmar" da NF a emitir. No fim, na ordem do CREATE (§17). */
+    if(vfCols.indexOf('unidades') < 0)       db.exec("ALTER TABLE venda_futura ADD COLUMN unidades INTEGER DEFAULT 1");
+    if(vfCols.indexOf('grupo') < 0)          db.exec("ALTER TABLE venda_futura ADD COLUMN grupo TEXT");
+    if(vfCols.indexOf('estado') < 0)         db.exec("ALTER TABLE venda_futura ADD COLUMN estado TEXT");
+    if(vfCols.indexOf('data_confirmar') < 0) db.exec("ALTER TABLE venda_futura ADD COLUMN data_confirmar INTEGER DEFAULT 0");
   }catch(e){ console.log('[plan] nao consegui conferir venda_futura.cancelada: '+e.message); }
   // Fase 4: snapshot diario do fechamento, uma linha por dia (PK = data).
   // Guarda o numero do dia para permitir "era M ontem" e o historico.
@@ -60,15 +72,19 @@ module.exports = function(app, db){
   seed.run('dias_cobertura','10');
   seed.run('janela_media','30');
   seed.run('alvo_minimo','2');
+  // PLANEJAMENTO-VENDAS-FUTURAS: o ritmo (fase 3) e a ordem pela falta (fase 4),
+  // que nasce DESLIGADA — so o dono liga, pela 401.
+  seed.run('janela_curta','14');
+  seed.run('ordem_por_falta','0');
 
   // Delega ao dominio: o padrao de cada parametro tem que ser o MESMO nos dois
   // lados, senao a tela mostra uma janela e a compra usa outra.
   const cfgNum = (chave, padrao) => DEMANDA.cfgNum(db, chave, padrao);
 
-  // Colunas usadas na planilha (secao 2 do desenho, 1-based -> 0-based):
-  //   1=N.o de venda(0)  2=Data da venda(1)  4=Estado(3)  23=SKU(22)
-  const IV = 0, IDV = 1, IE = 3, ISKU = 22;
-
+  /* As colunas saem do cabecalho do relatorio (planilha_estado.colunas): o
+     relatorio de 07/11/2026 trouxe "Descricao do status" (5), "Pacote" (6) e
+     "Unidades" (8) alem das quatro de sempre, e tem "Estado" de novo no
+     endereco do comprador — vale a PRIMEIRA. */
   const bigJson = express.json({ limit:'25mb' });
   app.post('/api/planejamento/importar', bigJson, (req,res)=>{
     try{
@@ -76,12 +92,17 @@ module.exports = function(app, db){
       if(!b64) return res.status(400).json({ erro:'sem arquivo' });
       const buf = Buffer.from(b64, 'base64');
       const linhas = lerPlanilha(buf);
+      const COL = ESTADO.colunas(linhas);
+      const IV = COL.venda, IDV = COL.data, IE = COL.estado, ISKU = COL.sku;
 
-      const up = db.prepare(`INSERT INTO venda_futura (venda_id,codigo,data_venda,data_envio,cancelada)
-        VALUES (?,?,?,?,?)
+      const up = db.prepare(`INSERT INTO venda_futura (venda_id,codigo,data_venda,data_envio,cancelada,
+          unidades,grupo,estado,data_confirmar)
+        VALUES (?,?,?,?,?,?,?,?,?)
         ON CONFLICT(venda_id) DO UPDATE SET
           codigo=excluded.codigo, data_venda=excluded.data_venda,
           data_envio=excluded.data_envio, cancelada=excluded.cancelada,
+          unidades=excluded.unidades, grupo=excluded.grupo, estado=excluded.estado,
+          data_confirmar=excluded.data_confirmar,
           importado_em=datetime('now','localtime')`);
       const existe   = db.prepare("SELECT 1 FROM venda_futura WHERE venda_id=?");
       const skuExiste= db.prepare("SELECT 1 FROM skus WHERE codigo=?");
@@ -91,8 +112,15 @@ module.exports = function(app, db){
          As duas guardas (arquivo sem futura, tirar mais da metade) precisam da
          conta pronta: decidir no meio da gravacao deixaria meio arquivo no banco. */
       const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
+      /* A data do RELATORIO e a regua das datas que ele nao escreve ("segunda-
+         feira", "dia seguinte"): o arquivo tirado sexta e subido sabado diz a
+         segunda da semana em que foi tirado. Sem titulo nem nome, hoje. */
+      const rel = ESTADO.dataDoRelatorio(linhas, req.body && req.body.nome);
+      const ref = ESTADO.deIso(rel ? rel.data : hoje);
       let semSku=0, semData=0, canceladas=0;
       const regs = [];
+      const grupos = {}; ESTADO.GRUPOS.forEach(g => grupos[g] = { linhas:0, pecas:0 });
+      const novos = {};
       /* As linhas canceladas saem do dono unico, com o pack do cabecalho no
          item do pacote de varios produtos (cancelada_dominio.js). */
       const cancelVol = CANC.daPlanilha(linhas, { venda:IV, estado:IE, sku:ISKU });
@@ -102,28 +130,40 @@ module.exports = function(app, db){
         if(!/^\d{6,}$/.test(vid)) continue;
         const estado = String(l[IE] || '');
         const sku = String(l[ISKU] || '').replace(/\s+/g,'').toUpperCase();
+        /* A tabela §3-B do dono (planilha_estado.js): o grupo, se entra na
+           media, se e venda futura e a data de envio de onde a tabela diz. */
+        const c = ESTADO.classificar(estado, l[COL.descricao], ref);
+        const un = ESTADO.unidades(l[COL.unidades]);
         /* O cabecalho do pacote de varios produtos ("Pacote de 2 produtos",
            sem SKU) nao e venda: os itens vem nas linhas de baixo. */
-        if(!sku && CANC.cabecalhoDePacote(estado)) continue;
+        if(!sku && CANC.cabecalhoDePacote(estado)){ grupos.nao_venda.linhas++; continue; }
         if(!sku){ semSku++; continue; }
-        const de = parseDataEnvio(estado);
-        // venda cancelada/devolvida/reembolsada nao e demanda real -> fora da media
-        const cancelada = /cancel|devolu|reembols/i.test(estado) ? 1 : 0;
-        if(!de) semData++;
+        grupos[c.grupo].linhas++; grupos[c.grupo].pecas += un;
+        if(!c.conhecido){ const k = estado.replace(/\s+/g,' ').trim(); novos[k] = (novos[k]||0) + 1; }
+        const cancelada = c.media ? 0 : 1;
+        if(!c.data_envio) semData++;
         if(cancelada) canceladas++;
-        regs.push({ vid, sku, dv: parseDataVenda(l[IDV]), de, cancelada });
+        regs.push({ vid, sku, dv: parseDataVenda(l[IDV]), de: c.data_envio, cancelada,
+                    un, grupo:c.grupo, estado:estado.replace(/\s+/g,' ').trim(), conf:c.data_confirmar, futura:c.futura });
       }
 
       /* ── 2. AS GUARDAS (spec VENDAS-E-MEDIA §5.2) ──────────────────────────
          A planilha deixou de ser espelho da HISTORIA: ela so espelha as vendas
          FUTURAS. Um arquivo sem nenhuma e quase sempre o periodo errado
          exportado — e aceito, ele apagaria todo o comprometido. */
-      const futuras = regs.filter(r => r.de && r.de >= hoje).length;
+      /* Futura e o que ainda nao saiu da fabrica (§3-B), e isso inclui a de
+         data ja passada — a coluna "Atrasada" (R3). */
+      const futuras = regs.filter(r => r.futura).length;
       if(!futuras) return res.status(400).json({ ok:false, motivo:'sem_futura',
         erro:'Este arquivo não tem venda com envio futuro — confira o período exportado. '+
              'Ele precisa ter as vendas ainda não enviadas.' });
       const vistos = new Set(regs.map(r => r.vid));
-      const futurasHoje = db.prepare("SELECT venda_id FROM venda_futura WHERE teste=0 AND data_envio >= ?").all(hoje);
+      /* As futuras gravadas: as de antes desta fase (sem grupo) so de hoje em
+         diante, como sempre; as classificadas, todas que tem data de envio —
+         so a venda futura recebe data (planilha_estado.js). A passada sem
+         grupo nunca sai por ausencia (#11). */
+      const futurasHoje = db.prepare("SELECT venda_id FROM venda_futura WHERE teste=0 AND data_envio IS NOT NULL "+
+        "AND (data_envio >= ? OR grupo IS NOT NULL)").all(hoje);
       const sairiam = futurasHoje.filter(r => !vistos.has(r.venda_id)).map(r => r.venda_id);
       const confirmar = !!(req.body && req.body.confirmar);
       if(futurasHoje.length && sairiam.length * 2 > futurasHoje.length && !confirmar)
@@ -138,7 +178,7 @@ module.exports = function(app, db){
       db.transaction(()=>{
         for(const r of regs){
           if(existe.get(r.vid)) atualizadas++; else novas++;
-          up.run(r.vid, r.sku, r.dv, r.de, r.cancelada);
+          up.run(r.vid, r.sku, r.dv, r.de, r.cancelada, r.un, r.grupo, r.estado, r.conf);
           if(!skuExiste.get(r.sku)) desconhecidos[r.sku] = (desconhecidos[r.sku]||0) + 1;
         }
         /* O ESPELHO VALE SO ENTRE AS FUTURAS. A venda futura que nao veio no
@@ -147,6 +187,11 @@ module.exports = function(app, db){
            planilha. Era esta linha que fazia o recorte zerar a media (#11). */
         for(const v of sairiam){ del.run(v); removidas++; }
         cancVol = CANC.marcar(db, cancelVol, { origem:'planilha' });
+        /* R8: a aba diz quando o relatorio foi TIRADO (o titulo dele), nao so
+           quando subiu. */
+        db.prepare("INSERT INTO config (chave,valor) VALUES ('planilha_relatorio_em',?) "+
+          "ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor")
+          .run(rel ? rel.data+' '+rel.hora : db.prepare("SELECT datetime('now','localtime') d").get().d.slice(0,16));
       })();
 
       if(cancVol && (cancVol.embalado || cancVol.no_canto || cancVol.no_carro || cancVol.varias)){
@@ -157,6 +202,11 @@ module.exports = function(app, db){
       res.json({ ok:true, linhas_arquivo:linhas.length, novas, atualizadas,
         removidas, sem_sku:semSku, sem_data_envio:semData, canceladas, futuras,
         canceladas_volumes: cancVol,
+        grupos, relatorio_em: rel ? rel.data+' '+rel.hora : null,
+        pecas_futuras: regs.filter(r => r.futura).reduce((a,r)=>a+r.un,0),
+        /* Estado novo NAO TRAVA (decisao do dono): contou como venda — e como
+           futura se trouxe data. O import so avisa, para o dono saber. */
+        estados_novos: Object.keys(novos).map(k=>({ estado:k, linhas:novos[k] })),
         desconhecidos: Object.keys(desconhecidos).map(k=>({sku:k, qtd:desconhecidos[k]})) });
     }catch(e){ console.error(e); res.status(500).json({ erro:String(e.message||e) }); }
   });
@@ -177,6 +227,31 @@ module.exports = function(app, db){
      divergiriam no primeiro ajuste de parametro (§9). */
   const calcular = () => DEMANDA.calcular(db);
 
+  /* R8: quando foi a ultima planilha — a hora do RELATORIO (o titulo dele) e a
+     do import. A tela pinta de ambar quando nao foi enviada hoje. */
+  function ultimaPlanilha(){
+    let rel = null, imp = null;
+    try{ const c = db.prepare("SELECT valor FROM config WHERE chave='planilha_relatorio_em'").get(); rel = c ? c.valor : null; }catch(e){}
+    try{ imp = db.prepare("SELECT MAX(importado_em) i FROM venda_futura WHERE teste=0").get().i; }catch(e){}
+    const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
+    const quando = rel || (imp ? imp.slice(0,16) : null);
+    return { relatorio_em: rel, importado_em: imp, de_hoje: !!quando && quando.slice(0,10) === hoje };
+  }
+
+  /* FASE 1 — AS VENDAS FUTURAS POR DIA DE ENVIO (so leitura). A conta e do
+     demanda_dominio.porDia (R1): esta rota nao conta nada. */
+  app.get('/api/planejamento/futuras',(req,res)=>{
+    try{ res.json(Object.assign({ ok:true, planilha: ultimaPlanilha() }, DEMANDA.porDia(db))); }
+    catch(e){ console.error(e); res.status(500).json({ erro:String(e.message||e) }); }
+  });
+
+  /* FASE 2 — AS JANELAS 7 · 14 · 30 · 45 DIAS, SO PARA OLHAR (R9): nada aqui
+     grava na `config`, e a producao continua com a janela de la. */
+  app.get('/api/planejamento/janelas',(req,res)=>{
+    try{ res.json(Object.assign({ ok:true, janela_producao: cfgNum('janela_media', 30) }, DEMANDA.janelas(db))); }
+    catch(e){ console.error(e); res.status(500).json({ erro:String(e.message||e) }); }
+  });
+
   app.get('/api/planejamento',(req,res)=>{
     const { config, linhas } = calcular();
     let meta = { imp:null, linhas:0, skus:0 };
@@ -189,6 +264,7 @@ module.exports = function(app, db){
     res.json({
       config,
       importado_em: meta.imp, total_linhas: meta.linhas, total_skus: meta.skus,
+      planilha: ultimaPlanilha(),
       total_precisa: linhas.reduce((a,b)=>a+b.precisa,0),
       total_comprometido: linhas.reduce((a,b)=>a+b.comprometido,0),
       desconhecidos, linhas
@@ -200,10 +276,16 @@ module.exports = function(app, db){
   // ja ordenados pela maior necessidade. A tela vermelha (pedidos de hoje) nao muda.
   app.get('/api/revisao/producao',(req,res)=>{
     const { linhas } = calcular();
-    res.json(linhas.filter(l=> l.cadastrado && l.precisa>0).map(l=>({
-      codigo:l.codigo, descricao:l.descricao, cor:l.cor,
-      estoque:l.estoque, comprometido:l.comprometido, alvo:l.alvo, precisa:l.precisa
-    })));
+    /* FASE 4: com `config.ordem_por_falta` ligada, a ordem e a da data da
+       falta e cada linha leva o porque (`motivo`). Desligada, a resposta e a
+       de sempre — o tablet nao ve diferenca nenhuma. */
+    const porFalta = cfgNum('ordem_por_falta', 0) === 1;
+    res.json(linhas.filter(l=> l.cadastrado && l.precisa>0).map(l=>{
+      const o = { codigo:l.codigo, descricao:l.descricao, cor:l.cor,
+        estoque:l.estoque, comprometido:l.comprometido, alvo:l.alvo, precisa:l.precisa };
+      if(porFalta){ o.motivo = l.motivo; o.data_falta = l.data_falta; o.falta_tipo = l.falta_tipo; }
+      return o;
+    }));
   });
 
   // Fase 4: fechamento diario (secao 10 do desenho).
@@ -293,9 +375,26 @@ module.exports = function(app, db){
     const ins = db.prepare("INSERT INTO config (chave,valor) VALUES (?,?) "+
       "ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor");
     let n = 0;
+    /* A recusa vem ANTES de gravar qualquer outro campo do mesmo pedido. */
+    const ac = app.locals.acesso, u = req.usuario;
+    if(b.ordem_por_falta!=null){
+      let ag = false; try{ ag = !!(u && ac && ac.ehAdminGeral && ac.ehAdminGeral(u.id)); }catch(e){}
+      if(!ag) return res.status(403).json({ ok:false, motivo:'admin_geral',
+        erro:'Só o nível Admin Geral liga ou desliga a ordem pela data da falta.' });
+    }
     if(b.dias_cobertura!=null){ ins.run('dias_cobertura', String(Math.max(1, Math.trunc(+b.dias_cobertura||10)))); n++; }
     if(b.janela_media!=null){   ins.run('janela_media',   String(Math.max(1, Math.trunc(+b.janela_media||30)))); n++; }
     if(b.alvo_minimo!=null){    ins.run('alvo_minimo',    String(Math.max(0, Math.trunc(+b.alvo_minimo||0)))); n++; }
+    // fase 3: a janela curta do ritmo, editada onde se edita a janela
+    if(b.janela_curta!=null){   ins.run('janela_curta',   String(Math.max(1, Math.trunc(+b.janela_curta||14)))); n++; }
+    /* FASE 4: a ordem pela data da falta nasce DESLIGADA e SO O ADMIN GERAL
+       liga ou desliga (decisao do dono, 07/11/2026: "quem liga sou eu"). A rota
+       e a mesma da janela (planilha.importar); o nivel e conferido aqui. */
+    if(b.ordem_por_falta!=null){
+      const v = (b.ordem_por_falta === true || +b.ordem_por_falta === 1) ? '1' : '0';
+      ins.run('ordem_por_falta', v); n++;
+      try{ if(ac && ac.auditar) ac.auditar(req, 'planejamento', 'ordem_por_falta', v==='1'?'ligada':'desligada', ''); }catch(e){}
+    }
     res.json({ ok:true, salvos:n });
   });
 };
