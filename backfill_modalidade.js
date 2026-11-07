@@ -50,7 +50,7 @@ for(const arq of arquivos){
   n++;
   let mapa={};
   try{
-    const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(arq))}).promise;
+    const pdf=await pdfjs.getDocument({data:new Uint8Array(fs.readFileSync(arq)), isEvalSupported:false}).promise;
     for(let p=1;p<=pdf.numPages;p++){
       const lines=pageLines(await (await pdf.getPage(p)).getTextContent());
       const t=lines.join('\n');
