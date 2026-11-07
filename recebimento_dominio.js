@@ -69,7 +69,7 @@ function custoUnit(pi, contadaAgora, db){
      (R-CMP-26, fase 4). */
   const nota = db ? require('./nota_dominio').liquidoDoItem(db, pi.id) : null;
   if(nota && !(pi.qtd_compra != null && pi.preco_unid_compra != null))
-    { const u = require('./nota_dominio').unidadesDaNota(pi, nota.quantidade); return u > 0 ? nota.valor / u : null; }
+    { const u = require('./nota_dominio').unidadesDoItem(db, pi); return u > 0 ? nota.valor / u : null; }
   if(pi.qtd_compra != null && pi.preco_unid_compra != null){
     const valor = nota ? nota.valor : pi.qtd_compra * pi.preco_unid_compra;
     /* Primeira entrega do item: o valor inteiro ÷ o que chegou contado. Entrega

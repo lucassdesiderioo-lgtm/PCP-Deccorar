@@ -72,6 +72,8 @@ document.addEventListener('click', async function(ev){
   b.disabled=false;
   if(r.erro){ box.innerHTML='<div class="avi">'+esc(r.erro)+'</div>'; return; }
   box.innerHTML='<div class="avi ok">✓ '+(r.volumes||[]).length+' volume(s): '+(r.volumes||[]).map(function(v){return '<span style="white-space:nowrap">'+esc(v.codigo)+'</span> ('+n3(v.metragem)+')';}).join(', ')+'. Imprima as etiquetas na 503.</div>';
+  /* o tecido etiquetado perde o campo e o botao na hora (ja nao e "de antes") */
+  var lin=b.parentNode; [].slice.call(lin.querySelectorAll('textarea,button')).forEach(function(e){ e.remove(); });
   /* o redesenho espera: metragem digitada em outro tecido nao some (§12) */
   setTimeout(function(){ var dig=[].some.call(document.querySelectorAll('[data-etq-m]'),function(t){return t.value.trim();}); if(!dig) inicio(); },4000);
 });

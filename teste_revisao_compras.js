@@ -181,14 +181,21 @@ const DINHEIRO_OU_ESPERADO = /^(valor|preco|desembolso|frete|desconto|custo|qtd_
   await post('/api/recebimento', { pedido_id:pCmd, itens:[{ pedido_item_id:iCmd, qtd_contada:10 }] }, AG);
   const cc = () => db.prepare('SELECT custo_medio FROM componente WHERE id=?').get(cmd).custo_medio;
   ok('recebido pela caixa: R$ 5 o comando', Math.abs(cc() - 5) < 1e-6, () => cc());
-  r = await post('/api/notas', { pedido_id:pCmd, numero:'7703', emissao:'2026-11-07', itens:[{ pedido_item_id:iCmd, quantidade:20, valor_produto:100 }] }, AG);
+  r = await post('/api/notas', { pedido_id:pCmd, numero:'7703', emissao:'2026-11-07', itens:[{ pedido_item_id:iCmd, quantidade:20, unidade:'UN', valor_produto:100 }] }, AG);
   ok('a nota diz "20 un por R$ 100": continua R$ 5 (e nao R$ 0,50)', r.status === 200 && Math.abs(cc() - 5) < 1e-6, () => r.status + ' ' + cc());
   const pCx = await pedir([{ oferta_id:ofCmd, necessidade:20 }]);
   const iCx = db.prepare('SELECT id FROM pedido_item WHERE pedido_id=?').get(pCx).id;
   await post('/api/recebimento', { pedido_id:pCx, itens:[{ pedido_item_id:iCx, qtd_contada:10 }] }, AG);
-  r = await post('/api/notas', { pedido_id:pCx, numero:'7704', emissao:'2026-11-07', itens:[{ pedido_item_id:iCx, quantidade:2, valor_produto:120 }] }, AG);
+  r = await post('/api/notas', { pedido_id:pCx, numero:'7704', emissao:'2026-11-07', itens:[{ pedido_item_id:iCx, quantidade:2, unidade:'CX', valor_produto:120 }] }, AG);
   ok('a nota diz "2 caixas por R$ 120": cada comando custa R$ 6 (pelo fator)', r.status === 200
      && Math.abs(db.prepare('SELECT custo_unit FROM recebimento_item WHERE pedido_item_id=?').get(iCx).custo_unit - 6) < 1e-6, () => db.prepare('SELECT custo_unit FROM recebimento_item WHERE pedido_item_id=?').get(iCx).custo_unit);
+
+  const pP1 = await pedir([{ oferta_id:ofCmd, necessidade:20 }]);
+  const iP1 = db.prepare('SELECT id FROM pedido_item WHERE pedido_id=?').get(pP1).id;
+  await post('/api/recebimento', { pedido_id:pP1, itens:[{ pedido_item_id:iP1, qtd_contada:10 }] }, AG);
+  r = await post('/api/notas', { pedido_id:pP1, numero:'7706', emissao:'2026-11-07', itens:[{ pedido_item_id:iP1, quantidade:1, unidade:'CX', valor_produto:50 }] }, AG);
+  ok('rodada 3: a nota PARCIAL "1 CX por R$ 50" (de 2 caixas) da R$ 5 o comando, e nao R$ 50', r.status === 200
+     && Math.abs(db.prepare('SELECT custo_unit FROM recebimento_item WHERE pedido_item_id=?').get(iP1).custo_unit - 5) < 1e-6, () => db.prepare('SELECT custo_unit FROM recebimento_item WHERE pedido_item_id=?').get(iP1).custo_unit);
 
   secao('rodada 2: com nota e "fornecedor nao vai entregar", o kg inteiro faz o custo virar valor / contado');
   const t3 = (await post('/api/componentes', { nome:'Tubo 63', unidade:'un', modo_saldo:'quantidade', almoxarifado_id:alm }, AG)).corpo.id;

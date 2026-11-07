@@ -227,7 +227,8 @@ const transporte = async (cert, url, corpo) => {
   await post('/api/pedidos/' + pZ + '/comprar', { canal:'direto', numero_externo:'OC-Z', comprado_em:'2026-11-03' }, AG);
   const nNF = (XML_11.match(/<nNF>(\d+)<\/nNF>/) || [])[1];
   const itZ = db.prepare('SELECT id FROM pedido_item WHERE pedido_id=? ORDER BY id').get(pZ).id;
-  r = await post('/api/notas', { pedido_id:pZ, numero:nNF, emitente_cnpj:'66.777.888/0001-99', emissao:'2026-11-05', itens:[{ pedido_item_id:itZ, quantidade:600, valor_produto:4800 }] }, AG);
+  /* como a tela grava: SEM o CNPJ, e com zeros a esquerda no numero (rodada 3) */
+  r = await post('/api/notas', { pedido_id:pZ, numero:'000' + nNF, emitente_nome:'Loja 66', emissao:'2026-11-05', itens:[{ pedido_item_id:itZ, quantidade:600, valor_produto:4800 }] }, AG);
   ok('a nota foi digitada a mao', r.status === 200, () => JSON.stringify(r));
   db.prepare('UPDATE dfe_controle SET proxima_consulta=NULL WHERE id=1').run();
   fila = [ret('138', '000000000000011', '000000000000011', [])];

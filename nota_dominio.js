@@ -148,17 +148,27 @@ function liquidoDoItem(db, pedido_item_id){
 /* A nota que chega DEPOIS do recebimento corrige o custo medio pelo que ja
    entrou: o custo de antes (o que o recebimento usou) contra o liquido ÷ o
    recebido. Fica no componente_dominio (dono unico do custo medio). */
-/* QUANTAS UNIDADES DA CASA A NOTA COBRA (revisao do PR #305). A quantidade da
-   nota vem como o fornecedor faturou: na compra por unidade de compra (kg, cx),
-   ela e nessa unidade e o fator a converte; na compra por embalagem, ela so e
-   embalagem quando bate com as embalagens do pedido — senao ja e unidade da
-   casa ("UN 20" de uma caixa de 10). */
-function unidadesDaNota(pi, q){
+/* QUANTAS UNIDADES DA CASA A NOTA COBRA (revisao do PR #305, rodadas 2 e 3). A
+   quantidade da nota vem como o fornecedor faturou, e quem diz em que unidade e
+   a UNIDADE escrita na nota (o uCom do XML, ou a digitada): igual a unidade do
+   material ("UN" de um comando em un) ja e unidade da casa; outra ("CX", "KG")
+   e a unidade de compra, e o fator converte. Sem unidade escrita, vale a de
+   sempre: a unidade de compra. Nunca pela coincidencia da quantidade — a nota
+   parcial "1 CX" de um pedido de 2 caixas e uma caixa, nao um comando. */
+const SINON = { un:'un', und:'un', unid:'un', unidade:'un', pc:'un', pca:'un', 'pç':'un', peca:'un', 'peça':'un', m:'m', mt:'m', mts:'m', metro:'m', metros:'m', kg:'kg', quilo:'kg' };
+const normUn = u => { const t = String(u || '').trim().toLowerCase().replace(/[.\s]/g, ''); return SINON[t] || t; };
+function unidadesDaNota(pi, q, unidade, unidadeCasa){
   q = +q || 0;
   const f = +pi.fator || 1;
-  if(pi.qtd_compra != null) return q * f;
-  if(f !== 1 && pi.qtd_embalagem != null && Math.abs(q - pi.qtd_embalagem) < 1e-9) return q * f;
-  return q;
+  if(unidade && unidadeCasa && normUn(unidade) === normUn(unidadeCasa)) return q;
+  return q * f;
+}
+/* As unidades da casa que as notas do item cobram, linha a linha (cada linha com
+   a sua unidade). */
+function unidadesDoItem(db, pi){
+  const casa = pi.componente_id ? (db.prepare('SELECT unidade FROM componente WHERE id=?').get(pi.componente_id) || {}).unidade : null;
+  return db.prepare('SELECT quantidade, unidade FROM nota_compra_item WHERE pedido_item_id=?').all(pi.id)
+    .reduce((t, l) => t + unidadesDaNota(pi, l.quantidade, l.unidade, casa), 0);
 }
 function corrigirPeloLiquido(db, pi){
   if(!pi.componente_id) return;
@@ -174,7 +184,7 @@ function corrigirPeloLiquido(db, pi){
   const atual = db.prepare('SELECT * FROM pedido_item WHERE id=?').get(pi.id) || pi;
   /* fechado: recebido, ou cancelado o resto ("fornecedor nao vai entregar") */
   const completo = atual.status === 'recebido' || (atual.status === 'cancelado' && atual.qtd_recebida > 0);
-  const daNota = unidadesDaNota(atual, liq.quantidade);
+  const daNota = unidadesDoItem(db, atual);
   const base = completo ? (atual.qtd_recebida || rec.q) : (daNota > 0 ? daNota : rec.q);
   const antigo = rec.v / rec.q, novo = liq.valor / base;
   const comp = db.prepare('SELECT modo_saldo FROM componente WHERE id=?').get(pi.componente_id);
@@ -193,4 +203,4 @@ function listar(db, q){
   return l;
 }
 
-module.exports = { unidadesDaNota, Recusa, REGIMES, IMPOSTOS, regimeVigente, mudarRegime, aproveita, regras, novaRegra, lancar, listar, liquidoDoItem, corrigirPeloLiquido };
+module.exports = { unidadesDaNota, unidadesDoItem, Recusa, REGIMES, IMPOSTOS, regimeVigente, mudarRegime, aproveita, regras, novaRegra, lancar, listar, liquidoDoItem, corrigirPeloLiquido };

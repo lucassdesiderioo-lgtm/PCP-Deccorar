@@ -147,7 +147,7 @@ async function consultar(db, opcoes){
     db.prepare('DELETE FROM dfe_documento WHERE id=?').run(e.id);
     const d = { nsu:e.nsu, schema:e.schema_doc, xml:e.bruto };
     try{ const x = await guardar(db, d, cert, transporte, opcoes); r.documentos++; if(x.lancada) r.lancadas++; }
-    catch(x){ gravarErro(db, d, x, (e.tentativas || 0) + 1); }
+    catch(x){ r.erros++; gravarErro(db, d, x, (e.tentativas || 0) + 1); }
   }
   db.prepare('UPDATE dfe_controle SET ultimo_nsu=COALESCE(?, ultimo_nsu), ultima_consulta=?, proxima_consulta=?, ultimo_erro=?, ultimo_cstat=? WHERE id=1')
     .run(ult || null, agora(), prox, (cStat === '137' || cStat === '138') ? (r.erros ? r.erros + ' documento(s) da Receita não entraram: veja a lista' : null) : (cStat + ' ' + (xMotivo || '')), cStat || null);
@@ -168,7 +168,9 @@ async function consultar(db, opcoes){
 function gravarErro(db, d, e, tentativas){
   const msg = String(e && e.message || e).slice(0, 500);
   db.prepare("INSERT OR IGNORE INTO dfe_documento (nsu, tipo, situacao) VALUES (?, 'erro', 'erro')").run(d.nsu);
-  db.prepare("UPDATE dfe_documento SET erro=?, bruto=COALESCE(bruto, ?), schema_doc=COALESCE(schema_doc, ?), tentativas=COALESCE(?, tentativas, 0) WHERE nsu=?")
+  /* a linha que o guardar ja tinha criado (e estourou depois) tambem vira
+     "erro": senao ficava "aguardando", fora da nova tentativa e das Pendencias */
+  db.prepare("UPDATE dfe_documento SET situacao=CASE WHEN situacao='lancada' THEN situacao ELSE 'erro' END, erro=?, bruto=COALESCE(bruto, ?), schema_doc=COALESCE(schema_doc, ?), tentativas=COALESCE(?, tentativas, 0) WHERE nsu=?")
     .run(msg, d.xml || null, d.schema || null, tentativas == null ? null : tentativas, d.nsu);
 }
 async function guardar(db, d, cert, transporte, opcoes){
@@ -224,7 +226,13 @@ function ligar(db, chave){
   /* A MESMA NOTA DIGITADA A MAO NAO E LANCADA DE NOVO (rodada 2 da revisao): a
      de mao nao tem chave, entao confere-se o numero e o emitente. */
   const dig = s => String(s || '').replace(/\D/g, '');
-  const mao = nota.numero ? db.prepare('SELECT id, emitente_cnpj FROM nota_compra WHERE numero=?').all(String(nota.numero)).find(n => dig(n.emitente_cnpj) === dig(nota.emitente_cnpj)) : null;
+  /* o CNPJ da nota de mao, ou — a tela nao o pede — o do fornecedor do pedido
+     dela; o numero sem os zeros a esquerda (rodada 3 da revisao) */
+  const semZero = v => dig(v).replace(/^0+/, '');
+  const mao = semZero(nota.numero) ? db.prepare(`SELECT n.id, n.numero, n.emitente_cnpj, f.cnpj fcnpj FROM nota_compra n
+      LEFT JOIN pedido_compra p ON p.id=n.pedido_id LEFT JOIN fornecedor f ON f.id=p.fornecedor_id
+      WHERE COALESCE(n.sem_nota,0)=0 AND COALESCE(n.chave,'')<>?`).all(String(nota.chave || ''))
+    .find(n => semZero(n.numero) === semZero(nota.numero) && [n.emitente_cnpj, n.fcnpj].some(c => dig(c) && dig(c) === dig(nota.emitente_cnpj))) : null;
   if(mao){
     db.prepare("UPDATE dfe_documento SET situacao='escolher', erro=? WHERE id=?").run('já existe a nota nº ' + nota.numero + ' deste fornecedor lançada à mão (nota #' + mao.id + '): confira antes de lançar esta', doc.id);
     return false;
