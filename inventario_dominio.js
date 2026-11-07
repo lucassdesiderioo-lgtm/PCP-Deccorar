@@ -279,8 +279,9 @@ function skusConferiveis(db){
  * mais tempo sem conferir. `folga` (dias) tira dos degraus 2 a 4 o que foi
  * conferido ha pouco; o degrau 1 ignora a folga — o furo apareceu.
  *
- * Cobertura = LIVRE ÷ media diaria (demanda_dominio, a mesma media da tela
- * azul). Sem venda na janela a cobertura e null e o SKU cai para 3 e 4. */
+ * Cobertura = LIVRE ÷ media diaria (demanda_dominio, a media da JANELA — e nao o
+ * ritmo, que a tela azul usa desde 07/11/2026 para o alvo e a cobertura dela).
+ * Sem venda na janela a cobertura e null e o SKU cai para 3 e 4. */
 function ordenar(db, { codigos, folga, recusasDesde }){
   const conf = conferencias(db);
   const media = {};

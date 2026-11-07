@@ -130,11 +130,11 @@
 - **Status:** no ar.
 
 ### R-REV-03 · A tela azul é ordenada por prioridade, e cada linha diz por quê
-- **Regra:** quatro degraus, nesta ordem: 1) cliente com prazo até amanhã, 2) sem estoque, 3) cobertura abaixo de metade dos dias de cobertura, 4) abaixo do alvo. Cada linha traz o `motivo`. Sem venda na janela a cobertura é vazia, nunca zero.
-- **Por quê:** ordenar pelo que falta põe em cima o SKU que mais gira, que quase nunca é o que acaba primeiro.
-- **Exceções:** nenhuma.
-- **Teste que trava:** ⚠ **sem teste** da ordem. `teste_estoque.js` trava só que a conta é a mesma da aba Estoque.
-- **Status:** no ar.
+- **Regra:** com `config.ordem_por_falta = 0` (o padrão), quatro degraus, nesta ordem: 1) cliente com prazo até amanhã (a venda **atrasada** conta aqui), 2) sem estoque, 3) cobertura abaixo de metade dos dias de cobertura, 4) abaixo do alvo. **Com a chave ligada (fase 4 da `PLANEJAMENTO-VENDAS-FUTURAS`, 07/11/2026), a ordem é pela data em que a peça vai faltar**: a data mais cedo primeiro; no mesmo dia, venda feita antes de reposição; no mesmo dia e tipo, mais peças faltando primeiro. Venda feita: o primeiro dia de envio que o estoque não cobre (a conta da aba por dia). Reposição: `hoje + (estoque − comprometido) ÷ ritmo`. Cada linha traz o `motivo` — *"faltam 3 para ter 10/11 (vendidas)"* ou *"acaba qua 12/11 pelo ritmo (3,5/dia)"*. Sem venda na janela, a cobertura e a data são vazias, nunca zero.
+- **Por quê:** ordenar pelo que falta põe em cima o SKU que mais gira, que quase nunca é o que acaba primeiro. E a fábrica precisa andar 1, 2 ou 3 dias à frente das vendas: terminado o de hoje, a primeira linha é a falta de amanhã.
+- **Exceções:** a chave nasce **desligada** e só o **Admin Geral** (o setor, pelo `ehAdminGeral`) liga ou desliga (403 para os outros, antes de gravar qualquer campo do mesmo pedido). O modo vermelho e o âmbar não mudam.
+- **Teste que trava:** `teste_vendas_futuras.js` (a ordem, os três desempates, o motivo, o caso do meio-dia, a chave desligada por padrão e o 403).
+- **Status:** os degraus no ar · a ordem pela falta em código desde 07/11/2026, desligada.
 
 ### R-REV-04 · Sob medida não tem alvo
 - **Regra:** o alvo calculado de SKU sob medida é zero; ele só pede produção quando há venda comprometida.
@@ -397,10 +397,47 @@
 
 ---
 
+## O planejamento — vendas futuras por dia (07/11/2026)
+
+### R-PLN-01 · Que linha da planilha é o quê: a tabela do dono
+- **Regra:** cada linha do relatório do ML cai num grupo da tabela §3-B da spec `PLANEJAMENTO-VENDAS-FUTURAS` (`planilha_estado.js`, dono único): **ainda na fábrica** (coleta do dia N, pronto para coleta, NF a emitir) é venda futura e média; **já saiu**, **entregue** e **pós-venda** (os 26 estados de devolução, reclamação, mediação e reembolso) só média; **cancelada** e **não é venda** (cabeçalho de pacote, Estado vazio) ficam fora. A data de envio: no Estado; no "Pronto para coleta", o dia da semana da Descrição a partir da data do relatório (segunda de uma segunda é o mesmo dia); na "NF a emitir", o dia seguinte, marcado **"data a confirmar"**.
+- **Por quê:** o comprometido deixava ~49 peças de hoje fora da tela azul, e o pós-venda saía da média sendo venda.
+- **Exceções:** **estado novo não trava** — conta como venda, como futura se trouxer "dia N de mês", e o import avisa o texto. Um estado novo com "cancel" é novo (conta), e não cancelada.
+- **Teste que trava:** `teste_vendas_futuras.js` (os 40 estados do relatório real de 07/11 nos grupos; 228 linhas · 239 peças futuras).
+- **Status:** em código desde 07/11/2026.
+
+### R-PLN-02 · Conta-se peça, pela coluna Unidades
+- **Regra:** o comprometido, a média e a falta por dia somam `venda_futura.unidades`. A linha de antes desta fase vale 1.
+- **Por quê:** a venda de 2 unidades valia 1.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `teste_vendas_futuras.js`.
+- **Status:** em código desde 07/11/2026.
+
+### R-PLN-03 · A falta acumulada por dia, e a Atrasada primeiro
+- **Regra:** `demanda_dominio.porDia` é a única conta: `falta até o dia D = max(0, vendas de hoje até D − estoque)`, com o estoque = o **saldo** (o mesmo da tela azul, §2). A primeira coluna é **Atrasada** (data já passada, ainda na fábrica pela planilha) e ela conta no comprometido. O horizonte é todo dia com venda futura. Sob medida fica fora da falta, contado à parte; SKU sem cadastro em linha própria. A aba e a tela azul dão o **mesmo** comprometido.
+- **Por quê:** a venda futura era um número só, e ninguém sabia o que era para segunda, terça, quarta.
+- **Exceções:** a linha de antes desta fase (sem `grupo`) só conta de hoje em diante, como sempre.
+- **Teste que trava:** `teste_vendas_futuras.js`.
+- **Status:** em código desde 07/11/2026.
+
+### R-PLN-04 · As janelas 7 · 14 · 30 · 45 são só para olhar
+- **Regra:** os botões da 401 trocam a janela **da tela** e mostram a média de cada SKU e a seta 14 contra 30. Não gravam na `config`. Janela maior que a história da planilha é cortada e dita em âmbar.
+- **Por quê:** decisão do dono — a produção não muda por um clique de análise.
+- **Exceções:** nenhuma.
+- **Teste que trava:** `teste_vendas_futuras.js`.
+- **Status:** em código desde 07/11/2026.
+
+### R-PLN-05 · O ritmo é o maior entre a média da janela e a de 14 dias
+- **Regra:** `ritmo = max(média de config.janela_media, média de config.janela_curta = 14)`; o alvo e a cobertura usam o ritmo. Quando a curta vence, a tela diz *"subindo: 6,3 → 8,9/dia"*.
+- **Por quê:** a média de 30 atrasava o SKU que acelera. A simulação nos 60 dias do relatório de 07/11 (`simular_ritmo.js`, 21 dias avaliados) deu, com a régua da produção, 2.005 → 1.386 peças faltando, com a sobra subindo de 2.091 para 3.232 — o preço decidido; com N dias cheios, 2.130 → 1.584.
+- **Exceções:** a queda **não** derruba o alvo antes dos 30 dias. Sob medida continua sem alvo (R-REV-04).
+- **Teste que trava:** `teste_vendas_futuras.js`.
+- **Status:** em código desde 07/11/2026; vale a partir do deploy.
+
 ## O que ainda não tem teste nesta área
 
 R-EST-04 (reimpressão não baixa), R-REV-01 (os três modos), R-REV-02 (SKU fora
-da lista), R-REV-03 (ordem da tela azul), R-REV-06 (peça com problema),
+da lista), R-REV-06 (peça com problema),
 R-EMB-05 (conferência no bipe 1) e as partes de tela de R-EST-11 e R-EST-17.
 Ficam aqui para virar trabalho, e não esquecimento.
 

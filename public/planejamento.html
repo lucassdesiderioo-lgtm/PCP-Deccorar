@@ -8,7 +8,7 @@
   .mark{width:34px;height:34px;border-radius:8px;background:var(--blue);display:grid;place-items:center;color:#04121f;font-weight:800}
   h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
   .links{margin-left:auto;display:flex;gap:8px}.link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
-  .wrap{max-width:1180px;margin:0 auto;padding:20px}
+  .wrap{max-width:1400px;margin:0 auto;padding:20px}
   .bar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
   .bar input[type=number]{width:66px;padding:9px;border-radius:8px;border:1px solid var(--line);background:#0b0f14;color:var(--txt);text-align:center}
   .bar button{border:0;border-radius:9px;font-weight:700;padding:11px 16px;cursor:pointer}
@@ -47,6 +47,31 @@
   .cmp td.code{white-space:normal}
   @media(max-width:500px){.cmp td.code{font-size:12px}.cmp th{font-size:10px}}
   .dpos{color:#7ee2a0}.dneg{color:#ffb4ae}
+  /* PLANEJAMENTO-VENDAS-FUTURAS: a aba por dia, as janelas e a chave da fase 4 */
+  .meta.velha{color:#ffd85c}
+  .vf{margin:0 0 22px}
+  .vf h2,.jn h2,.ord h2{font-size:15px;margin:0 0 4px}
+  .vf table{min-width:0}
+  .vf th,.vf td{padding:7px 8px}
+  .vf td.dcel{min-width:52px}
+  .vf .vn{font-weight:700;font-variant-numeric:tabular-nums}
+  .vf .vfal{font-size:11px;color:#ff8c84;font-weight:700}
+  .vf .vok{font-size:11px;color:var(--muted)}
+  .vf .conf{font-size:10px;color:#ffd85c}
+  .vf th.dia{min-width:52px}
+  .vf th.atr,.vf td.atr{background:#2a1414}
+  .vf tr.tot td{background:#11161d;font-weight:700}
+  .vf td.sk{position:sticky;left:0;background:var(--panel);z-index:1}
+  .vf .fdesde{color:#ff8c84;font-weight:700}
+  .vf .sem{color:var(--muted)}
+  .jn{margin:26px 0 22px}
+  .ord button.ghost{border:1px solid var(--line);border-radius:9px;padding:11px 16px;font-weight:700;cursor:pointer;color:var(--txt)}
+  .jbtn{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:700}
+  .jbtn.on{background:var(--blue);color:#04121f;border-color:var(--blue)}
+  .seta.sobe{color:#7ee2a0}.seta.desce{color:#ffb4ae}.seta.igual{color:var(--muted)}
+  .ord{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .ord .est{font-weight:800}.ord .est.lig{color:#7ee2a0}.ord .est.des{color:var(--muted)}
+  .subindo{color:#7ee2a0;font-size:11px}
   .apl{background:transparent;color:var(--blue);border:1px solid var(--line);border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}.apl:hover{border-color:var(--blue)}
 </style></head><body>
 <header><div class="mark">P</div>
@@ -87,6 +112,27 @@
   <div class="aviso" id="recorte" style="border-color:#8a5a12;background:#2e2008"></div>
   <div class="aviso" id="aviso"></div>
 
+  <!-- FASE 1: as vendas futuras por dia de envio, com a falta acumulada. So
+       leitura; a conta e do demanda_dominio.porDia (R1). -->
+  <div class="vf">
+    <h2>Vendas futuras por dia de envio</h2>
+    <div class="sub">O que já foi vendido e ainda não saiu da fábrica, por dia de envio. Embaixo de cada número,
+      a <b style="color:#e6edf3">falta acumulada</b>: o estoque cobre primeiro o dia mais cedo.
+      A coluna <b style="color:#ffb4ae">Atrasada</b> é venda com data já passada que a planilha ainda mostra na fábrica.</div>
+    <div class="meta" id="vfMeta" style="margin-top:8px"></div>
+    <div class="tbwrap"><table id="vfTab"><tbody><tr><td class="dim" style="text-align:center;padding:18px">carregando…</td></tr></tbody></table></div>
+    <div class="sub" id="vfExtra" style="margin-top:8px"></div>
+  </div>
+
+  <!-- FASE 4: a ordem da tela azul pela data da falta. Nasce desligada; so o
+       nivel Admin Geral liga (o servidor confere). -->
+  <div class="ord">
+    <div><h2>Ordem da tela azul</h2>
+      <div class="sub" id="ordTxt">—</div></div>
+    <button class="ghost" id="ordBtn" style="margin-left:auto">—</button>
+    <span class="msg" id="ordMsg"></span>
+  </div>
+
   <div class="bar">
     <span class="sub">Dias de cobertura</span>
     <input type="number" id="diasCob" min="1" value="10">
@@ -94,6 +140,9 @@
     <input type="number" id="janela" min="1" value="30">
     <span class="sub">dias · Alvo mínimo</span>
     <input type="number" id="alvoMin" min="0" value="2">
+    <span class="sub">· Janela curta do ritmo</span>
+    <input type="number" id="janCurta" min="1" value="14">
+    <span class="sub">dias</span>
     <button class="ghost" onclick="salvarConfig()">recalcular</button>
     <span class="msg" id="msgCfg"></span>
     <span class="tot">Precisa (total): <b id="totPrecisa">0</b> peças</span>
@@ -111,6 +160,20 @@
   <div style="margin-top:10px"><button class="ghost" id="verTodos" style="font-size:12px">ver todos os SKUs</button></div>
   <div style="margin-top:12px"><button class="prim" onclick="aplicarTodos()">Aplicar alvo em todos (com venda na janela)</button>
     <span class="sub" style="margin-left:8px">grava o alvo sugerido nos SKUs que tiveram venda na janela</span></div>
+
+  <!-- FASE 2: as janelas 7 · 14 · 30 · 45 dias, SO PARA OLHAR (R9): trocar a
+       janela aqui nao muda a producao nem a config. -->
+  <div class="jn cmp">
+    <h2>Média por janela — só para olhar</h2>
+    <div class="sub">Trocar a janela aqui <b style="color:#e6edf3">não muda a produção</b>: ela continua com a janela de
+      <b id="jnProd" style="color:#e6edf3">30</b> dias e o ritmo da janela curta. A seta compara a média de 14 com a de 30 dias.</div>
+    <div style="display:flex;gap:8px;margin:10px 0" id="jnBtns"></div>
+    <div class="aviso" id="jnAviso"></div>
+    <div class="tbwrap"><table>
+      <thead><tr class="cols"><th class="l">SKU</th><th id="jnCab">Média</th><th>Vendas</th><th>14 × 30</th></tr></thead>
+      <tbody id="jnCorpo"><tr><td colspan="4" class="dim" style="text-align:center;padding:18px">carregando…</td></tr></tbody>
+    </table></div>
+  </div>
 
   <!-- VENDAS-E-MEDIA, fase 1: a media contada pelo sistema, AO LADO da planilha.
        So conferencia: a tabela de cima, a tela azul e a compra continuam lendo a
@@ -144,6 +207,9 @@
 <script>
 const $=s=>document.querySelector(s);
 function fmt(v){ return v==null?'—':v; }
+const dec1=v=>(Math.round(v*10)/10).toFixed(1).replace('.',',');
+const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dataBr=d=>d?d.slice(8,10)+'/'+d.slice(5,7):'';
 
 async function fechamento(){
   let f; try{ f=await (await fetch('/api/fechamento')).json(); }catch(e){ return; }
@@ -167,11 +233,24 @@ async function load(){
   $('#diasCob').value=d.config.dias_cobertura;
   $('#janela').value=d.config.janela_media;
   $('#alvoMin').value=d.config.alvo_minimo;
+  $('#janCurta').value=d.config.janela_curta;
+  ORDEM=d.config.ordem_por_falta===1; desenharOrdem();
   $('#totPrecisa').textContent=d.total_precisa;
 
+  /* R8: quando foi a ultima planilha — ambar se nao foi enviada hoje. */
+  const pl=d.planilha||{};
+  const quando=pl.relatorio_em||(pl.importado_em||'').slice(0,16);
+  if(quando){
+    const hora=quando.slice(11,16);
+    const frase = pl.de_hoje ? 'Planilha enviada hoje às '+hora
+      : 'Planilha de '+dataBr(quando.slice(0,10))+' às '+hora+' — não foi enviada hoje';
+    $('#vfMeta').innerHTML='<b>'+frase+'</b>'+(pl.relatorio_em?' (hora do relatório do ML)':'');
+    $('#vfMeta').className='meta'+(pl.de_hoje?'':' velha');
+  } else { $('#vfMeta').textContent='Nenhuma planilha importada ainda.'; $('#vfMeta').className='meta velha'; }
   if(d.importado_em){
     $('#meta').innerHTML='Última importação: <b style="color:#e6edf3">'+d.importado_em+'</b> · '
       +d.total_linhas+' vendas na base · '+d.total_skus+' SKUs · comprometido total: '+d.total_comprometido+' peças';
+    $('#meta').className='meta';
   } else {
     $('#meta').textContent='Nenhuma planilha importada ainda. Os números novos só aparecem após a primeira importação.';
   }
@@ -212,6 +291,14 @@ function desenhar(){
   } else {
     let h='', degrauAtual=null;
     for(const r of mostrar){
+      /* Com a ordem pela falta LIGADA, a lista nao segue os degraus: um
+         cabecalho so, e cada linha diz o porque no proprio motivo. */
+      if(ORDEM){
+        if(degrauAtual===null){ degrauAtual='falta';
+          h+='<tr class="deg"><td colspan="8" style="border-left:3px solid #4493f8;color:#4493f8">Pela data da falta — a mais cedo primeiro</td></tr>'; }
+        if(r.prioridade===0 && degrauAtual!=='alvo'){ degrauAtual='alvo';
+          h+='<tr class="deg"><td colspan="8" style="border-left:3px solid #2f3a48;color:var(--muted)">No alvo — nada a produzir</td></tr>'; }
+      } else
       if(r.prioridade!==degrauAtual){
         degrauAtual=r.prioridade;
         const g=DEGRAUS[r.prioridade];
@@ -230,7 +317,7 @@ function desenhar(){
       h+=`<tr>
         <td class="l code">${r.codigo}${r.cadastrado?'':' <span class="novoSku">s/ cadastro</span>'}
             ${r.motivo?`<div class="dim" style="font-size:11px;font-family:system-ui">${r.motivo}</div>`:''}</td>
-        <td>${r.vendas_janela}<div class="dim" style="font-size:11px">${r.media_dia}/d</div></td>
+        <td>${r.vendas_janela}<div class="dim" style="font-size:11px">${r.media_dia}/d</div>${r.subindo?`<div class="subindo">subindo: ${dec1(r.media_dia)} → ${dec1(r.media_curta)}/dia</div>`:''}</td>
         <td>${comp}</td>
         <td>${fmt(r.estoque)}</td>
         <td>${cob}</td>
@@ -282,8 +369,13 @@ async function importar(confirmar){
     if(r.erro){ $('#msgImp').style.color='#f85149'; $('#msgImp').textContent='erro: '+r.erro; return; }
     $('#msgImp').style.color='#2ea043';
     $('#msgImp').textContent=`${r.futuras} futuras no arquivo · ${r.novas} novas · ${r.atualizadas} atualizadas · ${r.removidas} futuras saíram`
-      +(r.canceladas?` · ${r.canceladas} fora da média (cancel./devol.)`:'')
+      +(r.canceladas?` · ${r.canceladas} fora da média (canceladas ou não são venda)`:'')
+      +(r.atrasadas_sairam?` · ${r.atrasadas_sairam} atrasadas não vieram e passaram a "já saiu"`:'')
       +(r.sem_sku?` · ${r.sem_sku} sem SKU`:'');
+    /* O resumo pela tabela §3-B, e o aviso do estado novo (nao trava). */
+    const G=r.grupos||{}, NM={fabrica:'na fábrica',saiu:'já saíram',entregue:'entregues',pos_venda:'pós-venda',cancelada:'canceladas',nao_venda:'não são venda',novo:'estado novo'};
+    const gs=Object.keys(NM).filter(k=>G[k]&&G[k].linhas).map(k=>G[k].linhas+' '+NM[k]+(k==='nao_venda'?'':' ('+G[k].pecas+' pç)'));
+    if(gs.length) $('#msgImp').textContent+=' · '+gs.join(' · ');
     /* O QUE O IMPORT FEZ COM OS VOLUMES CANCELADOS (fase 2). Cada estagio tem a
        sua frase, porque cada um pede uma coisa diferente de quem le. */
     const c=r.canceladas_volumes||{}, rec=$('#recorte'), l=[];
@@ -296,17 +388,21 @@ async function importar(confirmar){
       +': separe e confira em Admin → Pendências → <i>Canceladas depois da etiqueta</i>. O estoque delas <b>não volta sozinho</b>.');
     if(c.varias) l.push('<b>'+q(c.varias,'caixa de várias persianas tem','caixas de várias persianas têm')+' um item cancelado</b> — '
       +(c.varias===1?'ela não foi cancelada':'elas não foram canceladas')+', porque o cliente ainda quer o resto; confira no mesmo card.');
+    if(r.estados_novos&&r.estados_novos.length)
+      l.push('<b>Estado novo na planilha</b> (contou como venda'+'; e como futura, se trouxe data): '
+        +r.estados_novos.map(x=>'"'+esc(x.estado)+'" ('+x.linhas+')').join(' · '));
     if(l.length){ rec.style.display='block'; rec.innerHTML=l.join('<br>'); }
     else rec.style.display='none';
-    load(); fechamento(); comparar();
+    load(); fechamento(); comparar(); futuras(); janelas();
   }catch(e){ $('#msgImp').style.color='#f85149'; $('#msgImp').textContent='falha: '+e; }
 }
 
 async function salvarConfig(){
-  const body={dias_cobertura:+$('#diasCob').value||10, janela_media:+$('#janela').value||30, alvo_minimo:+$('#alvoMin').value||0};
+  const body={dias_cobertura:+$('#diasCob').value||10, janela_media:+$('#janela').value||30, alvo_minimo:+$('#alvoMin').value||0,
+    janela_curta:+$('#janCurta').value||14};
   await fetch('/api/planejamento/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   $('#msgCfg').textContent='recalculado'; setTimeout(()=>$('#msgCfg').textContent='',2000);
-  load(); fechamento(); comparar();
+  load(); fechamento(); comparar(); futuras(); janelas();
 }
 /* A tabela da comparacao. Mostra os 12 maiores desvios; o resto a um clique —
    lista cheia de "igual" ensina a passar o olho por cima de onde importa. */
@@ -364,7 +460,78 @@ function desenharCmp(){
 document.addEventListener('click',function(e){
   if(e.target.id==='cmpTodos'){ CMPTODOS=!CMPTODOS; desenharCmp(); }
 });
-load(); fechamento(); comparar();
+/* ── FASE 1: a aba por dia ─────────────────────────────────────────────── */
+async function futuras(){
+  let d; try{ d=await (await fetch('/api/planejamento/futuras')).json(); }catch(e){ d=null; }
+  const tab=$('#vfTab');
+  if(!d||!d.ok){ tab.innerHTML='<tbody><tr><td class="dim" style="padding:18px">Não foi possível carregar as vendas futuras.</td></tr></tbody>'; return; }
+  if(!d.dias.length){ tab.innerHTML='<tbody><tr><td class="dim" style="padding:18px">Nenhuma venda futura na planilha.</td></tr></tbody>'; $('#vfExtra').textContent=''; return; }
+  const cl=x=>x.dia==='atrasada'?' atr':'';
+  let h='<thead><tr class="cols"><th class="l">SKU</th><th>Estoque</th><th>Total</th><th class="l">Falta a partir de</th>'
+    +d.dias.map(x=>'<th class="dia'+cl(x)+'">'+x.rotulo+'</th>').join('')+'</tr></thead><tbody>';
+  for(const l of d.linhas){
+    /* Dia sem venda do SKU mostra so o ponto: a falta acumulada nao muda ali, e
+       repetir "falta 28" em vinte colunas escondia os dias que importam. */
+    h+='<tr><td class="l code sk">'+esc(l.codigo)+'</td><td>'+l.estoque+'</td><td><b>'+l.total+'</b></td>'
+      +'<td class="l">'+(l.falta_desde?'<span class="fdesde">'+l.falta_desde_rotulo+'</span> <span class="dim">· falta '+l.falta_total+'</span>':'<span class="sem">estoque cobre</span>')+'</td>'
+      +l.celulas.map((c,i)=>'<td class="dcel'+cl(d.dias[i])+'">'+(c.vendas?'<div class="vn">'+c.vendas+'</div>'
+          +(c.falta?'<div class="vfal">falta '+c.falta+'</div>':'<div class="vok">ok</div>')
+          +(c.confirmar?'<div class="conf">'+c.confirmar+' data a confirmar</div>':''):'<span class="dim">·</span>')+'</td>').join('')+'</tr>';
+  }
+  h+='<tr class="tot"><td class="l sk">Total da fábrica</td><td></td><td>'+d.linhas.reduce((a,l)=>a+l.total,0)+'</td><td class="l dim">vendas · falta</td>'
+    +d.dias.map(x=>{ const t=d.total[x.dia]; return '<td class="'+cl(x).trim()+'">'+t.vendas+(t.falta?'<div class="vfal">falta '+t.falta+'</div>':'')+'</td>'; }).join('')+'</tr></tbody>';
+  tab.innerHTML=h;
+  const ex=[];
+  const lista=a=>a.map(x=>esc(x.codigo)+' ('+x.total+')').join(' · ');
+  if(d.sob_medida.length) ex.push('<b style="color:#e6edf3">Sob medida, fora da falta</b> (não tem estoque): '+lista(d.sob_medida));
+  if(d.sem_cadastro.length) ex.push('<b style="color:#ffb4ae">Sem cadastro</b> (cadastre para entrar na conta): '+lista(d.sem_cadastro));
+  $('#vfExtra').innerHTML=ex.join('<br>');
+}
+
+/* ── FASE 2: as janelas, só para olhar ───────────────────────────────── */
+let JN=null, JSEL=30;
+async function janelas(){
+  try{ JN=await (await fetch('/api/planejamento/janelas')).json(); }catch(e){ JN=null; }
+  desenharJn();
+}
+function desenharJn(){
+  if(!JN||!JN.ok){ $('#jnCorpo').innerHTML='<tr><td colspan="4" class="dim" style="text-align:center;padding:18px">Não foi possível carregar.</td></tr>'; return; }
+  $('#jnProd').textContent=JN.janela_producao;
+  $('#jnBtns').innerHTML=JN.janelas.map(j=>'<button class="jbtn'+(j.dias===JSEL?' on':'')+'" data-jn="'+j.dias+'">'+j.dias+' dias</button>').join('');
+  const j=JN.janelas.find(x=>x.dias===JSEL);
+  const av=$('#jnAviso');
+  if(j&&j.cortada){ av.style.display='block';
+    av.innerHTML='<b>⚠ Média de '+j.usada+' dia'+(j.usada===1?'':'s')+', não '+j.dias+'.</b> A planilha começa em '
+      +JN.primeiro.split('-').reverse().join('/')+' — antes disso não há venda para contar.'; }
+  else av.style.display='none';
+  $('#jnCab').textContent='Média de '+JSEL+' dias';
+  const L=(JN.linhas||[]).slice().sort((a,b)=>b.medias[JSEL].media-a.medias[JSEL].media||a.codigo.localeCompare(b.codigo));
+  const SETA={sobe:'↑ subindo',desce:'↓ caindo',igual:'= igual'};
+  $('#jnCorpo').innerHTML=L.length?L.map(l=>'<tr><td class="l code">'+esc(l.codigo)+'</td><td><b>'+dec(l.medias[JSEL].media)+'</b><span class="dim">/d</span></td>'
+    +'<td>'+l.medias[JSEL].vendas+'</td><td><span class="seta '+l.tendencia+'">'+SETA[l.tendencia]+'</span> <span class="dim" style="font-size:11px">'
+    +dec(l.medias[14].media)+' × '+dec(l.medias[30].media)+'</span></td></tr>').join('')
+    :'<tr><td colspan="4" class="dim" style="text-align:center;padding:18px">Nenhuma venda na planilha.</td></tr>';
+}
+document.addEventListener('click',function(e){ const b=e.target.closest('[data-jn]'); if(b){ JSEL=+b.getAttribute('data-jn'); desenharJn(); } });
+
+/* ── FASE 4: a chave da ordem pela data da falta ─────────────────────── */
+let ORDEM=false;
+function desenharOrdem(){
+  $('#ordTxt').innerHTML = ORDEM
+    ? '<span class="est lig">Pela data da falta — LIGADA.</span> A primeira linha é a peça que falta mais cedo: venda feita antes de reposição no mesmo dia. Cada linha diz o porquê.'
+    : '<span class="est des">Pelos degraus de sempre — DESLIGADA.</span> Ligar faz a tela azul ordenar pela data em que a peça vai faltar. Só o nível Admin Geral liga.';
+  $('#ordBtn').textContent = ORDEM ? 'Desligar' : 'Ligar a ordem pela falta';
+}
+$('#ordBtn').addEventListener('click', async function(){
+  const quer = !ORDEM;
+  if(quer && !confirm('Ligar a ordem pela data da falta?\n\nA tela azul da revisão passa a mostrar primeiro a peça que falta mais cedo.')) return;
+  let r; try{ r=await (await fetch('/api/planejamento/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ordem_por_falta:quer?1:0})})).json(); }catch(e){ r={erro:String(e)}; }
+  if(r.erro||!r.ok){ $('#ordMsg').style.color='#f85149'; $('#ordMsg').textContent=r.erro||'não deu para gravar'; return; }
+  $('#ordMsg').style.color='#2ea043'; $('#ordMsg').textContent=quer?'ligada':'desligada'; setTimeout(()=>$('#ordMsg').textContent='',2500);
+  load();
+});
+
+load(); fechamento(); comparar(); futuras(); janelas();
 </script>
 <script src="/nav.js"></script>
 </body></html>

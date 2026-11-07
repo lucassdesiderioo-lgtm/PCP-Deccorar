@@ -102,6 +102,12 @@ const app = {
   use:()=>{}, locals:{}
 };
 require('./plan_route')(app, db);    // cria venda_futura, fechamento e config
+/* A fase 3 da PLANEJAMENTO-VENDAS-FUTURAS (07/11/2026) faz o ritmo ser o maior
+   entre a media da janela e a da janela curta. Este teste trava que a aba, a
+   tela azul e a TV dao a MESMA conta, e nao o ritmo: com a janela curta igual
+   a janela, ritmo = media, e os numeros daqui ficam os de sempre. O ritmo tem
+   teste proprio em teste_vendas_futuras.js. */
+db.prepare("INSERT OR REPLACE INTO config (chave,valor) VALUES ('janela_curta','30')").run();
 require('./est_route')(app, db);
 require('./painel_route')(app, db);  // a TV do chao de fabrica
 require('./ger_route')(app, db);     // o gerencial

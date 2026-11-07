@@ -199,7 +199,11 @@ const vol = (buyer, estagio, campos) => {
   ok('o item cancelado de um pacote de vários produtos acha a caixa pelo CABEÇALHO', l.estagio === 'pendente'
      && l.cancelada_varias === 1 && !l.cancelada_em, l);
   ok('devolução/reembolso NÃO cancela volume', lote(devol).estagio === 'pendente' && !lote(devol).cancelada_em, lote(devol));
-  ok('...mas continua fora da média da planilha', vf('2000018100000008') && vf('2000018100000008').cancelada === 1);
+  /* Ate 07/11/2026 a devolucao ficava fora da media. Desde a PLANEJAMENTO-
+     VENDAS-FUTURAS (decisao do dono, §3-B, A4) ela ENTRA: o cliente comprou e a
+     peca saiu. Continua sem cancelar volume (o caso de cima). */
+  ok('...e ENTRA na média da planilha (pós-venda é venda, §3-B)', vf('2000018100000008') && vf('2000018100000008').cancelada === 0
+     && vf('2000018100000008').grupo === 'pos_venda', vf('2000018100000008'));
   ok('volume sem cancelamento não se mexe', lote(vivo).estagio === 'pendente' && !lote(vivo).cancelada_em);
 
   // pend, bloq, emb e canto (BK140140BEGE) cancelados; o de varias e o do pacote NAO

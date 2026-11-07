@@ -122,12 +122,10 @@ function cobertura(db, janela){
   const j = Math.max(1, Math.trunc(+janela) || 30);
   const estoque_total = db.prepare("SELECT COALESCE(SUM(estoque),0) t FROM skus").get().t;
   let vendas_janela = 0;
-  try{
-    vendas_janela = db.prepare("SELECT COUNT(*) n FROM venda_futura "+
-      "WHERE data_venda IS NOT NULL AND COALESCE(cancelada,0)=0 "+
-      "AND data_venda >= date('now','localtime','-'||?||' days') "+
-      "AND COALESCE(teste,0)=0").get(j).n;
-  }catch(e){}
+  /* A MEDIA E A DO demanda_dominio (R1 da PLANEJAMENTO-VENDAS-FUTURAS,
+     07/11/2026): ate aqui esta era uma segunda conta, que contava LINHA onde a
+     producao passou a contar PECA. */
+  try{ vendas_janela = require('./demanda_dominio').vendasTotal(db, j); }catch(e){}
   const media_dia_total = vendas_janela / j;
   /* Sem venda na janela a cobertura e NULL, nunca infinito nem zero: os dois
      seriam numeros, e numero errado numa tela e pior que traco. */
