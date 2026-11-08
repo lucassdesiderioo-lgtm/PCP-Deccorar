@@ -50,6 +50,8 @@ const ETAPAS = [
         "UNION ALL SELECT por3_id, substr(em3,1,10) FROM inventario_item WHERE por3_id IS NOT NULL AND COALESCE(teste,0)=0 AND substr(em3,1,10) BETWEEN ? AND ?" }
 ];
 
+const MINIMO_SEM_NOME = 3;
+
 /* As linhas de uma etapa no período. Tabela ou coluna que não existe (banco
    antigo, módulo que não subiu) devolve vazio — e a etapa diz "sem registro". */
 function linhas(db, E, de, ate){
@@ -93,8 +95,13 @@ function daEquipe(db, de, ate, comNome){
     ls.forEach(l => { const k = +l.u; if(!por.has(k)) por.set(k, []); por.get(k).push(l); });
     const pessoas = Array.from(por, ([u, lp]) => Object.assign({ u }, resumoEtapa(E, lp)));
     const qtds = pessoas.map(p => p.qtd);
+    /* SEM NOME, COM MENOS DE 3 PESSOAS NA ETAPA, SÓ O TOTAL (③ REVISÃO): com
+       uma pessoa o "maior" é o número dela; com duas, o menor e o maior são os
+       dois. Quem conhece o posto sabe quem é — e "sem identificar quem" é a
+       chave `produtividade.equipe`. Com nome, a lista vai inteira. */
+    const mostra = comNome || pessoas.length >= MINIMO_SEM_NOME;
     const o = { chave:E.chave, nome:E.nome, total:ls.length, pessoas:pessoas.length,
-                por_pessoa: pessoas.length ? { menor:Math.min(...qtds), mediana:mediana(qtds), maior:Math.max(...qtds) } : null };
+                por_pessoa: pessoas.length && mostra ? { menor:Math.min(...qtds), mediana:mediana(qtds), maior:Math.max(...qtds) } : null };
     if(E.tempo){ const t = ls.map(l => +l.s).filter(s => s > 0); o.tempo_mediana = mediana(t); }
     if(comNome) o.lista = pessoas.map(p => ({ id:p.u, nome:nomes[p.u] || ('pessoa #' + p.u), qtd:p.qtd,
         tempo_mediana:p.tempo_mediana != null ? p.tempo_mediana : undefined, tempo_maior:p.tempo_maior != null ? p.tempo_maior : undefined }))

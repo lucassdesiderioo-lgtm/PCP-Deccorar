@@ -88,7 +88,11 @@ function desdeDe(db){
    ela puxaria a régua para perto de si. A média só usa as semanas com
    registro, e diz de quantas é. */
 function semana(db, domingo){
-  const fim = (domingo && ISO.test(domingo)) ? domingoAte(domingo) : ultimoDomingo(db);
+  /* Só semana que ACABOU (③ REVISÃO): a que está em andamento, ou no futuro,
+     sairia com zeros que parecem fato. Pedida, volta para a última completa. */
+  const ult = ultimoDomingo(db);
+  let fim = (domingo && ISO.test(domingo)) ? domingoAte(domingo) : ult;
+  if(fim > ult) fim = ult;
   const desde = desdeDe(db);
   const semanas = [0, 1, 2, 3, 4].map(k => numerosDaSemana(db, mais(fim, -6 - 7 * k), mais(fim, -7 * k), desde));
   const CAMPOS = ['vendas', 'devolucoes', 'taxa_devolucao', 'item_faltante', 'embaladas', 'saiu', 'despacho_no_prazo_pct'];
@@ -98,7 +102,7 @@ function semana(db, domingo){
     media[c] = v.length ? { media:Math.round(v.reduce((a, x) => a + x, 0) / v.length * 10) / 10, semanas:v.length } : null;
   });
   return { semana:semanas[0], anterior:semanas[1], media4:media, semanas, desde,
-           hoje:hojeDe(db), proxima: mais(fim, 7) <= hojeDe(db) ? mais(fim, 7) : null, anterior_domingo:mais(fim, -7) };
+           hoje:hojeDe(db), proxima: mais(fim, 7) <= ult ? mais(fim, 7) : null, anterior_domingo:mais(fim, -7) };
 }
 
 /* VENDAS (fase 2): o mês a mês com o crescimento, os SKUs, as cores e as
@@ -117,8 +121,14 @@ function vendas(db, de, ate){
     const o = { mes:m.mes, pecas:m.pecas, vs_mes_anterior: porMes[ant] != null ? cresc(m.pecas, porMes[ant]) : null,
                 vs_ano_anterior: porMes[anoAnt] != null ? cresc(m.pecas, porMes[anoAnt]) : null };
     if(m.mes === mesHoje){
+      /* O MÊS PELA METADE NÃO SE COMPARA COM O MÊS CHEIO (③ REVISÃO): 8 dias
+         de novembro contra outubro inteiro dariam "−70%" em vermelho na tabela
+         da reunião. A comparação do mês corrente usa a PROJEÇÃO, e diz isso. */
       const diaN = +hoje.slice(8, 10), total = +fimDoMes(m.mes).slice(8, 10);
       o.parcial = true; o.ate_dia = diaN; o.projecao = Math.round(m.pecas / diaN * total);
+      o.crescimento_pela_projecao = true;
+      o.vs_mes_anterior = porMes[ant] != null ? cresc(o.projecao, porMes[ant]) : null;
+      o.vs_ano_anterior = porMes[anoAnt] != null ? cresc(o.projecao, porMes[anoAnt]) : null;
     }
     return o;
   });

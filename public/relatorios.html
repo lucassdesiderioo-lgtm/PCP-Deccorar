@@ -162,7 +162,7 @@
   <!-- ═════════ ESTOQUE (fase 4) ═════════ -->
   <section id="secEstoque" hidden>
     <div class="duas">
-      <div class="card"><h3>Falta de estoque: peças que viraram urgência</h3>
+      <div class="card"><h3>Falta de estoque: peças em urgência no último PDF de cada dia</h3>
         <canvas id="esGraf" height="120"></canvas><div class="nota" id="esUrgNota"></div></div>
       <div class="card"><h3>Os SKUs que mais faltaram</h3><div class="rola"><table><thead><tr><th>SKU</th><th>Peças</th><th>Dias</th></tr></thead><tbody id="esSkus"></tbody></table></div></div>
       <div class="card"><h3>Acerto do inventário (1ª contagem)</h3><div class="rola"><table><thead><tr><th>Mês</th><th>Contados</th><th>Certos</th><th>Acerto</th></tr></thead><tbody id="esAcur"></tbody></table></div></div>
@@ -290,8 +290,8 @@ const cres=v=>v==null?'—':'<span class="'+(v>0?'sobe':(v<0?'desce':'igual'))+'
 async function vendas(){
   const d=await pegar('/api/rel/vendas'+qsP());
   if(!d){ $('#vMeses').innerHTML=vazio(4,'Não consegui carregar.'); return; }
-  $('#vMeses').innerHTML = d.meses.length ? d.meses.slice().reverse().map(m=>'<tr><td>'+mesBr(m.mes)+(m.parcial?' <span class="sub">(até dia '+m.ate_dia+' · projeção '+nf(m.projecao)+')</span>':'')+'</td><td>'+nf(m.pecas)+'</td><td>'+cres(m.vs_mes_anterior)+'</td><td>'+cres(m.vs_ano_anterior)+'</td></tr>').join('') : vazio(4,'Nenhuma venda importada.');
-  $('#vNota').textContent='Pela data da venda, da planilha do ML importada na tela Planejamento'+(d.desde?' (desde '+dBrAno(d.desde)+')':'')+'. A venda cancelada fica fora; o pós-venda entra. O mês de hoje é parcial: a projeção segue o ritmo do mês até agora.';
+  $('#vMeses').innerHTML = d.meses.length ? d.meses.slice().reverse().map(m=>'<tr><td>'+mesBr(m.mes)+(m.parcial?' <span class="sub">(até dia '+m.ate_dia+' · projeção '+nf(m.projecao)+')</span>':'')+'</td><td>'+nf(m.pecas)+'</td><td>'+cres(m.vs_mes_anterior)+(m.crescimento_pela_projecao&&m.vs_mes_anterior!=null?' <span class="sub">pela projeção</span>':'')+'</td><td>'+cres(m.vs_ano_anterior)+(m.crescimento_pela_projecao&&m.vs_ano_anterior!=null?' <span class="sub">pela projeção</span>':'')+'</td></tr>').join('') : vazio(4,'Nenhuma venda importada.');
+  $('#vNota').textContent='Pela data da venda, da planilha do ML importada na tela Planejamento'+(d.desde?' (desde '+dBrAno(d.desde)+')':'')+'. A venda cancelada fica fora; o pós-venda entra. O mês de hoje é parcial: a projeção segue o ritmo do mês até agora, e a comparação dele é pela projeção.';
   grafico('vGraf',{type:'bar',data:{labels:d.meses.map(m=>mesBr(m.mes)),datasets:[{label:'Peças vendidas',data:d.meses.map(m=>m.pecas),backgroundColor:d.meses.map(m=>m.parcial?'#2a4f80':'#4493f8')}]}});
   const tot=d.periodo.total||0, p=n=>tot?pctTxt(Math.round(n/tot*1000)/10):'—';
   $('#vSkus').innerHTML = d.periodo.top_skus.length ? d.periodo.top_skus.map(s=>'<tr><td class="code">'+esc(s.codigo)+'</td><td>'+nf(s.pecas)+'</td><td>'+p(s.pecas)+'</td></tr>').join('') : vazio(3);
@@ -386,9 +386,9 @@ async function estoque(){
   if(!d){ $('#esSkus').innerHTML=vazio(3,'Não consegui carregar.'); return; }
   const u=d.urgencia;
   grafico('esGraf',{type:'bar',data:{labels:u.dias.map(x=>dBr(x.data)),datasets:[{label:'Peças que viraram urgência',data:u.dias.map(x=>x.pecas),backgroundColor:'#ffb800'}]}});
-  $('#esUrgNota').textContent='A venda que chegou no PDF sem peça pronta vira urgência na tela de Revisão.'+(u.desde?' Registro desde '+dBrAno(u.desde)+'.':' Sem registro ainda.');
+  $('#esUrgNota').textContent='A venda que chegou no PDF sem peça pronta vira urgência na tela de Revisão. Cada dia mostra o que ainda era urgência no último PDF subido nele: a urgência da manhã resolvida antes do PDF da tarde não aparece.'+(u.desde?' Registro desde '+dBrAno(u.desde)+'.':' Sem registro ainda.');
   $('#esSkus').innerHTML = u.skus.length ? u.skus.map(s=>'<tr><td class="code">'+esc(s.codigo)+'</td><td>'+nf(s.pecas)+'</td><td>'+nf(s.dias)+'</td></tr>').join('') : vazio(3);
-  $('#esAcur').innerHTML = d.acuracidade.slice().reverse().map(a=>'<tr><td>'+mesBr(a.mes)+'</td><td>'+nf(a.contados)+'</td><td>'+nf(a.certos)+'</td><td>'+(a.pct==null?'—':pctTxt(a.pct))+'</td></tr>').join('');
+  $('#esAcur').innerHTML = d.acuracidade.slice().reverse().map(a=>'<tr><td>'+mesBr(a.mes)+'</td>'+(a.contados?'<td>'+nf(a.contados)+'</td><td>'+nf(a.certos)+'</td><td>'+(a.pct==null?'—':pctTxt(a.pct))+'</td>':'<td colspan="3" style="color:var(--muted)">sem contagem</td>')+'</tr>').join('');
   const p=d.pendencias;
   $('#esPend').innerHTML = p.dias.length ? p.dias.slice().reverse().map(x=>'<tr><td>'+dBrAno(x.data)+'</td><td>'+nf(x.total)+'</td><td>'+nf(x.bloqueados)+'</td><td>'+nf(x.sem_etiqueta)+'</td></tr>').join('') : vazio(4,'Sem registro no período.');
   $('#esPendNota').textContent='O número de cada dia é o último que a central de Pendências mostrou nele.'+(p.desde?' Registro desde '+dBrAno(p.desde)+'.':' O registro começa no dia em que esta tela subiu.');
@@ -425,14 +425,15 @@ async function pessoas(){
   } else {
     $('#peCorpo').innerHTML = '<div class="rola"><table><thead><tr><th>Etapa</th><th>Total</th><th>Pessoas</th><th>Menor</th><th>Mediana</th><th>Maior</th><th>Tempo (mediana)</th></tr></thead><tbody>'
       + d.etapas.filter(e=>!e.sem_registro).map(e=>'<tr><td>'+esc(e.nome)+'</td><td>'+nf(e.total)+'</td><td>'+nf(e.pessoas)+'</td><td>'+(e.por_pessoa?nf(e.por_pessoa.menor):'—')+'</td><td>'+(e.por_pessoa?nf(e.por_pessoa.mediana):'—')+'</td><td>'+(e.por_pessoa?nf(e.por_pessoa.maior):'—')+'</td><td>'+tempo(e)+'</td></tr>').join('')
-      + '</tbody></table></div><div class="nota">Menor, mediana e maior são de quanto cada pessoa fez no período.</div>';
+      + '</tbody></table></div><div class="nota">Menor, mediana e maior são de quanto cada pessoa fez no período. Na etapa feita por menos de 3 pessoas aparece só o total — senão o número seria o de alguém.</div>';
   }
 }
 
 /* ═════════ SOB MEDIDA (a rota dos indicadores de lá) ═════════ */
 async function sobmedida(){
-  const d=await pegar('/sobmedida/api/indicadores?dias=30');
+  let d=await pegar('/sobmedida/api/indicadores?dias=30');
   if(!d){ $('#smTiles').innerHTML='<div class="vazio">Não consegui carregar os indicadores do sob medida.</div>'; return; }
+  if(d.dados) d=d.dados;   // o sob medida responde no envelope {ok, dados} (R-SML; o ui.js de lá desembrulha)
   const t=(nome,v,extra)=>'<div class="tile"><div class="t">'+nome+'</div>'+(v==null?'<div class="v sem">sem registro</div>':'<div class="v">'+v+'</div>')+(extra?'<div class="c">'+extra+'</div>':'')+'</div>';
   const pr=d.prazo||{}, es=d.esforco||{}, ap=d.aprovacao||{}, pa=d.parados||{}, re=d.recusas||{};
   $('#smTiles').innerHTML =

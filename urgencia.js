@@ -63,9 +63,10 @@ function aplicar(db){
 }
 
 /* A FALTA DE ESTOQUE NO RELATORIO (RELATORIOS-UNIFICADOS, 08/11/2026): as
-   pecas que a urgencia do PDF mandou produzir em cada dia — a venda que chegou
-   sem peca pronta. O `aplicar` regrava o dia de hoje inteiro a cada upload,
-   entao o dia passado guarda o ultimo retrato dele. */
+   pecas que a urgencia do PDF mandava produzir em cada dia. ⚠️ E O RETRATO DO
+   ULTIMO PDF DO DIA, e nao a soma do dia: o `aplicar` apaga as ordens `ml` de
+   hoje e refaz pela conta de agora (R-URG-02), entao a urgencia da manha que
+   a fabrica ja resolveu antes do PDF da tarde nao aparece. A tela diz isso. */
 function porDia(db, de, ate){
   const m = {};
   db.prepare("SELECT data d, SUM(qtd) q FROM producao WHERE origem='ml' AND urgente=1 AND COALESCE(teste,0)=0 "+

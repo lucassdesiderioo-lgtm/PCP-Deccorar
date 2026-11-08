@@ -176,14 +176,19 @@ const chavesDe = (o, acc = []) => { if(o && typeof o === 'object') for(const k o
   PERMS[21] = new Set(['produtividade.equipe', 'produtividade.nominal']);
   const pe = await chamar('GET /api/rel/pessoas', { de: S(-6), ate: D }, { id:20, nome:'Sup' });
   const revE = pe.etapas.find(e => e.chave === 'revisao');
-  ok('a equipe: total, quantas pessoas, e menor/mediana/maior por pessoa', revE.total === 3 && revE.pessoas === 2
-     && revE.por_pessoa.menor === 1 && revE.por_pessoa.maior === 2, revE);
+  ok('a equipe: o total e quantas pessoas (com 2, sem a distribuição — ver o caso 10-B)', revE.total === 3 && revE.pessoas === 2
+     && revE.por_pessoa === null, revE);
+  rv.run('A', 30, S(-5), 0, 9); rv.run('A', 30, S(-5), 0, 9); rv.run('A', 30, S(-5), 0, 9);
+  const pe3 = (await chamar('GET /api/rel/pessoas', { de: S(-6), ate: D }, { id:20, nome:'Sup' })).etapas.find(e => e.chave === 'revisao');
+  ok('com 3 pessoas ou mais, menor/mediana/maior por pessoa (1, 2, 3)', pe3.pessoas === 3 && pe3.por_pessoa
+     && pe3.por_pessoa.menor === 1 && pe3.por_pessoa.mediana === 2 && pe3.por_pessoa.maior === 3, pe3);
   ok('a revisão sem id não é de ninguém (fica fora)', revE.total === 3);
   ok('SEM a de nome: nenhum nome e nenhum id viajam', !pe.com_nome && !JSON.stringify(pe).includes('Ana') && !pe.etapas.some(e => e.lista), pe);
   const pn = await chamar('GET /api/rel/pessoas', { de: S(-6), ate: D }, { id:21, nome:'Admin' });
   const revN = pn.etapas.find(e => e.chave === 'revisao');
-  ok('COM a de nome: cada pessoa, com o nome do cadastro', pn.com_nome && revN.lista.length === 2 && revN.lista[0].nome === 'Ana Revisora' && revN.lista[0].qtd === 2, revN);
-  ok('o tempo é a mediana, com o maior ao lado (30 e 50 → 40)', revN.lista[0].tempo_mediana === 40 && revN.lista[0].tempo_maior === 50, revN.lista[0]);
+  ok('COM a de nome: cada pessoa, com o nome do cadastro (quem não está no cadastro sai como "pessoa #id")', pn.com_nome && revN.lista.length === 3 && revN.lista.some(p => p.nome === 'Ana Revisora' && p.qtd === 2) && revN.lista.some(p => p.nome === 'pessoa #9'), revN);
+  const ana = revN.lista.find(p => p.nome === 'Ana Revisora');
+  ok('o tempo é a mediana, com o maior ao lado (30 e 50 → 40)', ana.tempo_mediana === 40 && ana.tempo_maior === 50, ana);
   const embN = pn.etapas.find(e => e.chave === 'embalagem');
   ok('a embalagem de teste não conta para ninguém', embN.total === 3, embN);
   ok('etiquetas impressas e conferidas, pelo id', pn.etapas.find(e => e.chave === 'etiqueta').total === 3
@@ -199,6 +204,17 @@ const chavesDe = (o, acc = []) => { if(o && typeof o === 'object') for(const k o
   ok('não há parâmetro de pessoa: pedir a de outro não muda nada',
      JSON.stringify((await chamar('GET /api/rel/minha', { usuario_id:8, id:8 }, { id:7, nome:'Ana Revisora' })).periodos) === JSON.stringify(mi.periodos));
   ok('sem login é 401', (await chamar('GET /api/rel/minha', {}, null)).__st === 401);
+
+  /* ═════════ 10-B. A revisão (③): o que a tela mostraria errado ═════════ */
+  const vMes = (await chamar('GET /api/rel/vendas', {})).meses.find(m => m.parcial);
+  ok('o mês de hoje (parcial) compara PELA PROJEÇÃO, e diz isso — mês pela metade contra mês cheio seria queda falsa',
+     !vMes || (vMes.crescimento_pela_projecao === true), vMes);
+  const peq = (await chamar('GET /api/rel/pessoas', { de: S(-6), ate: D }, { id:20, nome:'Sup' })).etapas.find(e => e.chave === 'embalagem');
+  ok('sem nome, com MENOS DE 3 pessoas na etapa, só o total viaja (o menor e o maior seriam o número de alguém)',
+     peq.pessoas === 2 && peq.por_pessoa === null && peq.total === 3, peq);
+  const sF = await chamar('GET /api/rel/semana', { domingo: REL.mais(D, 14) });
+  ok('uma semana que ainda não acabou não se pede: volta para a última completa', sF.semana.ate === D, sF.semana);
+  ok('e o ▶ não passa da última completa', (await chamar('GET /api/rel/semana', {})).proxima === null);
 
   /* ═════════ 11. Nenhum valor em reais ═════════ */
   for(const [k, q, u] of [['GET /api/rel/semana', {}], ['GET /api/rel/vendas', {}], ['GET /api/rel/producao', {}], ['GET /api/rel/expedicao', {}],
