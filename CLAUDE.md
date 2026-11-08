@@ -4805,6 +4805,9 @@ dos donos, no `rel_route.js` ou nas duas telas** — e `node
 teste_devolucao_casos.js` (o mês e o período têm que dar o mesmo). E **abra a
 tela**: os números do resumo são texto montado.
 
+> ✅ **NO AR DESDE 08/11/2026** (PR #319): o dono fez o backup, o deploy e o
+> teste de segurança e disse *"deu tudo certo no deploy"*.
+>
 > ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** o Resumo da semana passado na reunião
 > de segunda; o crescimento mês a mês com a planilha do ano importada; a 905
 > aberta por alguém da bancada; e o primeiro dia de pendências gravado. Prova

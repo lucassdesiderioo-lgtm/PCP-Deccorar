@@ -1,6 +1,7 @@
 # RELATORIOS-UNIFICADOS — todo relatório num lugar só, e o que cada pessoa fez pelo login dela
 
-> **STATUS · 08/11/2026 — AS QUATRO FASES EM CÓDIGO, falta subir.** Aprovada
+> **STATUS · 08/11/2026 — AS QUATRO FASES NO AR** (PR #319; o dono: *"deu tudo
+> certo no deploy"*). Falta a prova com dado real (CLAUDE.md §21). Aprovada
 > pelo dono (*"lista ok, embalagem sim, spec aprovada"*) e construída inteira
 > (*"vamos fazer ela inteira"*): a 904 em abas e a 905 Minha produção. R7 pela
 > opção (a), o retrato diário (`pendencias_dia`); a 905 nasce para os setores de
