@@ -550,10 +550,15 @@ colunas que a conta usa: sem nome, CPF ou endereço). **E `node simular_ritmo.js
 <relatório>`** (só lê) diz, SKU a SKU, quantas peças faltariam pela média de 30 e
 pelo ritmo.
 
-> ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** a falta da aba batendo com o que a
-> bancada vê por alguns dias (é a prova que libera ligar a fase 4), e o primeiro
-> estado novo aparecendo no aviso do import. Prova que não foi feita se escreve
-> como não feita.
+> ✅ **NO AR DESDE 07/11/2026** (PR #313): o dono fez o backup, o deploy e o
+> teste de segurança e disse *"deu tudo certo no deploy"*. A fase 4 está
+> **desligada** (`config.ordem_por_falta = 0`), como nasceu.
+>
+> ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** o primeiro import depois do deploy
+> classificando as linhas pela §3-B (o resumo por grupo); a falta da aba batendo
+> com o que a bancada vê por alguns dias (é a prova que libera ligar a fase 4);
+> o ritmo mudando o alvo da tela azul; e o primeiro estado novo aparecendo no
+> aviso do import. Prova que não foi feita se escreve como não feita.
 
 > **A ordem da tela azul e a regra da exceção** (SKU fora da lista no vermelho:
 > avisa e deixa passar) estão em [`docs/regras/estoque.md`](docs/regras/estoque.md),
