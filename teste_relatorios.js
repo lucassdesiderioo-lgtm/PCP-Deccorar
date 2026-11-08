@@ -228,6 +228,21 @@ const chavesDe = (o, acc = []) => { if(o && typeof o === 'object') for(const k o
   const fonte = fs.readFileSync(path.join(__dirname, 'relatorios_dominio.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   ok('o relatorios_dominio.js não tem SQL (pergunta aos donos)', !/\.prepare\(|\.exec\(|SELECT\s/i.test(fonte));
 
+  /* ═════════ 12-B. A tela não mata o nav.js (③ REVISÃO, testador-tela) ═════════
+     O `const CH` dos gráficos tinha o nome do `var CH` do nav.js: o segundo
+     script morria inteiro, e a 904 abria sem ☰ Menu, Trocar setor e Sair. */
+  const nomesTopo = txt => new Set((txt.match(/^(?:const|let|var|function|async function|class)\s+([A-Za-z_$][\w$]*)/gm) || [])
+    .map(l => l.replace(/^(?:const|let|var|async function|function|class)\s+/, '')));
+  const doNav = nomesTopo(fs.readFileSync(path.join(__dirname, 'public', 'nav.js'), 'utf8'));
+  for(const tela of ['relatorios.html', 'minha-producao.html']){
+    const h = fs.readFileSync(path.join(__dirname, 'public', tela), 'utf8');
+    const scr = h.slice(h.indexOf('<script>') + 8, h.indexOf('</script>', h.indexOf('<script>')));
+    const iguais = [...nomesTopo(scr)].filter(n => doNav.has(n));
+    ok(tela + ': nenhum nome de topo igual a um do nav.js', !iguais.length, iguais);
+  }
+  const h904 = fs.readFileSync(path.join(__dirname, 'public', 'relatorios.html'), 'utf8');
+  ok('o filtro escondido some de verdade (o display:flex não passa por cima do hidden)', /\[hidden\]\s*\{\s*display\s*:\s*none/.test(h904));
+
   /* ═════════ 13. Alçada ═════════ */
   const T = require('./telas').TELAS.find(t => t.n === 905);
   ok('a 905 está no mapa: nível Operação, aberta com "Ver a própria produção"',

@@ -3,6 +3,7 @@
 <title>Relatórios</title>
 <style>
   :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--blue:#4493f8;--violet:#a371f7;--red:#ff6b6b}
+  [hidden]{display:none !important}   /* o .filtro{display:flex} passava por cima do hidden */
   *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
   header{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
@@ -214,13 +215,16 @@ function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0
 const vazio=(n,txt)=>'<tr><td colspan="'+n+'" class="vazio">'+(txt||'Nada no período.')+'</td></tr>';
 async function pegar(url){ try{ const r=await fetch(url); if(!r.ok) return null; return await r.json(); }catch(e){ return null; } }
 const temChart=()=>typeof Chart!=='undefined';
-const CH={};
+/* GRAFICOS, e não `CH`: o nav.js já declara `var CH` (as cores), e um `const`
+   com o mesmo nome mata o script dele — a tela abria sem ☰ Menu, Trocar setor
+   e Sair (③ REVISÃO, o testador-tela). */
+const GRAFICOS={};
 function grafico(id, cfg){
   const el=document.getElementById(id); if(!el || !temChart()) return;
-  if(CH[id]) CH[id].destroy();
+  if(GRAFICOS[id]) GRAFICOS[id].destroy();
   cfg.options=Object.assign({responsive:true,plugins:{legend:{labels:{color:'#8b97a5'}}},
     scales:{x:{ticks:{color:'#8b97a5'},grid:{display:false}},y:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}}}, cfg.options||{});
-  CH[id]=new Chart(el.getContext('2d'), cfg);
+  GRAFICOS[id]=new Chart(el.getContext('2d'), cfg);
 }
 
 /* ── O PERÍODO (as abas que olham um intervalo) ── */
@@ -446,7 +450,7 @@ async function sobmedida(){
 
 /* ═════════ AS ABAS ═════════ */
 const ABAS={
-  semana:{sec:'secSemana', periodo:false, carregar(){ fechamento().finally(()=>semana()); }},
+  semana:{sec:'secSemana', periodo:false, carregar(){ (PODE_FECHO?fechamento():Promise.resolve()).finally(()=>semana()); }},
   vendas:{sec:'secVendas', periodo:true, carregar:vendas},
   producao:{sec:'secProducao', periodo:true, carregar:producao},
   expedicao:{sec:'secExpedicao', periodo:true, carregar:expedicao},
@@ -456,6 +460,9 @@ const ABAS={
   sobmedida:{sec:'secSobmedida', periodo:false, carregar:sobmedida}
 };
 let ABA='semana';
+/* O fechamento do dia é @admin: só se pede a quem é nível Admin (quem abre a
+   301 Estoque, que é @admin) — senão sai um 403 no console a cada abertura. */
+let PODE_FECHO=false;
 const abaVisivel=a=>ABAS[a] && !document.querySelector('.tab[data-t="'+a+'"]').hidden;
 function abrirAba(a, semHash){
   if(!abaVisivel(a)) a='semana';
@@ -477,6 +484,7 @@ window.addEventListener('hashchange',()=>{ const h=location.hash.slice(1); if(ab
 (async function(){
   const eu=await pegar('/api/telas/minhas');
   const tem=c=>!!eu && (eu.admin_geral || (eu.perms||[]).indexOf(c)>=0);
+  PODE_FECHO=!!eu && (eu.admin_geral || (eu.telas||[]).some(t=>t.n===301));
   document.querySelector('.tab[data-t="devolucoes"]').hidden=!(tem('devolucao.acompanhar')||tem('devolucao.lancar')||tem('devolucao.dinheiro'));
   document.querySelector('.tab[data-t="pessoas"]').hidden=!(tem('produtividade.equipe')||tem('produtividade.nominal'));
   document.querySelector('.tab[data-t="sobmedida"]').hidden=!tem('sobmedida.painel.ler');
