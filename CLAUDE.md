@@ -545,12 +545,22 @@ Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), sete linhas 
 - **A 401 é em abas desde 08/11/2026** (AJUSTE, pedido do dono: *"é a tela da
   gestão da fábrica, onde ele toma as decisões durante o dia"*), no estilo das
   Devoluções em andamento: **Vendas por dia · O que produzir · Médias por
-  janela · Planilha × sistema**. O topo — o fechamento do dia, a hora da
-  planilha (verde se é de hoje, âmbar se não) e o Importar — fica fixo em todas.
-  Cada aba carrega quando abre; sem nada, abre em **Vendas por dia**; a tela
-  lembra a última aba **neste computador** (`localStorage`, só conveniência) e o
-  endereço aceita `#dia`, `#produzir`, `#janelas` e `#comparar`. Nenhum número,
-  rota ou permissão mudou.
+  janela · Planilha × sistema**. O topo — a hora da planilha (verde se é de
+  hoje, âmbar se não) e o Importar — fica fixo em todas. Cada aba carrega quando
+  abre; sem nada, abre em **Vendas por dia**; a tela lembra a última aba **neste
+  computador** (`localStorage`, só conveniência) e o endereço aceita `#dia`,
+  `#produzir`, `#janelas` e `#comparar`. Nenhum número, rota ou permissão mudou.
+- **O fechamento do dia mora na 904 Relatórios desde 08/11/2026** (AJUSTE, o
+  dono: *"relatório fica concentrado num lugar só"*), com a mesma conta e a
+  mesma rota (`GET /api/fechamento`, `@admin`: quem não alcança não vê o
+  cartão). ⚠️ **A 401 CONTINUA PEDINDO A ROTA, CALADA, e não é sobra:** o GET
+  **grava** o retrato do dia na tabela `fechamento`, de onde sai o histórico
+  "produzi × vendi" da 904 — sem a chamada, o histórico só andaria no dia em que
+  alguém abrisse a 904. **E a tarja "SKUs na planilha e fora do cadastro" saiu**
+  (o dono: *"não traz dado nenhum"*): listava 14 meses de código velho e de
+  anúncio. A venda nova com SKU fora do cadastro continua retida no upload do
+  PDF (§6) e aparece em Pendências; o `desconhecidos` continua na resposta do
+  `GET /api/planejamento`.
 
 **Rode `node teste_vendas_futuras.js` (95) ao mexer no `planilha_estado.js`, no
 import do `plan_route.js`, no `demanda_dominio.js` ou na 401** — ele importa o

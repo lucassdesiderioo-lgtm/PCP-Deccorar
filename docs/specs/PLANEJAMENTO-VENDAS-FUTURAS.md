@@ -3,7 +3,9 @@
 > **STATUS · 07/11/2026 — AS QUATRO FASES NO AR** (PR #313; o dono fez o
 > backup, o deploy e o teste de segurança: *"deu tudo certo no deploy"*). A
 > fase 4 está desligada. **Desde 08/11/2026 a 401 é em abas** (AJUSTE: Vendas por
-> dia · O que produzir · Médias por janela · Planilha × sistema). **Falta a prova com dado real:** o primeiro import
+> dia · O que produzir · Médias por janela · Planilha × sistema), e no mesmo dia
+> o fechamento do dia foi para a 904 Relatórios e a tarja dos SKUs fora do
+> cadastro saiu (AJUSTE). **Falta a prova com dado real:** o primeiro import
 > classificando pela §3-B, a aba conferida com a bancada por alguns dias e, só
 > depois, o dono ligar a fase 4. O que mudou na construção, com o dono:
 > - **O relatório real dá 228 linhas · 239 peças ainda na fábrica, e não

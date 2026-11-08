@@ -37,7 +37,7 @@ module.exports=function(app,db){
         carregamento:q("SELECT data, SUM(CASE WHEN estagio='carregado' THEN 1 ELSE 0 END) qtd FROM lote WHERE "+W+" GROUP BY data ORDER BY data")
       },
       // cobertura de estoque (produzi x vendi) — snapshot diario da tabela
-      // fechamento, gravado pela tela Planejamento. Vazio se nunca fechou o dia.
+      // fechamento, gravado pelo GET /api/fechamento (401 e 904). Vazio se nunca fechou o dia.
       cobertura:q("SELECT data, produzido, vendido, variou, estoque_fim, cobertura FROM fechamento WHERE "+W+" ORDER BY data"),
       qualidade:{
         porMotivo:q("SELECT motivo l, COUNT(*) qtd FROM rejeicao WHERE "+W+" GROUP BY motivo ORDER BY qtd DESC"),
