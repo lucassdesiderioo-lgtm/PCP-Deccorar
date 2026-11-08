@@ -64,7 +64,16 @@
   .vf td.sk{position:sticky;left:0;background:var(--panel);z-index:1}
   .vf .fdesde{color:#ff8c84;font-weight:700}
   .vf .sem{color:var(--muted)}
-  .jn{margin:26px 0 22px}
+  .jn{margin:0 0 22px}
+  /* AJUSTE de 08/11/2026: o topo fixo e as abas, no estilo das Devoluções em andamento */
+  .topo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:14px;margin-bottom:14px}
+  .imp{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+  .imp .impl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .imp .prim{border:0;border-radius:9px;font-weight:700;padding:10px 16px;cursor:pointer}
+  .meta.hoje{color:#7ee2a0}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 14px}
+  .tab{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:9px 16px;cursor:pointer;font-size:14px}
+  .tab.on{background:var(--amber);color:#1a1300;border-color:var(--amber);font-weight:700}
   .ord button.ghost{border:1px solid var(--line);border-radius:9px;padding:11px 16px;font-weight:700;cursor:pointer;color:var(--txt)}
   .jbtn{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:700}
   .jbtn.on{background:var(--blue);color:#04121f;border-color:var(--blue)}
@@ -75,35 +84,34 @@
   .apl{background:transparent;color:var(--blue);border:1px solid var(--line);border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}.apl:hover{border-color:var(--blue)}
 </style></head><body>
 <header><div class="mark">P</div>
-  <div><h1>Planejamento por estoque alvo</h1>
-  <div class="sub">O que a fábrica precisa produzir, calculado da planilha do ML. É este número que a tela azul da revisão mostra e que a compra de material usa.</div></div>
+  <div><h1>Planejamento</h1>
+  <div class="sub">O que a fábrica produz primeiro para entregar o que já foi vendido — e o que vem depois. É este número que a tela azul da revisão mostra e que a compra de material usa.</div></div>
   <div class="links"><a class="link" href="/">Admin</a></div>
 </header>
 <div class="wrap">
 
-  <div class="fecho" id="fecho">
+  <!-- O TOPO FICA FIXO EM TODAS AS ABAS (AJUSTE de 08/11/2026, pedido do dono):
+       o fechamento do dia e a planilha do ML — subir a planilha e ver se ela e
+       de hoje e o primeiro gesto da manha e do fim do dia (R8, R12). -->
+  <div class="topo">
+  <div class="fecho" id="fecho" style="margin:0">
     <h3>Fechamento do dia — <span id="fData">—</span></h3>
     <div class="cell"><div class="cn" id="fProd" style="color:var(--green)">–</div><div class="cl">Produzi (virou estoque)</div></div>
     <div class="cell"><div class="cn" id="fVend" style="color:var(--red)">–</div><div class="cl">Vendi (etiquetas de venda)</div></div>
     <div class="cell"><div class="cn" id="fVar">–</div><div class="cl">Estoque variou</div></div>
     <div class="cell"><div class="cn" id="fCob" style="color:var(--blue)">–</div><div class="cl" id="fCobL">Cobertura média</div></div>
   </div>
-
-  <div class="bar">
-    <span class="sub">Vendas futuras — planilha do ML</span>
-    <input type="file" id="arq" class="file" accept=".xlsx,.csv">
-    <button class="prim" onclick="importar()">Importar</button>
+  <div class="imp">
+    <div class="meta" id="vfMeta" style="margin:0;font-size:14px;font-weight:700"></div>
+    <div class="impl">
+      <input type="file" id="arq" class="file" accept=".xlsx,.csv">
+      <button class="prim" onclick="importar()">Importar planilha do ML</button>
+    </div>
     <span class="msg" id="msgImp"></span>
-    <span class="sub" style="width:100%;margin-top:2px">
-      O arquivo precisa ter <b style="color:#e6edf3">as vendas ainda não enviadas</b> — qualquer período
-      que cubra todas elas. O campo <i>Estado</i> alimenta o comprometido e diz quais vendas foram
-      <b style="color:#e6edf3">canceladas</b>: o volume cancelado sai de "Faltam imprimir" sozinho.
-      Só a venda <b style="color:#e6edf3">futura</b> que não vier no arquivo sai do sistema;
-      a venda passada nunca é apagada, então um recorte não estraga a média.
-    </span>
+    <span class="sub">O arquivo precisa ter <b style="color:#e6edf3">as vendas ainda não enviadas</b>. A venda passada
+      nunca é apagada por ausência, então um recorte não estraga a média.</span>
   </div>
-  <div class="meta" id="meta">Nenhuma planilha importada ainda.</div>
-
+  </div>
   <!-- Duas tarjas, e sao coisas diferentes: `recorte` diz o que o import fez
        com os volumes cancelados (some no proximo import); `aviso` lista SKU da
        planilha fora do cadastro (some quando alguem cadastra). O id ficou
@@ -112,18 +120,29 @@
   <div class="aviso" id="recorte" style="border-color:#8a5a12;background:#2e2008"></div>
   <div class="aviso" id="aviso"></div>
 
+  <!-- AS ABAS (AJUSTE de 08/11/2026): no estilo das Devoluções em andamento.
+       Cada aba carrega quando abre; a tela lembra a ultima aberta neste
+       computador, e o endereco aceita #dia, #produzir, #janelas e #comparar. -->
+  <div class="tabs" id="tabs">
+    <button class="tab" data-t="dia">Vendas por dia</button>
+    <button class="tab" data-t="produzir">O que produzir</button>
+    <button class="tab" data-t="janelas">Médias por janela</button>
+    <button class="tab" data-t="comparar">Planilha × sistema</button>
+  </div>
+
+  <section id="secDia" class="aba">
   <!-- FASE 1: as vendas futuras por dia de envio, com a falta acumulada. So
        leitura; a conta e do demanda_dominio.porDia (R1). -->
   <div class="vf">
-    <h2>Vendas futuras por dia de envio</h2>
     <div class="sub">O que já foi vendido e ainda não saiu da fábrica, por dia de envio. Embaixo de cada número,
       a <b style="color:#e6edf3">falta acumulada</b>: o estoque cobre primeiro o dia mais cedo.
       A coluna <b style="color:#ffb4ae">Atrasada</b> é venda com data já passada que a planilha ainda mostra na fábrica.</div>
-    <div class="meta" id="vfMeta" style="margin-top:8px"></div>
     <div class="tbwrap"><table id="vfTab"><tbody><tr><td class="dim" style="text-align:center;padding:18px">carregando…</td></tr></tbody></table></div>
     <div class="sub" id="vfExtra" style="margin-top:8px"></div>
   </div>
+  </section>
 
+  <section id="secProduzir" class="aba" style="display:none">
   <!-- FASE 4: a ordem da tela azul pela data da falta. Nasce desligada; so o
        nivel Admin Geral liga (o servidor confere). -->
   <div class="ord">
@@ -132,7 +151,6 @@
     <button class="ghost" id="ordBtn" style="margin-left:auto">—</button>
     <span class="msg" id="ordMsg"></span>
   </div>
-
   <div class="bar">
     <span class="sub">Dias de cobertura</span>
     <input type="number" id="diasCob" min="1" value="10">
@@ -147,7 +165,7 @@
     <span class="msg" id="msgCfg"></span>
     <span class="tot">Precisa (total): <b id="totPrecisa">0</b> peças</span>
   </div>
-
+  <div class="meta" id="meta">Nenhuma planilha importada ainda.</div>
   <div class="tbwrap"><table>
     <thead>
       <tr class="cols">
@@ -160,11 +178,20 @@
   <div style="margin-top:10px"><button class="ghost" id="verTodos" style="font-size:12px">ver todos os SKUs</button></div>
   <div style="margin-top:12px"><button class="prim" onclick="aplicarTodos()">Aplicar alvo em todos (com venda na janela)</button>
     <span class="sub" style="margin-left:8px">grava o alvo sugerido nos SKUs que tiveram venda na janela</span></div>
+  <div class="sub" style="margin-top:12px">
+    <b style="color:var(--blue)">A ordem é de prioridade, não de quantidade:</b>
+    quem tem cliente com prazo curto vem primeiro, depois quem está sem estoque, depois quem cobre poucos dias.
+    <b>Cobertura</b> = quantos dias o estoque atual aguenta a venda desse SKU.
+    <br><b style="color:var(--blue)">Como o número sai:</b>
+    alvo = ritmo × dias de cobertura, com piso no alvo mínimo — o ritmo é o maior entre a média da janela e a da janela curta.
+    &nbsp;·&nbsp; precisa = comprometido (envios futuros da planilha) + alvo − estoque.
+  </div>
+  </section>
 
+  <section id="secJanelas" class="aba" style="display:none">
   <!-- FASE 2: as janelas 7 · 14 · 30 · 45 dias, SO PARA OLHAR (R9): trocar a
        janela aqui nao muda a producao nem a config. -->
-  <div class="jn cmp">
-    <h2>Média por janela — só para olhar</h2>
+  <div class="jn">
     <div class="sub">Trocar a janela aqui <b style="color:#e6edf3">não muda a produção</b>: ela continua com a janela de
       <b id="jnProd" style="color:#e6edf3">30</b> dias e o ritmo da janela curta. A seta compara a média de 14 com a de 30 dias.</div>
     <div style="display:flex;gap:8px;margin:10px 0" id="jnBtns"></div>
@@ -174,12 +201,13 @@
       <tbody id="jnCorpo"><tr><td colspan="4" class="dim" style="text-align:center;padding:18px">carregando…</td></tr></tbody>
     </table></div>
   </div>
+  </section>
 
+  <section id="secComparar" class="aba" style="display:none">
   <!-- VENDAS-E-MEDIA, fase 1: a media contada pelo sistema, AO LADO da planilha.
        So conferencia: a tabela de cima, a tela azul e a compra continuam lendo a
        planilha. A troca (fase 3) espera o ok do dono depois de alguns dias disto. -->
-  <div class="cmp">
-    <h2>Média: planilha × sistema</h2>
+  <div class="cmp" style="margin-top:0">
     <div class="sub">Só para conferir — <b style="color:#e6edf3">a produção continua pela planilha</b>.
       O sistema conta as <b style="color:#e6edf3">peças</b> dos PDFs que a expedição sobe todo dia
       (a caixa de várias persianas conta cada uma); a planilha conta as vendas do arquivo.
@@ -194,15 +222,7 @@
     </table></div>
     <div style="margin-top:10px"><button class="ghost" id="cmpTodos" style="font-size:12px;display:none"></button></div>
   </div>
-
-  <div class="sub" style="margin-top:12px">
-    <b style="color:var(--blue)">A ordem é de prioridade, não de quantidade:</b>
-    quem tem cliente com prazo curto vem primeiro, depois quem está sem estoque, depois quem cobre poucos dias.
-    <b>Cobertura</b> = quantos dias o estoque atual aguenta a venda desse SKU.
-    <br><b style="color:var(--blue)">Como o número sai:</b>
-    alvo = média na janela × dias de cobertura, com piso no alvo mínimo.
-    &nbsp;·&nbsp; precisa = comprometido (envios futuros da planilha) + alvo − estoque.
-  </div>
+  </section>
 </div>
 <script>
 const $=s=>document.querySelector(s);
@@ -244,8 +264,8 @@ async function load(){
     const hora=quando.slice(11,16);
     const frase = pl.de_hoje ? 'Planilha enviada hoje às '+hora
       : 'Planilha de '+dataBr(quando.slice(0,10))+' às '+hora+' — não foi enviada hoje';
-    $('#vfMeta').innerHTML='<b>'+frase+'</b>'+(pl.relatorio_em?' (hora do relatório do ML)':'');
-    $('#vfMeta').className='meta'+(pl.de_hoje?'':' velha');
+    $('#vfMeta').innerHTML=(pl.de_hoje?'✔ ':'⚠ ')+frase;
+    $('#vfMeta').className='meta'+(pl.de_hoje?' hoje':' velha');
   } else { $('#vfMeta').textContent='Nenhuma planilha importada ainda.'; $('#vfMeta').className='meta velha'; }
   if(d.importado_em){
     $('#meta').innerHTML='Última importação: <b style="color:#e6edf3">'+d.importado_em+'</b> · '
@@ -393,7 +413,7 @@ async function importar(confirmar){
         +r.estados_novos.map(x=>'"'+esc(x.estado)+'" ('+x.linhas+')').join(' · '));
     if(l.length){ rec.style.display='block'; rec.innerHTML=l.join('<br>'); }
     else rec.style.display='none';
-    load(); fechamento(); comparar(); futuras(); janelas();
+    load(); fechamento(); recarregarAba();
   }catch(e){ $('#msgImp').style.color='#f85149'; $('#msgImp').textContent='falha: '+e; }
 }
 
@@ -402,7 +422,7 @@ async function salvarConfig(){
     janela_curta:+$('#janCurta').value||14};
   await fetch('/api/planejamento/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   $('#msgCfg').textContent='recalculado'; setTimeout(()=>$('#msgCfg').textContent='',2000);
-  load(); fechamento(); comparar(); futuras(); janelas();
+  load(); fechamento(); recarregarAba();
 }
 /* A tabela da comparacao. Mostra os 12 maiores desvios; o resto a um clique —
    lista cheia de "igual" ensina a passar o olho por cima de onde importa. */
@@ -531,7 +551,40 @@ $('#ordBtn').addEventListener('click', async function(){
   load();
 });
 
-load(); fechamento(); comparar(); futuras(); janelas();
+/* ── AS ABAS (AJUSTE de 08/11/2026) ─────────────────────────────────────
+   Uma aba aberta por vez, no estilo das Devoluções em andamento. Cada uma
+   carrega o que é dela quando abre (a "O que produzir" é o load(), que também
+   traz a hora da planilha do topo e por isso roda sempre). A tela lembra a
+   última aba NESTE computador (localStorage, só conveniência) e o endereço
+   aceita #dia, #produzir, #janelas e #comparar. Sem nada, abre em "Vendas por
+   dia": é a decisão do dia. */
+const ABAS={ dia:{sec:'secDia', carregar:function(){ futuras(); }},
+             produzir:{sec:'secProduzir', carregar:function(){ load(); }},
+             janelas:{sec:'secJanelas', carregar:function(){ janelas(); }},
+             comparar:{sec:'secComparar', carregar:function(){ comparar(); }} };
+let ABA='dia';
+function abrirAba(a, semHash){
+  if(!ABAS[a]) a='dia';
+  ABA=a;
+  document.querySelectorAll('#tabs .tab').forEach(function(t){ t.classList.toggle('on', t.getAttribute('data-t')===a); });
+  Object.keys(ABAS).forEach(function(k){ document.getElementById(ABAS[k].sec).style.display = k===a ? '' : 'none'; });
+  try{ localStorage.setItem('plan_aba', a); }catch(e){}
+  if(!semHash && location.hash!=='#'+a){ try{ history.replaceState(null,'','#'+a); }catch(e){} }
+  ABAS[a].carregar();
+}
+function recarregarAba(){ ABAS[ABA].carregar(); }
+document.getElementById('tabs').addEventListener('click',function(e){
+  const t=e.target.closest('.tab'); if(t) abrirAba(t.getAttribute('data-t'));
+});
+window.addEventListener('hashchange',function(){ const h=location.hash.slice(1); if(ABAS[h] && h!==ABA) abrirAba(h, true); });
+(function(){
+  let a=location.hash.slice(1);
+  if(!ABAS[a]){ try{ a=localStorage.getItem('plan_aba')||''; }catch(e){ a=''; } }
+  if(!ABAS[a]) a='dia';
+  if(a!=='produzir') load();   // a hora da planilha do topo e a chave da ordem
+  fechamento();
+  abrirAba(a);
+})();
 </script>
 <script src="/nav.js"></script>
 </body></html>
