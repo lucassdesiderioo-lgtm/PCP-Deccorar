@@ -56,7 +56,7 @@ registro e nos setores nativos, e **nenhuma tela as usa** — a 904 abre com
 
 | Chave | Vê | Onde |
 |---|---|---|
-| `produtividade.propria` | só o que **ela** fez, pelo login dela | tela nova "Minha produção" (proposta 905), nível Operação — a 904 é Supervisor e o operador não a abre |
+| `produtividade.propria` | só o que **ela** fez, pelo login dela | tela nova 905 "Minha produção", nível Operação — a 904 é Supervisor e o operador não a abre |
 | `produtividade.equipe` | a equipe somada, **sem nome** (distribuição) | 904, aba Por pessoa |
 | `produtividade.nominal` | cada pessoa **com nome** | 904, aba Por pessoa |
 
@@ -120,15 +120,16 @@ saíram da empresa"*) e qualquer valor em reais.
 ## 5. Alçada (R-ALC-08)
 
 - **Telas novas:** 905 · Minha produção · módulo 9xx (Gestão) · nível Operação ·
-  abre com `produtividade.propria` — *proposta; o número só se firma no PLANO*.
+  abre com `produtividade.propria`.
 - **Ações novas:** nenhuma — as três chaves de produtividade já existem, e
   exportar saiu (D5).
 - **Setores novos:** nenhum.
-- **Quem recebe:** a 905 nasce só para o Admin Geral, até
-  o dono marcar na tela de Acessos (R-TEL-03). As três chaves de produtividade
-  **já estão** nos setores nativos (Operação tem a `propria`, Gestão tem a
-  `equipe`): ligar a tela a elas passa a valer para quem já as tem — o dono
-  confere a grade antes do deploy.
+- **Quem recebe:** ~~a 905 nasce só para o Admin Geral~~ — **a 905 nasce para os
+  setores de operação**, que já têm `produtividade.propria` (decisão do dono no
+  PLANO, 08/11/2026, exceção ao R-ALC-06, linha em `docs/DECISOES.md`). As outras
+  duas chaves de produtividade já estão nos setores nativos (Gestão tem a
+  `equipe`; a `nominal` é do setor Admin, que não abre a 904 — dúvida para o
+  dono no FECHAMENTO).
 
 ## 6. As respostas do dono (08/11/2026)
 
