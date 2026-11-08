@@ -312,9 +312,12 @@ function tarjaHistorico(desde){
   if(desde && meses+1 >= MESES_PARA_ANO){ el.hidden=true; el.innerHTML=''; return; }
   const quanto = !desde ? '📅 Nenhuma venda importada ainda.'
     : '📅 As vendas no sistema começam em <b>'+dBrAno(desde)+'</b> — '+(meses<1?'menos de 1 mês':meses===1?'1 mês':meses+' meses')+'.';
+  /* O que falta é o que vem ANTES da primeira venda (o relatório do ano anterior),
+     e não "o ano": quem já importou o ano lia o mesmo pedido de novo. */
+  const antes = desde ? 'o relatório das vendas de antes de '+dBrAno(desde) : 'o relatório de vendas do Mercado Livre';
   el.innerHTML = PODE_401
-    ? '<span>'+quanto+' Para ver o ano inteiro e comparar com o mesmo mês do ano anterior, importe o relatório de vendas do ano pela tela <b>Planejamento</b>.</span><a href="/planejamento">Importar na 401 Planejamento →</a>'
-    : '<span>'+quanto+' O ano inteiro aparece quando o relatório de vendas do ano for importado na tela Planejamento.</span>';
+    ? '<span>'+quanto+' Para comparar com o mesmo mês do ano anterior, importe também '+antes+' pela tela <b>Planejamento</b>.</span><a href="/planejamento">Importar na 401 Planejamento →</a>'
+    : '<span>'+quanto+' A comparação com o mesmo mês do ano anterior aparece quando '+antes+' for importado na tela Planejamento.</span>';
   el.hidden=false;
 }
 async function vendas(){
