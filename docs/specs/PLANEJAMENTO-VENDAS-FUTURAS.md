@@ -1,7 +1,10 @@
 # PLANEJAMENTO-VENDAS-FUTURAS — o Planejamento diz o que produzir primeiro
 
-> **STATUS · 07/11/2026 — AS QUATRO FASES EM CÓDIGO, falta subir** (branch
-> `claude/quirky-shannon-iyiixj`). O que mudou na construção, com o dono:
+> **STATUS · 07/11/2026 — AS QUATRO FASES NO AR** (PR #313; o dono fez o
+> backup, o deploy e o teste de segurança: *"deu tudo certo no deploy"*). A
+> fase 4 está desligada. **Falta a prova com dado real:** o primeiro import
+> classificando pela §3-B, a aba conferida com a bancada por alguns dias e, só
+> depois, o dono ligar a fase 4. O que mudou na construção, com o dono:
 > - **O relatório real dá 228 linhas · 239 peças ainda na fábrica, e não
 >   235 · 246** como o §3 escrevia; e **40 estados** (26 no pós-venda), não 38.
 >   O dono, 07/11/2026: *"vale 239, os 26 no grupo 4"*.
@@ -20,8 +23,8 @@
 >   (e saía da média, #11) — agora perde a data e passa a "já saiu"; o saldo
 >   negativo virava "faltam N atrasadas" — agora a falta começa na venda do SKU.
 > - Regras que parecem bug no `CLAUDE.md` §3; cartões R-PLN-01 a 05 e R-REV-03.
-> - Falta: o deploy, a prova da fase 1 com dado real (a aba batendo com a
->   bancada por alguns dias) e o dono ligar a fase 4.
+> - Falta: a prova da fase 1 com dado real (a aba batendo com a bancada por
+>   alguns dias) e o dono ligar a fase 4.
 > Desenhado no Projeto com o dono em 07/11/2026, a partir do relatório real do
 > ML de 07/11/2026 09:59 (3.326 linhas, 07/09 a 07/11, 246 peças com envio futuro).
 > Onde esta spec e o `CLAUDE.md` divergirem, vale o `CLAUDE.md` (§13).

@@ -134,7 +134,7 @@
 - **Por quê:** ordenar pelo que falta põe em cima o SKU que mais gira, que quase nunca é o que acaba primeiro. E a fábrica precisa andar 1, 2 ou 3 dias à frente das vendas: terminado o de hoje, a primeira linha é a falta de amanhã.
 - **Exceções:** a chave nasce **desligada** e só o **Admin Geral** (o setor, pelo `ehAdminGeral`) liga ou desliga (403 para os outros, antes de gravar qualquer campo do mesmo pedido). O modo vermelho e o âmbar não mudam.
 - **Teste que trava:** `teste_vendas_futuras.js` (a ordem, os três desempates, o motivo, o caso do meio-dia, a chave desligada por padrão e o 403).
-- **Status:** os degraus no ar · a ordem pela falta em código desde 07/11/2026, desligada.
+- **Status:** os degraus no ar · a ordem pela falta no ar desde 07/11/2026 (PR #313), **desligada** até o dono ligar.
 
 ### R-REV-04 · Sob medida não tem alvo
 - **Regra:** o alvo calculado de SKU sob medida é zero; ele só pede produção quando há venda comprometida.
@@ -404,35 +404,35 @@
 - **Por quê:** o comprometido deixava ~49 peças de hoje fora da tela azul, e o pós-venda saía da média sendo venda.
 - **Exceções:** **estado novo não trava** — conta como venda, como futura se trouxer "dia N de mês", e o import avisa o texto. Um estado novo com "cancel" é novo (conta), e não cancelada.
 - **Teste que trava:** `teste_vendas_futuras.js` (os 40 estados do relatório real de 07/11 nos grupos; 228 linhas · 239 peças futuras).
-- **Status:** em código desde 07/11/2026.
+- **Status:** no ar desde 07/11/2026 (PR #313).
 
 ### R-PLN-02 · Conta-se peça, pela coluna Unidades
 - **Regra:** o comprometido, a média e a falta por dia somam `venda_futura.unidades`. A linha de antes desta fase vale 1.
 - **Por quê:** a venda de 2 unidades valia 1.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_vendas_futuras.js`.
-- **Status:** em código desde 07/11/2026.
+- **Status:** no ar desde 07/11/2026 (PR #313).
 
 ### R-PLN-03 · A falta acumulada por dia, e a Atrasada primeiro
 - **Regra:** `demanda_dominio.porDia` é a única conta: `falta até o dia D = max(0, vendas de hoje até D − estoque)`, com o estoque = o **saldo** (o mesmo da tela azul, §2). A primeira coluna é **Atrasada** (data já passada, ainda na fábrica pela planilha) e ela conta no comprometido. O horizonte é todo dia com venda futura. Sob medida fica fora da falta, contado à parte; SKU sem cadastro em linha própria. A aba e a tela azul dão o **mesmo** comprometido.
 - **Por quê:** a venda futura era um número só, e ninguém sabia o que era para segunda, terça, quarta.
 - **Exceções:** a linha de antes desta fase (sem `grupo`) só conta de hoje em diante, como sempre.
 - **Teste que trava:** `teste_vendas_futuras.js`.
-- **Status:** em código desde 07/11/2026.
+- **Status:** no ar desde 07/11/2026 (PR #313).
 
 ### R-PLN-04 · As janelas 7 · 14 · 30 · 45 são só para olhar
 - **Regra:** os botões da 401 trocam a janela **da tela** e mostram a média de cada SKU e a seta 14 contra 30. Não gravam na `config`. Janela maior que a história da planilha é cortada e dita em âmbar.
 - **Por quê:** decisão do dono — a produção não muda por um clique de análise.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_vendas_futuras.js`.
-- **Status:** em código desde 07/11/2026.
+- **Status:** no ar desde 07/11/2026 (PR #313).
 
 ### R-PLN-05 · O ritmo é o maior entre a média da janela e a de 14 dias
 - **Regra:** `ritmo = max(média de config.janela_media, média de config.janela_curta = 14)`; o alvo e a cobertura usam o ritmo. Quando a curta vence, a tela diz *"subindo: 6,3 → 8,9/dia"*.
 - **Por quê:** a média de 30 atrasava o SKU que acelera. A simulação nos 60 dias do relatório de 07/11 (`simular_ritmo.js`, 21 dias avaliados) deu, com a régua da produção, 2.005 → 1.386 peças faltando, com a sobra subindo de 2.091 para 3.232 — o preço decidido; com N dias cheios, 2.130 → 1.584.
 - **Exceções:** a queda **não** derruba o alvo antes dos 30 dias. Sob medida continua sem alvo (R-REV-04).
 - **Teste que trava:** `teste_vendas_futuras.js`.
-- **Status:** em código desde 07/11/2026; vale a partir do deploy.
+- **Status:** no ar desde 07/11/2026 (PR #313).
 
 ## O que ainda não tem teste nesta área
 
