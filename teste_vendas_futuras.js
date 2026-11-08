@@ -269,6 +269,32 @@ const csv64 = txt => 'data:text/csv;base64,' + Buffer.from(txt, 'utf8').toString
   ok('"amanhã" na descrição dá o dia seguinte sem "a confirmar"',
      (c => c.data_envio === '2026-11-08' && c.data_confirmar === 0)(P.classificar('Pronto para coleta', 'A coleta passa amanhã.', new Date(2026,10,7))));
 
+  /* CONSERTO de 08/11/2026 (decisão do dono, linha em DECISOES): a planilha
+     da tarde troca "coleta do dia 9 de novembro" por "coleta de amanhã", e
+     traz "Etiqueta pronta para impressão". Os dois são venda AINDA NA FÁBRICA,
+     para o dia seguinte ao do relatório — sem isso, 81 + 21 vendas do relatório
+     das 17:34 saíam do comprometido de segunda. */
+  ok('"Para entregar na coleta de amanhã" é ainda na fábrica, no dia seguinte ao relatório, sem "a confirmar"',
+     (c => c.grupo === 'fabrica' && c.futura && c.data_envio === '2026-11-09' && c.data_confirmar === 0)(P.classificar('Para entregar na coleta de amanhã',
+       'Para organizar os envios, você poderá imprimir a etiqueta amanhã. Já avisamos seu comprador e isso não vai afetar sua reputação.', new Date(2026,10,8))));
+  ok('"Etiqueta pronta para impressão" com "coleta que passará amanhã" na descrição: ainda na fábrica, dia seguinte',
+     (c => c.grupo === 'fabrica' && c.futura && c.data_envio === '2026-11-09' && c.data_confirmar === 0)(P.classificar('Etiqueta pronta para impressão',
+       'Você deve entregar o pacote à coleta que passará amanhã.', new Date(2026,10,8))));
+  ok('"Etiqueta pronta para impressão" sem dia na descrição: dia seguinte, a confirmar (nunca some)',
+     (c => c.grupo === 'fabrica' && c.data_envio === '2026-11-09' && c.data_confirmar === 1)(P.classificar('Etiqueta pronta para impressão', '', new Date(2026,10,8))));
+  B = novoBanco();
+  B.db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('AM',0,1)").run();
+  B.db.prepare(`INSERT INTO venda_futura (venda_id,codigo,data_venda,data_envio,unidades,grupo,estado) VALUES ('2000000000000077','AM',?,?,1,'fabrica','x')`)
+    .run(dia(B.db,-2), dia(B.db,1));
+  r = await B.chamar('POST /api/planejamento/importar', { arquivo: csv64([CAB,
+    linhaCsv('2000000000000077', 'Para entregar na coleta de amanhã', 'AM'),
+    linhaCsv('2000000000000078', 'Etiqueta pronta para impressão', 'AM')].join('\n') + '\n') });
+  const vAm = B.db.prepare("SELECT data_envio, grupo FROM venda_futura WHERE venda_id IN ('2000000000000077','2000000000000078') ORDER BY venda_id").all();
+  ok('no import, a venda que virou "coleta de amanhã" continua no comprometido, e a "etiqueta pronta" entra',
+     r.ok && vAm.length === 2 && vAm.every(v => v.grupo === 'fabrica' && v.data_envio === dia(B.db,1))
+     && DEMANDA.calcular(B.db).linhas.find(l => l.codigo === 'AM').comprometido === 2
+     && !(r.estados_novos || []).length, { r, vAm });
+
   /* ═════════ 3. AS JANELAS, SÓ PARA OLHAR ═════════ */
   B = novoBanco();
   B.db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('J',0,1)").run();
