@@ -7,6 +7,8 @@
  *
  *   grupo      venda futura   media   data de envio
  *   fabrica        sim         sim    no Estado · na Descricao · dia seguinte
+ *                                         ("coleta de amanha" e "Etiqueta pronta
+ *                                         para impressao": 08/11/2026)
  *   saiu           nao         sim    —
  *   entregue       nao         sim    —
  *   pos_venda      nao         sim    —   (muda a regra de antes: A4)
@@ -72,6 +74,11 @@ function grupoDe(estado){
   if(/^pacote de \d+ produtos?$/.test(e)) return 'nao_venda';
   if(/^para entregar na coleta do dia \d{1,2} de [a-zç]+$/.test(e)) return 'fabrica';
   if(e === 'pronto para coleta') return 'fabrica';
+  /* A planilha da tarde (08/11/2026, 17:34): o ML troca "coleta do dia N" por
+     "coleta de amanhã" na véspera, e traz "Etiqueta pronta para impressão".
+     As duas são venda ainda na fábrica, para amanhã (o dono, 08/11/2026). */
+  if(e === 'para entregar na coleta de amanhã') return 'fabrica';
+  if(e === 'etiqueta pronta para impressão') return 'fabrica';
   if(e === 'pronta para emitir nf-e da venda') return 'fabrica';
   if(e === 'a caminho' || e === 'envio reagendado' || e === 'envio atrasado') return 'saiu';
   if(e === 'entregue' || e === 'venda entregue') return 'entregue';
@@ -93,8 +100,9 @@ function classificar(estado, descricao, ref){
   const e = norm(estado).toLowerCase();
   if(g === 'fabrica'){
     r.futura = true;
-    if(e.startsWith('para entregar')) r.data_envio = dataDoTexto(estado, ref);
-    else if(e === 'pronto para coleta') r.data_envio = dataDaSemana(descricao, ref);
+    if(e === 'para entregar na coleta de amanhã') r.data_envio = iso(mais(ref, 1));
+    else if(e.startsWith('para entregar')) r.data_envio = dataDoTexto(estado, ref);
+    else if(e === 'pronto para coleta' || e === 'etiqueta pronta para impressão') r.data_envio = dataDaSemana(descricao, ref);
     /* NF a emitir ainda nao tem data: fica no dia seguinte, "data a confirmar".
        O Pronto para coleta sem dia na Descricao tambem — nunca some. */
     if(!r.data_envio){ r.data_envio = iso(mais(ref, 1)); r.data_confirmar = 1; }
