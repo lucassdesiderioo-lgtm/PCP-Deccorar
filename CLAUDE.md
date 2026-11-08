@@ -518,6 +518,10 @@ Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), sete linhas 
   sem data — o relatório das 17:34 de 08/11 tirava **102 vendas** do
   comprometido de segunda, e um arquivo só com elas era recusado como "sem
   futura".
+  ✅ **No ar e provado com dado real em 08/11/2026** (PR #317): o dono fez o
+  deploy e importou o relatório das 17:34 — o aviso ficou só com os 3 estados
+  de uma linha (devolvido em 11 de setembro, Venda não entregue, Cancelada), e
+  a segunda 09/11 apareceu cheia na aba Vendas por dia.
 - **Estado novo não trava:** conta como venda (e como futura se trouxer "dia N
   de mês"), e o resumo do import lista o texto. Nunca vira zero calado.
 - **A Atrasada conta no comprometido**, e empurra para "despacha até amanhã".
