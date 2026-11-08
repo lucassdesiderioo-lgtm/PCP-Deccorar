@@ -3312,7 +3312,8 @@ Esperado: telas `302`, API `401`, `/login` `200`.
 `/admin/problemas`, `/admin/pendencias`, `/admin/correcoes`, `/admin/devolucoes`,
 `/admin/estoque`, `/admin/contagem`, `/admin/skus`, `/admin/sku-incompleto`,
 `/admin/ficha`, `/admin/compras`, `/admin/cadastros` e `/admin/teste` — e, desde
-05/11/2026, a tela 206 `/coleta-horarios` (HORARIOS-DE-COLETA).
+05/11/2026, a tela 206 `/coleta-horarios` (HORARIOS-DE-COLETA) — e, desde
+08/11/2026, a 905 `/minha-producao` (RELATORIOS-UNIFICADOS).
 
 Proteção contra força bruta: 5 PINs errados bloqueiam a pessoa por 1 minuto —
 **inclusive com o PIN certo**, senão a trava só atrasaria quem chuta —, e a trava é
@@ -3770,7 +3771,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). **Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa — o dado começa a se acumular agora · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (246), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (102); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (246), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (65), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (102), `teste_relatorios.js` (56); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4712,3 +4713,84 @@ reintroduzidos, e cada um reprova o seu caso.
 > piscar antes do `/api/eu`. Ajuda que fala do trabalho de outra pessoa é
 > texto que se aprende a não ler. ✅ No ar e conferido pelo dono no mesmo dia.
 
+---
+
+## 21. A central de relatórios — a 904 em abas e a 905 Minha produção (08/11/2026)
+
+Spec `docs/specs/RELATORIOS-UNIFICADOS.md` (as quatro fases numa entrega só),
+linhas em `docs/DECISOES.md`. O dono: *"tudo isso que temos de relatório … deve
+estar concentrado em apenas um lugar"*, para a reunião de toda segunda, **em
+quantidade, nunca em valor**.
+
+- **A 904 Relatórios virou abas**: **Resumo da semana** (abre primeiro) ·
+  Vendas · Produção · Expedição · Estoque · Devoluções · Por pessoa · Sob
+  medida. As três últimas só aparecem para quem tem a chave delas (o ☰ Menu
+  usa a mesma lista, `/api/telas/minhas`); esconder é conforto, quem tranca é a
+  rota. Hash `#semana`, `#vendas`… e a aba lembrada neste computador.
+- ⚠️ **A CENTRAL NÃO TEM CONTA PRÓPRIA** (a regra da central de pendências,
+  #12): `relatorios_dominio.js` **não tem SQL** — o `teste_relatorios.js`
+  recusa. Cada número vem do dono dele, por uma função de PERÍODO que nasceu
+  ao lado da que já existia: a venda do `demanda_dominio` (`vendasPorDiaPeriodo`,
+  `vendasPorMes`, `vendasPorSkuPeriodo`), a devolução do `devcaso_dominio`
+  (`relatorioPeriodo` — o `relatorio(mes)` do mês **delega** a ele, e os 1104
+  casos passam sem mudar o esperado), a embalagem e a baixa do `fluxo_estoque`
+  (`periodo`), o despacho do `carga.js` (`despachoPorDia`, pela mesma `SAIDA` do
+  adiantado: a coleta sai quando o caminhão leva), a urgência do `urgencia.js`,
+  o acerto do `inventario_dominio.acuracidade` (ganhou `ate`), a coleta que
+  não passou do `fim_dia.js`. As abas Devoluções e Sob medida chamam **as
+  rotas da 252 e da 615**, sem cópia.
+- **O Resumo da semana** é de **segunda a domingo**, a última completa, com a
+  semana anterior e a **média das 4 semanas ANTES dela** (a própria não entra,
+  senão puxaria a régua para si). Vendas em peça, devoluções e a taxa
+  (devoluções ÷ vendas), embaladas, as que saíram na Conferência, o despacho
+  no prazo e o item faltante **à parte** (a peça sai, não volta: não é
+  devolução). A cor da seta diz se **melhorou**: devolução e item faltante
+  subindo é vermelho.
+- ⚠️ **"SEM REGISTRO" NÃO É ZERO.** A semana que termina antes do primeiro dado
+  de um número sai `null`, e a tela escreve "sem registro". Todo número diz
+  desde quando existe.
+- ⚠️ **A VENDA CANCELADA FICA FORA** (o dono: *"são vendas que não saíram da
+  empresa"*), e nenhum campo de dinheiro sai de rota nenhuma — o teste varre as
+  chaves de todas as respostas. A aba Devoluções usa a rota da 252, que manda os
+  totais em reais a quem tem `devolucao.dinheiro`: a 904 **não os desenha**.
+- **`produtividade_dominio.js` é o dono de "quem fez quanto"**, pelo id do
+  login gravado em cada linha (revisão, embalagem, etiqueta, reimpressão,
+  conferência, devolução recebida, contagem). **Só quantidade e tempo** (D3):
+  peça com problema, desfazer e bipe recusado não entram. O tempo é a
+  **mediana, com o maior ao lado**. A linha sem id não é de ninguém — nunca se
+  atribui pelo nome (#10) —, e quem embalou a caixa de uma venda continua não
+  existindo (§9-B).
+- **As três chaves de produtividade, que estavam inertes (dívida 18), pegaram**:
+  - `produtividade.propria` abre a **905 Minha produção** (`/minha-producao`,
+    nível Operação, do tablet ou do computador — D4) e a rota `/api/rel/minha`,
+    que **não aceita pessoa**: quem é vem do login (`quem.js`). Ela já estava nos
+    setores de operação, e por isso **a 905 nasceu para eles** — exceção ao
+    R-ALC-06 decidida pelo dono (linha em `docs/DECISOES.md`);
+  - `produtividade.equipe` vê, na aba Por pessoa, a **distribuição sem nome**
+    (pessoas, total, menor/mediana/maior por pessoa) — nenhum nome e nenhum id
+    viajam, nem a ordem das pessoas;
+  - `produtividade.nominal` vê cada pessoa **com nome**.
+  `/api/rel/minha` e `/api/rel/pessoas` têm linha própria no `permDaRota`,
+  **antes** do `pre('/api/rel')` (senão cairiam em "Ver relatórios").
+- ⚠️ **O RETRATO DIÁRIO DAS PENDÊNCIAS (R7, decisão do dono "(a)")**: a central
+  só sabe o número de agora. `pendencias_dia.js` é o dono da tabela
+  `pendencias_dia` (uma linha por dia, o **último** retrato), gravada pela rota
+  da central a cada `resumo` ou `total` — a bancada e a TV perguntam a cada
+  minuto. **Fora do modo teste** (como o `fechamento`), e **começa vazia no
+  deploy**: antes disso é "sem registro". Falha ao gravar vai ao log e não
+  derruba a central.
+- **A Produção e o Estoque reaproveitam o painel gerencial e o histórico
+  produzi × vendi que já existiam** (`/api/gerencial`, `painel.ver`). Quem abre
+  a 904 sem `painel.ver` não os recebe: o bloco some, em vez de a tela quebrar
+  (era o "achei no caminho" de 08/11).
+
+**Rode `node teste_relatorios.js` (56) ao mexer no `relatorios_dominio.js`,
+no `produtividade_dominio.js`, no `pendencias_dia.js`, nas funções de período
+dos donos, no `rel_route.js` ou nas duas telas** — e `node
+teste_devolucao_casos.js` (o mês e o período têm que dar o mesmo). E **abra a
+tela**: os números do resumo são texto montado.
+
+> ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** o Resumo da semana passado na reunião
+> de segunda; o crescimento mês a mês com a planilha do ano importada; a 905
+> aberta por alguém da bancada; e o primeiro dia de pendências gravado. Prova
+> que não foi feita se escreve como não feita.

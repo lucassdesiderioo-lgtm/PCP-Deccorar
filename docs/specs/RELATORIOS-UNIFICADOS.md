@@ -1,7 +1,10 @@
 # RELATORIOS-UNIFICADOS — todo relatório num lugar só, e o que cada pessoa fez pelo login dela
 
-> **STATUS · 08/11/2026 — APROVADA PELO DONO** (*"lista ok, embalagem sim, spec
-> aprovada"*). Nada construído; a fase 1 espera o PLANO. Pedido do dono em 08/11/2026:
+> **STATUS · 08/11/2026 — AS QUATRO FASES EM CÓDIGO, falta subir.** Aprovada
+> pelo dono (*"lista ok, embalagem sim, spec aprovada"*) e construída inteira
+> (*"vamos fazer ela inteira"*): a 904 em abas e a 905 Minha produção. R7 pela
+> opção (a), o retrato diário (`pendencias_dia`); a 905 nasce para os setores de
+> operação. As regras que parecem bug estão no `CLAUDE.md` §21. Pedido do dono em 08/11/2026:
 > *"tudo isso que temos de relatório de alguma coisa no sistema devemos deixar
 > concentrado em apenas um lugar, que seria a tela de relatórios, e já deixando
 > registrado o que cada pessoa executou, pensando em extrair tudo isso pelo
