@@ -251,6 +251,12 @@ const chavesDe = (o, acc = []) => { if(o && typeof o === 'object') for(const k o
   const lista = P.PERMISSOES || P.LISTA || P;
   const prop = (Array.isArray(lista) ? lista : []).find(x => x.chave === 'produtividade.propria');
   ok('a permissão aponta para a tela onde é usada (905)', !prop || prop.tela === 905, prop);
+  /* AJUSTE de 08/11/2026: "Ver produção com nome" mora na 904, junto das outras
+     duas de relatório, na árvore da 901 Acessos (estava pendurada na 104). */
+  const nomi = (Array.isArray(lista) ? lista : []).find(x => x.chave === 'produtividade.nominal');
+  const equi = (Array.isArray(lista) ? lista : []).find(x => x.chave === 'produtividade.equipe');
+  ok('"Ver produção com nome" e "da equipe" aparecem na 904, e a com nome continua sensível e de nível Admin',
+     nomi && nomi.tela === 904 && equi && equi.tela === 904 && nomi.sensivel === true && nomi.nivel === 'admin', { nomi, equi });
   const ac = fs.readFileSync(path.join(__dirname, 'acesso.js'), 'utf8');
   ok('as rotas da minha produção e do por pessoa têm linha própria, ANTES do /api/rel',
      ac.indexOf("eq('/api/rel/minha')") > 0 && ac.indexOf("eq('/api/rel/minha')") < ac.indexOf("if(pre('/api/rel')) return 'relatorios.ver'")

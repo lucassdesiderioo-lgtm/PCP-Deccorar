@@ -291,7 +291,7 @@ module.exports = [
     rotulo:'Ver a própria produção', desc:'Quanto a pessoa produziu' },
   { chave:'produtividade.equipe', grupo:'Visão',      tela:904, nivel:'supervisor',
     rotulo:'Ver produção da equipe', desc:'Distribuição sem identificar quem' },
-  { chave:'produtividade.nominal',grupo:'Visão',      tela:104, nivel:'admin',
+  { chave:'produtividade.nominal',grupo:'Visão',      tela:904, nivel:'admin',
     rotulo:'Ver produção com nome', desc:'Identifica cada operador',
     sensivel:true },
   { chave:'relatorios.ver',       grupo:'Visão',      tela:904, nivel:'supervisor',
