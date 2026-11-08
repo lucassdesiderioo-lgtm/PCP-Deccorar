@@ -561,6 +561,8 @@ Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), sete linhas 
   anúncio. A venda nova com SKU fora do cadastro continua retida no upload do
   PDF (§6) e aparece em Pendências; o `desconhecidos` continua na resposta do
   `GET /api/planejamento`.
+  ✅ **No ar desde 08/11/2026** (PRs #315 e #316): o dono fez o deploy e disse
+  *"deu tudo certo no deploy"*.
 
 **Rode `node teste_vendas_futuras.js` (95) ao mexer no `planilha_estado.js`, no
 import do `plan_route.js`, no `demanda_dominio.js` ou na 401** — ele importa o
