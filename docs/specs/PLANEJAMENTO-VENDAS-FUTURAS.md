@@ -96,8 +96,8 @@ depois isso, depois aquilo".
 | | *Etiqueta pronta para impressão* (21, idem) — **acréscimo do dono, 08/11/2026** | ✅ | ✅ | na Descrição: *"coleta que passará amanhã"*; sem dia, o seguinte, *"data a confirmar"* |
 | **2. Já saiu, não chegou** | *A caminho* (159), *Envio reagendado* (4), *Envio atrasado* (1) | ❌ já saiu da fábrica | ✅ | — |
 | **3. Entregue** | *Entregue* (2.628), *Venda entregue* (8) | ❌ | ✅ | — |
-| **4. Pós-venda** | devolução, reclamação, mediação, reembolso, *Devolvido no dia N*, *Pacote não entregue* (~140, 20 estados) | ❌ | ✅ **muda a regra de hoje** (A4) | — |
-| **5. Cancelada** | *Cancelada pelo comprador* (113), *Venda cancelada. Não envie.* (6), *Cancelada pelo Mercado Livre* (2), *Pacote cancelado pelo Mercado Livre* (1) | ❌ | ❌ | — |
+| **4. Pós-venda** | devolução, reclamação, mediação, reembolso, *Devolvido no dia N*, *Pacote não entregue* (~140, 20 estados); *Seu pacote foi devolvido em N*, *Venda não entregue* (acréscimo do dono, 08/11/2026) | ❌ | ✅ **muda a regra de hoje** (A4) | — |
+| **5. Cancelada** | *Cancelada pelo comprador* (113), *Venda cancelada. Não envie.* (6), *Cancelada pelo Mercado Livre* (2), *Pacote cancelado pelo Mercado Livre* (1); *Cancelada* (acréscimo do dono, 08/11/2026) | ❌ | ❌ | — |
 | **6. Não é venda** | *Pacote de 2 produtos* (16 — cabeçalho, os itens vêm embaixo), Estado **vazio** (2) | ❌ | ❌ | — |
 
 A data da **média** é sempre a **Data de venda**.

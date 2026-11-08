@@ -1,7 +1,7 @@
 # RELATORIOS-UNIFICADOS — todo relatório num lugar só, e o que cada pessoa fez pelo login dela
 
-> **STATUS · 08/11/2026 — RASCUNHO, COM AS RESPOSTAS DO DONO (§6); falta ele
-> aprovar a versão final.** Nada construído. Pedido do dono em 08/11/2026:
+> **STATUS · 08/11/2026 — APROVADA PELO DONO** (*"lista ok, embalagem sim, spec
+> aprovada"*). Nada construído; a fase 1 espera o PLANO. Pedido do dono em 08/11/2026:
 > *"tudo isso que temos de relatório de alguma coisa no sistema devemos deixar
 > concentrado em apenas um lugar, que seria a tela de relatórios, e já deixando
 > registrado o que cada pessoa executou, pensando em extrair tudo isso pelo
@@ -143,5 +143,5 @@ saíram da empresa"*) e qualquer valor em reais.
 - **D7 — a lista da §4.** O dono pediu vendas, devoluções e o crescimento mês a
   mês, em quantidade; a venda cancelada saiu (*"vendas que não saíram da
   empresa"*). O resto da lista é proposta, para ele aprovar.
-- **A produção final é a embalagem** (*"final me refiro a embalagem"*) — a
-  confirmar no PLANO.
+- **A produção final é a embalagem** (*"final me refiro a embalagem"*,
+  confirmado: *"embalagem sim"*).

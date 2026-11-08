@@ -282,6 +282,13 @@ const csv64 = txt => 'data:text/csv;base64,' + Buffer.from(txt, 'utf8').toString
        'Você deve entregar o pacote à coleta que passará amanhã.', new Date(2026,10,8))));
   ok('"Etiqueta pronta para impressão" sem dia na descrição: dia seguinte, a confirmar (nunca some)',
      (c => c.grupo === 'fabrica' && c.data_envio === '2026-11-09' && c.data_confirmar === 1)(P.classificar('Etiqueta pronta para impressão', '', new Date(2026,10,8))));
+  /* E os três estados de uma linha do mesmo relatório (o dono, 08/11/2026). */
+  ok('"Seu pacote foi devolvido em 11 de setembro" é pós-venda (entra na média, não é futura)',
+     (c => c.grupo === 'pos_venda' && c.media && !c.futura)(P.classificar('Seu pacote foi devolvido em 11 de setembro', '', new Date(2026,10,8))));
+  ok('"Venda não entregue" é pós-venda, como "Pacote não entregue"',
+     (c => c.grupo === 'pos_venda' && c.media && !c.futura)(P.classificar('Venda não entregue', '', new Date(2026,10,8))));
+  ok('"Cancelada" sozinha é cancelada (fora da média)',
+     (c => c.grupo === 'cancelada' && !c.media && !c.futura)(P.classificar('Cancelada', '', new Date(2026,10,8))));
   B = novoBanco();
   B.db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('AM',0,1)").run();
   B.db.prepare(`INSERT INTO venda_futura (venda_id,codigo,data_venda,data_envio,unidades,grupo,estado) VALUES ('2000000000000077','AM',?,?,1,'fabrica','x')`)
