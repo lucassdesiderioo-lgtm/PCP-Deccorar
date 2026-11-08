@@ -68,6 +68,38 @@ function vendasPorSku(db, dias){
     "GROUP BY UPPER(codigo)").all(dias).forEach(r=> m[r.c]=r.n);
   return m;
 }
+/* RELATORIOS-UNIFICADOS (08/11/2026): a mesma venda, por PERIODO. A regua e a
+   de cima — peca (Unidades), pela Data de venda, sem a cancelada e sem a linha
+   que nao e venda (`cancelada`), sem o modo teste —, so com as bordas dadas.
+   O relatorio nao conta venda por conta propria: le daqui (R1). */
+function vendasPorDiaPeriodo(db, de, ate){
+  const m = {}, Q = sql(db);
+  db.prepare("SELECT data_venda d, SUM("+Q.PECA+") n FROM venda_futura "+
+    "WHERE data_venda IS NOT NULL AND COALESCE(cancelada,0)=0"+Q.TESTE+" "+
+    "AND data_venda BETWEEN ? AND ? GROUP BY data_venda").all(de, ate).forEach(r => m[r.d] = r.n);
+  return m;
+}
+function vendasPorMes(db){
+  const Q = sql(db);
+  return db.prepare("SELECT substr(data_venda,1,7) mes, SUM("+Q.PECA+") pecas FROM venda_futura "+
+    "WHERE data_venda IS NOT NULL AND COALESCE(cancelada,0)=0"+Q.TESTE+" "+
+    "GROUP BY substr(data_venda,1,7) ORDER BY mes").all();
+}
+/* Os SKUs do periodo, com a cor e a medida do CADASTRO (§7: o codigo nao diz
+   o que a peca e). SKU fora do cadastro sai com cor e medida vazias. */
+function vendasPorSkuPeriodo(db, de, ate){
+  const Q = sql(db);
+  return db.prepare("SELECT UPPER(v.codigo) codigo, SUM("+Q.PECA.replace('unidades','v.unidades')+") pecas, "+
+    "s.cor_codigo cor, s.largura_cm largura, s.altura_cm altura FROM venda_futura v "+
+    "LEFT JOIN skus s ON s.codigo=UPPER(v.codigo) "+
+    "WHERE v.data_venda IS NOT NULL AND COALESCE(v.cancelada,0)=0"+Q.TESTE.replace('teste','v.teste')+" "+
+    "AND v.data_venda BETWEEN ? AND ? GROUP BY UPPER(v.codigo) ORDER BY pecas DESC, codigo").all(de, ate);
+}
+function primeiraVenda(db){
+  try{ const Q = sql(db);
+    return db.prepare("SELECT MIN(data_venda) d FROM venda_futura WHERE data_venda IS NOT NULL"+Q.TESTE).get().d || null;
+  }catch(e){ return null; }
+}
 function vendasTotal(db, dias){
   const m = vendasPorSku(db, dias);
   return Object.keys(m).reduce((a,k)=>a+m[k], 0);
@@ -345,4 +377,5 @@ function aProduzir(db){
   return calcular(db).linhas.filter(l => l.cadastrado && l.precisa > 0);
 }
 
-module.exports = { calcular, aProduzir, cfgNum, porDia, janelas, vendasPorSku, vendasTotal, rotuloDia, JANELAS };
+module.exports = { calcular, aProduzir, cfgNum, porDia, janelas, vendasPorSku, vendasTotal, rotuloDia, JANELAS,
+  vendasPorDiaPeriodo, vendasPorMes, vendasPorSkuPeriodo, primeiraVenda };

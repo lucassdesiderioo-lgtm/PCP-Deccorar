@@ -52,6 +52,9 @@ const TELAS={
   '/':'admin','/admin':'admin','/index.html':'admin',
   '/painel':'painel','/painel.html':'painel',
   '/relatorios':'relatorios','/relatorios.html':'relatorios',
+  /* A 905 Minha produção (RELATORIOS-UNIFICADOS, 08/11/2026): fora desta lista,
+     sem sessão, o pedido cairia no static (armadilha #3 por outra porta). */
+  '/minha-producao':'minha_producao','/minha-producao.html':'minha_producao',
   '/planejamento':'necessidade','/planejamento.html':'necessidade',
   '/operador':'operador','/operador.html':'operador',
   '/devolucao':'devolucao','/devolucao.html':'devolucao',

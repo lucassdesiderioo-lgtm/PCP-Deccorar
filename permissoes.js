@@ -287,7 +287,7 @@ module.exports = [
   // ─── VISÃO ──────────────────────────────────────────────────
   { chave:'painel.ver',           grupo:'Visão',      tela:105, nivel:'operacao',
     rotulo:'Ver painel do dia',   desc:'Andamento geral da operação' },
-  { chave:'produtividade.propria',grupo:'Visão',      tela:105, nivel:'operacao',
+  { chave:'produtividade.propria',grupo:'Visão',      tela:905, nivel:'operacao',   // a 905 Minha produção (RELATORIOS-UNIFICADOS)
     rotulo:'Ver a própria produção', desc:'Quanto a pessoa produziu' },
   { chave:'produtividade.equipe', grupo:'Visão',      tela:904, nivel:'supervisor',
     rotulo:'Ver produção da equipe', desc:'Distribuição sem identificar quem' },

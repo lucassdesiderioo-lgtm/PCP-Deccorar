@@ -102,6 +102,7 @@ app.get('/carregamento',(req,res)=>res.sendFile(path.join(__dirname,'public','ca
 require('./backup_route')(app, db);
 require('./rel_route')(app, db);
 app.get('/relatorios',(req,res)=>res.sendFile(path.join(__dirname,'public','relatorios.html')));
+app.get('/minha-producao',(req,res)=>res.sendFile(path.join(__dirname,'public','minha-producao.html')));   // 905 (RELATORIOS-UNIFICADOS)
 require('./alvo_route')(app, db);
 /* A aba Estoque do admin. Depois do CREATE de `ajuste_estoque` la em cima —
    a rota le a tabela, e num banco novo ela precisa existir antes. */

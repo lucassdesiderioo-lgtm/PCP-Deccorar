@@ -1082,9 +1082,10 @@ function acuracidade(db, opcoes){
   const r = db.prepare(`SELECT COUNT(*) contados,
       SUM(CASE WHEN contado1 = saldo_na_contagem THEN 1 ELSE 0 END) certos
     FROM inventario_item
-    WHERE contado1 IS NOT NULL AND em1 >= ? AND COALESCE(teste,0)=0`).get(desde);
+    WHERE contado1 IS NOT NULL AND em1 >= ? AND (? IS NULL OR substr(em1,1,10) <= ?) AND COALESCE(teste,0)=0`)
+    .get(desde, (opcoes && opcoes.ate) || null, (opcoes && opcoes.ate) || null);
   const contados = r.contados || 0, certos = r.certos || 0;
-  return { desde, contados, certos, pct: contados ? Math.round(certos / contados * 1000) / 10 : null };
+  return { desde, ate:(opcoes && opcoes.ate) || null, contados, certos, pct: contados ? Math.round(certos / contados * 1000) / 10 : null };
 }
 
 /* A diferenca do mes, por motivo, em PECAS (|delta|). O que aplicou sozinho

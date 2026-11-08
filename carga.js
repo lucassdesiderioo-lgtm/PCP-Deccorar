@@ -141,6 +141,40 @@ function saidasAdiantadas(db, dias){
   return r;
 }
 
+/* O DESPACHO NO PRAZO, por dia (RELATORIOS-UNIFICADOS, 08/11/2026). A caixa
+   que SAIU (pela porta dela: coleta quando o caminhao leva, agencia quando sobe
+   no carro — a mesma `SAIDA` do adiantado) no dia `despachar_em` ou antes esta
+   no prazo; depois, atrasada. Sem data de despacho lida nao ha prazo contra o
+   qual medir: conta a parte. Conta CAIXA (o prazo e da etiqueta, uma por
+   caixa). O passivo fechado a mao pelos scripts do §5 carimba a saida NA data
+   do despacho, e por isso entra como no prazo — o relatorio diz isso. */
+function despachoPorDia(db, de, ate){
+  const linhas = db.prepare(`SELECT date(${SAIDA('l')}) dia,
+      CASE WHEN l.despachar_em IS NULL THEN 'sem_prazo'
+           WHEN date(${SAIDA('l')}) <= l.despachar_em THEN 'no_prazo' ELSE 'atrasado' END situacao,
+      COUNT(*) n
+    FROM lote l
+    WHERE l.estagio='carregado' AND ${SAIDA('l')} IS NOT NULL AND COALESCE(l.teste,0)=0
+      AND date(${SAIDA('l')}) BETWEEN ? AND ?
+    GROUP BY 1, 2`).all(de, ate);
+  const m = {};
+  for(const r of linhas){ const x = m[r.dia] = m[r.dia] || { no_prazo:0, atrasado:0, sem_prazo:0 }; x[r.situacao] += r.n; }
+  return m;
+}
+function primeiraSaida(db){
+  try{ return db.prepare(`SELECT MIN(date(${SAIDA('l')})) d FROM lote l WHERE l.estagio='carregado'
+      AND ${SAIDA('l')} IS NOT NULL AND COALESCE(l.teste,0)=0`).get().d || null; }catch(e){ return null; }
+}
+/* Coleta x agencia por MES, pela modalidade da ETIQUETA (R-MOD-03: este e o
+   dono de "isto e coleta?") e pelo dia em que o PDF entrou. A cancelada e o
+   teste ficam fora; conta caixa e peca. */
+function modalidadePorMes(db){
+  return db.prepare(`SELECT substr(l.data,1,7) mes, ${COLETA('l')} coleta, COUNT(*) caixas,
+      SUM(MAX(1, COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=l.id),1))) pecas
+    FROM lote l WHERE COALESCE(l.teste,0)=0 AND l.estagio<>'cancelado' AND l.data IS NOT NULL
+    GROUP BY 1, 2 ORDER BY 1`).all();
+}
+
 /* A CONFERENCIA DA PILHA (spec SAIDA-E-DUPLA-CONFERENCIA, fase 2, 26/09/2026).
    Dupla conferencia sao duas contagens por caixa: a impressao da etiqueta de
    venda (bipe 1, `impresso_por`) e a conferencia na area de expedicao (bipe 2,
@@ -298,4 +332,5 @@ const VARIAS = alias => `(SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=${a
 module.exports = { VARIAS, PRA_CARREGAR, DO_DIA, ORDEM_CARGA, atrasado, futuro,
                    COLETA, AGENCIA, ehColeta, AGUARDA_CAMINHAO,
                    SAIDA, saidasAdiantadas, pilhaDaArea, nomeIgual, mesmaPessoa,
-                   acharVolumes, NA_SAIDA, naSaida, PODE_TER_IDO, podeTerIdo, PRONTA_PRO_CARRO };
+                   acharVolumes, NA_SAIDA, naSaida, PODE_TER_IDO, podeTerIdo, PRONTA_PRO_CARRO,
+                   despachoPorDia, primeiraSaida, modalidadePorMes };

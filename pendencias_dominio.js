@@ -156,8 +156,8 @@ function resumo(db){
    da folha estao sem etiqueta (a que pode atrasar no ML). Quem opera a
    Etiqueta de Venda ou a Conferencia nao abre o admin, e sem isto a central
    so existia para quem ja estava la. */
-function total(db){
-  const r = resumo(db);
+function total(db, pronto){
+  const r = pronto || resumo(db);   // a rota já tem o resumo (gravou o retrato do dia com ele)
   const t = new Date(), z = n => String(n).padStart(2, '0');
   const hoje = Date.parse(t.getFullYear() + '-' + z(t.getMonth() + 1) + '-' + z(t.getDate()) + 'T00:00:00');
   let dias = null;

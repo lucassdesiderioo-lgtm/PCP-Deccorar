@@ -1,0 +1,70 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minha produção</title>
+<style>
+  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--blue:#4493f8;--violet:#a371f7}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  .mark{width:34px;height:34px;border-radius:8px;background:var(--green);display:grid;place-items:center;color:#04140a;font-weight:800}
+  h1{font-size:18px;margin:0}.sub{font-size:13px;color:var(--muted)}
+  .wrap{max-width:960px;margin:0 auto;padding:20px 16px}
+  /* Os botões do período: grandes, para o dedo no tablet da bancada (D4: de onde estiver logado) */
+  .per{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .per button{flex:1 1 140px;min-height:52px;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:12px;font-size:17px;cursor:pointer}
+  .per button.on{background:var(--green);border-color:var(--green);color:#04140a;font-weight:800}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+  .tile .t{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .tile .v{font-size:48px;font-weight:800;margin:6px 0 2px;font-variant-numeric:tabular-nums;line-height:1.05}
+  .tile .c{font-size:14px;color:var(--muted)}
+  .vazio{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px;text-align:center;color:var(--muted);font-size:16px}
+  .nota{color:var(--muted);font-size:12px;margin-top:16px;line-height:1.5}
+</style></head><body>
+<header><div class="mark">✓</div><div><h1>Minha produção</h1><div class="sub" id="quem">—</div></div></header>
+<div class="wrap">
+  <div class="per" id="per">
+    <button data-p="hoje">Hoje</button>
+    <button data-p="semana">Nesta semana</button>
+    <button data-p="mes">Neste mês</button>
+  </div>
+  <div class="tiles" id="tiles"><div class="vazio">carregando…</div></div>
+  <div class="nota" id="nota"></div>
+</div>
+<script>
+/* A 905 (RELATORIOS-UNIFICADOS, 08/11/2026): o que a pessoa LOGADA fez. A
+   rota não aceita pessoa nenhuma — quem é vem do login, no servidor. Só
+   quantidade e tempo (decisão do dono): erro não entra aqui. */
+const $=s=>document.querySelector(s);
+const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const nf=n=>(+n||0).toLocaleString('pt-BR');
+function fmt(s){ s=+s||0; const m=Math.floor(s/60); return (m?m+'m ':'')+(s%60)+'s'; }
+const dBr=d=>d?d.slice(8,10)+'/'+d.slice(5,7):'';
+const COR={revisao:'var(--amber)',embalagem:'var(--violet)',etiqueta:'var(--blue)',reimpressao:'var(--blue)',conferencia:'var(--green)',devolucao:'#e07798',contagem:'#7ee2a0'};
+let D=null, P='hoje';
+try{ P=localStorage.getItem('minha_per')||'hoje'; }catch(e){}
+
+function desenhar(){
+  document.querySelectorAll('#per button').forEach(b=>b.classList.toggle('on', b.dataset.p===P));
+  const per=D.periodos.find(x=>x.chave===P) || D.periodos[0];
+  /* Mostra a etapa em que a pessoa trabalhou em ALGUM dos três períodos, para
+     o painel não mudar de forma ao trocar de botão; a que ela nunca faz some. */
+  const usadas=new Set(); D.periodos.forEach(p=>p.etapas.forEach(e=>{ if(e.qtd) usadas.add(e.chave); }));
+  const etapas=per.etapas.filter(e=>usadas.has(e.chave));
+  $('#tiles').innerHTML = etapas.length ? etapas.map(e=>'<div class="tile"><div class="t">'+esc(e.nome)+'</div>'
+      +'<div class="v" style="color:'+(COR[e.chave]||'var(--txt)')+'">'+nf(e.qtd)+'</div>'
+      +(e.tempo_mediana!=null?'<div class="c">tempo típico: <b style="color:var(--txt)">'+fmt(e.tempo_mediana)+'</b> · maior: '+fmt(e.tempo_maior)+'</div>':'')+'</div>').join('')
+    : '<div class="vazio">Nada registrado no seu nome '+(P==='hoje'?'hoje':(P==='semana'?'nesta semana':'neste mês'))+' ainda.</div>';
+  $('#nota').textContent=(P==='hoje'?'Hoje, '+dBr(per.de):'De '+dBr(per.de)+' a '+dBr(per.ate))
+    +'. Conta o que foi feito com o seu PIN: revisão e embalagem desde 26/10/2026, o resto desde 05/11/2026. O tempo típico é a mediana.';
+}
+async function carregar(){
+  try{ const r=await fetch('/api/rel/minha'); if(!r.ok) throw 0; D=await r.json(); }
+  catch(e){ $('#tiles').innerHTML='<div class="vazio">Não consegui carregar a sua produção. Tente de novo.</div>'; return; }
+  $('#quem').textContent=D.nome||'';
+  desenhar();
+}
+document.querySelectorAll('#per button').forEach(b=>b.addEventListener('click',()=>{ P=b.dataset.p; try{ localStorage.setItem('minha_per',P); }catch(e){} if(D) desenhar(); }));
+carregar();
+setInterval(carregar, 60000);   // a bancada deixa aberta: atualiza sozinha a cada minuto
+</script><script src="/nav.js"></script>
+</body></html>

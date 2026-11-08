@@ -9,14 +9,16 @@
  * A conta de cada linha é da tela dona; ver o pendencias_dominio.js.
  */
 const PEND = require('./pendencias_dominio');
+const DIA = require('./pendencias_dia');   // o retrato de cada dia, para o relatório (R7)
 
 module.exports = function(app, db){
+  try{ DIA.garantir(db); }catch(e){}
   app.get('/api/pendencias/resumo', (req,res) => {
-    try{ res.json(PEND.resumo(db)); }
+    try{ const r = PEND.resumo(db); DIA.gravar(db, r); res.json(r); }
     catch(e){ console.log('[pendencias] ' + (e && e.stack || e)); res.status(500).json({ erro:'não consegui montar o resumo' }); }
   });
   app.get('/api/pendencias/total', (req,res) => {
-    try{ res.json(PEND.total(db)); }
+    try{ const r = PEND.resumo(db); DIA.gravar(db, r); res.json(PEND.total(db, r)); }
     catch(e){ console.log('[pendencias] ' + (e && e.stack || e)); res.status(500).json({ erro:'não consegui contar' }); }
   });
 };

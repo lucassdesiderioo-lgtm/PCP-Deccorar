@@ -72,4 +72,12 @@ function marcas(db){
   return m;
 }
 
-module.exports = { garantir, registrar, doDia, marcas };
+/* RELATORIOS-UNIFICADOS (08/11/2026): os dias em que a coleta nao passou, e
+   quantas caixas ficaram em cada um. Fora do modo teste. */
+function porPeriodo(db, de, ate){
+  garantir(db);
+  return db.prepare("SELECT dia, ids FROM fim_dia WHERE COALESCE(teste,0)=0 AND dia BETWEEN ? AND ? ORDER BY dia")
+    .all(de, ate).map(r => ({ dia:r.dia, caixas:lista(r.ids).length }));
+}
+
+module.exports = { garantir, registrar, doDia, marcas, porPeriodo };

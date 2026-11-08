@@ -87,7 +87,9 @@ const TELAS = [
   { n:901, nome:'Acessos',               rota:'/acessos',       nivel:'admin_geral', onde:'computador', perms:['pessoas.gerenciar'],    aba:'acs' },
   { n:902, nome:'Cadastros',             rota:'/admin/cadastros', nivel:'admin',    onde:'computador', perms:['listas.editar','kit.editar','kit.imprimir','horarios.editar'], aba:'cd' },
   { n:903, nome:'Modo teste',            rota:'/admin/teste',   nivel:'admin',      onde:'computador', perms:['teste.operar'],          aba:'tst' },
-  { n:904, nome:'Relatórios',            rota:'/relatorios',    nivel:'supervisor', onde:'computador', perms:['relatorios.ver'],        area:'relatorios', aba:'rel' }
+  { n:904, nome:'Relatórios',            rota:'/relatorios',    nivel:'supervisor', onde:'computador', perms:['relatorios.ver'],        area:'relatorios', aba:'rel' },
+  // RELATORIOS-UNIFICADOS (08/11/2026): o que a pessoa logada fez. Nível Operação, do tablet ou do computador (D4).
+  { n:905, nome:'Minha produção',        rota:'/minha-producao', nivel:'operacao',  onde:'tablet',     perms:['produtividade.propria'] }
 ];
 
 /* A ORDEM DE CHEGADA depois do PIN (destino.js): a primeira tela que a pessoa
