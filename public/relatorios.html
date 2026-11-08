@@ -21,6 +21,9 @@
   .kpi.rev .n{color:var(--blue)}.kpi.emb .n{color:var(--violet)}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:18px}
   .card h3{margin:0 0 12px;font-size:13px;color:var(--muted);text-transform:uppercase}
+  .fecho{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end}
+  .fecho .cn{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
+  .fecho .cl{font-size:12px;color:var(--muted)}
   table{width:100%;border-collapse:collapse;font-size:14px}
   th,td{text-align:right;padding:10px;border-bottom:1px solid var(--line)}
   th:first-child,td:first-child{text-align:left}
@@ -31,6 +34,18 @@
 <header><div class="mark">R</div><div><h1>Relatórios de produtividade</h1><div class="sub">Tempos e volume de revisão e embalagem</div></div>
 <div class="links"><a class="link" href="/painel">Painel</a><a class="link" href="/">Admin</a></div></header>
 <div class="wrap">
+  <!-- O FECHAMENTO DO DIA (AJUSTE de 08/11/2026): veio da 401 Planejamento, que
+       ficou so com o que serve para decidir o que produzir. A rota continua
+       @admin (nao mudou quem ve): para quem nao alcanca, o cartao some. -->
+  <div class="card" id="fecho" style="display:none">
+    <h3>Fechamento do dia — <span id="fData">—</span></h3>
+    <div class="fecho">
+      <div><div class="cn" id="fProd" style="color:var(--green)">–</div><div class="cl">Produzi (virou estoque)</div></div>
+      <div><div class="cn" id="fVend" style="color:#ff6b6b">–</div><div class="cl">Vendi (etiquetas de venda)</div></div>
+      <div><div class="cn" id="fVar">–</div><div class="cl">Estoque variou</div></div>
+      <div><div class="cn" id="fCob" style="color:var(--blue)">–</div><div class="cl" id="fCobL">Cobertura média</div></div>
+    </div>
+  </div>
   <div class="filtro">
     <div><label>De</label><input type="date" id="de"></div>
     <div><label>Até</label><input type="date" id="ate"></div>
@@ -66,7 +81,7 @@
 <div class="card"><h3>Cobertura de estoque — produzi &times; vendi</h3>
   <canvas id="gCob" height="80"></canvas>
   <div style="overflow:auto;margin-top:12px"><table id="gCobTab"><thead><tr><th>Dia</th><th>Produzi</th><th>Vendi</th><th>Variação</th><th>Estoque fim</th><th>Cobertura (dias)</th></tr></thead><tbody id="gCobBody"></tbody></table></div>
-  <div id="gCobMsg" style="color:#8b97a5;font-size:13px;margin-top:8px">O fechamento do dia é gravado na tela Planejamento.</div>
+  <div id="gCobMsg" style="color:#8b97a5;font-size:13px;margin-top:8px">O fechamento do dia é gravado quando a tela Planejamento ou esta tela é aberta.</div>
 </div>
 
   <div class="card"><h3>Por SKU</h3>
@@ -191,6 +206,27 @@ async function carregarGer(){
   }
 }
 
+/* O mesmo cartao que morava na 401, com a mesma conta (GET /api/fechamento,
+   que tambem grava o retrato do dia). Recusa ou falha: o cartao fica escondido. */
+async function fechamento(){
+  let f; try{ const r=await fetch('/api/fechamento'); if(!r.ok) return; f=await r.json(); }catch(e){ return; }
+  $('#fData').textContent=f.data||'—';
+  $('#fProd').textContent=f.produzido;
+  $('#fVend').textContent=f.vendido;
+  const v=f.variou; $('#fVar').textContent=(v>0?'+':'')+v;
+  $('#fVar').style.color = v>0?'var(--green)':(v<0?'#ff6b6b':'var(--muted)');
+  if(f.cobertura_dias==null){ $('#fCob').textContent='—'; $('#fCobL').textContent='Cobertura média (sem vendas na janela)'; }
+  else{
+    $('#fCob').textContent=f.cobertura_dias+'d';
+    let cmp='';
+    if(f.cobertura_ontem!=null){ const dd=+(f.cobertura_dias-f.cobertura_ontem).toFixed(1);
+      cmp=' · era '+f.cobertura_ontem+'d ontem'+(dd>0?' (↑'+dd+')':(dd<0?' (↓'+Math.abs(dd)+')':' (=)')); }
+    $('#fCobL').textContent='Cobertura média · alvo '+f.dias_cobertura_alvo+'d'+cmp;
+  }
+  $('#fecho').style.display='';
+}
+
+fechamento();
 carregarGer();
 </script><script src="/nav.js"></script>
 </body></html>

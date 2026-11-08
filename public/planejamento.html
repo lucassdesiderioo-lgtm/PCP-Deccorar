@@ -17,11 +17,6 @@
   .tot{margin-left:auto;font-size:14px;color:var(--muted)}.tot b{color:var(--blue);font-size:20px}
   .msg{font-size:13px;color:var(--green)}
   .meta{font-size:12px;color:var(--muted);margin:2px 0 14px}
-  .fecho{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end}
-  .fecho h3{margin:0 0 6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;width:100%}
-  .fecho .cell{display:flex;flex-direction:column;gap:2px}
-  .fecho .cn{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
-  .fecho .cl{font-size:12px;color:var(--muted)}
   .aviso{background:#2a2410;border:1px solid #6b5a12;color:#ffd85c;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13px;display:none}
   .aviso b{color:#ffe98a}
   .tbwrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
@@ -66,9 +61,9 @@
   .vf .sem{color:var(--muted)}
   .jn{margin:0 0 22px}
   /* AJUSTE de 08/11/2026: o topo fixo e as abas, no estilo das Devoluções em andamento */
-  .topo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:14px;margin-bottom:14px}
-  @media(max-width:900px){.topo{grid-template-columns:minmax(0,1fr)}}
-  .topo .fecho{align-content:flex-start}  /* esticado à altura do Importar, o título fica no alto */
+  /* O fechamento do dia saiu daqui para a 904 Relatórios (AJUSTE de 08/11/2026):
+     é retrato do que já foi feito, e a 401 é para decidir o que produzir. */
+  .topo{display:grid;grid-template-columns:minmax(0,640px);gap:14px;margin-bottom:14px}
   .imp{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px}
   .imp .impl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .imp .prim{border:0;border-radius:9px;font-weight:700;padding:10px 16px;cursor:pointer}
@@ -93,16 +88,10 @@
 <div class="wrap">
 
   <!-- O TOPO FICA FIXO EM TODAS AS ABAS (AJUSTE de 08/11/2026, pedido do dono):
-       o fechamento do dia e a planilha do ML — subir a planilha e ver se ela e
-       de hoje e o primeiro gesto da manha e do fim do dia (R8, R12). -->
+       a planilha do ML — subir a planilha e ver se ela e de hoje e o primeiro
+       gesto da manha e do fim do dia (R8, R12). O fechamento do dia foi para a
+       904 Relatorios no mesmo dia (outro AJUSTE). -->
   <div class="topo">
-  <div class="fecho" id="fecho" style="margin:0">
-    <h3>Fechamento do dia — <span id="fData">—</span></h3>
-    <div class="cell"><div class="cn" id="fProd" style="color:var(--green)">–</div><div class="cl">Produzi (virou estoque)</div></div>
-    <div class="cell"><div class="cn" id="fVend" style="color:var(--red)">–</div><div class="cl">Vendi (etiquetas de venda)</div></div>
-    <div class="cell"><div class="cn" id="fVar">–</div><div class="cl">Estoque variou</div></div>
-    <div class="cell"><div class="cn" id="fCob" style="color:var(--blue)">–</div><div class="cl" id="fCobL">Cobertura média</div></div>
-  </div>
   <div class="imp">
     <div class="meta" id="vfMeta" style="margin:0;font-size:14px;font-weight:700"></div>
     <div class="impl">
@@ -114,13 +103,14 @@
       nunca é apagada por ausência, então um recorte não estraga a média.</span>
   </div>
   </div>
-  <!-- Duas tarjas, e sao coisas diferentes: `recorte` diz o que o import fez
-       com os volumes cancelados (some no proximo import); `aviso` lista SKU da
-       planilha fora do cadastro (some quando alguem cadastra). O id ficou
-       `recorte` por historia: a tarja do recorte saiu na fase 2 de
-       VENDAS-E-MEDIA, quando o import parou de apagar a venda passada. -->
+  <!-- `recorte` diz o que o import fez com os volumes cancelados (some no
+       proximo import). O id ficou `recorte` por historia: a tarja do recorte
+       saiu na fase 2 de VENDAS-E-MEDIA. A tarja dos SKUs da planilha fora do
+       cadastro SAIU em 08/11/2026 (AJUSTE, o dono: "nao traz dado nenhum"):
+       ela listava 14 meses de codigo velho e de anuncio; a venda NOVA com SKU
+       fora do cadastro continua retida no upload do PDF (§6) e aparece em
+       Pendencias. -->
   <div class="aviso" id="recorte" style="border-color:#8a5a12;background:#2e2008"></div>
-  <div class="aviso" id="aviso"></div>
 
   <!-- AS ABAS (AJUSTE de 08/11/2026): no estilo das Devoluções em andamento.
        Cada aba carrega quando abre; a tela lembra a ultima aberta neste
@@ -233,22 +223,11 @@ const dec1=v=>(Math.round(v*10)/10).toFixed(1).replace('.',',');
 const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const dataBr=d=>d?d.slice(8,10)+'/'+d.slice(5,7):'';
 
-async function fechamento(){
-  let f; try{ f=await (await fetch('/api/fechamento')).json(); }catch(e){ return; }
-  $('#fData').textContent=f.data||'—';
-  $('#fProd').textContent=f.produzido;
-  $('#fVend').textContent=f.vendido;
-  const v=f.variou; $('#fVar').textContent=(v>0?'+':'')+v;
-  $('#fVar').style.color = v>0?'var(--green)':(v<0?'var(--red)':'var(--muted)');
-  if(f.cobertura_dias==null){ $('#fCob').textContent='—'; $('#fCobL').textContent='Cobertura média (sem vendas na janela)'; }
-  else{
-    $('#fCob').textContent=f.cobertura_dias+'d';
-    var cmp='';
-    if(f.cobertura_ontem!=null){ var dd=+(f.cobertura_dias-f.cobertura_ontem).toFixed(1);
-      cmp=' · era '+f.cobertura_ontem+'d ontem'+(dd>0?' (↑'+dd+')':(dd<0?' (↓'+Math.abs(dd)+')':' (=)')); }
-    $('#fCobL').textContent='Cobertura média · alvo '+f.dias_cobertura_alvo+'d'+cmp;
-  }
-}
+/* O GET /api/fechamento GRAVA o retrato do dia (tabela `fechamento`), de onde
+   sai o historico "produzi × vendi" da 904. O cartao saiu daqui (AJUSTE de
+   08/11/2026), mas a 401 continua pedindo, calada: sem isso o historico so
+   andaria nos dias em que alguem abrisse a 904. */
+function fechamento(){ fetch('/api/fechamento').catch(()=>{}); }
 
 async function load(){
   const d=await (await fetch('/api/planejamento')).json();
@@ -277,14 +256,6 @@ async function load(){
   } else {
     $('#meta').textContent='Nenhuma planilha importada ainda. Os números novos só aparecem após a primeira importação.';
   }
-
-  const av=$('#aviso');
-  if(d.desconhecidos && d.desconhecidos.length){
-    av.style.display='block';
-    av.innerHTML='<b>⚠ SKUs na planilha e fora do cadastro:</b> '
-      +d.desconhecidos.map(x=>x.codigo+' ('+x.qtd+')').join(' · ')
-      +' — cadastre no Admin para entrarem no cálculo de estoque.';
-  } else av.style.display='none';
 
   LINHAS=d.linhas;
   desenhar();
