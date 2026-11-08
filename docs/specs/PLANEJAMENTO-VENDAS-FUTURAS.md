@@ -5,7 +5,9 @@
 > fase 4 está desligada. **Desde 08/11/2026 a 401 é em abas** (AJUSTE: Vendas por
 > dia · O que produzir · Médias por janela · Planilha × sistema), e no mesmo dia
 > o fechamento do dia foi para a 904 Relatórios e a tarja dos SKUs fora do
-> cadastro saiu (AJUSTE). **Falta a prova com dado real:** o primeiro import
+> cadastro saiu (AJUSTE). **E a tabela §3-B ganhou dois estados** (CONSERTO de
+> 08/11/2026, o dono): "Para entregar na coleta de amanhã" e "Etiqueta pronta para
+> impressão" são ainda na fábrica, para o dia seguinte. **Falta a prova com dado real:** o primeiro import
 > classificando pela §3-B, a aba conferida com a bancada por alguns dias e, só
 > depois, o dono ligar a fase 4. O que mudou na construção, com o dono:
 > - **O relatório real dá 228 linhas · 239 peças ainda na fábrica, e não
@@ -90,6 +92,8 @@ depois isso, depois aquilo".
 | **1. Ainda na fábrica** | *Para entregar na coleta do dia N* (182) | ✅ | ✅ | no Estado |
 | | *Pronto para coleta* (42) | ✅ | ✅ | na Descrição: *"coleta que passará na segunda-feira"* → a próxima segunda a partir da data do relatório |
 | | *Pronta para emitir NF-e da venda* (4) | ✅ | ✅ | ainda não existe; **fica no dia seguinte**, marcada *"data a confirmar"*. Depois da NF o ML mostra a data, e a próxima planilha corrige |
+| | *Para entregar na coleta de amanhã* (81, relatório das 17:34 de 08/11) — **acréscimo do dono, 08/11/2026** | ✅ | ✅ | o dia seguinte ao do relatório |
+| | *Etiqueta pronta para impressão* (21, idem) — **acréscimo do dono, 08/11/2026** | ✅ | ✅ | na Descrição: *"coleta que passará amanhã"*; sem dia, o seguinte, *"data a confirmar"* |
 | **2. Já saiu, não chegou** | *A caminho* (159), *Envio reagendado* (4), *Envio atrasado* (1) | ❌ já saiu da fábrica | ✅ | — |
 | **3. Entregue** | *Entregue* (2.628), *Venda entregue* (8) | ❌ | ✅ | — |
 | **4. Pós-venda** | devolução, reclamação, mediação, reembolso, *Devolvido no dia N*, *Pacote não entregue* (~140, 20 estados) | ❌ | ✅ **muda a regra de hoje** (A4) | — |
