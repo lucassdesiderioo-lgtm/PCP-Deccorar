@@ -68,6 +68,7 @@
   /* AJUSTE de 08/11/2026: o topo fixo e as abas, no estilo das Devoluções em andamento */
   .topo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:14px;margin-bottom:14px}
   @media(max-width:900px){.topo{grid-template-columns:minmax(0,1fr)}}
+  .topo .fecho{align-content:flex-start}  /* esticado à altura do Importar, o título fica no alto */
   .imp{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px}
   .imp .impl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .imp .prim{border:0;border-radius:9px;font-weight:700;padding:10px 16px;cursor:pointer}
@@ -580,7 +581,11 @@ function recarregarAba(){ if(ABA!=='produzir') ABAS[ABA].carregar(); }
 document.getElementById('tabs').addEventListener('click',function(e){
   const t=e.target.closest('.tab'); if(t) abrirAba(t.getAttribute('data-t'));
 });
-window.addEventListener('hashchange',function(){ const h=location.hash.slice(1); if(ABAS[h] && h!==ABA) abrirAba(h, true); });
+window.addEventListener('hashchange',function(){
+  const h=location.hash.slice(1);
+  if(ABAS[h]){ if(h!==ABA) abrirAba(h, true); }
+  else { try{ history.replaceState(null,'','#'+ABA); }catch(e){} }   // endereço inválido volta a dizer a aba aberta
+});
 (function(){
   let a=location.hash.slice(1);
   if(!ABAS[a]){ try{ a=localStorage.getItem('plan_aba')||''; }catch(e){ a=''; } }
