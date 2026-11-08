@@ -1,4 +1,46 @@
+/* RELATORIOS-UNIFICADOS (08/11/2026): a central de relatorios na 904. Toda
+   rota daqui so LE, e cada numero vem do dono dele (relatorios_dominio.js,
+   produtividade_dominio.js). Quem pode: `/api/rel/*` e "Ver relatorios"; a
+   "Minha producao" e "Ver a propria producao"; o "Por pessoa" e "Ver producao
+   da equipe" ou "com nome" — e o nome so viaja com a de nome (permDaRota). */
+const REL = require('./relatorios_dominio');
+const PROD = require('./produtividade_dominio');
+const QUEM = require('./quem');
 module.exports=function(app,db){
+  const responder = (res, f) => { try{ res.json(f()); }
+    catch(e){ console.log('[relatorios] ' + (e && e.stack || e)); res.status(500).json({ erro:'não consegui montar o relatório' }); } };
+  const per = req => REL.periodo(db, (req.query||{}).de, (req.query||{}).ate);
+  app.get('/api/rel/semana', (req,res) => responder(res, () => REL.semana(db, (req.query||{}).domingo)));
+  app.get('/api/rel/vendas', (req,res) => responder(res, () => REL.vendas(db, (req.query||{}).de, (req.query||{}).ate)));
+  app.get('/api/rel/producao', (req,res) => responder(res, () => { const p = per(req); return REL.producao(db, p.de, p.ate); }));
+  app.get('/api/rel/expedicao', (req,res) => responder(res, () => { const p = per(req); return REL.expedicao(db, p.de, p.ate); }));
+  app.get('/api/rel/estoque', (req,res) => responder(res, () => { const p = per(req); return REL.estoque(db, p.de, p.ate); }));
+
+  /* POR PESSOA (fase 3). A equipe sem nome a quem so tem "Ver producao da
+     equipe"; com nome a quem tem "Ver producao com nome". */
+  app.get('/api/rel/pessoas', (req,res) => responder(res, () => {
+    const p = per(req);
+    let comNome = false;
+    try{ comNome = !!app.locals.acesso.podePermissao(req.usuario, 'produtividade.nominal'); }catch(e){}
+    return { de:p.de, ate:p.ate, com_nome:comNome, desde:PROD.desde(db), etapas:PROD.daEquipe(db, p.de, p.ate, comNome) };
+  }));
+
+  /* A MINHA PRODUCAO (905): o que a pessoa LOGADA fez — hoje, nesta semana
+     (de segunda ate hoje) e neste mes. Quem e a pessoa vem do servidor
+     (quem.js), nunca da tela: nao ha parametro de pessoa nesta rota. */
+  app.get('/api/rel/minha', (req,res) => {
+    const uid = QUEM.idDe(req);
+    if(uid == null) return res.status(401).json({ erro:'Entre com o seu PIN para ver a sua produção.' });
+    responder(res, () => {
+      const hoje = REL.periodo(db).ate;
+      const seg = REL.mais(REL.domingoAte(hoje), -6), mes = hoje.slice(0, 8) + '01';
+      return { nome:QUEM.nomeDe(req), hoje, desde:PROD.desde(db),
+        periodos:[ { chave:'hoje', nome:'Hoje', de:hoje, ate:hoje, etapas:PROD.daPessoa(db, uid, hoje, hoje) },
+                   { chave:'semana', nome:'Nesta semana', de:seg, ate:hoje, etapas:PROD.daPessoa(db, uid, seg, hoje) },
+                   { chave:'mes', nome:'Neste mês', de:mes, ate:hoje, etapas:PROD.daPessoa(db, uid, mes, hoje) } ] };
+    });
+  });
+
   function faixa(req){
     let de=(req.query.de||'').trim(), ate=(req.query.ate||'').trim();
     if(!/^\d{4}-\d{2}-\d{2}$/.test(de)) de="date('now','localtime','-6 days')"; else de="'"+de+"'";

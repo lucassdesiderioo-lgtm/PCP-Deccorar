@@ -62,4 +62,24 @@ function aplicar(db){
   return { urgentes, linhas };
 }
 
-module.exports = { calcular, aplicar };
+/* A FALTA DE ESTOQUE NO RELATORIO (RELATORIOS-UNIFICADOS, 08/11/2026): as
+   pecas que a urgencia do PDF mandava produzir em cada dia. ⚠️ E O RETRATO DO
+   ULTIMO PDF DO DIA, e nao a soma do dia: o `aplicar` apaga as ordens `ml` de
+   hoje e refaz pela conta de agora (R-URG-02), entao a urgencia da manha que
+   a fabrica ja resolveu antes do PDF da tarde nao aparece. A tela diz isso. */
+function porDia(db, de, ate){
+  const m = {};
+  db.prepare("SELECT data d, SUM(qtd) q FROM producao WHERE origem='ml' AND urgente=1 AND COALESCE(teste,0)=0 "+
+    "AND data BETWEEN ? AND ? GROUP BY data").all(de, ate).forEach(r => m[r.d] = r.q);
+  return m;
+}
+function porSku(db, de, ate){
+  return db.prepare("SELECT UPPER(codigo) codigo, SUM(qtd) pecas, COUNT(DISTINCT data) dias FROM producao "+
+    "WHERE origem='ml' AND urgente=1 AND COALESCE(teste,0)=0 AND data BETWEEN ? AND ? "+
+    "GROUP BY UPPER(codigo) ORDER BY pecas DESC, codigo").all(de, ate);
+}
+function primeira(db){
+  try{ return db.prepare("SELECT MIN(data) d FROM producao WHERE origem='ml' AND urgente=1 AND COALESCE(teste,0)=0").get().d || null; }catch(e){ return null; }
+}
+
+module.exports = { calcular, aplicar, porDia, porSku, primeira };

@@ -1,15 +1,20 @@
 <!DOCTYPE html><html lang="pt-BR"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Relatórios de produtividade</title>
+<title>Relatórios</title>
 <style>
-  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--blue:#4493f8;--violet:#a371f7}
+  :root{--bg:#0e1217;--panel:#161b22;--line:#262d37;--txt:#e6edf3;--muted:#8b97a5;--amber:#ffb800;--green:#2ea043;--blue:#4493f8;--violet:#a371f7;--red:#ff6b6b}
+  [hidden]{display:none !important}   /* o .filtro{display:flex} passava por cima do hidden */
   *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
-  header{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  header{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
   h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
   .links{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
   .link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
-  .wrap{max-width:1000px;margin:0 auto;padding:20px}
+  .wrap{max-width:1200px;margin:0 auto;padding:20px}
+  /* AS ABAS (RELATORIOS-UNIFICADOS, 08/11/2026), no estilo da 401 e das Devoluções em andamento */
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+  .tab{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:9px 16px;cursor:pointer;font-size:14px}
+  .tab.on{background:var(--amber);color:#1a1300;border-color:var(--amber);font-weight:700}
   .filtro{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px;display:flex;gap:12px;align-items:end;flex-wrap:wrap}
   .filtro label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
   .filtro input{padding:9px;border-radius:8px;border:1px solid var(--line);background:#0b0f14;color:var(--txt)}
@@ -19,7 +24,7 @@
   .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
   .kpi .n{font-size:26px;font-weight:800}.kpi .l{font-size:12px;color:var(--muted);text-transform:uppercase;margin-top:4px}
   .kpi.rev .n{color:var(--blue)}.kpi.emb .n{color:var(--violet)}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:18px;min-width:0}
   .card h3{margin:0 0 12px;font-size:13px;color:var(--muted);text-transform:uppercase}
   .fecho{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end}
   .fecho .cn{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
@@ -29,192 +34,250 @@
   th:first-child,td:first-child{text-align:left}
   th{font-size:11px;color:var(--muted);text-transform:uppercase}
   td.code{font-family:ui-monospace,monospace;font-weight:600}
+  .rola{overflow-x:auto}
   canvas{max-width:100%}
+  .duas{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:16px}
+  .vazio{color:var(--muted);padding:14px;text-align:center}
+  .nota{color:var(--muted);font-size:12px;margin-top:8px}
+  /* O RESUMO DA SEGUNDA-FEIRA: números grandes, para projetar na reunião */
+  .semnav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .semnav button{background:transparent;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 14px;cursor:pointer;font-size:16px}
+  .semnav button:disabled{opacity:.35;cursor:default}
+  .semnav .qual{font-size:18px;font-weight:700}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+  .tile{background:#0f141a;border:1px solid var(--line);border-radius:14px;padding:18px}
+  .tile .t{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .tile .v{font-size:44px;font-weight:800;margin:6px 0 2px;font-variant-numeric:tabular-nums;line-height:1.05}
+  .tile .v.sem{font-size:20px;color:var(--muted);font-weight:600}
+  .tile .c{font-size:13px;color:var(--muted);line-height:1.6}
+  /* a cor diz se MELHOROU (verde) ou PIOROU (vermelho); a seta diz se subiu ou desceu */
+  .sobe{color:#7ee2a0}.desce{color:#ffb4ae}.igual{color:var(--muted)}
 </style></head><body>
-<header><div class="mark">R</div><div><h1>Relatórios de produtividade</h1><div class="sub">Tempos e volume de revisão e embalagem</div></div>
+<header><div class="mark">R</div><div><h1>Relatórios</h1><div class="sub">Tudo o que a fábrica fez, num lugar só — em quantidade</div></div>
 <div class="links"><a class="link" href="/painel">Painel</a><a class="link" href="/">Admin</a></div></header>
 <div class="wrap">
-  <!-- O FECHAMENTO DO DIA (AJUSTE de 08/11/2026): veio da 401 Planejamento, que
-       ficou so com o que serve para decidir o que produzir. A rota continua
-       @admin (nao mudou quem ve): para quem nao alcanca, o cartao some. -->
-  <div class="card" id="fecho" style="display:none">
-    <h3>Fechamento do dia — <span id="fData">—</span></h3>
-    <div class="fecho">
-      <div><div class="cn" id="fProd" style="color:var(--green)">–</div><div class="cl">Produzi (virou estoque)</div></div>
-      <div><div class="cn" id="fVend" style="color:#ff6b6b">–</div><div class="cl">Vendi (etiquetas de venda)</div></div>
-      <div><div class="cn" id="fVar">–</div><div class="cl">Estoque variou</div></div>
-      <div><div class="cn" id="fCob" style="color:var(--blue)">–</div><div class="cl" id="fCobL">Cobertura média</div></div>
-    </div>
-  </div>
-  <div class="filtro">
-    <div><label>De</label><input type="date" id="de"></div>
-    <div><label>Até</label><input type="date" id="ate"></div>
-    <button onclick="carregar()">Aplicar</button>
-    <button class="qk" onclick="atalho(0)">Hoje</button>
-    <button class="qk" onclick="atalho(6)">7 dias</button>
-    <button class="qk" onclick="atalho(29)">30 dias</button>
-  </div>
-  <div class="cards">
-    <div class="kpi rev"><div class="n" id="kRevQ">0</div><div class="l">Revisadas · méd <span id="kRevT">0s</span></div></div>
-    <div class="kpi emb"><div class="n" id="kEmbQ">0</div><div class="l">Embaladas · méd <span id="kEmbT">0s</span></div></div>
-  </div>
-  <div class="card"><h3>Evolução por dia</h3><canvas id="graf" height="90"></canvas></div>
-<div class="card" style="margin-top:26px">
-  <h3 style="margin:0 0 14px">Painel gerencial</h3>
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap">
-    <span style="font-size:13px;color:#8b97a5">De</span><input type="date" id="gDe" onchange="carregarGer()">
-    <span style="font-size:13px;color:#8b97a5">ate</span><input type="date" id="gAte" onchange="carregarGer()">
-  </div>
-  <div id="gCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px"></div>
-  <div id="gInd" style="padding:16px;background:#0e1217;border-radius:12px"></div>
-</div>
-<div class="card"><h3>Evolucao: revisadas, embaladas e rejeitadas</h3><canvas id="gSerie" height="80"></canvas></div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-  <div class="card"><h3>Por que voltam para a producao</h3><canvas id="gRejMot" height="150"></canvas></div>
-  <div class="card"><h3>SKUs que mais voltam</h3><canvas id="gRejSku" height="150"></canvas></div>
-  <div class="card"><h3>Motivos de devolucao</h3><canvas id="gDevMot" height="150"></canvas></div>
-  <div class="card"><h3>SKUs mais devolvidos</h3><canvas id="gDevSku" height="150"></canvas></div>
-  <div class="card"><h3>Tempo medio de revisao (seg)</h3><canvas id="gTempo" height="150"></canvas></div>
-  <div class="card"><h3>Estoque: quanto falta para o alvo</h3><canvas id="gEstoque" height="150"></canvas></div>
-</div>
-<div class="card"><h3>Reputacao</h3><div id="gRep" style="font-size:15px"></div></div>
-<div class="card"><h3>Cobertura de estoque — produzi &times; vendi</h3>
-  <canvas id="gCob" height="80"></canvas>
-  <div style="overflow:auto;margin-top:12px"><table id="gCobTab"><thead><tr><th>Dia</th><th>Produzi</th><th>Vendi</th><th>Variação</th><th>Estoque fim</th><th>Cobertura (dias)</th></tr></thead><tbody id="gCobBody"></tbody></table></div>
-  <div id="gCobMsg" style="color:#8b97a5;font-size:13px;margin-top:8px">O fechamento do dia é gravado quando alguém de nível Admin abre a tela Planejamento ou esta tela.</div>
-</div>
 
-  <div class="card"><h3>Por SKU</h3>
-    <table><thead><tr><th>SKU</th><th>Revisadas</th><th>Tempo méd. revisão</th><th>Embaladas</th><th>Tempo méd. embalagem</th></tr></thead>
-    <tbody id="corpo"></tbody></table>
+  <div class="tabs" id="tabs">
+    <button class="tab" data-t="semana">Resumo da semana</button>
+    <button class="tab" data-t="vendas">Vendas</button>
+    <button class="tab" data-t="producao">Produção</button>
+    <button class="tab" data-t="expedicao">Expedição</button>
+    <button class="tab" data-t="estoque">Estoque</button>
+    <button class="tab" data-t="devolucoes" hidden>Devoluções</button>
+    <button class="tab" data-t="pessoas" hidden>Por pessoa</button>
+    <button class="tab" data-t="sobmedida" hidden>Sob medida</button>
   </div>
+
+  <!-- O PERÍODO das abas que olham um intervalo (Vendas, Produção, Expedição,
+       Estoque, Por pessoa). O Resumo anda por semana; as Devoluções, por mês. -->
+  <div class="filtro" id="periodo" hidden>
+    <div><label>De</label><input type="date" id="pDe"></div>
+    <div><label>Até</label><input type="date" id="pAte"></div>
+    <button onclick="recarregar()">Aplicar</button>
+    <button class="qk" onclick="atalhoP(6)">7 dias</button>
+    <button class="qk" onclick="atalhoP(29)">30 dias</button>
+    <button class="qk" onclick="atalhoP(89)">90 dias</button>
+  </div>
+
+  <!-- ═════════ RESUMO DA SEMANA (fase 1) ═════════ -->
+  <section id="secSemana" hidden>
+    <!-- O FECHAMENTO DO DIA (AJUSTE de 08/11/2026): veio da 401. A rota continua
+         @admin (nao mudou quem ve): para quem nao alcanca, o cartao some. -->
+    <div class="card" id="fecho" style="display:none">
+      <h3>Fechamento do dia — <span id="fData">—</span></h3>
+      <div class="fecho">
+        <div><div class="cn" id="fProd" style="color:var(--green)">–</div><div class="cl">Produzi (virou estoque)</div></div>
+        <div><div class="cn" id="fVend" style="color:var(--red)">–</div><div class="cl">Vendi (etiquetas de venda)</div></div>
+        <div><div class="cn" id="fVar">–</div><div class="cl">Estoque variou</div></div>
+        <div><div class="cn" id="fCob" style="color:var(--blue)">–</div><div class="cl" id="fCobL">Cobertura média</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Resumo da semana — para a reunião de segunda</h3>
+      <div class="semnav">
+        <button id="semAnt" onclick="semana(SEM.anterior_domingo)" title="Semana anterior">◀</button>
+        <span class="qual" id="semQual">—</span>
+        <button id="semProx" onclick="semana(SEM.proxima)" title="Semana seguinte">▶</button>
+      </div>
+      <div class="tiles" id="semTiles"><div class="vazio">carregando…</div></div>
+      <div class="nota" id="semNota"></div>
+    </div>
+  </section>
+
+  <!-- ═════════ VENDAS (fase 2) ═════════ -->
+  <section id="secVendas" hidden>
+    <div class="card"><h3>Vendas mês a mês, em peças</h3>
+      <canvas id="vGraf" height="80"></canvas>
+      <div class="rola"><table><thead><tr><th>Mês</th><th>Peças</th><th>× mês anterior</th><th>× mesmo mês do ano anterior</th></tr></thead><tbody id="vMeses"></tbody></table></div>
+      <div class="nota" id="vNota"></div>
+    </div>
+    <div class="duas">
+      <div class="card"><h3>Os 10 SKUs que mais venderam no período</h3><div class="rola"><table><thead><tr><th>SKU</th><th>Peças</th><th>% do período</th></tr></thead><tbody id="vSkus"></tbody></table></div></div>
+      <div class="card"><h3>Coleta × agência, por mês (peças)</h3><div class="rola"><table><thead><tr><th>Mês</th><th>Coleta</th><th>Agência</th><th>% coleta</th></tr></thead><tbody id="vModal"></tbody></table></div>
+        <div class="nota">Pela etiqueta, no mês em que o PDF entrou.</div></div>
+      <div class="card"><h3>Cores que mais saem no período</h3><div class="rola"><table><thead><tr><th>Cor</th><th>Peças</th><th>%</th></tr></thead><tbody id="vCores"></tbody></table></div></div>
+      <div class="card"><h3>Medidas que mais saem no período</h3><div class="rola"><table><thead><tr><th>Medida (cm)</th><th>Peças</th><th>%</th></tr></thead><tbody id="vMedidas"></tbody></table></div></div>
+    </div>
+  </section>
+
+  <!-- ═════════ PRODUÇÃO (fase 4; o painel gerencial que já existia) ═════════ -->
+  <section id="secProducao" hidden>
+    <div class="card"><h3>Embaladas × saíram na Conferência, por dia (peças)</h3>
+      <canvas id="prGraf" height="80"></canvas>
+      <div class="rola"><table><thead><tr><th>Dia</th><th>Embaladas</th><th>Saíram</th><th>Voltaram (venda cancelada)</th></tr></thead><tbody id="prDias"></tbody></table></div>
+    </div>
+    <div class="cards">
+      <div class="kpi rev"><div class="n" id="kRevQ">0</div><div class="l">Revisadas · méd <span id="kRevT">0s</span></div></div>
+      <div class="kpi emb"><div class="n" id="kEmbQ">0</div><div class="l">Embaladas · méd <span id="kEmbT">0s</span></div></div>
+    </div>
+    <div class="card"><h3>Revisadas e embaladas por dia</h3><canvas id="graf" height="90"></canvas></div>
+    <div id="gerencial">
+      <div class="card"><h3>Painel gerencial</h3>
+        <div id="gCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px"></div>
+        <div id="gInd" style="padding:16px;background:#0e1217;border-radius:12px"></div>
+      </div>
+      <div class="card"><h3>Evolução: revisadas, embaladas e peças com problema</h3><canvas id="gSerie" height="80"></canvas></div>
+      <div class="duas">
+        <div class="card"><h3>Por que voltam para a produção</h3><canvas id="gRejMot" height="150"></canvas></div>
+        <div class="card"><h3>SKUs que mais voltam</h3><canvas id="gRejSku" height="150"></canvas></div>
+        <div class="card"><h3>Tempo médio de revisão (seg)</h3><canvas id="gTempo" height="150"></canvas></div>
+        <div class="card"><h3>Estoque: quanto falta para o alvo</h3><canvas id="gEstoque" height="150"></canvas></div>
+      </div>
+    </div>
+    <div class="card"><h3>Por SKU</h3><div class="rola">
+      <table><thead><tr><th>SKU</th><th>Revisadas</th><th>Tempo méd. revisão</th><th>Embaladas</th><th>Tempo méd. embalagem</th></tr></thead>
+      <tbody id="corpo"></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ═════════ EXPEDIÇÃO (fase 4) ═════════ -->
+  <section id="secExpedicao" hidden>
+    <div class="card"><h3>Despacho no prazo × atrasado, por dia (caixas)</h3>
+      <canvas id="exGraf" height="80"></canvas>
+      <div class="rola"><table><thead><tr><th>Dia</th><th>No prazo</th><th>Atrasadas</th><th>Sem prazo lido</th><th>% no prazo</th></tr></thead><tbody id="exDias"></tbody></table></div>
+      <div class="nota">No prazo é a caixa que saiu até a data de despacho da etiqueta. A coleta conta quando o caminhão leva, e não quando foi bipada no canto. O passivo fechado à mão sai na data do despacho, e por isso conta como no prazo.</div>
+    </div>
+    <div class="card"><h3>A coleta não passou</h3><div class="rola"><table><thead><tr><th>Dia</th><th>Caixas que ficaram</th></tr></thead><tbody id="exFim"></tbody></table></div></div>
+  </section>
+
+  <!-- ═════════ ESTOQUE (fase 4) ═════════ -->
+  <section id="secEstoque" hidden>
+    <div class="duas">
+      <div class="card"><h3>Falta de estoque: peças em urgência no último PDF de cada dia</h3>
+        <canvas id="esGraf" height="120"></canvas><div class="nota" id="esUrgNota"></div></div>
+      <div class="card"><h3>Os SKUs que mais faltaram</h3><div class="rola"><table><thead><tr><th>SKU</th><th>Peças</th><th>Dias</th></tr></thead><tbody id="esSkus"></tbody></table></div></div>
+      <div class="card"><h3>Acerto do inventário (1ª contagem)</h3><div class="rola"><table><thead><tr><th>Mês</th><th>Contados</th><th>Certos</th><th>Acerto</th></tr></thead><tbody id="esAcur"></tbody></table></div></div>
+      <div class="card"><h3>Pendências por dia</h3><div class="rola"><table><thead><tr><th>Dia</th><th>Total</th><th>Bloqueados</th><th>Vendas sem etiqueta</th></tr></thead><tbody id="esPend"></tbody></table></div>
+        <div class="nota" id="esPendNota"></div></div>
+    </div>
+    <div class="card" id="cobCard"><h3>Cobertura de estoque — produzi &times; vendi</h3>
+      <canvas id="gCob" height="80"></canvas>
+      <div class="rola" style="margin-top:12px"><table id="gCobTab"><thead><tr><th>Dia</th><th>Produzi</th><th>Vendi</th><th>Variação</th><th>Estoque fim</th><th>Cobertura (dias)</th></tr></thead><tbody id="gCobBody"></tbody></table></div>
+      <div class="nota">O fechamento do dia é gravado quando alguém de nível Admin abre a tela Planejamento ou esta tela.</div>
+    </div>
+  </section>
+
+  <!-- ═════════ DEVOLUÇÕES (fase 4): as rotas da 252, sem cópia ═════════ -->
+  <section id="secDevolucoes" hidden>
+    <div class="filtro"><div><label>Mês</label><input type="month" id="dMes"></div><button onclick="devolucoes()">Aplicar</button></div>
+    <div class="tiles" id="dTiles" style="margin-bottom:18px"></div>
+    <div class="duas">
+      <div class="card"><h3>Por motivo</h3><div class="rola"><table><thead><tr><th>Motivo</th><th>Quantas</th></tr></thead><tbody id="dMotivo"></tbody></table></div></div>
+      <div class="card"><h3>Por SKU</h3><div class="rola"><table><thead><tr><th>SKU</th><th>Quantas</th></tr></thead><tbody id="dSku"></tbody></table></div></div>
+    </div>
+    <div class="card"><h3>Desempenho por responsável (casos encerrados no mês)</h3><div class="rola"><table><thead><tr><th>Responsável</th><th>Casos</th><th>Prazos cumpridos</th><th>Dias (mediana)</th><th>Vezes parado</th></tr></thead><tbody id="dDes"></tbody></table></div></div>
+  </section>
+
+  <!-- ═════════ POR PESSOA (fase 3) ═════════ -->
+  <section id="secPessoas" hidden>
+    <div class="card"><h3 id="peTit">Por pessoa</h3><div id="peCorpo"><div class="vazio">carregando…</div></div>
+      <div class="nota">Só quantidade e tempo. O tempo é a mediana, com o maior ao lado. Conta desde que o sistema grava quem fez cada coisa: revisão e embalagem desde 26/10/2026, o resto desde 05/11/2026.</div></div>
+  </section>
+
+  <!-- ═════════ SOB MEDIDA (fase 4): a rota dos indicadores de lá ═════════ -->
+  <section id="secSobmedida" hidden>
+    <div class="tiles" id="smTiles"></div>
+    <p class="nota">Últimos 30 dias. <a href="/sobmedida/indicadores" style="color:var(--blue)">Abrir os indicadores completos do sob medida (615) →</a></p>
+  </section>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 const $=s=>document.querySelector(s);
+const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const nf=n=>n==null?'—':(+n).toLocaleString('pt-BR');
+const pctTxt=n=>n==null?'—':String(n).replace('.',',')+'%';
+const dBr=d=>d?d.slice(8,10)+'/'+d.slice(5,7):'';
+const dBrAno=d=>d?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):'';
+const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const mesBr=m=>MES[+m.slice(5,7)-1]+'/'+m.slice(2,4);
 function fmt(s){ s=+s||0; const m=Math.floor(s/60); return (m?m+'m':'')+(s%60)+'s'; }
 function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
-function atalho(dias){ const a=new Date(); const d=new Date(); d.setDate(d.getDate()-dias); $('#de').value=iso(d); $('#ate').value=iso(a); carregar(); }
-let chart=null;
-async function carregar(){
-  const de=$('#de').value, ate=$('#ate').value;
-  const qs='?de='+de+'&ate='+ate;
-  const resumo=await (await fetch('/api/rel/resumo'+qs)).json();
-  $('#kRevQ').textContent=resumo.rev_qtd; $('#kRevT').textContent=fmt(resumo.rev_tmedio);
-  $('#kEmbQ').textContent=resumo.emb_qtd; $('#kEmbT').textContent=fmt(resumo.emb_tmedio);
-  const sku=await (await fetch('/api/rel/sku'+qs)).json();
-  $('#corpo').innerHTML = sku.map(r=>'<tr><td class="code">'+r.codigo+'</td><td>'+r.rev_qtd+'</td><td>'+fmt(r.rev_tmedio)+'</td><td>'+r.emb_qtd+'</td><td>'+fmt(r.emb_tmedio)+'</td></tr>').join('')
-    || '<tr><td colspan="5" style="color:#8b97a5;padding:20px;text-align:center">Sem dados no período.</td></tr>';
-  const dia=await (await fetch('/api/rel/dia'+qs)).json();
-  const labels=dia.map(d=>{const p=d.data.split('-');return p[2]+'/'+p[1];});
-  const ctx=$('#graf');
-  if(chart) chart.destroy();
-  chart=new Chart(ctx,{type:'bar',data:{labels,datasets:[
-    {label:'Revisadas',data:dia.map(d=>d.rev),backgroundColor:'#4493f8'},
-    {label:'Embaladas',data:dia.map(d=>d.emb),backgroundColor:'#a371f7'}]},
-    options:{responsive:true,scales:{x:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'}},y:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}},plugins:{legend:{labels:{color:'#e6edf3'}}}}});
-}
-atalho(6);
-
-var GCH={};
-function gcor(i){ var c=['#ffb800','#4493f8','#f85149','#2ea043','#a479e2','#e07798','#3dc789','#ffad47']; return c[i%c.length]; }
-function gfmt(s){ s=+s||0; var m=Math.floor(s/60); return (m?m+'m':'')+(s%60)+'s'; }
-function gGraf(id,tipo,labels,dados,cores){
-  var el=document.getElementById(id);
-  if(!el) return;
-  if(GCH[id]) GCH[id].destroy();
-  GCH[id]=new Chart(el.getContext('2d'),{
-    type:tipo,
-    data:{labels:labels,datasets:[{data:dados,backgroundColor:cores||labels.map(function(x,i){return gcor(i);}),borderWidth:0}]},
-    options:{responsive:true,plugins:{legend:{display:tipo==='doughnut',position:'right',labels:{color:'#8b97a5',font:{size:11}}}},
-      scales:tipo==='doughnut'?{}:{x:{ticks:{color:'#8b97a5',font:{size:10}},grid:{display:false}},y:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}}}
-  });
-}
-async function carregarGer(){
-  var de=document.getElementById('gDe'), ate=document.getElementById('gAte');
-  var q=[]; if(de&&de.value)q.push('de='+de.value); if(ate&&ate.value)q.push('ate='+ate.value);
-  var d=null;
-  try{ d=await (await fetch('/api/gerencial'+(q.length?'?'+q.join('&'):''))).json(); }catch(e){ return; }
-  var t=d.totais;
-  var cards=[
-    {n:t.revisadas,l:'revisadas',c:'#ffb800'},
-    {n:t.embaladas,l:'embaladas',c:'#2ea043'},
-    {n:t.carregadas,l:'carregadas',c:'#7ee2a0'},
-    {n:t.filaAtual,l:'na fila agora',c:'#4493f8'},
-    {n:t.rejeitadas,l:'voltaram p/ producao',c:'#f85149'},
-    {n:t.devolucoes,l:'devolucoes',c:'#e07798'},
-    {n:t.vendas,l:'vendas',c:'#8b97a5'}
-  ];
-  var h='';
-  for(var i=0;i<cards.length;i++){
-    h+='<div style="background:#161b22;border:1px solid #262d37;border-radius:14px;padding:16px"><div style="font-size:30px;font-weight:800;color:'+cards[i].c+'">'+cards[i].n+'</div><div style="font-size:12px;color:#8b97a5;text-transform:uppercase;letter-spacing:.4px">'+cards[i].l+'</div></div>';
-  }
-  document.getElementById('gCards').innerHTML=h;
-  var taxaRej = t.revisadas+t.rejeitadas ? Math.round(t.rejeitadas*100/(t.revisadas+t.rejeitadas)) : 0;
-  var taxaDev = t.vendas ? (t.devolucoes*100/t.vendas).toFixed(1) : '0';
-  var ind='<div style="display:flex;gap:26px;flex-wrap:wrap;font-size:14px">';
-  ind+='<div>Taxa de retrabalho: <b style="color:'+(taxaRej>10?'#f85149':'#2ea043')+';font-size:19px">'+taxaRej+'%</b></div>';
-  ind+='<div>Taxa de devolucao: <b style="color:'+(taxaDev>5?'#f85149':'#2ea043')+';font-size:19px">'+taxaDev+'%</b></div>';
-  ind+='<div>Tempo medio revisao: <b style="font-size:19px">'+gfmt(t.tempoRev)+'</b></div>';
-  ind+='<div>Tempo medio embalagem: <b style="font-size:19px">'+gfmt(t.tempoEmb)+'</b></div>';
-  if(t.divergencias>0) ind+='<div style="color:#f85149">SKU divergente em <b style="font-size:19px">'+t.divergencias+'</b> devolucoes</div>';
-  document.getElementById('gInd').innerHTML=ind+'</div>';
-  var dias={};
-  ['producao','embalagem','rejeicao','carregamento'].forEach(function(k){ (d.serie[k]||[]).forEach(function(r){ dias[r.data]=1; }); });
-  var L=Object.keys(dias).sort();
-  var mapa=function(arr){ var m={}; arr.forEach(function(r){ m[r.data]=r.qtd; }); return L.map(function(x){ return m[x]||0; }); };
-  var el=document.getElementById('gSerie');
-  if(el){
-    if(GCH.gSerie) GCH.gSerie.destroy();
-    GCH.gSerie=new Chart(el.getContext('2d'),{type:'line',
-      data:{labels:L.map(function(x){return x.slice(5);}),datasets:[
-        {label:'Revisadas',data:mapa(d.serie.producao),borderColor:'#ffb800',backgroundColor:'transparent',tension:.3},
-        {label:'Embaladas',data:mapa(d.serie.embalagem),borderColor:'#2ea043',backgroundColor:'transparent',tension:.3},
-        {label:'Carregadas',data:mapa(d.serie.carregamento||[]),borderColor:'#7ee2a0',backgroundColor:'transparent',tension:.3},
-        {label:'Rejeitadas',data:mapa(d.serie.rejeicao),borderColor:'#f85149',backgroundColor:'transparent',tension:.3}]},
-      options:{responsive:true,plugins:{legend:{labels:{color:'#8b97a5'}}},
-        scales:{x:{ticks:{color:'#8b97a5'},grid:{display:false}},y:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}}}});
-  }
-  var L2=function(a){ return a.map(function(x){ return x.l; }); };
-  var Q=function(a){ return a.map(function(x){ return x.qtd; }); };
-  gGraf('gRejMot','doughnut',L2(d.qualidade.porMotivo),Q(d.qualidade.porMotivo));
-  gGraf('gRejSku','bar',L2(d.qualidade.porSku),Q(d.qualidade.porSku),'#f85149');
-  gGraf('gDevMot','doughnut',L2(d.devolucao.porMotivo),Q(d.devolucao.porMotivo));
-  gGraf('gDevSku','bar',L2(d.devolucao.porSku),Q(d.devolucao.porSku),'#e07798');
-  gGraf('gTempo','bar',L2(d.tempos.porSku),d.tempos.porSku.map(function(x){return x.media;}),'#4493f8');
-  gGraf('gEstoque','bar',L2(d.estoque),d.estoque.map(function(x){return x.falta;}),'#ffb800');
-  var r=d.devolucao.reputacao||{};
-  document.getElementById('gRep').innerHTML='Afetaram reputacao: <b style="color:#f85149;font-size:19px">'+(r.sim||0)+'</b> &nbsp; Nao afetaram: <b style="color:#2ea043;font-size:19px">'+(r.nao||0)+'</b> &nbsp; Sem baixa: <b style="color:#ffb800;font-size:19px">'+(r.pendente||0)+'</b>';
-  // cobertura de estoque (produzi x vendi) — da tabela fechamento
-  var cob=d.cobertura||[];
-  var cbBody=document.getElementById('gCobBody');
-  if(cbBody){
-    cbBody.innerHTML = cob.length ? cob.map(function(x){
-      var v=x.variou||0, vc=v>0?'#2ea043':(v<0?'#f85149':'#8b97a5');
-      return '<tr><td class="code">'+String(x.data).slice(5)+'</td><td>'+(x.produzido||0)+'</td><td>'+(x.vendido||0)+'</td><td style="color:'+vc+'">'+(v>0?'+':'')+v+'</td><td>'+(x.estoque_fim||0)+'</td><td>'+(x.cobertura==null?'—':(+x.cobertura).toFixed(1))+'</td></tr>';
-    }).join('') : '<tr><td colspan="6" style="color:#8b97a5;padding:16px;text-align:center">Sem fechamento registrado no período.</td></tr>';
-  }
-  var cbEl=document.getElementById('gCob');
-  if(cbEl){
-    if(GCH.gCob) GCH.gCob.destroy();
-    GCH.gCob=new Chart(cbEl.getContext('2d'),{type:'bar',
-      data:{labels:cob.map(function(x){return String(x.data).slice(5);}),datasets:[
-        {label:'Produzi',data:cob.map(function(x){return x.produzido||0;}),backgroundColor:'#2ea043'},
-        {label:'Vendi',data:cob.map(function(x){return x.vendido||0;}),backgroundColor:'#4493f8'}]},
-      options:{responsive:true,plugins:{legend:{labels:{color:'#8b97a5'}}},
-        scales:{x:{ticks:{color:'#8b97a5'},grid:{display:false}},y:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}}}});
-  }
+const vazio=(n,txt)=>'<tr><td colspan="'+n+'" class="vazio">'+(txt||'Nada no período.')+'</td></tr>';
+async function pegar(url){ try{ const r=await fetch(url); if(!r.ok) return null; return await r.json(); }catch(e){ return null; } }
+const temChart=()=>typeof Chart!=='undefined';
+/* GRAFICOS, e não `CH`: o nav.js já declara `var CH` (as cores), e um `const`
+   com o mesmo nome mata o script dele — a tela abria sem ☰ Menu, Trocar setor
+   e Sair (③ REVISÃO, o testador-tela). */
+const GRAFICOS={};
+function grafico(id, cfg){
+  const el=document.getElementById(id); if(!el || !temChart()) return;
+  if(GRAFICOS[id]) GRAFICOS[id].destroy();
+  cfg.options=Object.assign({responsive:true,plugins:{legend:{labels:{color:'#8b97a5'}}},
+    scales:{x:{ticks:{color:'#8b97a5'},grid:{display:false}},y:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}}}, cfg.options||{});
+  GRAFICOS[id]=new Chart(el.getContext('2d'), cfg);
 }
 
-/* O mesmo cartao que morava na 401, com a mesma conta (GET /api/fechamento,
-   que tambem grava o retrato do dia). Recusa ou falha: o cartao fica escondido. */
+/* ── O PERÍODO (as abas que olham um intervalo) ── */
+function atalhoP(dias){ const a=new Date(), d=new Date(); d.setDate(d.getDate()-dias); $('#pDe').value=iso(d); $('#pAte').value=iso(a); recarregar(); }
+const qsP=()=>'?de='+($('#pDe').value||'')+'&ate='+($('#pAte').value||'');
+(function(){ const a=new Date(), d=new Date(); d.setDate(d.getDate()-29); $('#pDe').value=iso(d); $('#pAte').value=iso(a); })();
+
+/* ═════════ RESUMO DA SEMANA ═════════ */
+let SEM=null;
+/* A seta compara com a semana anterior. Para devolução e atraso, subir é ruim. */
+function seta(atual, ant, ruim){
+  if(atual==null || ant==null) return '';
+  if(atual===ant) return '<span class="igual">= igual</span>';
+  const sobe=atual>ant, pct=ant? Math.round(Math.abs(atual-ant)/ant*1000)/10 : null;
+  const cls=(sobe!==!!ruim)?'sobe':'desce';
+  return '<span class="'+cls+'">'+(sobe?'▲':'▼')+(pct!=null?' '+String(pct).replace('.',',')+'%':'')+'</span>';
+}
+function tile(t, campo, opc){
+  opc=opc||{};
+  const a=SEM.semana[campo], b=SEM.anterior[campo], m=SEM.media4[campo];
+  const f=opc.pct?pctTxt:nf;
+  const v = a==null ? '<div class="v sem">sem registro</div>' : '<div class="v" style="color:'+(opc.cor||'var(--txt)')+'">'+f(a)+'</div>';
+  const c = a==null ? '' : '<div class="c">semana anterior: <b style="color:var(--txt)">'+f(b)+'</b> '+seta(a,b,opc.ruim)+'<br>média de 4 semanas: <b style="color:var(--txt)">'+(m?f(m.media):'—')+'</b>'+(m&&m.semanas<4?' ('+m.semanas+' sem.)':'')+(opc.extra?'<br>'+opc.extra:'')+'</div>';
+  return '<div class="tile"><div class="t">'+t+'</div>'+v+c+'</div>';
+}
+async function semana(domingo){
+  const d=await pegar('/api/rel/semana'+(domingo?'?domingo='+domingo:''));
+  if(!d){ $('#semTiles').innerHTML='<div class="vazio">Não consegui carregar o resumo.</div>'; return; }
+  SEM=d;
+  $('#semQual').textContent='de '+dBr(d.semana.de)+' a '+dBrAno(d.semana.ate);
+  $('#semProx').disabled=!d.proxima;
+  const desp=d.semana.despacho;
+  $('#semTiles').innerHTML=
+    tile('Vendas (peças)','vendas',{cor:'var(--blue)'})+
+    tile('Devoluções','devolucoes',{cor:'#e07798',ruim:true,extra: d.semana.taxa_devolucao!=null?'taxa: <b style="color:var(--txt)">'+pctTxt(d.semana.taxa_devolucao)+'</b> das vendas':''})+
+    tile('Embaladas (peças)','embaladas',{cor:'var(--violet)'})+
+    tile('Saíram na Conferência (peças)','saiu',{cor:'var(--green)'})+
+    tile('Despacho no prazo','despacho_no_prazo_pct',{pct:true,cor:'var(--amber)',extra: desp?nf(desp.no_prazo)+' no prazo · '+nf(desp.atrasado)+' atrasadas':''})+
+    tile('Item faltante enviado','item_faltante',{ruim:true});
+  const ds=d.desde, x=[];
+  if(ds.vendas) x.push('vendas desde '+dBrAno(ds.vendas)); if(ds.devolucoes) x.push('devoluções desde '+dBrAno(ds.devolucoes));
+  if(ds.embalagem) x.push('embalagem desde '+dBrAno(ds.embalagem)); if(ds.despacho) x.push('despacho desde '+dBrAno(ds.despacho));
+  $('#semNota').textContent='Semana de segunda a domingo. A média é das 4 semanas antes desta. A venda cancelada fica fora. Os números existem: '+(x.join(' · ')||'—')+'.';
+}
+
+/* O mesmo cartão que morava na 401 (GET /api/fechamento, que também grava o
+   retrato do dia). Recusa ou falha: o cartão fica escondido. */
 async function fechamento(){
-  let f; try{ const r=await fetch('/api/fechamento'); if(!r.ok) return; f=await r.json(); }catch(e){ return; }
-  $('#fData').textContent=f.data||'—';
-  $('#fProd').textContent=f.produzido;
-  $('#fVend').textContent=f.vendido;
+  const f=await pegar('/api/fechamento'); if(!f) return;
+  $('#fData').textContent=f.data?dBrAno(f.data):'—';
+  $('#fProd').textContent=f.produzido; $('#fVend').textContent=f.vendido;
   const v=f.variou; $('#fVar').textContent=(v>0?'+':'')+v;
-  $('#fVar').style.color = v>0?'var(--green)':(v<0?'#ff6b6b':'var(--muted)');
+  $('#fVar').style.color = v>0?'var(--green)':(v<0?'var(--red)':'var(--muted)');
   if(f.cobertura_dias==null){ $('#fCob').textContent='—'; $('#fCobL').textContent='Cobertura média (sem vendas na janela)'; }
   else{
     $('#fCob').textContent=f.cobertura_dias+'d';
@@ -226,8 +289,208 @@ async function fechamento(){
   $('#fecho').style.display='';
 }
 
-/* Primeiro grava o retrato de hoje, depois le o historico: em paralelo, a
-   linha de hoje da tabela podia sair mais velha que o cartao de cima. */
-fechamento().finally(carregarGer);
+/* ═════════ VENDAS ═════════ */
+const cres=v=>v==null?'—':'<span class="'+(v>0?'sobe':(v<0?'desce':'igual'))+'">'+(v>0?'+':'')+String(v).replace('.',',')+'%</span>';
+async function vendas(){
+  const d=await pegar('/api/rel/vendas'+qsP());
+  if(!d){ $('#vMeses').innerHTML=vazio(4,'Não consegui carregar.'); return; }
+  $('#vMeses').innerHTML = d.meses.length ? d.meses.slice().reverse().map(m=>'<tr><td>'+mesBr(m.mes)+(m.parcial?' <span class="sub">(até dia '+m.ate_dia+' · projeção '+nf(m.projecao)+')</span>':'')+'</td><td>'+nf(m.pecas)+'</td><td>'+cres(m.vs_mes_anterior)+(m.crescimento_pela_projecao&&m.vs_mes_anterior!=null?' <span class="sub">pela projeção</span>':'')+'</td><td>'+cres(m.vs_ano_anterior)+(m.crescimento_pela_projecao&&m.vs_ano_anterior!=null?' <span class="sub">pela projeção</span>':'')+'</td></tr>').join('') : vazio(4,'Nenhuma venda importada.');
+  $('#vNota').textContent='Pela data da venda, da planilha do ML importada na tela Planejamento'+(d.desde?' (desde '+dBrAno(d.desde)+')':'')+'. A venda cancelada fica fora; o pós-venda entra. O mês de hoje é parcial: a projeção segue o ritmo do mês até agora, e a comparação dele é pela projeção.';
+  grafico('vGraf',{type:'bar',data:{labels:d.meses.map(m=>mesBr(m.mes)),datasets:[{label:'Peças vendidas',data:d.meses.map(m=>m.pecas),backgroundColor:d.meses.map(m=>m.parcial?'#2a4f80':'#4493f8')}]}});
+  const tot=d.periodo.total||0, p=n=>tot?pctTxt(Math.round(n/tot*1000)/10):'—';
+  $('#vSkus').innerHTML = d.periodo.top_skus.length ? d.periodo.top_skus.map(s=>'<tr><td class="code">'+esc(s.codigo)+'</td><td>'+nf(s.pecas)+'</td><td>'+p(s.pecas)+'</td></tr>').join('') : vazio(3);
+  $('#vCores').innerHTML = d.periodo.cores.length ? d.periodo.cores.slice(0,12).map(s=>'<tr><td>'+esc(s.cor)+'</td><td>'+nf(s.pecas)+'</td><td>'+p(s.pecas)+'</td></tr>').join('') : vazio(3);
+  $('#vMedidas').innerHTML = d.periodo.medidas.length ? d.periodo.medidas.slice(0,12).map(s=>'<tr><td>'+esc(s.medida)+'</td><td>'+nf(s.pecas)+'</td><td>'+p(s.pecas)+'</td></tr>').join('') : vazio(3);
+  $('#vModal').innerHTML = d.modalidade.length ? d.modalidade.slice().reverse().map(m=>{ const t=m.coleta+m.agencia;
+    return '<tr><td>'+mesBr(m.mes)+'</td><td>'+nf(m.coleta)+'</td><td>'+nf(m.agencia)+'</td><td>'+(t?pctTxt(Math.round(m.coleta/t*1000)/10):'—')+'</td></tr>'; }).join('') : vazio(4);
+}
+
+/* ═════════ PRODUÇÃO ═════════ */
+async function producao(){
+  const d=await pegar('/api/rel/producao'+qsP());
+  if(d){
+    $('#prDias').innerHTML = d.dias.slice().reverse().map(x=>'<tr><td>'+dBrAno(x.data)+'</td><td>'+nf(x.entrou)+'</td><td>'+nf(x.saiu)+'</td><td>'+nf(x.voltou)+'</td></tr>').join('') || vazio(4);
+    grafico('prGraf',{type:'bar',data:{labels:d.dias.map(x=>dBr(x.data)),datasets:[
+      {label:'Embaladas',data:d.dias.map(x=>x.entrou),backgroundColor:'#a371f7'},
+      {label:'Saíram',data:d.dias.map(x=>x.saiu),backgroundColor:'#2ea043'}]}});
+  } else $('#prDias').innerHTML=vazio(4,'Não consegui carregar.');
+  carregarProd(); carregarGer();
+}
+async function carregarProd(){
+  const qs=qsP();
+  const resumo=await pegar('/api/rel/resumo'+qs);
+  if(resumo){ $('#kRevQ').textContent=resumo.rev_qtd; $('#kRevT').textContent=fmt(resumo.rev_tmedio);
+    $('#kEmbQ').textContent=resumo.emb_qtd; $('#kEmbT').textContent=fmt(resumo.emb_tmedio); }
+  const sku=await pegar('/api/rel/sku'+qs) || [];
+  $('#corpo').innerHTML = sku.map(r=>'<tr><td class="code">'+esc(r.codigo)+'</td><td>'+r.rev_qtd+'</td><td>'+fmt(r.rev_tmedio)+'</td><td>'+r.emb_qtd+'</td><td>'+fmt(r.emb_tmedio)+'</td></tr>').join('') || vazio(5);
+  const dia=await pegar('/api/rel/dia'+qs) || [];
+  grafico('graf',{type:'bar',data:{labels:dia.map(d=>dBr(d.data)),datasets:[
+    {label:'Revisadas',data:dia.map(d=>d.rev),backgroundColor:'#4493f8'},
+    {label:'Embaladas',data:dia.map(d=>d.emb),backgroundColor:'#a371f7'}]}});
+}
+function gcor(i){ const c=['#ffb800','#4493f8','#f85149','#2ea043','#a479e2','#e07798','#3dc789','#ffad47']; return c[i%c.length]; }
+function gGraf(id,tipo,labels,dados,cores){
+  grafico(id,{type:tipo,data:{labels:labels,datasets:[{data:dados,backgroundColor:cores||labels.map((x,i)=>gcor(i)),borderWidth:0}]},
+    options:{plugins:{legend:{display:tipo==='doughnut',position:'right',labels:{color:'#8b97a5',font:{size:11}}}},
+      scales:tipo==='doughnut'?{}:{x:{ticks:{color:'#8b97a5',font:{size:10}},grid:{display:false}},y:{ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}}}});
+}
+/* O PAINEL GERENCIAL (o de antes). Ele é "Ver painel do dia": quem abre a 904
+   sem essa permissão não o recebe, e o bloco some em vez de quebrar a tela. */
+async function carregarGer(){
+  const d=await pegar('/api/gerencial'+qsP());
+  $('#gerencial').hidden=!d; $('#cobCard').hidden=!d;
+  if(!d) return;
+  const t=d.totais;
+  const cards=[{n:t.revisadas,l:'revisadas',c:'#ffb800'},{n:t.embaladas,l:'embaladas',c:'#2ea043'},{n:t.carregadas,l:'carregadas',c:'#7ee2a0'},
+    {n:t.filaAtual,l:'na fila agora',c:'#4493f8'},{n:t.rejeitadas,l:'voltaram p/ produção',c:'#f85149'}];
+  $('#gCards').innerHTML=cards.map(c=>'<div style="background:#161b22;border:1px solid #262d37;border-radius:14px;padding:16px"><div style="font-size:30px;font-weight:800;color:'+c.c+'">'+nf(c.n)+'</div><div style="font-size:12px;color:#8b97a5;text-transform:uppercase;letter-spacing:.4px">'+c.l+'</div></div>').join('');
+  const taxaRej = t.revisadas+t.rejeitadas ? Math.round(t.rejeitadas*100/(t.revisadas+t.rejeitadas)) : 0;
+  $('#gInd').innerHTML='<div style="display:flex;gap:26px;flex-wrap:wrap;font-size:14px">'
+    +'<div>Peça com problema na revisão: <b style="color:'+(taxaRej>10?'#f85149':'#2ea043')+';font-size:19px">'+taxaRej+'%</b></div>'
+    +'<div>Tempo médio de revisão: <b style="font-size:19px">'+fmt(t.tempoRev)+'</b></div>'
+    +'<div>Tempo médio de embalagem: <b style="font-size:19px">'+fmt(t.tempoEmb)+'</b></div></div>';
+  const dias={}; ['producao','embalagem','rejeicao','carregamento'].forEach(k=>(d.serie[k]||[]).forEach(r=>dias[r.data]=1));
+  const L=Object.keys(dias).sort(), mapa=arr=>{ const m={}; (arr||[]).forEach(r=>m[r.data]=r.qtd); return L.map(x=>m[x]||0); };
+  grafico('gSerie',{type:'line',data:{labels:L.map(x=>dBr(x)),datasets:[
+    {label:'Revisadas',data:mapa(d.serie.producao),borderColor:'#ffb800',backgroundColor:'transparent',tension:.3},
+    {label:'Embaladas',data:mapa(d.serie.embalagem),borderColor:'#2ea043',backgroundColor:'transparent',tension:.3},
+    {label:'Carregadas',data:mapa(d.serie.carregamento),borderColor:'#7ee2a0',backgroundColor:'transparent',tension:.3},
+    {label:'Com problema',data:mapa(d.serie.rejeicao),borderColor:'#f85149',backgroundColor:'transparent',tension:.3}]}});
+  const L2=a=>a.map(x=>x.l), Q=a=>a.map(x=>x.qtd);
+  gGraf('gRejMot','doughnut',L2(d.qualidade.porMotivo),Q(d.qualidade.porMotivo));
+  gGraf('gRejSku','bar',L2(d.qualidade.porSku),Q(d.qualidade.porSku),'#f85149');
+  gGraf('gTempo','bar',L2(d.tempos.porSku),d.tempos.porSku.map(x=>x.media),'#4493f8');
+  gGraf('gEstoque','bar',L2(d.estoque),d.estoque.map(x=>x.falta),'#ffb800');
+  const cob=d.cobertura||[];
+  $('#gCobBody').innerHTML = cob.length ? cob.slice().reverse().map(x=>{ const v=x.variou||0, vc=v>0?'#2ea043':(v<0?'#f85149':'#8b97a5');
+    return '<tr><td>'+dBrAno(x.data)+'</td><td>'+(x.produzido||0)+'</td><td>'+(x.vendido||0)+'</td><td style="color:'+vc+'">'+(v>0?'+':'')+v+'</td><td>'+(x.estoque_fim||0)+'</td><td>'+(x.cobertura==null?'—':(+x.cobertura).toFixed(1))+'</td></tr>'; }).join('')
+    : vazio(6,'Sem fechamento registrado no período.');
+  grafico('gCob',{type:'bar',data:{labels:cob.map(x=>dBr(x.data)),datasets:[
+    {label:'Produzi',data:cob.map(x=>x.produzido||0),backgroundColor:'#2ea043'},
+    {label:'Vendi',data:cob.map(x=>x.vendido||0),backgroundColor:'#4493f8'}]}});
+}
+
+/* ═════════ EXPEDIÇÃO ═════════ */
+async function expedicao(){
+  const d=await pegar('/api/rel/expedicao'+qsP());
+  if(!d){ $('#exDias').innerHTML=vazio(5,'Não consegui carregar.'); return; }
+  $('#exDias').innerHTML = d.dias.slice().reverse().filter(x=>x.no_prazo+x.atrasado+x.sem_prazo>0).map(x=>{ const t=x.no_prazo+x.atrasado;
+    return '<tr><td>'+dBrAno(x.data)+'</td><td>'+nf(x.no_prazo)+'</td><td style="color:'+(x.atrasado?'var(--red)':'inherit')+'">'+nf(x.atrasado)+'</td><td>'+nf(x.sem_prazo)+'</td><td>'+(t?pctTxt(Math.round(x.no_prazo/t*1000)/10):'—')+'</td></tr>'; }).join('')
+    || vazio(5, d.desde ? 'Nenhuma caixa saiu no período.' : 'Sem registro de saída ainda.');
+  grafico('exGraf',{type:'bar',data:{labels:d.dias.map(x=>dBr(x.data)),datasets:[
+    {label:'No prazo',data:d.dias.map(x=>x.no_prazo),backgroundColor:'#2ea043',stack:'a'},
+    {label:'Atrasadas',data:d.dias.map(x=>x.atrasado),backgroundColor:'#f85149',stack:'a'}]},options:{scales:{x:{stacked:true,ticks:{color:'#8b97a5'},grid:{display:false}},y:{stacked:true,ticks:{color:'#8b97a5'},grid:{color:'#262d37'},beginAtZero:true}}}});
+  $('#exFim').innerHTML = d.coleta_nao_passou.length ? d.coleta_nao_passou.slice().reverse().map(x=>'<tr><td>'+dBrAno(x.dia)+'</td><td>'+nf(x.caixas)+'</td></tr>').join('') : vazio(2,'Em todos os dias do período a coleta passou (ou ninguém registrou que não passou).');
+}
+
+/* ═════════ ESTOQUE ═════════ */
+async function estoque(){
+  const d=await pegar('/api/rel/estoque'+qsP());
+  carregarGer();   // o histórico produzi × vendi (o gerencial)
+  if(!d){ $('#esSkus').innerHTML=vazio(3,'Não consegui carregar.'); return; }
+  const u=d.urgencia;
+  grafico('esGraf',{type:'bar',data:{labels:u.dias.map(x=>dBr(x.data)),datasets:[{label:'Peças que viraram urgência',data:u.dias.map(x=>x.pecas),backgroundColor:'#ffb800'}]}});
+  $('#esUrgNota').textContent='A venda que chegou no PDF sem peça pronta vira urgência na tela de Revisão. Cada dia mostra o que ainda era urgência no último PDF subido nele: a urgência da manhã resolvida antes do PDF da tarde não aparece.'+(u.desde?' Registro desde '+dBrAno(u.desde)+'.':' Sem registro ainda.');
+  $('#esSkus').innerHTML = u.skus.length ? u.skus.map(s=>'<tr><td class="code">'+esc(s.codigo)+'</td><td>'+nf(s.pecas)+'</td><td>'+nf(s.dias)+'</td></tr>').join('') : vazio(3);
+  $('#esAcur').innerHTML = d.acuracidade.slice().reverse().map(a=>'<tr><td>'+mesBr(a.mes)+'</td>'+(a.contados?'<td>'+nf(a.contados)+'</td><td>'+nf(a.certos)+'</td><td>'+(a.pct==null?'—':pctTxt(a.pct))+'</td>':'<td colspan="3" style="color:var(--muted)">sem contagem</td>')+'</tr>').join('');
+  const p=d.pendencias;
+  $('#esPend').innerHTML = p.dias.length ? p.dias.slice().reverse().map(x=>'<tr><td>'+dBrAno(x.data)+'</td><td>'+nf(x.total)+'</td><td>'+nf(x.bloqueados)+'</td><td>'+nf(x.sem_etiqueta)+'</td></tr>').join('') : vazio(4,'Sem registro no período.');
+  $('#esPendNota').textContent='O número de cada dia é o último que a central de Pendências mostrou nele.'+(p.desde?' Registro desde '+dBrAno(p.desde)+'.':' O registro começa no dia em que esta tela subiu.');
+}
+
+/* ═════════ DEVOLUÇÕES (as rotas da 252) ═════════ */
+async function devolucoes(){
+  if(!$('#dMes').value) $('#dMes').value=iso(new Date()).slice(0,7);
+  const mes=$('#dMes').value;
+  const [r, des] = await Promise.all([pegar('/api/devolucao-casos/relatorio?mes='+mes), pegar('/api/devolucao-casos/desempenho?mes='+mes)]);
+  if(!r){ $('#dTiles').innerHTML='<div class="vazio">Não consegui carregar.</div>'; return; }
+  const t=(nome,n,cor,extra)=>'<div class="tile"><div class="t">'+nome+'</div><div class="v" style="color:'+(cor||'var(--txt)')+'">'+nf(n)+'</div>'+(extra?'<div class="c">'+extra+'</div>':'')+'</div>';
+  const pt=r.por_tipo||{};
+  $('#dTiles').innerHTML = t('Devoluções no mês', r.devolucoes!=null?r.devolucoes:r.total, '#e07798',
+      'ML devolve: '+nf(pt.ml)+' · nós coletamos: '+nf(pt.coleta)+' · recebidas sem caso: '+nf(pt.sem_caso))
+    + t('Item faltante enviado', pt.envio, 'var(--amber)')
+    + t('Via publicidade', r.publicidade?r.publicidade.sim:null, 'var(--txt)', r.publicidade?'não: '+nf(r.publicidade.nao)+' · não informado: '+nf(r.publicidade.nao_informado):'');
+  $('#dMotivo').innerHTML = (r.por_motivo||[]).length ? r.por_motivo.map(m=>'<tr><td>'+esc(m.motivo)+'</td><td>'+nf(m.qtd)+'</td></tr>').join('') : vazio(2);
+  $('#dSku').innerHTML = (r.por_sku||[]).length ? r.por_sku.slice(0,15).map(m=>'<tr><td class="code">'+esc(m.sku)+'</td><td>'+nf(m.qtd)+'</td></tr>').join('') : vazio(2);
+  $('#dDes').innerHTML = des && des.pessoas && des.pessoas.length ? des.pessoas.map(p=>'<tr><td>'+esc(p.nome)+'</td><td>'+nf(p.casos)+'</td><td>'+(p.prazos.decididos?nf(p.prazos.cumpridos)+' de '+nf(p.prazos.decididos):'—')+'</td><td>'+(p.dias_mediana==null?'—':nf(p.dias_mediana))+'</td><td>'+nf(p.vezes_parado)+'</td></tr>').join('') : vazio(5,'Nenhum caso encerrado no mês.');
+}
+
+/* ═════════ POR PESSOA ═════════ */
+async function pessoas(){
+  const d=await pegar('/api/rel/pessoas'+qsP());
+  if(!d){ $('#peCorpo').innerHTML='<div class="vazio">Não consegui carregar.</div>'; return; }
+  $('#peTit').textContent = d.com_nome ? 'Por pessoa — com nome' : 'A equipe — sem identificar quem';
+  const tempo=e=>e.tempo_mediana!=null?fmt(e.tempo_mediana):'—';
+  if(d.com_nome){
+    $('#peCorpo').innerHTML = d.etapas.filter(e=>!e.sem_registro && e.total).map(e=>
+      '<h3 style="margin:14px 0 6px">'+esc(e.nome)+' — '+nf(e.total)+'</h3><div class="rola"><table><thead><tr><th>Pessoa</th><th>Quantidade</th>'+(e.tempo_mediana!==undefined?'<th>Tempo (mediana)</th><th>Maior</th>':'')+'</tr></thead><tbody>'
+      + e.lista.map(p=>'<tr><td>'+esc(p.nome)+'</td><td>'+nf(p.qtd)+'</td>'+(e.tempo_mediana!==undefined?'<td>'+(p.tempo_mediana!=null?fmt(p.tempo_mediana):'—')+'</td><td>'+(p.tempo_maior!=null?fmt(p.tempo_maior):'—')+'</td>':'')+'</tr>').join('')
+      + '</tbody></table></div>').join('') || '<div class="vazio">Ninguém registrou trabalho no período.</div>';
+  } else {
+    $('#peCorpo').innerHTML = '<div class="rola"><table><thead><tr><th>Etapa</th><th>Total</th><th>Pessoas</th><th>Menor</th><th>Mediana</th><th>Maior</th><th>Tempo (mediana)</th></tr></thead><tbody>'
+      + d.etapas.filter(e=>!e.sem_registro).map(e=>'<tr><td>'+esc(e.nome)+'</td><td>'+nf(e.total)+'</td><td>'+nf(e.pessoas)+'</td><td>'+(e.por_pessoa?nf(e.por_pessoa.menor):'—')+'</td><td>'+(e.por_pessoa?nf(e.por_pessoa.mediana):'—')+'</td><td>'+(e.por_pessoa?nf(e.por_pessoa.maior):'—')+'</td><td>'+tempo(e)+'</td></tr>').join('')
+      + '</tbody></table></div><div class="nota">Menor, mediana e maior são de quanto cada pessoa fez no período. Na etapa feita por menos de 3 pessoas aparece só o total — senão o número seria o de alguém.</div>';
+  }
+}
+
+/* ═════════ SOB MEDIDA (a rota dos indicadores de lá) ═════════ */
+async function sobmedida(){
+  let d=await pegar('/sobmedida/api/indicadores?dias=30');
+  if(!d){ $('#smTiles').innerHTML='<div class="vazio">Não consegui carregar os indicadores do sob medida.</div>'; return; }
+  if(d.dados) d=d.dados;   // o sob medida responde no envelope {ok, dados} (R-SML; o ui.js de lá desembrulha)
+  const t=(nome,v,extra)=>'<div class="tile"><div class="t">'+nome+'</div>'+(v==null?'<div class="v sem">sem registro</div>':'<div class="v">'+v+'</div>')+(extra?'<div class="c">'+extra+'</div>':'')+'</div>';
+  const pr=d.prazo||{}, es=d.esforco||{}, ap=d.aprovacao||{}, pa=d.parados||{}, re=d.recusas||{};
+  $('#smTiles').innerHTML =
+      t('Prazo cumprido (prometido)', pr.pct_prometido==null?null:pr.pct_prometido+'%', pr.prontos!=null?nf(pr.prontos)+' pedidos prontos · negociado: '+(pr.pct_negociado==null?'—':pr.pct_negociado+'%'):'')
+    + t('Peças completas', es.pecas_completas==null?null:nf(es.pecas_completas), es.horas_por_peca!=null?String(es.horas_por_peca).replace('.',',')+' h por peça':'')
+    + t('Pedidos aprovados', ap.pedidos==null?null:nf(ap.pedidos), '')
+    + t('Pedidos parados', pa.lista?nf(pa.lista.length):null, pa.vencidos!=null?nf(pa.vencidos)+' com prazo vencido':'')
+    + t('Recusas na bancada', re.total==null?null:nf(re.total), '');
+}
+
+/* ═════════ AS ABAS ═════════ */
+const ABAS={
+  semana:{sec:'secSemana', periodo:false, carregar(){ (PODE_FECHO?fechamento():Promise.resolve()).finally(()=>semana()); }},
+  vendas:{sec:'secVendas', periodo:true, carregar:vendas},
+  producao:{sec:'secProducao', periodo:true, carregar:producao},
+  expedicao:{sec:'secExpedicao', periodo:true, carregar:expedicao},
+  estoque:{sec:'secEstoque', periodo:true, carregar:estoque},
+  devolucoes:{sec:'secDevolucoes', periodo:false, carregar:devolucoes},
+  pessoas:{sec:'secPessoas', periodo:true, carregar:pessoas},
+  sobmedida:{sec:'secSobmedida', periodo:false, carregar:sobmedida}
+};
+let ABA='semana';
+/* O fechamento do dia é @admin: só se pede a quem é nível Admin (quem abre a
+   301 Estoque, que é @admin) — senão sai um 403 no console a cada abertura. */
+let PODE_FECHO=false;
+const abaVisivel=a=>ABAS[a] && !document.querySelector('.tab[data-t="'+a+'"]').hidden;
+function abrirAba(a, semHash){
+  if(!abaVisivel(a)) a='semana';
+  ABA=a;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on', b.dataset.t===a));
+  Object.keys(ABAS).forEach(k=>{ document.getElementById(ABAS[k].sec).hidden = k!==a; });
+  $('#periodo').hidden=!ABAS[a].periodo;
+  try{ localStorage.setItem('rel_aba', a); }catch(e){}
+  if(!semHash) history.replaceState(null,'','#'+a);
+  ABAS[a].carregar();
+}
+function recarregar(){ ABAS[ABA].carregar(); }
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>abrirAba(b.dataset.t)));
+window.addEventListener('hashchange',()=>{ const h=location.hash.slice(1); if(abaVisivel(h)) abrirAba(h,true); else history.replaceState(null,'','#'+ABA); });
+
+/* As abas de outras permissões (Devoluções, Por pessoa, Sob medida) aparecem
+   só para quem as tem — a mesma lista que o ☰ Menu usa. Esconder é conforto:
+   quem tranca é a rota. */
+(async function(){
+  const eu=await pegar('/api/telas/minhas');
+  const tem=c=>!!eu && (eu.admin_geral || (eu.perms||[]).indexOf(c)>=0);
+  PODE_FECHO=!!eu && (eu.admin_geral || (eu.telas||[]).some(t=>t.n===301));
+  document.querySelector('.tab[data-t="devolucoes"]').hidden=!(tem('devolucao.acompanhar')||tem('devolucao.lancar')||tem('devolucao.dinheiro'));
+  document.querySelector('.tab[data-t="pessoas"]').hidden=!(tem('produtividade.equipe')||tem('produtividade.nominal'));
+  document.querySelector('.tab[data-t="sobmedida"]').hidden=!tem('sobmedida.painel.ler');
+  let a=location.hash.slice(1);
+  if(!abaVisivel(a)){ try{ a=localStorage.getItem('rel_aba')||''; }catch(e){ a=''; } }
+  abrirAba(abaVisivel(a)?a:'semana');
+})();
 </script><script src="/nav.js"></script>
 </body></html>

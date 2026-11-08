@@ -135,4 +135,21 @@ function cobertura(db, janela){
            media_dia_total:+media_dia_total.toFixed(2), cobertura_dias };
 }
 
-module.exports = { doDia, serie, cobertura, saidasDoDia };
+/* RELATORIOS-UNIFICADOS (08/11/2026): o ENTROU, o SAIU e o VOLTOU de cada dia
+   de um PERIODO, pela mesma regua de cima. Dia sem movimento e zero. */
+function periodo(db, de, ate){
+  const ent = {}, sai = {}, vol = {};
+  db.prepare("SELECT data d, COUNT(*) q FROM montagem WHERE data BETWEEN ? AND ? AND COALESCE(teste,0)=0 "+
+    "GROUP BY data").all(de, ate).forEach(r => ent[r.d] = r.q);
+  pecasBaixadas(db, "date(l.baixado_em) BETWEEN ? AND ?", [de, ate]).forEach(r => sai[r.d] = r.q);
+  sobrasPorDia(db, de).forEach(r => { if(r.d <= ate) vol[r.d] = r.q; });
+  const dias = [];
+  for(let d = de; d <= ate; d = db.prepare("SELECT date(?,'+1 day') d").get(d).d)
+    dias.push({ data:d, entrou:ent[d] || 0, saiu:sai[d] || 0, voltou:vol[d] || 0 });
+  return dias;
+}
+function primeiraEmbalagem(db){
+  try{ return db.prepare("SELECT MIN(data) d FROM montagem WHERE COALESCE(teste,0)=0").get().d || null; }catch(e){ return null; }
+}
+
+module.exports = { doDia, serie, cobertura, saidasDoDia, periodo, primeiraEmbalagem };

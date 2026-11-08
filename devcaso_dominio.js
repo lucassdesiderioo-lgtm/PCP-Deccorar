@@ -1830,11 +1830,19 @@ function baixaReembolso(db, id, resultado, usuario){
    comprador, e sai como PISO quando falta algum valor (R9). */
 function relatorio(db, mes, comDinheiro){
   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(mes||''))) throw new Recusa(400, 'Mês impossível. Use AAAA-MM.');
-  const casos = db.prepare("SELECT * FROM devolucao_caso WHERE teste=0 AND substr(criado_em,1,7)=?").all(mes);
+  return relatorioPeriodo(db, mes + '-01', mes + '-31', comDinheiro, mes);
+}
+/* O MESMO relatorio, por periodo (RELATORIOS-UNIFICADOS, 08/11/2026): a semana
+   da reuniao de segunda le daqui, e nao de uma segunda conta (#12). As bordas
+   sao datas AAAA-MM-DD, inclusivas; o mes e o periodo do dia 01 ao 31 (texto:
+   o dia que nao existe nao casa com nada). */
+function relatorioPeriodo(db, de, ate, comDinheiro, mes){
+  const casos = db.prepare("SELECT * FROM devolucao_caso WHERE teste=0 AND substr(criado_em,1,10) BETWEEN ? AND ?").all(de, ate);
   let semCaso = [];
   try{
-    semCaso = db.prepare(`SELECT motivo FROM devolucao d WHERE COALESCE(d.teste,0)=0 AND substr(d.data,1,7)=?
-      AND NOT EXISTS (SELECT 1 FROM devolucao_caso c WHERE c.devolucao_id=d.id)`).all(mes);
+    semCaso = db.prepare(`SELECT motivo, UPPER(COALESCE(NULLIF(sku_fisico,''),sku_venda,'')) sku FROM devolucao d
+      WHERE COALESCE(d.teste,0)=0 AND d.data BETWEEN ? AND ?
+      AND NOT EXISTS (SELECT 1 FROM devolucao_caso c WHERE c.devolucao_id=d.id)`).all(de, ate);
   }catch(e){}
   const SEM = 'sem motivo';
   const por = new Map();
@@ -1851,7 +1859,17 @@ function relatorio(db, mes, comDinheiro){
   const por_motivo = Array.from(por.values()).sort((a,b) => b.qtd - a.qtd || a.motivo.localeCompare(b.motivo))
     .map(l => comDinheiro ? Object.assign(l, { perda_prazo:r2(l.perda_prazo), devolvido_comprador:r2(l.devolvido_comprador) })
                           : { motivo:l.motivo, qtd:l.qtd, casos:l.casos, sem_caso:l.sem_caso, envio:l.envio, publicidade:l.publicidade });
-  const out = { mes, total: casos.length + semCaso.length, casos: casos.length, sem_caso: semCaso.length, por_motivo,
+  /* Por TIPO e por SKU (RELATORIOS-UNIFICADOS): o item faltante (envio) nao e
+     devolucao — a peca sai, nao volta —, e por isso vem contado a parte. O SKU
+     do caso; da devolucao sem caso, o que o Edvaldo viu (o fisico). */
+  const por_tipo = { ml: casos.filter(c => c.tipo === 'ml').length, coleta: casos.filter(c => c.tipo === 'coleta').length,
+                     envio: casos.filter(c => c.tipo === 'envio').length, sem_caso: semCaso.length };
+  const skuM = new Map();
+  casos.filter(c => c.tipo !== 'envio').map(c => String(c.sku || '').toUpperCase()).concat(semCaso.map(d => d.sku || ''))
+    .forEach(k => { k = k || '(sem SKU)'; skuM.set(k, (skuM.get(k) || 0) + 1); });
+  const por_sku = Array.from(skuM, ([sku, qtd]) => ({ sku, qtd })).sort((a,b) => b.qtd - a.qtd || a.sku.localeCompare(b.sku));
+  const out = { mes: mes || null, de, ate, total: casos.length + semCaso.length, casos: casos.length, sem_caso: semCaso.length,
+                devolucoes: casos.length + semCaso.length - por_tipo.envio, por_tipo, por_sku, por_motivo,
                 por_saida: casos.reduce((a,c) => { if(c.saida) a[c.saida] = (a[c.saida]||0) + 1; return a; }, {}),
                 /* Só os casos: a devolução recebida sem caso não tem a pergunta. */
                 publicidade: { sim: casos.filter(c => c.publicidade === 1).length,
@@ -1897,6 +1915,14 @@ function relatorio(db, mes, comDinheiro){
       piso: faltam.length > 0, faltam };
   }
   return out;
+}
+
+/* Desde quando ha devolucao gravada (o caso ou a devolucao recebida). */
+function primeiraDevolucao(db){
+  let a = null, b = null;
+  try{ a = db.prepare("SELECT MIN(substr(criado_em,1,10)) d FROM devolucao_caso WHERE teste=0").get().d; }catch(e){}
+  try{ b = db.prepare("SELECT MIN(data) d FROM devolucao WHERE COALESCE(teste,0)=0").get().d; }catch(e){}
+  return [a, b].filter(Boolean).sort()[0] || null;
 }
 
 /* A BUSCA (AJUSTE de 03/11/2026): "esta reclamação já foi lançada?". Pelo
@@ -2155,7 +2181,7 @@ module.exports = {
   responsaveis, responsavelValido,
   proximoPasso, comProximo, VEZ_NOSSA,
   buscar, lancarCompleto, trocarTipo, pedirRevisaoFrete, respostaRevisaoFrete, desfazerEtapa, podeDesfazer, mesmoComprador,
-  SITUACOES_VALOR, situacaoValor, lancarValor, baixaReembolso, relatorio, custosPorCaso,
+  SITUACOES_VALOR, situacaoValor, lancarValor, baixaReembolso, relatorio, relatorioPeriodo, primeiraDevolucao, custosPorCaso,
   docsExigidos, situacaoDocs, listarAnexos, anexar, arquivoDoAnexo, devolverComprador,
   RESULTADOS, listarTransportadoras, salvarTransportadora, tentativas, pedirColeta, resultadoColeta, sugerirTransportadoras,
   abertoPorCodigo, chegou, avisarML, ligarRevisao, baixaDaDevolucao,

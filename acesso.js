@@ -1217,6 +1217,12 @@ module.exports = function(app, db){
     if(eq('/api/rejeicao/resumo')) return 'produtividade.nominal';
     // ── leituras de gestao ──
     if(eq('/api/painel') || eq('/api/gerencial')) return 'painel.ver';
+    /* RELATORIOS-UNIFICADOS (08/11/2026): a "Minha producao" e de quem ve a
+       propria producao (a rota so devolve a da pessoa logada), e o "Por
+       pessoa" de quem ve a da equipe — o nome so viaja com a de nome. Antes
+       do `pre('/api/rel')`, senao cairiam em "Ver relatorios". */
+    if(eq('/api/rel/minha')) return 'produtividade.propria';
+    if(eq('/api/rel/pessoas')) return ['produtividade.equipe','produtividade.nominal'];
     if(pre('/api/rel')) return 'relatorios.ver';
     if(eq('/api/cruzamento') || pre('/api/planejamento') || eq('/api/fechamento')) return '@admin';
 
