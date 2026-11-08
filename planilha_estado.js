@@ -83,11 +83,14 @@ function grupoDe(estado){
   if(e === 'a caminho' || e === 'envio reagendado' || e === 'envio atrasado') return 'saiu';
   if(e === 'entregue' || e === 'venda entregue') return 'entregue';
   if(e === 'cancelada pelo comprador' || e === 'venda cancelada. não envie.' ||
-     e === 'cancelada pelo mercado livre' || e === 'pacote cancelado pelo mercado livre') return 'cancelada';
+     e === 'cancelada pelo mercado livre' || e === 'pacote cancelado pelo mercado livre' ||
+     e === 'cancelada') return 'cancelada';   // "Cancelada" sozinha: o dono, 08/11/2026
   /* Pos-venda: devolucao, reclamacao, mediacao, reembolso, "Devolvido no dia
      N", "Pacote nao entregue" — os 26 estados do arquivo de 07/11 (o dono
      confirmou os 26, 07/11/2026). */
   if(/^devolu|^devolvido no dia|^reclama|^media[cç][aã]o|reembols|devolveram|^pacote n[aã]o entregue/.test(e)) return 'pos_venda';
+  /* Do relatório das 17:34 de 08/11/2026 (o dono, no mesmo dia). */
+  if(/^seu pacote foi devolvido|^venda n[aã]o entregue$/.test(e)) return 'pos_venda';
   return 'novo';
 }
 
