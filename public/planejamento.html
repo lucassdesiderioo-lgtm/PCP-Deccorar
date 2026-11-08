@@ -67,6 +67,7 @@
   .jn{margin:0 0 22px}
   /* AJUSTE de 08/11/2026: o topo fixo e as abas, no estilo das Devoluções em andamento */
   .topo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:14px;margin-bottom:14px}
+  @media(max-width:900px){.topo{grid-template-columns:minmax(0,1fr)}}
   .imp{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px}
   .imp .impl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .imp .prim{border:0;border-radius:9px;font-weight:700;padding:10px 16px;cursor:pointer}
@@ -191,7 +192,7 @@
   <section id="secJanelas" class="aba" style="display:none">
   <!-- FASE 2: as janelas 7 · 14 · 30 · 45 dias, SO PARA OLHAR (R9): trocar a
        janela aqui nao muda a producao nem a config. -->
-  <div class="jn">
+  <div class="jn cmp">
     <div class="sub">Trocar a janela aqui <b style="color:#e6edf3">não muda a produção</b>: ela continua com a janela de
       <b id="jnProd" style="color:#e6edf3">30</b> dias e o ritmo da janela curta. A seta compara a média de 14 com a de 30 dias.</div>
     <div style="display:flex;gap:8px;margin:10px 0" id="jnBtns"></div>
@@ -264,7 +265,8 @@ async function load(){
     const hora=quando.slice(11,16);
     const frase = pl.de_hoje ? 'Planilha enviada hoje às '+hora
       : 'Planilha de '+dataBr(quando.slice(0,10))+' às '+hora+' — não foi enviada hoje';
-    $('#vfMeta').innerHTML=(pl.de_hoje?'✔ ':'⚠ ')+frase;
+    $('#vfMeta').innerHTML=(pl.de_hoje?'✔ ':'⚠ ')+frase
+      +(pl.relatorio_em?' <span class="sub" style="font-weight:400">(hora do relatório do ML)</span>':'');
     $('#vfMeta').className='meta'+(pl.de_hoje?' hoje':' velha');
   } else { $('#vfMeta').textContent='Nenhuma planilha importada ainda.'; $('#vfMeta').className='meta velha'; }
   if(d.importado_em){
@@ -572,7 +574,9 @@ function abrirAba(a, semHash){
   if(!semHash && location.hash!=='#'+a){ try{ history.replaceState(null,'','#'+a); }catch(e){} }
   ABAS[a].carregar();
 }
-function recarregarAba(){ ABAS[ABA].carregar(); }
+/* Quem chama já rodou o load() (a hora da planilha do topo); na aba "O que
+   produzir" ele é a própria carga, e não precisa rodar duas vezes. */
+function recarregarAba(){ if(ABA!=='produzir') ABAS[ABA].carregar(); }
 document.getElementById('tabs').addEventListener('click',function(e){
   const t=e.target.closest('.tab'); if(t) abrirAba(t.getAttribute('data-t'));
 });
