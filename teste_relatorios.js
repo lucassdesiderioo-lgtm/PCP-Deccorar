@@ -245,6 +245,8 @@ const chavesDe = (o, acc = []) => { if(o && typeof o === 'object') for(const k o
 
   /* A tarja do histórico curto (AJUSTE de 08/11/2026): a 904 manda importar pela
      401, nunca recebe planilha; o botão só para quem abre a 401; some com 13 meses. */
+  ok('tarja do histórico: pede o que vem ANTES da primeira venda, e não "o ano" de novo',
+     /'o relatório das vendas de antes de '\+dBrAno\(desde\)/.test(h904) && !/importe o relatório de vendas do ano/.test(h904));
   ok('tarja do histórico: o botão é só para quem abre a 401, e a 904 não tem upload',
      /PODE_401\s*=\s*!!eu\s*&&\s*\(eu\.admin_geral\s*\|\|\s*\(eu\.telas\|\|\[\]\)\.some\(t=>t\.n===401\)\)/.test(h904)
      && /PODE_401\s*\?[^:]*href="\/planejamento"/.test(h904) && !/type=["']?file/.test(h904));
