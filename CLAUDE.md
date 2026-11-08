@@ -542,6 +542,15 @@ Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), sete linhas 
 - **Duas rotas novas de leitura**, `GET /api/planejamento/futuras` e
   `/janelas`, caem na linha `pre('/api/planejamento')` → `@admin`, a mesma da
   401. Nenhuma tela, ação ou setor novo.
+- **A 401 é em abas desde 08/11/2026** (AJUSTE, pedido do dono: *"é a tela da
+  gestão da fábrica, onde ele toma as decisões durante o dia"*), no estilo das
+  Devoluções em andamento: **Vendas por dia · O que produzir · Médias por
+  janela · Planilha × sistema**. O topo — o fechamento do dia, a hora da
+  planilha (verde se é de hoje, âmbar se não) e o Importar — fica fixo em todas.
+  Cada aba carrega quando abre; sem nada, abre em **Vendas por dia**; a tela
+  lembra a última aba **neste computador** (`localStorage`, só conveniência) e o
+  endereço aceita `#dia`, `#produzir`, `#janelas` e `#comparar`. Nenhum número,
+  rota ou permissão mudou.
 
 **Rode `node teste_vendas_futuras.js` (95) ao mexer no `planilha_estado.js`, no
 import do `plan_route.js`, no `demanda_dominio.js` ou na 401** — ele importa o
