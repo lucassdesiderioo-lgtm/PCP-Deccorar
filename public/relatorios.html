@@ -35,6 +35,11 @@
   th{font-size:11px;color:var(--muted);text-transform:uppercase}
   td.code{font-family:ui-monospace,monospace;font-weight:600}
   .rola{overflow-x:auto}
+  /* A tarja do histórico curto (AJUSTE de 08/11/2026): diz desde quando há venda e
+     onde se importa o ano. A 904 não recebe planilha: a porta é só a 401. */
+  .hist{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#2a2108;border:1px solid #6b5212;border-radius:10px;padding:11px 14px;margin-bottom:14px;font-size:14px;line-height:1.5}
+  .hist b{color:var(--amber)} .hist span{flex:1 1 280px;min-width:0}
+  .hist a{margin-left:auto;background:var(--amber);color:#1a1300;text-decoration:none;font-weight:700;border-radius:8px;padding:8px 14px}
   canvas{max-width:100%}
   .duas{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:16px}
   .vazio{color:var(--muted);padding:14px;text-align:center}
@@ -107,6 +112,7 @@
   <!-- ═════════ VENDAS (fase 2) ═════════ -->
   <section id="secVendas" hidden>
     <div class="card"><h3>Vendas mês a mês, em peças</h3>
+      <div class="hist" id="vHist" hidden></div>
       <canvas id="vGraf" height="80"></canvas>
       <div class="rola"><table><thead><tr><th>Mês</th><th>Peças</th><th>× mês anterior</th><th>× mesmo mês do ano anterior</th></tr></thead><tbody id="vMeses"></tbody></table></div>
       <div class="nota" id="vNota"></div>
@@ -291,10 +297,31 @@ async function fechamento(){
 
 /* ═════════ VENDAS ═════════ */
 const cres=v=>v==null?'—':'<span class="'+(v>0?'sobe':(v<0?'desce':'igual'))+'">'+(v>0?'+':'')+String(v).replace('.',',')+'%</span>';
+/* MENOS DE 13 MESES DE VENDA = A COLUNA "× MESMO MÊS DO ANO ANTERIOR" VAZIA.
+   A tarja diz desde quando há venda e manda importar o ano pela 401 — o botão só
+   para quem abre a 401 (a conta do portão, /api/telas/minhas); para os outros, só
+   a frase. Com 13 meses ou mais, some. */
+const MESES_PARA_ANO = 13;
+function mesesDesde(iso, hoje){
+  const [y1,m1,d1]=iso.split('-').map(Number), y2=hoje.getFullYear(), m2=hoje.getMonth()+1, d2=hoje.getDate();
+  return (y2*12+m2)-(y1*12+m1)-(d2<d1?1:0);
+}
+function tarjaHistorico(desde){
+  const el=$('#vHist');
+  const meses = desde ? mesesDesde(desde, new Date()) : null;
+  if(desde && meses+1 >= MESES_PARA_ANO){ el.hidden=true; el.innerHTML=''; return; }
+  const quanto = !desde ? '📅 Nenhuma venda importada ainda.'
+    : '📅 As vendas no sistema começam em <b>'+dBrAno(desde)+'</b> — '+(meses<1?'menos de 1 mês':meses===1?'1 mês':meses+' meses')+'.';
+  el.innerHTML = PODE_401
+    ? '<span>'+quanto+' Para ver o ano inteiro e comparar com o mesmo mês do ano anterior, importe o relatório de vendas do ano pela tela <b>Planejamento</b>.</span><a href="/planejamento">Importar na 401 Planejamento →</a>'
+    : '<span>'+quanto+' O ano inteiro aparece quando o relatório de vendas do ano for importado na tela Planejamento.</span>';
+  el.hidden=false;
+}
 async function vendas(){
   const d=await pegar('/api/rel/vendas'+qsP());
   if(!d){ $('#vMeses').innerHTML=vazio(4,'Não consegui carregar.'); return; }
   $('#vMeses').innerHTML = d.meses.length ? d.meses.slice().reverse().map(m=>'<tr><td>'+mesBr(m.mes)+(m.parcial?' <span class="sub">(até dia '+m.ate_dia+' · projeção '+nf(m.projecao)+')</span>':'')+'</td><td>'+nf(m.pecas)+'</td><td>'+cres(m.vs_mes_anterior)+(m.crescimento_pela_projecao&&m.vs_mes_anterior!=null?' <span class="sub">pela projeção</span>':'')+'</td><td>'+cres(m.vs_ano_anterior)+(m.crescimento_pela_projecao&&m.vs_ano_anterior!=null?' <span class="sub">pela projeção</span>':'')+'</td></tr>').join('') : vazio(4,'Nenhuma venda importada.');
+  tarjaHistorico(d.desde);
   $('#vNota').textContent='Pela data da venda, da planilha do ML importada na tela Planejamento'+(d.desde?' (desde '+dBrAno(d.desde)+')':'')+'. A venda cancelada fica fora; o pós-venda entra. O mês de hoje é parcial: a projeção segue o ritmo do mês até agora, e a comparação dele é pela projeção.';
   grafico('vGraf',{type:'bar',data:{labels:d.meses.map(m=>mesBr(m.mes)),datasets:[{label:'Peças vendidas',data:d.meses.map(m=>m.pecas),backgroundColor:d.meses.map(m=>m.parcial?'#2a4f80':'#4493f8')}]}});
   const tot=d.periodo.total||0, p=n=>tot?pctTxt(Math.round(n/tot*1000)/10):'—';
@@ -462,7 +489,7 @@ const ABAS={
 let ABA='semana';
 /* O fechamento do dia é @admin: só se pede a quem é nível Admin (quem abre a
    301 Estoque, que é @admin) — senão sai um 403 no console a cada abertura. */
-let PODE_FECHO=false;
+let PODE_FECHO=false, PODE_401=false;
 const abaVisivel=a=>ABAS[a] && !document.querySelector('.tab[data-t="'+a+'"]').hidden;
 function abrirAba(a, semHash){
   if(!abaVisivel(a)) a='semana';
@@ -485,6 +512,7 @@ window.addEventListener('hashchange',()=>{ const h=location.hash.slice(1); if(ab
   const eu=await pegar('/api/telas/minhas');
   const tem=c=>!!eu && (eu.admin_geral || (eu.perms||[]).indexOf(c)>=0);
   PODE_FECHO=!!eu && (eu.admin_geral || (eu.telas||[]).some(t=>t.n===301));
+  PODE_401=!!eu && (eu.admin_geral || (eu.telas||[]).some(t=>t.n===401));
   document.querySelector('.tab[data-t="devolucoes"]').hidden=!(tem('devolucao.acompanhar')||tem('devolucao.lancar')||tem('devolucao.dinheiro'));
   document.querySelector('.tab[data-t="pessoas"]').hidden=!(tem('produtividade.equipe')||tem('produtividade.nominal'));
   document.querySelector('.tab[data-t="sobmedida"]').hidden=!tem('sobmedida.painel.ler');

@@ -243,6 +243,19 @@ const chavesDe = (o, acc = []) => { if(o && typeof o === 'object') for(const k o
   const h904 = fs.readFileSync(path.join(__dirname, 'public', 'relatorios.html'), 'utf8');
   ok('o filtro escondido some de verdade (o display:flex não passa por cima do hidden)', /\[hidden\]\s*\{\s*display\s*:\s*none/.test(h904));
 
+  /* A tarja do histórico curto (AJUSTE de 08/11/2026): a 904 manda importar pela
+     401, nunca recebe planilha; o botão só para quem abre a 401; some com 13 meses. */
+  ok('tarja do histórico: o botão é só para quem abre a 401, e a 904 não tem upload',
+     /PODE_401\s*=\s*!!eu\s*&&\s*\(eu\.admin_geral\s*\|\|\s*\(eu\.telas\|\|\[\]\)\.some\(t=>t\.n===401\)\)/.test(h904)
+     && /PODE_401\s*\?[^:]*href="\/planejamento"/.test(h904) && !/type=["']?file/.test(h904));
+  {
+    const m = h904.match(/const MESES_PARA_ANO = (\d+);\s*function mesesDesde[\s\S]*?\n}\n/);
+    const mesesDesde = m && new Function(m[0] + 'return mesesDesde;')();
+    ok('tarja do histórico: some com 13 meses de venda, e a conta dos meses é a do calendário',
+       m && +m[1] === 13 && mesesDesde('2026-09-05', new Date(2026,10,8)) === 2
+       && mesesDesde('2026-09-09', new Date(2026,10,8)) === 1 && mesesDesde('2025-11-01', new Date(2026,10,8)) + 1 === 13);
+  }
+
   /* ═════════ 13. Alçada ═════════ */
   const T = require('./telas').TELAS.find(t => t.n === 905);
   ok('a 905 está no mapa: nível Operação, aberta com "Ver a própria produção"',
