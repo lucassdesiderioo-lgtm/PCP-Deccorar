@@ -81,7 +81,7 @@
 <div class="card"><h3>Cobertura de estoque — produzi &times; vendi</h3>
   <canvas id="gCob" height="80"></canvas>
   <div style="overflow:auto;margin-top:12px"><table id="gCobTab"><thead><tr><th>Dia</th><th>Produzi</th><th>Vendi</th><th>Variação</th><th>Estoque fim</th><th>Cobertura (dias)</th></tr></thead><tbody id="gCobBody"></tbody></table></div>
-  <div id="gCobMsg" style="color:#8b97a5;font-size:13px;margin-top:8px">O fechamento do dia é gravado quando a tela Planejamento ou esta tela é aberta.</div>
+  <div id="gCobMsg" style="color:#8b97a5;font-size:13px;margin-top:8px">O fechamento do dia é gravado quando alguém de nível Admin abre a tela Planejamento ou esta tela.</div>
 </div>
 
   <div class="card"><h3>Por SKU</h3>
@@ -226,7 +226,8 @@ async function fechamento(){
   $('#fecho').style.display='';
 }
 
-fechamento();
-carregarGer();
+/* Primeiro grava o retrato de hoje, depois le o historico: em paralelo, a
+   linha de hoje da tabela podia sair mais velha que o cartao de cima. */
+fechamento().finally(carregarGer);
 </script><script src="/nav.js"></script>
 </body></html>
