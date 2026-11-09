@@ -217,8 +217,10 @@ const ok = (n, c, extra) => { casos++;
   // ── 2. O COMPROMETIDO ENTRA NA CONTA (era o que faltava) ─────────────────
   ok('BK140140BEGE: alvo ao vivo 10 (30 vendas na janela x 10 dias)', por.BK140140BEGE.alvo === 10,
      'veio ' + por.BK140140BEGE.alvo);
-  ok('BK140140BEGE: precisa 10 = comprometido 2 + alvo 10 - estoque 2',
-     por.BK140140BEGE.precisa === 10 && por.BK140140BEGE.comprometido === 2,
+  /* 09/11/2026: o precisa conta pelo LIVRE. A caixa impressa hoje e ainda nao
+     conferida (logo acima) reserva 1 peca: livre = 2 − 1 = 1. */
+  ok('BK140140BEGE: precisa 11 = comprometido 2 + alvo 10 - livre 1 (saldo 2, 1 em caixa)',
+     por.BK140140BEGE.precisa === 11 && por.BK140140BEGE.comprometido === 2,
      'precisa=' + por.BK140140BEGE.precisa + ' comprometido=' + por.BK140140BEGE.comprometido);
   ok('a conta velha (alvo salvo 5 - estoque 2 = 3) nao e mais o que a tela mostra',
      por.BK140140BEGE.precisa !== 3);
@@ -295,8 +297,8 @@ const ok = (n, c, extra) => { casos++;
   ok('soma as pecas em estoque (2 + 0 + 0 + 7 + 5)', p.resumo.pecas_estoque === 14,
      'veio ' + p.resumo.pecas_estoque);
   ok('conta os SKUs em falta', p.resumo.skus_falta === 2, 'veio ' + p.resumo.skus_falta);
-  ok('soma as pecas a produzir (10 do BEGE + 2 do sob medida)',
-     p.resumo.pecas_precisa === 12, 'veio ' + p.resumo.pecas_precisa);
+  ok('soma as pecas a produzir (11 do BEGE, pelo livre + 2 do sob medida)',
+     p.resumo.pecas_precisa === 13, 'veio ' + p.resumo.pecas_precisa);
   ok('o semaforo cobre todos os SKUs',
      p.resumo.zerados + p.resumo.baixos + p.resumo.ok + p.resumo.excesso === p.resumo.skus,
      JSON.stringify(p.resumo));
@@ -399,8 +401,8 @@ const ok = (n, c, extra) => { casos++;
   const l2 = painel2.linhas.find(l => l.codigo === 'BK140140BEGE');
   ok('"falta hoje" conta a ordem do dia que ainda não saiu (5 pedidas − 2 revisadas no vermelho)',
      l2.faltaHoje === 3 && l2.atendidas === 0, 'veio ' + l2.faltaHoje + '/' + l2.atendidas);
-  ok('e não se mistura com o precisa, que segue o do estoque',
-     l2.precisa === 10, 'veio ' + l2.precisa);
+  ok('e não se mistura com o precisa, que segue o do livre (11)',
+     l2.precisa === 11, 'veio ' + l2.precisa);
   /* O caso de 08/09/2026 na TV: ordem URGENTE cuja venda ja saiu inteira. A
      falta e zero, e a TV diz que foi porque saiu do estoque — nao deixa o
      "produzido" abaixo do pedido sem explicacao. */

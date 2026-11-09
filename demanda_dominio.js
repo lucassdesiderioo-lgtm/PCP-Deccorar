@@ -15,8 +15,10 @@
  * As contas (secao 3 do docs/DESENHO-PLANEJAMENTO.md):
  *   media diaria = vendas do SKU na janela / dias da janela
  *   alvo         = max(alvo_minimo, ceil(media diaria * dias_cobertura))
- *   precisa      = max(0, comprometido + alvo - estoque)
- * comprometido = vendas com data de envio futura (coluna Estado da planilha).
+ *   precisa      = max(0, comprometido + alvo - livre)
+ * comprometido = vendas com data de envio futura (coluna Estado da planilha)
+ *                SEM as que ja tem etiqueta impressa no PCP (09/11/2026);
+ * livre        = saldo − peca em caixa com etiqueta (baixa_dominio).
  *
  * O modelo ATUAL (curva ABC da tabela `demanda`) continua sendo devolvido lado a
  * lado, nos campos `at_*`, porque a tela de planejamento compara os dois. Ele
@@ -44,6 +46,23 @@ function cfgNum(db, chave, padrao){
 /* As colunas novas nascem no plan_route.js (CREATE + ALTER, §17). Um banco que
    so tem a tabela de antes (um script, um teste que monta a sua) conta como
    antes: 1 por linha, e futura so de hoje em diante. */
+function etiquetaSql(db){
+  let lc = [];
+  try{ lc = db.prepare("PRAGMA table_info(lote)").all().map(c => c.name); }catch(e){}
+  if(lc.indexOf('embalado_em') < 0 || lc.indexOf('venda') < 0) return '';
+  const pack = lc.indexOf('packId') >= 0 ? " OR l.packId=venda_futura.venda_id" : '';
+  const teste = lc.indexOf('teste') >= 0 ? " AND COALESCE(l.teste,0)=0" : '';
+  return "EXISTS (SELECT 1 FROM lote l WHERE (l.venda=venda_futura.venda_id"+pack+") "+
+         "AND l.embalado_em IS NOT NULL"+teste+")";
+}
+
+/* O RESERVADO pela etiqueta, por SKU: o dono e o baixa_dominio (o mesmo
+   numero do livre da Etiqueta de Venda e da TV). Banco sem `lote` (um teste
+   que monta so a planilha) nao tem reserva. */
+function reservadoPorSku(db){
+  try{ return require('./baixa_dominio').reservados(db) || {}; }catch(e){ return {}; }
+}
+
 function sql(db){
   let cols = [];
   try{ cols = db.prepare("PRAGMA table_info(venda_futura)").all().map(c => c.name); }catch(e){}
@@ -54,6 +73,15 @@ function sql(db){
             (tem('grupo') ? "AND (data_envio >= date('now','localtime') OR grupo IS NOT NULL)"
                           : "AND data_envio >= date('now','localtime')"),
     CONF: tem('data_confirmar') ? "COALESCE(data_confirmar,0)" : "0",
+    /* A VENDA COM ETIQUETA JA FOI ATENDIDA PELA PRODUCAO (decisao do dono,
+       09/11/2026): a peca ja foi embalada e esta na caixa dela. A planilha so
+       troca o Estado quando o caminhao bipa, e ate la a venda ficava no
+       comprometido E a peca ja tinha saido do saldo na Conferencia — a mesma
+       peca contada duas vezes (o A3 da PLANEJAMENTO-VENDAS-FUTURAS). Quem
+       liga a venda da planilha a caixa e o cruzamento do cancelamento: a
+       venda ou o pack. A venda que o PCP nao acha CONTINUA contando: na
+       duvida, produz-se. */
+    ETQ: etiquetaSql(db),
     TESTE: tem('teste') ? " AND COALESCE(teste,0)=0" : ""
   };
 }
@@ -135,8 +163,9 @@ function porDia(db){
       CASE WHEN data_envio < ? THEN 'atrasada' ELSE data_envio END d,
       SUM(${PECA}) n,
       SUM(CASE WHEN ${Q.CONF}=1 THEN ${PECA} ELSE 0 END) nconf
-    FROM venda_futura WHERE ${FUTURA}
+    FROM venda_futura WHERE ${FUTURA}${Q.ETQ ? ' AND NOT '+Q.ETQ : ''}
     GROUP BY UPPER(codigo), CASE WHEN data_envio < ? THEN 'atrasada' ELSE data_envio END`).all(hoje, hoje);
+  const reserva = reservadoPorSku(db);
 
   const diasSet = new Set(), porSku = {};
   for(const r of regs){
@@ -154,7 +183,9 @@ function porDia(db){
     const totalSku = cel.reduce((a,x)=>a+x.vendas, 0);
     if(!s){ semCadastro.push({ codigo:c, total:totalSku, celulas:cel }); continue; }
     if(s.sob_medida){ sobMedida.push({ codigo:c, total:totalSku, celulas:cel }); continue; }
-    const estoque = s.estoque || 0;
+    /* O LIVRE, e nao o saldo: a venda com etiqueta saiu da lista, e a peca
+       dela (em caixa, esperando a Conferencia) nao pode cobrir outra venda. */
+    const emCaixa = reserva[c] || 0, estoque = s.estoque || 0, livre = estoque - emCaixa;
     let acum = 0, faltaDesde = null, faltaPrimeiro = 0;
     for(const x of cel){
       acum += x.vendas;
@@ -162,11 +193,11 @@ function porDia(db){
       /* Antes da primeira venda do SKU nao ha falta: o saldo negativo
          (R-EST-08) nao vira "atrasada" numa coluna em que o SKU nao vendeu
          nada (③ REVISAO, 07/11/2026). Ele entra na falta da primeira venda. */
-      x.falta = acum > 0 ? Math.max(0, acum - estoque) : 0;
+      x.falta = acum > 0 ? Math.max(0, acum - livre) : 0;
       if(x.falta > 0 && faltaDesde == null){ faltaDesde = x.dia; faltaPrimeiro = x.falta; }
       total[x.dia].vendas += x.vendas; total[x.dia].falta += x.falta; total[x.dia].confirmar += x.confirmar;
     }
-    linhas.push({ codigo:c, descricao:s.descricao, cor:s.cor, estoque, total:totalSku,
+    linhas.push({ codigo:c, descricao:s.descricao, cor:s.cor, estoque, livre, em_caixa:emCaixa, total:totalSku,
       falta_total: cel.length ? cel[cel.length-1].falta : 0,
       falta_desde: faltaDesde, falta_desde_rotulo: faltaDesde==='atrasada' ? 'atrasada' : rotuloDia(faltaDesde),
       falta_primeiro: faltaPrimeiro, celulas:cel });
@@ -179,7 +210,17 @@ function porDia(db){
   const ordemAlfa = (a,b)=> a.codigo.localeCompare(b.codigo);
   sobMedida.sort(ordemAlfa); semCadastro.sort(ordemAlfa);
   return { hoje, dias: dias.map(d => ({ dia:d, rotulo: d==='atrasada' ? 'Atrasada' : rotuloDia(d) })),
-           linhas, sob_medida:sobMedida, sem_cadastro:semCadastro, total };
+           linhas, sob_medida:sobMedida, sem_cadastro:semCadastro, total, com_etiqueta: comEtiqueta(db) };
+}
+
+/* Quantas vendas que a planilha ainda mostra na fabrica ja tem etiqueta impressa
+   no PCP — as que sairam da lista. A tela diz, para o total que cai ao longo do
+   dia nao parecer sumir. */
+function comEtiqueta(db){
+  const Q = sql(db);
+  if(!Q.ETQ) return { vendas:0, pecas:0 };
+  try{ const r = db.prepare(`SELECT COUNT(*) v, COALESCE(SUM(${Q.PECA}),0) p FROM venda_futura WHERE ${Q.FUTURA} AND ${Q.ETQ}`).get();
+    return { vendas:r.v, pecas:r.p }; }catch(e){ return { vendas:0, pecas:0 }; }
 }
 
 function calcular(db){
@@ -207,8 +248,9 @@ function calcular(db){
       SUM(CASE WHEN data_envio >  date('now','localtime','+7 day') THEN ${PECA} ELSE 0 END) depois,
       SUM(${PECA}) total
     FROM venda_futura
-    WHERE ${FUTURA}
+    WHERE ${FUTURA}${Q.ETQ ? ' AND NOT '+Q.ETQ : ''}
     GROUP BY UPPER(codigo)`).all().forEach(r=> compMap[r.c]=r);
+  const reserva = reservadoPorSku(db);
 
   /* `sob_medida` vem junto porque muda a conta la embaixo: peca feita contra o
      pedido nao tem estoque para repor. Sem o JOIN ela cai no alvo minimo e pede
@@ -238,6 +280,13 @@ function calcular(db){
   for(const c of cods){
     const s = smap[c];
     const estoque = s ? s.estoque : null;
+    /* O LIVRE (saldo − peca em caixa com etiqueta): a venda com etiqueta saiu
+       do comprometido, e a peca reservada a ela nao cobre outra venda. Sem
+       caixa impressa o livre e o saldo, e a conta e a de sempre. O `estoque`
+       devolvido continua sendo o SALDO (a aba Estoque, o custo e a cobertura
+       leem o saldo); o que muda e o `precisa`. */
+    const emCaixa = s ? (reserva[c] || 0) : 0;
+    const livre = s ? (estoque || 0) - emCaixa : null;
     const nVendas = mediaMap[c] || 0;
     const media = janela>0 ? nVendas/janela : 0;
     const mediaCurta = curta>0 ? (curtaMap[c] || 0)/curta : 0;
@@ -256,7 +305,7 @@ function calcular(db){
        a equipe aprende a ignorar.
        O que ela precisa e o que foi VENDIDO — o comprometido, e so ele. */
     const alvo = (s && s.sob_medida) ? 0 : Math.max(alvoMin, Math.ceil(ritmo*diasCob));
-    const precisa = Math.max(0, comprometido + alvo - (estoque||0));
+    const precisa = Math.max(0, comprometido + alvo - (livre||0));
     /* COBERTURA: quantos DIAS o estoque atual aguenta a venda desse SKU, no
        RITMO (fase 3). E a metrica que ordena por risco, e nao por tamanho.
        Sem venda na janela nao ha cobertura a calcular: `null` e "nao da pra
@@ -291,7 +340,7 @@ function calcular(db){
           : 'faltam ' + falta_pecas + ' para ' + rotuloDia(fv.falta_desde) + ' (vendidas)';
       } else {
         falta_tipo = 'reposicao'; falta_pecas = precisa;
-        const livreDaVenda = (estoque||0) - comprometido;
+        const livreDaVenda = (livre||0) - comprometido;
         const r1 = (+ritmo.toFixed(1)).toString().replace('.', ',');
         if(ritmo > 0){
           data_falta = somaDias(hoje, Math.max(0, Math.floor(livreDaVenda / ritmo)));
@@ -304,7 +353,7 @@ function calcular(db){
     linhas.push({
       codigo:c, cadastrado:!!s,
       descricao: s?s.descricao:'', cor: s?s.cor:'',
-      estoque,
+      estoque, livre, em_caixa: emCaixa,
       vendas_janela:nVendas, media_dia:+media.toFixed(2),
       media_curta:+mediaCurta.toFixed(2), ritmo:+ritmo.toFixed(2), subindo,
       alvo, comprometido, precisa,
@@ -377,5 +426,5 @@ function aProduzir(db){
   return calcular(db).linhas.filter(l => l.cadastrado && l.precisa > 0);
 }
 
-module.exports = { calcular, aProduzir, cfgNum, porDia, janelas, vendasPorSku, vendasTotal, rotuloDia, JANELAS,
+module.exports = { calcular, aProduzir, cfgNum, porDia, comEtiqueta, janelas, vendasPorSku, vendasTotal, rotuloDia, JANELAS,
   vendasPorDiaPeriodo, vendasPorMes, vendasPorSkuPeriodo, primeiraVenda };

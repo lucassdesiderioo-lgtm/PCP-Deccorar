@@ -414,7 +414,7 @@
 - **Status:** no ar desde 07/11/2026 (PR #313).
 
 ### R-PLN-03 · A falta acumulada por dia, e a Atrasada primeiro
-- **Regra:** `demanda_dominio.porDia` é a única conta: `falta até o dia D = max(0, vendas de hoje até D − estoque)`, com o estoque = o **saldo** (o mesmo da tela azul, §2). A primeira coluna é **Atrasada** (data já passada, ainda na fábrica pela planilha) e ela conta no comprometido. O horizonte é todo dia com venda futura. Sob medida fica fora da falta, contado à parte; SKU sem cadastro em linha própria. A aba e a tela azul dão o **mesmo** comprometido.
+- **Regra:** `demanda_dominio.porDia` é a única conta: `falta até o dia D = max(0, vendas de hoje até D − livre)`, com o **livre** = saldo − peça em caixa com etiqueta (desde 09/11/2026, R-PLN-06; até ali era o saldo). A primeira coluna é **Atrasada** (data já passada, ainda na fábrica pela planilha) e ela conta no comprometido. O horizonte é todo dia com venda futura. Sob medida fica fora da falta, contado à parte; SKU sem cadastro em linha própria. A aba e a tela azul dão o **mesmo** comprometido.
 - **Por quê:** a venda futura era um número só, e ninguém sabia o que era para segunda, terça, quarta.
 - **Exceções:** a linha de antes desta fase (sem `grupo`) só conta de hoje em diante, como sempre.
 - **Teste que trava:** `teste_vendas_futuras.js`.
@@ -433,6 +433,13 @@
 - **Exceções:** a queda **não** derruba o alvo antes dos 30 dias. Sob medida continua sem alvo (R-REV-04).
 - **Teste que trava:** `teste_vendas_futuras.js`.
 - **Status:** no ar desde 07/11/2026 (PR #313).
+
+### R-PLN-06 · A venda com etiqueta impressa sai do planejamento, e a conta usa o livre
+- **Regra:** o comprometido (a 401, a tela azul, a TV e a compra — o `demanda_dominio`) não conta a venda da planilha que já tem caixa com etiqueta de venda no PCP (`lote.embalado_em`, achada pela venda ou pelo pack; o modo teste fica fora), e a conta usa o **livre**: `precisa = comprometido + alvo − livre`. A falta só se mexe quando a venda chega e quando a peça é embalada. A 401 mostra "Livre" com "+N em caixa", diz quantas vendas saíram da lista e se atualiza a cada minuto.
+- **Por quê:** a planilha só muda o Estado quando o caminhão bipa; a peça conferida saía do saldo e a venda ficava no comprometido. Em 09/11/2026: 84 peças assim, falta 269 na tela contra 199 de verdade. O dono: *"assim que der saída com a embalagem feita já deve sair do planejamento da produção"*.
+- **Exceções:** a venda que o PCP não acha continua contando (na dúvida, produz-se) — inclusive o item de pacote cuja venda não é a da caixa, que fica com a falta a mais. O `estoque` devolvido continua sendo o saldo (aba Estoque, custo, cobertura).
+- **Teste que trava:** `teste_vendas_futuras.js` (seção 7: a venda chega, a peça é embalada, a etiqueta, a Conferência, o modo teste, o pack, a venda não achada, a caixa de venda fora da planilha, o banco sem `lote`) e `teste_estoque.js` (o `precisa` pelo livre).
+- **Status:** construído em 09/11/2026.
 
 ## O que ainda não tem teste nesta área
 
