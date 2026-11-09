@@ -526,7 +526,31 @@ const csv64 = txt => 'data:text/csv;base64,' + Buffer.from(txt, 'utf8').toString
     h.run('2026-11-11', 1, '10:15', '12:15', 0);
     ok('amanhã "sem coleta" (feriado) → a próxima coleta lançada, depois de amanhã, sem "a confirmar"',
        JSON.stringify(pc('2026-11-09', '17:34')) === JSON.stringify({ data:'2026-11-11', confirmar:0 }), pc('2026-11-09', '17:34'));
-    ok('relatório sem hora lida: qualquer coleta lançada do dia vale', pc('2026-11-09', null).data === '2026-11-09');
+    ok('relatório sem hora lida: a coleta lançada do dia vale, mas "a confirmar" (③ REVISÃO)',
+       JSON.stringify(pc('2026-11-09', null)) === JSON.stringify({ data:'2026-11-09', confirmar:1 }), pc('2026-11-09', null));
+    /* ③ REVISÃO: o que a primeira versão errava ou não travava. */
+    const dr = new Database(path.join(tmp, 'r' + Math.random().toString(36).slice(2) + '.db'));
+    CH.garantirSchema(dr);
+    const hr = dr.prepare("INSERT INTO saida_horario (data,tipo,ordem,inicio,fim,rascunho,removido_em) VALUES (?,?,?,?,?,0,?)");
+    hr.run('2026-11-10', 'coleta', 1, '10:15', '12:15', null);
+    ok('a coleta com a janela ainda aberta na hora do relatório vale (10:53 dentro de 10:15–12:15 → hoje)',
+       JSON.stringify(CH.proximaColeta(dr, '2026-11-10', '10:53')) === JSON.stringify({ data:'2026-11-10', confirmar:0 }), CH.proximaColeta(dr, '2026-11-10', '10:53'));
+    hr.run('2026-11-12', 'coleta', 1, '15:00', '17:00', '2026-11-11 08:00:00');   // removida
+    hr.run('2026-11-12', 'agencia', 1, null, '15:00', null);                       // agência não é coleta
+    ok('a coleta removida e o horário da agência não contam como coleta (quinta sem coleta lançada → a confirmar)',
+       JSON.stringify(CH.proximaColeta(dr, '2026-11-11', '09:00')) === 'null', CH.proximaColeta(dr, '2026-11-11', '09:00'));
+    dr.prepare("INSERT INTO saida_dia (data,sem_coleta) VALUES ('2026-11-13',1)").run();
+    hr.run('2026-11-14', 'coleta', 1, '10:00', '12:00', null);
+    ok('o próprio dia do relatório "sem coleta" (feriado) → a próxima coleta lançada',
+       JSON.stringify(CH.proximaColeta(dr, '2026-11-13', '09:00')) === JSON.stringify({ data:'2026-11-14', confirmar:0 }), CH.proximaColeta(dr, '2026-11-13', '09:00'));
+    ok('relatório tirado no DOMINGO, sem nada lançado: a segunda, a confirmar — nunca o domingo',
+       JSON.stringify(CH.proximaColeta(dr, '2026-11-15', '09:00')) === JSON.stringify({ data:'2026-11-16', confirmar:1 }), CH.proximaColeta(dr, '2026-11-15', '09:00'));
+    const c4 = P.classificar('Pronto para coleta', 'O pacote não estava pronto quando a coleta de segunda-feira passou. Por favor, entregue o pacote na próxima coleta.',
+       new Date(2026,10,10), { proximaColeta: () => ({ data:'2026-11-10', confirmar:0 }) });
+    ok('com "próxima coleta" na frase, o dia da semana que ela cita é o que PASSOU: manda a próxima coleta', c4.data_envio === '2026-11-10', c4);
+    const c5 = P.classificar('Pronta para emitir NF-e da venda', FRASE, seg, { proximaColeta: () => ({ data:'2026-11-09', confirmar:0 }) });
+    ok('a "NF a emitir" com a frase continua no dia seguinte, a confirmar (a regra é só do "Pronto para coleta" e da "Etiqueta pronta")',
+       c5.data_envio === '2026-11-10' && c5.data_confirmar === 1, c5);
 
     B = novoBanco();
     CH.garantirSchema(B.db);

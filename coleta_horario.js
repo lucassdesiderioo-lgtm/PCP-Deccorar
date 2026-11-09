@@ -404,12 +404,16 @@ function agenciaDeHoje(db){
    O relatório do ML diz "entregue o pacote na próxima coleta", sem dia; o
    planejamento pergunta aqui qual é. Só vale o horário LANÇADO (o rascunho da
    semana copiada não vale, R-HCO-13), e o dia "sem coleta" é pulado.
-   - no dia do relatório, a coleta que começa depois da hora dele → esse dia;
+   - no dia do relatório, a coleta cuja janela ainda não FECHOU na hora dele →
+     esse dia (pelo fim, e não pelo início: com a janela aberta o caminhão pode
+     não ter passado — na dúvida, mais cedo; ③ REVISÃO). Sem hora lida, a
+     coleta do dia vale, mas "a confirmar";
    - senão, o próximo dia com coleta lançada → esse dia;
    - o próximo dia sem nada lançado → esse dia, "a confirmar" (o domingo, que
      a 206 não tem, é pulado);
    - o dia do relatório sem nada lançado → null: quem pergunta decide (o
-     planejamento põe no dia do relatório, a confirmar). */
+     planejamento põe no dia do relatório, a confirmar) — menos no DOMINGO,
+     que não tem coleta: aí a busca segue para os dias seguintes. */
 function proximaColeta(db, data, hora){
   if(!DATA.test(String(data || ''))) return null;
   let coletas, semColeta;
@@ -424,9 +428,10 @@ function proximaColeta(db, data, hora){
     return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); };
   const domingo = d => { const [a, m, x] = d.split('-').map(Number); return new Date(a, m - 1, x).getDay() === 0; };
   const deHoje = coletas(data);
-  if(!deHoje.length && !semColeta(data)) return null;
-  const h = HM.test(String(hora || '')) ? min(hora) : -1;
-  if(!semColeta(data) && deHoje.some(c => min(c.inicio || c.fim) > h)) return { data, confirmar:0 };
+  if(!deHoje.length && !semColeta(data) && !domingo(data)) return null;
+  const temHora = HM.test(String(hora || ''));
+  if(!semColeta(data) && deHoje.some(c => !temHora || min(c.fim || c.inicio) > min(hora)))
+    return { data, confirmar: temHora ? 0 : 1 };
   for(let i = 1; i <= 14; i++){
     const d = mais(data, i);
     if(semColeta(d)) continue;
