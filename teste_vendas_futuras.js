@@ -16,6 +16,8 @@
  *    Admin Geral.
  * 7. A venda com etiqueta impressa sai da lista, e a conta usa o livre
  *    (09/11/2026, decisao do dono).
+ * 8. "Entregue o pacote na proxima coleta": a proxima coleta lancada na 206
+ *    (09/11/2026, decisao do dono).
  *
  * Sobe um banco temporario e chama os handlers direto. Nao toca em producao.
  */
@@ -486,6 +488,57 @@ const csv64 = txt => 'data:text/csv;base64,' + Buffer.from(txt, 'utf8').toString
      && /CREATE INDEX IF NOT EXISTS ix_lote_pack ON lote\(packId\)/.test(fs.readFileSync(path.join(__dirname,'exp_route.js'),'utf8')));
   ok('a 401 se atualiza sozinha a cada minuto, sem pisar no campo digitado',
      /setInterval\(\s*atualizarSozinha\s*,\s*60000\s*\)/.test(htm) && /activeElement/.test(htm));
+
+  /* ═════════ 8. "ENTREGUE O PACOTE NA PRÓXIMA COLETA" (09/11/2026) ═════════
+     O relatório das 10:53 de 09/11 trouxe 60 "Pronto para coleta" com a
+     Descrição "O pacote não estava pronto quando a coleta de 10:15 às 12:15
+     passou. Por favor, entregue o pacote na próxima coleta." — sem dia da
+     semana: caíam em amanhã "a confirmar", e eram da coleta das 15h de hoje.
+     Decisão do dono (a): a próxima coleta LANÇADA na 206, a partir da hora
+     do relatório; sem horário lançado, o dia do relatório, a confirmar. */
+  {
+    const FRASE = 'O pacote não estava pronto quando a coleta de 10:15 às 12:15 passou. Por favor, entregue o pacote na próxima coleta.';
+    const seg = new Date(2026,10,9);
+    const c1 = P.classificar('Pronto para coleta', FRASE, seg, { proximaColeta: () => ({ data:'2026-11-09', confirmar:0 }) });
+    ok('"entregue o pacote na próxima coleta" vai para a próxima coleta que a 206 dá (hoje), sem "a confirmar"',
+       c1.grupo === 'fabrica' && c1.data_envio === '2026-11-09' && c1.data_confirmar === 0, c1);
+    const c2 = P.classificar('Pronto para coleta', FRASE, seg);
+    ok('sem horário de coleta para consultar, fica no dia do relatório, "a confirmar" — nunca depois',
+       c2.data_envio === '2026-11-09' && c2.data_confirmar === 1, c2);
+    const c3 = P.classificar('Pronto para coleta', 'Você deve entregar o pacote à coleta que passará na terça-feira.', seg,
+       { proximaColeta: () => ({ data:'2026-11-09', confirmar:0 }) });
+    ok('a Descrição com o dia da semana continua mandando (a próxima coleta é só para a frase sem dia)', c3.data_envio === '2026-11-10', c3);
+
+    const CH = require('./coleta_horario');
+    const dh = new Database(path.join(tmp, 'h' + Math.random().toString(36).slice(2) + '.db'));
+    CH.garantirSchema(dh);
+    const pc = (data, hora) => CH.proximaColeta(dh, data, hora);
+    ok('nenhum horário lançado: a 206 não sabe dizer (null)', pc('2026-11-09', '10:53') === null);
+    const h = dh.prepare("INSERT INTO saida_horario (data,tipo,ordem,inicio,fim,rascunho) VALUES (?,'coleta',?,?,?,?)");
+    h.run('2026-11-09', 1, '10:15', '12:15', 0); h.run('2026-11-09', 2, '15:00', '17:00', 0);
+    ok('relatório das 10:53, coletas das 10:15 e das 15:00 lançadas hoje → hoje (a das 15:00)',
+       JSON.stringify(pc('2026-11-09', '10:53')) === JSON.stringify({ data:'2026-11-09', confirmar:0 }), pc('2026-11-09', '10:53'));
+    ok('relatório das 17:34, depois da última coleta, e amanhã sem nada lançado → amanhã, "a confirmar"',
+       JSON.stringify(pc('2026-11-09', '17:34')) === JSON.stringify({ data:'2026-11-10', confirmar:1 }), pc('2026-11-09', '17:34'));
+    h.run('2026-11-10', 1, '10:15', '12:15', 1);   // RASCUNHO da semana copiada: não vale (R-HCO-13)
+    ok('o rascunho da semana copiada não vale como coleta lançada', pc('2026-11-09', '17:34').confirmar === 1);
+    dh.prepare("INSERT INTO saida_dia (data,sem_coleta) VALUES ('2026-11-10',1)").run();
+    h.run('2026-11-11', 1, '10:15', '12:15', 0);
+    ok('amanhã "sem coleta" (feriado) → a próxima coleta lançada, depois de amanhã, sem "a confirmar"',
+       JSON.stringify(pc('2026-11-09', '17:34')) === JSON.stringify({ data:'2026-11-11', confirmar:0 }), pc('2026-11-09', '17:34'));
+    ok('relatório sem hora lida: qualquer coleta lançada do dia vale', pc('2026-11-09', null).data === '2026-11-09');
+
+    B = novoBanco();
+    CH.garantirSchema(B.db);
+    B.db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('PC',0,1)").run();
+    B.db.prepare("INSERT INTO saida_horario (data,tipo,ordem,inicio,fim,rascunho) VALUES ('2026-11-09','coleta',1,'10:15','12:15',0),('2026-11-09','coleta',2,'15:00','17:00',0)").run();
+    r = await B.chamar('POST /api/planejamento/importar', { nome:'20261109_Vendas_BR_Mercado_Libre_y_Mercado_Shops_2026-11-09_10-53hs_136721278.xlsx',
+      arquivo: csv64([CAB, linhaCsv('2000000000000091', 'Pronto para coleta', 'PC', '1.0', FRASE),
+                           linhaCsv('2000000000000092', 'Para entregar na coleta do dia 12 de novembro', 'PC')].join('\n') + '\n') });
+    const v91 = B.db.prepare("SELECT data_envio, data_confirmar FROM venda_futura WHERE venda_id='2000000000000091'").get();
+    ok('no import do relatório das 10:53: a "próxima coleta" cai em 09/11 (a das 15:00, lançada na 206), sem "a confirmar"',
+       r.ok && v91 && v91.data_envio === '2026-11-09' && v91.data_confirmar === 0, { r, v91 });
+  }
 
   console.log('\n' + (falhas ? 'FALHARAM ' + falhas + ' de ' + casos : 'todos os ' + casos + ' casos passaram'));
   process.exit(falhas ? 1 : 0);
