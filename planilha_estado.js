@@ -96,16 +96,33 @@ function grupoDe(estado){
 
 /* classificar(estado, descricao, ref) — ref = Date do relatorio.
    Devolve { grupo, conhecido, media, futura, data_envio, data_confirmar }. */
-function classificar(estado, descricao, ref){
+function classificar(estado, descricao, ref, opcoes){
   const g = grupoDe(estado);
   const r = { grupo:g, conhecido: g !== 'novo', media: g !== 'cancelada' && g !== 'nao_venda',
               futura:false, data_envio:null, data_confirmar:0 };
   const e = norm(estado).toLowerCase();
+  let proximaColeta = false;
   if(g === 'fabrica'){
     r.futura = true;
     if(e === 'para entregar na coleta de amanhã') r.data_envio = iso(mais(ref, 1));
     else if(e.startsWith('para entregar')) r.data_envio = dataDoTexto(estado, ref);
-    else if(e === 'pronto para coleta' || e === 'etiqueta pronta para impressão') r.data_envio = dataDaSemana(descricao, ref);
+    else if(e === 'pronto para coleta' || e === 'etiqueta pronta para impressão'){
+      if(!/pr[oó]xima coleta/.test(norm(descricao).toLowerCase())) r.data_envio = dataDaSemana(descricao, ref);
+      /* com "próxima coleta" na frase, o dia da semana que ela cita é o da
+         coleta que PASSOU (③ REVISÃO) — quem manda é a próxima coleta, abaixo */
+      else proximaColeta = true;
+    }
+    /* "O pacote não estava pronto quando a coleta de 10:15 às 12:15 passou. Por
+       favor, entregue o pacote na próxima coleta." (relatório das 10:53 de
+       09/11/2026): sem dia. Decisão do dono (a): a próxima coleta LANÇADA na
+       206 depois da hora do relatório — quem sabe é o coleta_horario.js, que o
+       import passa em `opcoes.proximaColeta`. Sem resposta, o dia do
+       relatório, "a confirmar": na dúvida, mais cedo, nunca depois. */
+    if(proximaColeta){
+      const pc = opcoes && typeof opcoes.proximaColeta === 'function' ? opcoes.proximaColeta() : null;
+      if(pc && pc.data){ r.data_envio = pc.data; r.data_confirmar = pc.confirmar ? 1 : 0; }
+      else { r.data_envio = iso(ref); r.data_confirmar = 1; }
+    }
     /* NF a emitir ainda nao tem data: fica no dia seguinte, "data a confirmar".
        O Pronto para coleta sem dia na Descricao tambem — nunca some. */
     if(!r.data_envio){ r.data_envio = iso(mais(ref, 1)); r.data_confirmar = 1; }

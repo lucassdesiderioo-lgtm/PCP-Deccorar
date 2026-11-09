@@ -400,5 +400,52 @@ function agenciaDeHoje(db){
   try{ const d = dia(db, R.hoje()); return d.agencia && !d.rascunho ? d.agencia.fim : null; }catch(e){ return null; }
 }
 
+/* A PRÓXIMA COLETA DEPOIS DE UMA HORA (09/11/2026, decisão do dono, opção (a)).
+   O relatório do ML diz "entregue o pacote na próxima coleta", sem dia; o
+   planejamento pergunta aqui qual é. Só vale o horário LANÇADO (o rascunho da
+   semana copiada não vale, R-HCO-13), e o dia "sem coleta" é pulado.
+   - no dia do relatório, a coleta que ainda vai COMEÇAR depois da hora dele →
+     esse dia; a que está com a janela ABERTA → esse dia, "a confirmar" (o
+     caminhão pode não ter passado, e pode ser a que o ML diz que passou — na
+     dúvida, mais cedo; ③ REVISÃO). Sem hora lida, a coleta do dia vale, mas
+     "a confirmar";
+   - senão, o próximo dia com coleta lançada → esse dia;
+   - o próximo dia sem nada lançado → esse dia, "a confirmar" (o domingo, que
+     a 206 não tem, é pulado);
+   - o dia do relatório sem nada lançado → null: quem pergunta decide (o
+     planejamento põe no dia do relatório, a confirmar) — menos no DOMINGO,
+     que não tem coleta: aí a busca segue para os dias seguintes. */
+function proximaColeta(db, data, hora){
+  if(!DATA.test(String(data || ''))) return null;
+  let coletas, semColeta;
+  try{
+    const q1 = db.prepare(`SELECT inicio, fim FROM saida_horario WHERE data=? AND tipo='coleta'
+      AND removido_em IS NULL AND COALESCE(rascunho,0)=0 ORDER BY inicio`);
+    const q2 = db.prepare('SELECT sem_coleta FROM saida_dia WHERE data=?');
+    coletas = d => q1.all(d);
+    semColeta = d => { const r = q2.get(d); return !!(r && r.sem_coleta); };
+  }catch(e){ return null; }
+  const mais = (d, n) => { const [a, m, x] = d.split('-').map(Number); const t = new Date(a, m - 1, x + n);
+    return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); };
+  const domingo = d => { const [a, m, x] = d.split('-').map(Number); return new Date(a, m - 1, x).getDay() === 0; };
+  const deHoje = coletas(data);
+  if(!deHoje.length && !semColeta(data) && !domingo(data)) return null;
+  const temHora = HM.test(String(hora || ''));
+  if(!semColeta(data)){
+    /* A coleta que ainda vai COMEÇAR é certeza; a que está com a janela aberta
+       vale, mas "a confirmar" — pode ser a que o ML diz que passou (③ REVISÃO). */
+    if(temHora && deHoje.some(c => min(c.inicio || c.fim) > min(hora))) return { data, confirmar:0 };
+    if(deHoje.some(c => !temHora || min(c.fim || c.inicio) > min(hora))) return { data, confirmar:1 };
+  }
+  for(let i = 1; i <= 14; i++){
+    const d = mais(data, i);
+    if(semColeta(d)) continue;
+    if(coletas(d).length) return { data:d, confirmar:0 };
+    if(domingo(d)) continue;
+    return { data:d, confirmar:1 };
+  }
+  return { data: mais(data, 1), confirmar:1 };
+}
+
 module.exports = { garantirSchema, dia, lancar, semana, infoSemana, historia, saidaDeHoje, motivoSemMarca, rotulo,
-  status, agenciaDeHoje, garantirSemana, confirmarSemana, conferir, tarefas, MAX_COLETAS };
+  status, agenciaDeHoje, garantirSemana, confirmarSemana, conferir, tarefas, proximaColeta, MAX_COLETAS };

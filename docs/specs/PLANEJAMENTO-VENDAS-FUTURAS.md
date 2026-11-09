@@ -16,11 +16,13 @@
 > - **A3 confirmado por construção** (a peça conferida sai do saldo e fica no
 >   comprometido até a próxima planilha; a coluna Atrasada estica isso). O dono
 >   escolheu **(a)**: construir assim, e a correção vira plano à parte.
->   **Corrigido em 09/11/2026 — construído, falta subir** (REGRA, o dono): a consulta com dado real achou
+>   **Corrigido em 09/11/2026 — no ar (PR #323)** (REGRA, o dono): a consulta com dado real achou
 >   84 peças conferidas ainda no comprometido (falta 269 na tela × 199 real). A
 >   venda com etiqueta impressa no PCP sai do comprometido e a conta usa o
 >   **livre** (CLAUDE.md §3, R-PLN-06); a 401 mostra "Livre" e se atualiza a cada
->   minuto.
+>   minuto. **E, no mesmo dia (CONSERTO, opção (a) do dono)**, o "Pronto para
+>   coleta" com *"entregue o pacote na próxima coleta"* vai para a próxima coleta
+>   lançada na 206, e não mais para amanhã "a confirmar" — construído, falta subir.
 > - A chave da fase 4 só é ligada pelo **Admin Geral** (o setor; o §7 não cria
 >   ação nova, a rota confere). As rotas novas de leitura (`/futuras`, `/janelas`)
 >   caem em `@admin`, como a 401. A fase 3 vale a partir do deploy.

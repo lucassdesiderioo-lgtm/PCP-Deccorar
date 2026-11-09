@@ -117,6 +117,17 @@ module.exports = function(app, db){
          segunda da semana em que foi tirado. Sem titulo nem nome, hoje. */
       const rel = ESTADO.dataDoRelatorio(linhas, req.body && req.body.nome);
       const ref = ESTADO.deIso(rel ? rel.data : hoje);
+      /* "Entregue o pacote na próxima coleta" (09/11/2026, decisão do dono):
+         a próxima coleta lançada na 206 depois da hora do relatório. Uma
+         pergunta só por import, e só se alguma linha precisar. */
+      let pcCache;
+      const proximaColeta = () => {
+        if(pcCache === undefined){
+          try{ pcCache = require('./coleta_horario').proximaColeta(db, rel ? rel.data : hoje, rel ? rel.hora : null); }
+          catch(e){ pcCache = null; }
+        }
+        return pcCache;
+      };
       let semSku=0, semData=0, canceladas=0;
       const regs = [];
       const grupos = {}; ESTADO.GRUPOS.forEach(g => grupos[g] = { linhas:0, pecas:0 });
@@ -132,7 +143,7 @@ module.exports = function(app, db){
         const sku = String(l[ISKU] || '').replace(/\s+/g,'').toUpperCase();
         /* A tabela §3-B do dono (planilha_estado.js): o grupo, se entra na
            media, se e venda futura e a data de envio de onde a tabela diz. */
-        const c = ESTADO.classificar(estado, l[COL.descricao], ref);
+        const c = ESTADO.classificar(estado, l[COL.descricao], ref, { proximaColeta });
         const un = ESTADO.unidades(l[COL.unidades]);
         /* O cabecalho do pacote de varios produtos ("Pacote de 2 produtos",
            sem SKU) nao e venda: os itens vem nas linhas de baixo. */
