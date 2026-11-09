@@ -16,7 +16,7 @@
 > - **A3 confirmado por construção** (a peça conferida sai do saldo e fica no
 >   comprometido até a próxima planilha; a coluna Atrasada estica isso). O dono
 >   escolheu **(a)**: construir assim, e a correção vira plano à parte.
->   **Corrigido em 09/11/2026** (REGRA, o dono): a consulta com dado real achou
+>   **Corrigido em 09/11/2026 — construído, falta subir** (REGRA, o dono): a consulta com dado real achou
 >   84 peças conferidas ainda no comprometido (falta 269 na tela × 199 real). A
 >   venda com etiqueta impressa no PCP sai do comprometido e a conta usa o
 >   **livre** (CLAUDE.md §3, R-PLN-06); a 401 mostra "Livre" e se atualiza a cada

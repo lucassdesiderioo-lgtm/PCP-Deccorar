@@ -287,7 +287,7 @@ saem **dois** números, de lugares diferentes:
 ```
 alvo    = max(alvo_minimo, ritmo × dias_cobertura)
 ritmo   = max(média da janela, média da janela curta)      ← desde 07/11/2026
-precisa = comprometido + alvo − estoque
+precisa = comprometido + alvo − livre                     ← desde 09/11/2026 (era − estoque)
 ```
 
 > Desde 07/11/2026 (PLANEJAMENTO-VENDAS-FUTURAS) a média e o comprometido contam
@@ -492,8 +492,8 @@ confirmação (3), aceitar arquivo sem futura (2), o bipe aceitando a cancelada
 
 ### ⚠️ A PLANILHA SE LÊ PELA TABELA DO DONO, CONTA PEÇA, E O PLANEJAMENTO MOSTRA A FALTA POR DIA (07/11/2026)
 
-Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), sete linhas em
-`docs/DECISOES.md`, cartões **R-PLN-01 a R-PLN-05** e **R-REV-03** em
+Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), as linhas de 07 a 09/11/2026 em
+`docs/DECISOES.md`, cartões **R-PLN-01 a R-PLN-06** e **R-REV-03** em
 [`docs/regras/estoque.md`](docs/regras/estoque.md). O que parece bug e não é:
 
 - **`planilha_estado.js` é o dono único de "que linha é o quê"** (a tabela §3-B,
@@ -567,6 +567,10 @@ Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), sete linhas 
     (§12) nem com a aba do navegador escondida — e o campo da configuração
     mexido e ainda não salvo **não é reescrito**, mesmo sem o foco (`cfgCampo`;
     o testador de tela achou o "recalcular" gravando o valor antigo).
+  ⚠️ **CONSTRUÍDO EM 09/11/2026, FALTA SUBIR**, e não provado com dado real. A
+  prova: depois do deploy, a consulta do dia 09/11 rodada de novo dá a "falta
+  tela" igual à "falta real", e a falta da 401 não sobe quando a Conferência
+  baixa uma caixa. Prova que não foi feita se escreve como não feita.
 - **A linha de antes desta fase (sem `grupo`) conta como antes**: 1 peça, e só
   de hoje em diante. Ela não sai por ausência se tiver data passada (#11).
 - **O ritmo (fase 3) é `max(média da janela, média de config.janela_curta=14)`**
@@ -4213,7 +4217,7 @@ Compare com a §3 do `docs/ARQUITETURA.md`. Diferença ali é dívida nova.
 | R-EST-12 | A falta de estoque tem uma conta só (`demanda_dominio`): aba, tela azul, TV e gerencial (#12) |
 | R-EST-13 | O gráfico conta em PEÇA a embalagem, a baixa (`baixado_em`) e, à parte, a sobra ("voltou"); ajuste e contagem ficam fora (`fluxo_estoque`) |
 | R-EST-14 | Custo sem preço é piso, nunca zero; sem `custo.ver` o valor não viaja |
-| R-EST-15 | O reservado (sem etiqueta + em caixa) é leitura e não muda o `precisa` |
+| R-EST-15 | O reservado (sem etiqueta + em caixa) aparece ao lado do saldo; desde 09/11/2026 o `precisa` conta pelo livre (R-PLN-06) |
 | R-EST-16 | Toda correção aplica a DIFERENÇA sobre o saldo de agora (#32) |
 | R-EST-17 | Quem conta não vê o saldo, nem no JSON; conta-se toda caixa embalada SEM etiqueta de venda, contra o LIVRE |
 | R-EST-18 | Ninguém conta duas vezes o mesmo SKU nem resolve o que contou, nem o Admin Geral; o aprovador único do ajuste espera |

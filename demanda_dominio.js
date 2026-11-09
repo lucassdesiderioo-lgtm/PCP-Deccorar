@@ -147,9 +147,10 @@ function somaDias(isoData, n){
 }
 
 /* AS VENDAS FUTURAS POR DIA DE ENVIO, com a falta ACUMULADA (R4):
- *   falta ate o dia D = max(0, vendas de hoje ate D − estoque)
- * O estoque cobre primeiro o dia mais cedo. O estoque e o SALDO, o mesmo da
- * tela azul (§2: o comprometido ja conta a venda impressa ate ela sair).
+ *   falta ate o dia D = max(0, vendas de hoje ate D − livre)
+ * O livre cobre primeiro o dia mais cedo. Desde 09/11/2026 (R-PLN-06) a venda
+ * com etiqueta impressa sai da lista, e o livre (saldo − peca em caixa) e a
+ * regua, a mesma da tela azul.
  * A primeira coluna e "Atrasada" (data ja passada). O horizonte e todo dia que
  * tem venda futura (R5). Sob medida fica fora da falta (R6) e SKU sem cadastro
  * em linha propria (R7). */
@@ -329,7 +330,7 @@ function calcular(db){
     }
 
     /* FASE 4 — A DATA DA FALTA (R11). Venda feita: o primeiro dia de envio
-       que o estoque nao cobre (exato). Reposicao: hoje + (estoque −
+       que o livre nao cobre (exato). Reposicao: hoje + (livre −
        comprometido) ÷ ritmo (estimado). Sem ritmo, sem data — vazia, nunca
        zero (R-REV-03). */
     let data_falta = null, falta_tipo = null, falta_pecas = 0;

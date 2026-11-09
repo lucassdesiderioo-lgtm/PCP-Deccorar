@@ -22,11 +22,11 @@
  * ⚠️ O SALDO CONTINUA SENDO `skus.estoque`, e o livro continua fechando: a
  * reserva e CONTA, nao movimento. Quem move saldo e o `estoque_dominio`.
  *
- * ⚠️ O DISPONIVEL NAO ENTRA NO `precisa` DA TELA AZUL. O comprometido da
- * planilha ja conta a venda impressa ate ela sair (`venda_futura` com envio a
- * partir de hoje); descontar a reserva de novo contaria a mesma peca duas
- * vezes. Ele entra onde a pergunta e "tem peca LIVRE?": a trava da impressao,
- * a urgencia, o inventario e o numero que a Etiqueta de Venda mostra.
+ * O DISPONIVEL ENTRA ONDE A PERGUNTA E "tem peca LIVRE?": a trava da impressao,
+ * a urgencia, o inventario, o numero que a Etiqueta de Venda mostra — e, desde
+ * 09/11/2026, o `precisa` do demanda_dominio, que JUNTO tira do comprometido a
+ * venda que ja tem etiqueta (R-PLN-06). As duas coisas vao juntas: uma sem a
+ * outra contaria a mesma peca duas vezes.
  *
  * Nenhuma funcao daqui abre transacao: quem chama abre (R-EST-07).
  */
