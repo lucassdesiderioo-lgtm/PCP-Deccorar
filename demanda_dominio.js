@@ -153,7 +153,7 @@ function somaDias(isoData, n){
  * A primeira coluna e "Atrasada" (data ja passada). O horizonte e todo dia que
  * tem venda futura (R5). Sob medida fica fora da falta (R6) e SKU sem cadastro
  * em linha propria (R7). */
-function porDia(db){
+function porDia(db, opcoes){
   const hoje = db.prepare("SELECT date('now','localtime') d").get().d;
   const Q = sql(db), PECA = Q.PECA, FUTURA = Q.FUTURA;
   const smap = {};
@@ -210,7 +210,8 @@ function porDia(db){
   const ordemAlfa = (a,b)=> a.codigo.localeCompare(b.codigo);
   sobMedida.sort(ordemAlfa); semCadastro.sort(ordemAlfa);
   return { hoje, dias: dias.map(d => ({ dia:d, rotulo: d==='atrasada' ? 'Atrasada' : rotuloDia(d) })),
-           linhas, sob_medida:sobMedida, sem_cadastro:semCadastro, total, com_etiqueta: comEtiqueta(db) };
+           linhas, sob_medida:sobMedida, sem_cadastro:semCadastro, total,
+           com_etiqueta: opcoes && opcoes.semResumo ? null : comEtiqueta(db) };
 }
 
 /* Quantas vendas que a planilha ainda mostra na fabrica ja tem etiqueta impressa
@@ -268,7 +269,7 @@ function calcular(db){
 
   /* FASE 4: a primeira falta de venda feita sai da MESMA conta da aba (R1). */
   const faltaVenda = {};
-  if(ordemFalta) porDia(db).linhas.forEach(l => { if(l.falta_desde) faltaVenda[l.codigo] = l; });
+  if(ordemFalta) porDia(db, { semResumo:true }).linhas.forEach(l => { if(l.falta_desde) faltaVenda[l.codigo] = l; });
 
   // --- uniao de todos os codigos vistos ---
   const cods = new Set();
@@ -310,7 +311,9 @@ function calcular(db){
        RITMO (fase 3). E a metrica que ordena por risco, e nao por tamanho.
        Sem venda na janela nao ha cobertura a calcular: `null` e "nao da pra
        dizer", que e diferente de zero. */
-    const cobertura = (ritmo > 0 && estoque != null) ? +(estoque/ritmo).toFixed(1) : null;
+    /* Pelo LIVRE, a regua do precisa (③ REVISAO, 09/11/2026): a peca em caixa
+       ja tem dono, e a 401 mostra "Livre" ao lado da cobertura. */
+    const cobertura = (ritmo > 0 && livre != null) ? +(Math.max(0, livre)/ritmo).toFixed(1) : null;
 
     /* A PRIORIDADE E UM DEGRAU COM NOME, NAO UMA NOTA.
        Uma pontuacao composta ordena bem e nao explica nada — e quem le a lista
@@ -319,7 +322,7 @@ function calcular(db){
     let prioridade = 0, motivo = null;
     if(precisa > 0){
       if(cp && cp.ja > 0){        prioridade = 1; motivo = 'despacha até amanhã'; }
-      else if(!estoque){          prioridade = 2; motivo = 'sem estoque'; }
+      else if(!(livre > 0)){      prioridade = 2; motivo = 'sem estoque'; }
       else if(cobertura != null && cobertura < diasCob/2){
                                   prioridade = 3; motivo = 'cobre só ' + cobertura + ' dia(s)'; }
       else {                      prioridade = 4; motivo = 'abaixo do alvo'; }

@@ -63,8 +63,9 @@ module.exports = function(app, db){
     /* O LIVRE (22/10/2026): desde a fase 2-A da CONFERENCIA-E-BAIXA a caixa
        impressa so reserva a peca, que continua no saldo ate a conferencia. A
        coluna da TV responde "tem peca na prateleira?", e essa conta e do
-       baixa_dominio — a mesma da Etiqueta de Venda. O `precisa` NAO muda: o
-       comprometido da planilha ja conta a venda impressa (CLAUDE.md §2). */
+       baixa_dominio — a mesma da Etiqueta de Venda. O `precisa` vem pronto do
+       demanda_dominio, que desde 09/11/2026 conta pelo livre e tira do
+       comprometido a venda que ja tem etiqueta (R-PLN-06). */
     let resv={}; try{ resv=require('./baixa_dominio').reservados(db); }catch(e){ resv={}; }
 
     const linhas = skus.map(s=>{

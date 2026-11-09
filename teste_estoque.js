@@ -247,7 +247,9 @@ const ok = (n, c, extra) => { casos++;
      'parado=' + por.BK160160CINZA.parado + ' situacao=' + por.BK160160CINZA.situacao);
   ok('sem venda na janela a cobertura e traco, nunca infinito',
      por.BK160160CINZA.cobertura_dias === null);
-  ok('quem gira tem cobertura em dias', por.BK140140BEGE.cobertura_dias === 2,
+  /* 09/11/2026: a cobertura conta pelo LIVRE (R-PLN-06) — a caixa impressa e
+     não conferida reserva 1 das 2 peças: 1 livre ÷ 1/dia = 1 dia. */
+  ok('quem gira tem cobertura em dias (pelo livre: 1 peça livre, 1 em caixa)', por.BK140140BEGE.cobertura_dias === 1,
      'veio ' + por.BK140140BEGE.cobertura_dias);
   /* A COBERTURA DA ABA E A DO DOMINIO, SKU A SKU. A aba chegou a ter a sua
      propria conta e ela divergia na primeira casa decimal, porque dividia pela
@@ -596,6 +598,40 @@ const ok = (n, c, extra) => { casos++;
        'doDia=' + FLUXO.doDia(db).saiu + ' resumo=' + s.resumo.saiu_hoje + ' antes=' + hojeAntes);
     const fech = await chamar('GET /api/fechamento');
     ok('e o fechamento grava o vendido em peça', fech.vendido === hojeAntes + 1, 'veio ' + fech.vendido);
+  }
+
+  /* ── A VENDA COM ETIQUETA SAIU DO COMPROMETIDO (09/11/2026, R-PLN-06) ──
+     A peça em caixa já não está livre: a aba não pode chamá-la de sobra
+     ("excesso"), nem chamar de "baixo" o SKU cujo saldo inteiro está em caixa.
+     E a cobertura e o degrau "sem estoque" contam pelo livre, a régua do
+     precisa (③ REVISÃO). */
+  {
+    const DEMANDA = require('./demanda_dominio');
+    try{ db.exec('ALTER TABLE lote ADD COLUMN venda TEXT'); }catch(e){}
+    db.prepare("INSERT INTO skus (codigo,descricao,estoque,alvo,modelo_id) VALUES ('ETQ1','Etq',7,2,1),('ETQ2','Etq',3,0,1)").run();
+    const env = db.prepare("SELECT date('now','localtime','+2 day') d").get().d;
+    for(let i = 1; i <= 5; i++){
+      vf.run('E1-'+i, 'ETQ1', hoje, env);
+      db.prepare("INSERT INTO lote (codigo,estagio,embalado_em,data,teste,venda) VALUES ('ETQ1','embalado',?,?,0,?)").run(hoje+' 10:00:00', hoje, 'E1-'+i);
+    }
+    for(let i = 1; i <= 3; i++){
+      vf.run('E2-'+i, 'ETQ2', hoje, env);
+      db.prepare("INSERT INTO lote (codigo,estagio,embalado_em,data,teste,venda) VALUES ('ETQ2','embalado',?,?,0,?)").run(hoje+' 10:00:00', hoje, 'E2-'+i);
+    }
+    vf.run('E2-x', 'ETQ2', hoje, env);   // a quarta venda do ETQ2, ainda sem caixa
+    const pe = await chamar('GET /api/estoque/painel');
+    const L = {}; pe.linhas.forEach(l => L[l.codigo] = l);
+    const d1 = DEMANDA.calcular(db).linhas.find(l => l.codigo === 'ETQ1');
+    ok('ETQ1: saldo 7, 5 em caixa, livre 2 = o alvo → "ok", e não "excesso" com sobra de 5',
+       L.ETQ1 && L.ETQ1.situacao === 'ok' && d1.livre === 2 && d1.comprometido === 0,
+       JSON.stringify(L.ETQ1 && { s:L.ETQ1.situacao, sobra:L.ETQ1.sobra, livre:d1.livre, comp:d1.comprometido }));
+    const d2 = DEMANDA.calcular(db).linhas.find(l => l.codigo === 'ETQ2');
+    ok('ETQ2: saldo 3, todas em caixa, 1 venda sem caixa → "zerado" (o livre é 0), e não "baixo"',
+       L.ETQ2 && L.ETQ2.situacao === 'zerado' && d2.livre === 0 && d2.precisa > 0, JSON.stringify(L.ETQ2 && L.ETQ2.situacao));
+    ok('...e o degrau é "sem estoque" (a próxima venda já vira urgência), pela régua do livre',
+       d2.prioridade === 2 || d2.prioridade === 1, 'prioridade ' + d2.prioridade + ' · ' + d2.motivo);
+    ok('a cobertura conta pelo livre (0 peças livres → 0 dia), a mesma régua do precisa',
+       d2.cobertura === null || d2.cobertura === 0, 'veio ' + d2.cobertura);
   }
 
   console.log('');

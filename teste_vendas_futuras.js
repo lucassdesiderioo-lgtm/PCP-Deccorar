@@ -462,6 +462,24 @@ const csv64 = txt => 'data:text/csv;base64,' + Buffer.from(txt, 'utf8').toString
      && (z => z.precisa === z.comprometido + z.alvo - 2)(DEMANDA.calcular(banco0).linhas.find(l=>l.codigo==='Z')));
   const htm = fs.readFileSync(path.join(__dirname, 'public', 'planejamento.html'), 'utf8');
   ok('a 401 mostra "Livre" com o "em caixa" embaixo, e a linha das vendas com etiqueta', /<th>Livre<\/th>/.test(htm) && /em caixa/.test(htm) && /com_etiqueta/.test(htm));
+  /* ③ REVISÃO: com o foco fora do campo, o load() da atualização reescrevia o
+     número digitado e ainda não salvo — e o "recalcular" gravava o antigo. */
+  {
+    const m = htm.match(/function cfgCampo\([\s\S]*?\n}\n/);
+    const CFG = {}; const el = { value:'10' };
+    const cfgCampo = m && new Function('CFG_CARREGADO', '$', m[0] + 'return cfgCampo;')(CFG, () => el);
+    let okCfg = !!cfgCampo;
+    if(okCfg){
+      cfgCampo('diasCob', 10); okCfg = okCfg && String(el.value) === '10';
+      el.value = '25'; cfgCampo('diasCob', 10); okCfg = okCfg && String(el.value) === '25';     // digitado e não salvo: fica
+      el.value = '10'; cfgCampo('diasCob', 12); okCfg = okCfg && String(el.value) === '12';     // não mexido: recebe o novo
+    }
+    ok('a atualização não reescreve o número digitado e ainda não salvo, mesmo sem o foco',
+       okCfg && !/\$\('#diasCob'\)\.value\s*=/.test(htm), el.value);
+  }
+  ok('o lote tem índice pela venda e pelo pack (a conta roda a cada 3 s na tela azul)',
+     /CREATE INDEX IF NOT EXISTS ix_lote_venda ON lote\(venda\)/.test(fs.readFileSync(path.join(__dirname,'exp_route.js'),'utf8'))
+     && /CREATE INDEX IF NOT EXISTS ix_lote_pack ON lote\(packId\)/.test(fs.readFileSync(path.join(__dirname,'exp_route.js'),'utf8')));
   ok('a 401 se atualiza sozinha a cada minuto, sem pisar no campo digitado',
      /setInterval\(\s*atualizarSozinha\s*,\s*60000\s*\)/.test(htm) && /activeElement/.test(htm));
 

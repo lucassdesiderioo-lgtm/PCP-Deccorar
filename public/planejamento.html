@@ -178,7 +178,7 @@
   <div class="sub" style="margin-top:12px">
     <b style="color:var(--blue)">A ordem é de prioridade, não de quantidade:</b>
     quem tem cliente com prazo curto vem primeiro, depois quem está sem estoque, depois quem cobre poucos dias.
-    <b>Cobertura</b> = quantos dias o estoque atual aguenta a venda desse SKU.
+    <b>Cobertura</b> = quantos dias o livre aguenta a venda desse SKU.
     <br><b style="color:var(--blue)">Como o número sai:</b>
     alvo = ritmo × dias de cobertura, com piso no alvo mínimo — o ritmo é o maior entre a média da janela e a da janela curta.
     &nbsp;·&nbsp; precisa = comprometido (envios futuros da planilha, sem as vendas que já têm etiqueta de venda) + alvo − livre (o estoque menos as peças já em caixa com etiqueta).
@@ -234,12 +234,23 @@ const dataBr=d=>d?d.slice(8,10)+'/'+d.slice(5,7):'';
    andaria nos dias em que alguem abrisse a 904. */
 function fechamento(){ fetch('/api/fechamento').catch(()=>{}); }
 
+/* O CAMPO DA CONFIGURACAO SO RECEBE O VALOR GRAVADO SE NINGUEM O MEXEU desde a
+   ultima carga (③ REVISAO, 09/11/2026): a atualizacao de 60 s reescrevia o
+   numero digitado e ainda nao salvo assim que o campo perdia o foco, e o
+   "recalcular" gravava o antigo (§12). Depois de salvar, o gravado e o digitado
+   sao o mesmo, e o campo volta a acompanhar. */
+const CFG_CARREGADO={};
+function cfgCampo(id, valor){
+  const el=$('#'+id);
+  if(CFG_CARREGADO[id]===undefined || String(el.value)===String(CFG_CARREGADO[id])) el.value=valor;
+  CFG_CARREGADO[id]=valor;
+}
 async function load(){
   const d=await (await fetch('/api/planejamento')).json();
-  $('#diasCob').value=d.config.dias_cobertura;
-  $('#janela').value=d.config.janela_media;
-  $('#alvoMin').value=d.config.alvo_minimo;
-  $('#janCurta').value=d.config.janela_curta;
+  cfgCampo('diasCob', d.config.dias_cobertura);
+  cfgCampo('janela', d.config.janela_media);
+  cfgCampo('alvoMin', d.config.alvo_minimo);
+  cfgCampo('janCurta', d.config.janela_curta);
   ORDEM=d.config.ordem_por_falta===1; desenharOrdem();
   $('#totPrecisa').textContent=d.total_precisa;
 
