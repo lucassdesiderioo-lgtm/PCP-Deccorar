@@ -412,6 +412,9 @@ async function salvarConfig(){
     janela_curta:+$('#janCurta').value||14};
   await fetch('/api/planejamento/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   $('#msgCfg').textContent='recalculado'; setTimeout(()=>$('#msgCfg').textContent='',2000);
+  /* Salvo, o campo mostra o que o servidor GRAVOU (o 0 vira 10, o 2,5 vira 2):
+     esquece o carregado, e o load() reescreve os quatro (③ REVISAO). */
+  Object.keys(CFG_CARREGADO).forEach(k => delete CFG_CARREGADO[k]);
   load(); fechamento(); recarregarAba();
 }
 /* A tabela da comparacao. Mostra os 12 maiores desvios; o resto a um clique —

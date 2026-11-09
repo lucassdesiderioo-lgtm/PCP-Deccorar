@@ -477,6 +477,10 @@ const csv64 = txt => 'data:text/csv;base64,' + Buffer.from(txt, 'utf8').toString
     ok('a atualização não reescreve o número digitado e ainda não salvo, mesmo sem o foco',
        okCfg && !/\$\('#diasCob'\)\.value\s*=/.test(htm), el.value);
   }
+  /* ③ REVISÃO, 2ª rodada: depois de "recalcular" o campo tem que mostrar o que
+     o servidor GRAVOU (o 0 vira 10, o 2,5 vira 2), e não o digitado. */
+  ok('"recalcular" esquece o que estava carregado antes de recarregar: o campo mostra o gravado',
+     /async function salvarConfig\(\)\{[\s\S]*?Object\.keys\(CFG_CARREGADO\)\.forEach\(k\s*=>\s*delete CFG_CARREGADO\[k\]\)[\s\S]*?load\(\)/.test(htm));
   ok('o lote tem índice pela venda e pelo pack (a conta roda a cada 3 s na tela azul)',
      /CREATE INDEX IF NOT EXISTS ix_lote_venda ON lote\(venda\)/.test(fs.readFileSync(path.join(__dirname,'exp_route.js'),'utf8'))
      && /CREATE INDEX IF NOT EXISTS ix_lote_pack ON lote\(packId\)/.test(fs.readFileSync(path.join(__dirname,'exp_route.js'),'utf8')));

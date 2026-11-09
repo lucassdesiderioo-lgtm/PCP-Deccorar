@@ -285,8 +285,9 @@ function calcular(db){
     /* O LIVRE (saldo − peca em caixa com etiqueta): a venda com etiqueta saiu
        do comprometido, e a peca reservada a ela nao cobre outra venda. Sem
        caixa impressa o livre e o saldo, e a conta e a de sempre. O `estoque`
-       devolvido continua sendo o SALDO (a aba Estoque, o custo e a cobertura
-       leem o saldo); o que muda e o `precisa`. */
+       devolvido continua sendo o SALDO (o que a aba Estoque mostra e soma, e o
+       custo); o `precisa`, a cobertura e o degrau "sem estoque" contam pelo
+       LIVRE (③ REVISAO). */
     const emCaixa = s ? (reserva[c] || 0) : 0;
     const livre = s ? (estoque || 0) - emCaixa : null;
     const nVendas = mediaMap[c] || 0;
