@@ -185,6 +185,12 @@ module.exports=function(app,db){
      tem de ter as colunas na mesma ordem do de producao (§17). */
   try{ db.exec("ALTER TABLE lote_item ADD COLUMN conferido_por_id INTEGER"); }catch(e){}
   try{ db.exec("CREATE INDEX IF NOT EXISTS ix_lote_item_lote ON lote_item(lote_id)"); }catch(e){}
+  /* A venda da planilha acha a caixa pela venda ou pelo pack (demanda_dominio,
+     R-PLN-06, 09/11/2026) — e a conta roda a cada 3 s na tela azul de cada
+     tablet. Sem indice era uma varredura do lote por venda futura (③ REVISAO:
+     13 → 55 ms com 5.000 caixas, segurando o servidor inteiro). */
+  try{ db.exec("CREATE INDEX IF NOT EXISTS ix_lote_venda ON lote(venda)"); }catch(e){}
+  try{ db.exec("CREATE INDEX IF NOT EXISTS ix_lote_pack ON lote(packId)"); }catch(e){}
 
   /* ── O QUE O SISTEMA APRENDE SOBRE FAMILIA x PREFIXO DE SKU ────────────────
      Medida e cor nao separam duas pecas que so diferem no TECIDO — e elas

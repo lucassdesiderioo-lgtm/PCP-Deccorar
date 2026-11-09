@@ -130,7 +130,7 @@
 - **Status:** no ar.
 
 ### R-REV-03 · A tela azul é ordenada por prioridade, e cada linha diz por quê
-- **Regra:** com `config.ordem_por_falta = 0` (o padrão), quatro degraus, nesta ordem: 1) cliente com prazo até amanhã (a venda **atrasada** conta aqui), 2) sem estoque, 3) cobertura abaixo de metade dos dias de cobertura, 4) abaixo do alvo. **Com a chave ligada (fase 4 da `PLANEJAMENTO-VENDAS-FUTURAS`, 07/11/2026), a ordem é pela data em que a peça vai faltar**: a data mais cedo primeiro; no mesmo dia, venda feita antes de reposição; no mesmo dia e tipo, mais peças faltando primeiro. Venda feita: o primeiro dia de envio que o estoque não cobre (a conta da aba por dia). Reposição: `hoje + (estoque − comprometido) ÷ ritmo`. Cada linha traz o `motivo` — *"faltam 3 para ter 10/11 (vendidas)"* ou *"acaba qua 12/11 pelo ritmo (3,5/dia)"*. Sem venda na janela, a cobertura e a data são vazias, nunca zero.
+- **Regra:** com `config.ordem_por_falta = 0` (o padrão), quatro degraus, nesta ordem: 1) cliente com prazo até amanhã (a venda **atrasada** conta aqui), 2) sem estoque, 3) cobertura abaixo de metade dos dias de cobertura, 4) abaixo do alvo. **Com a chave ligada (fase 4 da `PLANEJAMENTO-VENDAS-FUTURAS`, 07/11/2026), a ordem é pela data em que a peça vai faltar**: a data mais cedo primeiro; no mesmo dia, venda feita antes de reposição; no mesmo dia e tipo, mais peças faltando primeiro. Venda feita: o primeiro dia de envio que o livre não cobre (a conta da aba por dia). Reposição: `hoje + (livre − comprometido) ÷ ritmo` (pelo livre desde 09/11/2026, R-PLN-06). O degrau 2 "sem estoque" e a cobertura também contam pelo livre. Cada linha traz o `motivo` — *"faltam 3 para ter 10/11 (vendidas)"* ou *"acaba qua 12/11 pelo ritmo (3,5/dia)"*. Sem venda na janela, a cobertura e a data são vazias, nunca zero.
 - **Por quê:** ordenar pelo que falta põe em cima o SKU que mais gira, que quase nunca é o que acaba primeiro. E a fábrica precisa andar 1, 2 ou 3 dias à frente das vendas: terminado o de hoje, a primeira linha é a falta de amanhã.
 - **Exceções:** a chave nasce **desligada** e só o **Admin Geral** (o setor, pelo `ehAdminGeral`) liga ou desliga (403 para os outros, antes de gravar qualquer campo do mesmo pedido). O modo vermelho e o âmbar não mudam.
 - **Teste que trava:** `teste_vendas_futuras.js` (a ordem, os três desempates, o motivo, o caso do meio-dia, a chave desligada por padrão e o 403).
@@ -299,10 +299,10 @@
 ## A aba Estoque
 
 ### R-EST-12 · A falta de estoque tem uma conta só
-- **Regra:** a aba Estoque, a tela azul, a TV e o gerencial leem a falta do `demanda_dominio.js` (`comprometido + alvo − estoque`, com o alvo calculado ao vivo). O alvo salvo aparece ao lado, em âmbar, quando diverge.
+- **Regra:** a aba Estoque, a tela azul, a TV e o gerencial leem a falta do `demanda_dominio.js` (`comprometido + alvo − livre`, com o alvo calculado ao vivo; até 09/11/2026 era `− estoque`, R-PLN-06). O alvo salvo aparece ao lado, em âmbar, quando diverge.
 - **Por quê:** duas telas diziam "a repor" com números diferentes, as duas certas cada uma na sua régua.
 - **Exceções:** na TV, "falta hoje" (ordens do dia, R-REV-05) e "precisa" (estoque) são duas colunas e não se somam.
-- **Teste que trava:** `teste_estoque.js` (86).
+- **Teste que trava:** `teste_estoque.js` (90).
 - **Status:** no ar desde 01/09/2026.
 - **História:** armadilha #12.
 
@@ -321,7 +321,7 @@
 - **Status:** no ar desde 01/09/2026.
 
 ### R-EST-15 · O reservado é leitura, não conta
-- **Regra:** "reservado" é a soma das peças de volumes pendentes (vendidos, sem etiqueta) **e**, desde 22/10/2026, das caixas impressas que esperam a conferência (`baixa_dominio.reservados`). Aparece ao lado do saldo como "N sem etiqueta · N em caixa · N livres", e **não muda o `precisa`**: o comprometido da planilha já conta a venda impressa até ela sair, e descontar a reserva de novo contaria a mesma peça duas vezes. Quem usa o livre (saldo − caixa impressa) é a trava da impressão, a urgência, o inventário, o número da Etiqueta de Venda e a coluna **Livre** da TV (`/painel`, com "+N em caixa" embaixo, desde 22/10/2026; o `precisa` da TV não muda). Sob medida não tem reservado; bloqueado e cancelado não reservam; modo teste não reserva na coluna "sem etiqueta".
+- **Regra:** "reservado" é a soma das peças de volumes pendentes (vendidos, sem etiqueta) **e**, desde 22/10/2026, das caixas impressas que esperam a conferência (`baixa_dominio.reservados`). Aparece ao lado do saldo como "N sem etiqueta · N em caixa · N livres". ~~Não muda o `precisa`~~ — **desde 09/11/2026 o `precisa` conta pelo livre, e a venda com etiqueta sai do comprometido** (R-PLN-06): as duas coisas juntas, senão a mesma peça contaria duas vezes. Quem usa o livre (saldo − caixa impressa) é a trava da impressão, a urgência, o inventário, o número da Etiqueta de Venda e a coluna **Livre** da TV (`/painel`, com "+N em caixa" embaixo, desde 22/10/2026), e desde 09/11/2026 o `precisa`, a cobertura e o degrau "sem estoque" do `demanda_dominio` (R-PLN-06). Sob medida não tem reservado; bloqueado e cancelado não reservam; modo teste não reserva na coluna "sem etiqueta".
 - **Por quê:** informa o que já está prometido sem criar uma segunda conta de produção.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_acuracidade.js` (23).
@@ -414,7 +414,7 @@
 - **Status:** no ar desde 07/11/2026 (PR #313).
 
 ### R-PLN-03 · A falta acumulada por dia, e a Atrasada primeiro
-- **Regra:** `demanda_dominio.porDia` é a única conta: `falta até o dia D = max(0, vendas de hoje até D − estoque)`, com o estoque = o **saldo** (o mesmo da tela azul, §2). A primeira coluna é **Atrasada** (data já passada, ainda na fábrica pela planilha) e ela conta no comprometido. O horizonte é todo dia com venda futura. Sob medida fica fora da falta, contado à parte; SKU sem cadastro em linha própria. A aba e a tela azul dão o **mesmo** comprometido.
+- **Regra:** `demanda_dominio.porDia` é a única conta: `falta até o dia D = max(0, vendas de hoje até D − livre)`, com o **livre** = saldo − peça em caixa com etiqueta (desde 09/11/2026, R-PLN-06; até ali era o saldo). A primeira coluna é **Atrasada** (data já passada, ainda na fábrica pela planilha) e ela conta no comprometido. O horizonte é todo dia com venda futura. Sob medida fica fora da falta, contado à parte; SKU sem cadastro em linha própria. A aba e a tela azul dão o **mesmo** comprometido.
 - **Por quê:** a venda futura era um número só, e ninguém sabia o que era para segunda, terça, quarta.
 - **Exceções:** a linha de antes desta fase (sem `grupo`) só conta de hoje em diante, como sempre.
 - **Teste que trava:** `teste_vendas_futuras.js`.
@@ -433,6 +433,13 @@
 - **Exceções:** a queda **não** derruba o alvo antes dos 30 dias. Sob medida continua sem alvo (R-REV-04).
 - **Teste que trava:** `teste_vendas_futuras.js`.
 - **Status:** no ar desde 07/11/2026 (PR #313).
+
+### R-PLN-06 · A venda com etiqueta impressa sai do planejamento, e a conta usa o livre
+- **Regra:** o comprometido (a 401, a tela azul, a TV e a compra — o `demanda_dominio`) não conta a venda da planilha que já tem caixa com etiqueta de venda no PCP (`lote.embalado_em`, achada pela venda ou pelo pack; o modo teste fica fora), e a conta usa o **livre**: `precisa = comprometido + alvo − livre`. A falta só se mexe quando a venda chega e quando a peça é embalada. A 401 mostra "Livre" com "+N em caixa", diz quantas vendas saíram da lista e se atualiza a cada minuto.
+- **Por quê:** a planilha só muda o Estado quando o caminhão bipa; a peça conferida saía do saldo e a venda ficava no comprometido. Em 09/11/2026: 84 peças assim, falta 269 na tela contra 199 de verdade. O dono: *"assim que der saída com a embalagem feita já deve sair do planejamento da produção"*.
+- **Exceções:** a venda que o PCP não acha continua contando (na dúvida, produz-se) — inclusive o item de pacote cuja venda não é a da caixa, que fica com a falta a mais (a `venda_futura` não guarda o pack do item). O `estoque` devolvido continua sendo o saldo (o que a aba Estoque mostra e soma, e o custo); a cobertura, o degrau "sem estoque", a sobra e o "zerado" contam pelo livre.
+- **Teste que trava:** `teste_vendas_futuras.js` (seção 7: a venda chega, a peça é embalada, a etiqueta, a Conferência, o modo teste, o pack, a venda não achada, a caixa de venda fora da planilha, o banco sem `lote`) e `teste_estoque.js` (o `precisa` pelo livre).
+- **Status:** construído em 09/11/2026; falta subir e provar com dado real.
 
 ## O que ainda não tem teste nesta área
 

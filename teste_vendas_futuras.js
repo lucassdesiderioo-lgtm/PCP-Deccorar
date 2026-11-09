@@ -14,6 +14,8 @@
  * 4. O ritmo = maior entre a janela e a janela curta (R10).
  * 5. A ordem pela data da falta (R11), desligada por padrao e ligada so pelo
  *    Admin Geral.
+ * 7. A venda com etiqueta impressa sai da lista, e a conta usa o livre
+ *    (09/11/2026, decisao do dono).
  *
  * Sobe um banco temporario e chama os handlers direto. Nao toca em producao.
  */
@@ -408,6 +410,82 @@ const csv64 = txt => 'data:text/csv;base64,' + Buffer.from(txt, 'utf8').toString
      && SIMc.total.velho.falta === 2130 && SIMc.total.novo.falta === 1584, SIMc.total);
   const s150 = SIM.skus.find(x => x.sku === 'BK150150BRANCO');
   ok('o BK150150BRANCO da spec: 6,33/dia na de 30 e 8,93 na de 14', s150 && s150.media30_fim === 6.33 && s150.media14_fim === 8.93, s150);
+
+  /* ═════════ 7. A VENDA COM ETIQUETA SAI DA LISTA (09/11/2026) ═════════
+     Decisão do dono: impressa a etiqueta de venda, a produção daquela venda
+     acabou. A falta só se mexe quando a venda chega e quando a peça é
+     embalada — a etiqueta e a Conferência não mexem nela. A consulta de
+     09/11 achou 84 peças conferidas ainda no comprometido (falta 269 × 199). */
+  B = novoBanco();
+  const d7 = B.db;
+  d7.exec(`CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, venda TEXT, packId TEXT,
+      estagio TEXT, embalado_em TEXT, baixado_em TEXT, teste INTEGER DEFAULT 0, data TEXT);
+    CREATE TABLE lote_item (id INTEGER PRIMARY KEY AUTOINCREMENT, lote_id INTEGER, codigo TEXT, qtd INTEGER DEFAULT 1);`);
+  d7.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('X',0,1),('Y',2,1)").run();
+  const v7 = d7.prepare("INSERT INTO venda_futura (venda_id,codigo,data_venda,data_envio,unidades,grupo) VALUES (?,?,?,?,1,'fabrica')");
+  ['v1','v2','v3'].forEach(v => v7.run(v, 'X', dia(d7,0), dia(d7,1)));
+  const lx = () => DEMANDA.porDia(d7).linhas.find(l => l.codigo === 'X');
+  const cx = () => DEMANDA.calcular(d7).linhas.find(l => l.codigo === 'X');
+  const passo = () => ({ falta: lx().falta_total, precisa: cx().precisa, comp: cx().comprometido, livre: lx().livre });
+  let e0 = passo();
+  const alvoX = DEMANDA.calcular(d7).linhas.find(l => l.codigo === 'X').alvo;
+  ok('a venda chega: 3 vendidas, nada em estoque → falta 3 (precisa = 3 + o alvo)', e0.falta === 3 && e0.precisa === 3 + alvoX && e0.comp === 3, e0);
+  d7.prepare("UPDATE skus SET estoque=1 WHERE codigo='X'").run();
+  let e1 = passo();
+  ok('a peça é EMBALADA (+1): a falta cai para 2', e1.falta === 2 && e1.precisa === e0.precisa - 1 && e1.livre === 1, e1);
+  d7.prepare("INSERT INTO lote (codigo,venda,estagio,embalado_em,data) VALUES ('X','v1','embalado',datetime('now','localtime'),date('now','localtime'))").run();
+  let e2 = passo();
+  ok('a ETIQUETA de v1 sai: v1 sai da lista, o livre cai (peça em caixa), e a falta NÃO muda',
+     e2.falta === 2 && e2.precisa === e1.precisa && e2.comp === 2 && e2.livre === 0 && lx().em_caixa === 1 && lx().estoque === 1, [e2, lx()]);
+  const ce = DEMANDA.porDia(d7).com_etiqueta;
+  ok('a aba diz quantas vendas saíram da lista por já ter etiqueta', ce.vendas === 1 && ce.pecas === 1, ce);
+  d7.prepare("UPDATE lote SET baixado_em=datetime('now','localtime') WHERE venda='v1'").run();
+  d7.prepare("UPDATE skus SET estoque=0 WHERE codigo='X'").run();
+  let e3 = passo();
+  ok('a CONFERÊNCIA baixa (−1 no saldo): a falta continua 2 — antes do conserto subia para 3', e3.falta === 2 && e3.precisa === e1.precisa && e3.comp === 2, e3);
+  d7.prepare("INSERT INTO lote (codigo,venda,estagio,embalado_em,teste) VALUES ('X','v2','embalado',datetime('now','localtime'),1)").run();
+  ok('a caixa do MODO TESTE não tira a venda de verdade da lista', passo().comp === 2, passo());
+  d7.prepare("INSERT INTO lote (codigo,venda,packId,estagio,embalado_em,baixado_em) VALUES ('X','outra','v3','carregado',datetime('now','localtime'),datetime('now','localtime'))").run();
+  ok('a venda se acha também pelo PACK, como no cancelamento', passo().comp === 1, passo());
+  ok('a venda que o PCP não acha (v2) continua contando: na dúvida, produz-se', passo().comp === 1 && lx().total === 1, lx());
+  const y0 = DEMANDA.calcular(d7).linhas.find(l => l.codigo === 'Y');
+  d7.prepare("INSERT INTO lote (codigo,venda,estagio,embalado_em) VALUES ('Y','fora-da-planilha','embalado',datetime('now','localtime'))").run();
+  const y1 = DEMANDA.calcular(d7).linhas.find(l => l.codigo === 'Y');
+  ok('a caixa impressa de venda que a planilha ainda não trouxe reserva a peça: o precisa conta pelo livre',
+     y1.precisa === y0.precisa + 1 && y1.livre === 1 && y1.estoque === 2, [y0, y1]);
+  ok('o `estoque` devolvido continua sendo o SALDO (a aba Estoque e o custo leem o saldo)', cx().estoque === 0 && y1.estoque === 2);
+  const banco0 = novoBanco().db;
+  banco0.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('Z',2,1)").run();
+  banco0.prepare("INSERT INTO venda_futura (venda_id,codigo,data_venda,data_envio,unidades,grupo) VALUES ('z1','Z',?,?,3,'fabrica')").run(dia(banco0,0), dia(banco0,1));
+  ok('banco sem a tabela `lote`: a conta de sempre (saldo, sem desconto)',
+     DEMANDA.porDia(banco0).linhas[0].falta_total === 1 && DEMANDA.porDia(banco0).linhas[0].livre === 2
+     && (z => z.precisa === z.comprometido + z.alvo - 2)(DEMANDA.calcular(banco0).linhas.find(l=>l.codigo==='Z')));
+  const htm = fs.readFileSync(path.join(__dirname, 'public', 'planejamento.html'), 'utf8');
+  ok('a 401 mostra "Livre" com o "em caixa" embaixo, e a linha das vendas com etiqueta', /<th>Livre<\/th>/.test(htm) && /em caixa/.test(htm) && /com_etiqueta/.test(htm));
+  /* ③ REVISÃO: com o foco fora do campo, o load() da atualização reescrevia o
+     número digitado e ainda não salvo — e o "recalcular" gravava o antigo. */
+  {
+    const m = htm.match(/function cfgCampo\([\s\S]*?\n}\n/);
+    const CFG = {}; const el = { value:'10' };
+    const cfgCampo = m && new Function('CFG_CARREGADO', '$', m[0] + 'return cfgCampo;')(CFG, () => el);
+    let okCfg = !!cfgCampo;
+    if(okCfg){
+      cfgCampo('diasCob', 10); okCfg = okCfg && String(el.value) === '10';
+      el.value = '25'; cfgCampo('diasCob', 10); okCfg = okCfg && String(el.value) === '25';     // digitado e não salvo: fica
+      el.value = '10'; cfgCampo('diasCob', 12); okCfg = okCfg && String(el.value) === '12';     // não mexido: recebe o novo
+    }
+    ok('a atualização não reescreve o número digitado e ainda não salvo, mesmo sem o foco',
+       okCfg && !/\$\('#diasCob'\)\.value\s*=/.test(htm), el.value);
+  }
+  /* ③ REVISÃO, 2ª rodada: depois de "recalcular" o campo tem que mostrar o que
+     o servidor GRAVOU (o 0 vira 10, o 2,5 vira 2), e não o digitado. */
+  ok('"recalcular" esquece o que estava carregado antes de recarregar: o campo mostra o gravado',
+     /async function salvarConfig\(\)\{[\s\S]*?Object\.keys\(CFG_CARREGADO\)\.forEach\(k\s*=>\s*delete CFG_CARREGADO\[k\]\)[\s\S]*?load\(\)/.test(htm));
+  ok('o lote tem índice pela venda e pelo pack (a conta roda a cada 3 s na tela azul)',
+     /CREATE INDEX IF NOT EXISTS ix_lote_venda ON lote\(venda\)/.test(fs.readFileSync(path.join(__dirname,'exp_route.js'),'utf8'))
+     && /CREATE INDEX IF NOT EXISTS ix_lote_pack ON lote\(packId\)/.test(fs.readFileSync(path.join(__dirname,'exp_route.js'),'utf8')));
+  ok('a 401 se atualiza sozinha a cada minuto, sem pisar no campo digitado',
+     /setInterval\(\s*atualizarSozinha\s*,\s*60000\s*\)/.test(htm) && /activeElement/.test(htm));
 
   console.log('\n' + (falhas ? 'FALHARAM ' + falhas + ' de ' + casos : 'todos os ' + casos + ' casos passaram'));
   process.exit(falhas ? 1 : 0);

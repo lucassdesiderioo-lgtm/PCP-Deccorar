@@ -239,9 +239,10 @@ devolução:** `node teste_sobra.js` e `node teste_conferencia_expedicao.js`.
 >   a urgência, o inventário (compara a contagem com o que deve estar na
 >   **prateleira**), o número que a Etiqueta de Venda mostra e a coluna **Livre**
 >   da TV (`/painel`, desde 22/10/2026, com "+N em caixa" embaixo).
-> - ⚠️ **O `precisa` da tela azul NÃO usa o livre**, e não é esquecimento: o
->   comprometido da planilha já conta a venda impressa até ela sair, e descontar
->   a reserva de novo contaria a mesma peça duas vezes.
+>   ~~O `precisa` da tela azul NÃO usa o livre~~ — **desde 09/11/2026 USA**, e
+>   junto a venda com etiqueta impressa SAI do comprometido (decisão do dono,
+>   bloco "A VENDA COM ETIQUETA SAI DO PLANEJAMENTO" no §3). As duas coisas vão
+>   juntas: uma sem a outra contaria a mesma peça duas vezes.
 > - ⚠️ **A VIRADA RODOU UMA VEZ SÓ** (`config.virada_baixa_conferencia`): toda
 >   caixa com etiqueta no dia do deploy ganhou `baixado_em = embalado_em`, porque
 >   já tinha baixado na impressão. Rodá-la de novo marcaria como baixada uma caixa
@@ -286,7 +287,7 @@ saem **dois** números, de lugares diferentes:
 ```
 alvo    = max(alvo_minimo, ritmo × dias_cobertura)
 ritmo   = max(média da janela, média da janela curta)      ← desde 07/11/2026
-precisa = comprometido + alvo − estoque
+precisa = comprometido + alvo − livre                     ← desde 09/11/2026 (era − estoque)
 ```
 
 > Desde 07/11/2026 (PLANEJAMENTO-VENDAS-FUTURAS) a média e o comprometido contam
@@ -491,8 +492,8 @@ confirmação (3), aceitar arquivo sem futura (2), o bipe aceitando a cancelada
 
 ### ⚠️ A PLANILHA SE LÊ PELA TABELA DO DONO, CONTA PEÇA, E O PLANEJAMENTO MOSTRA A FALTA POR DIA (07/11/2026)
 
-Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), sete linhas em
-`docs/DECISOES.md`, cartões **R-PLN-01 a R-PLN-05** e **R-REV-03** em
+Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), as linhas de 07 a 09/11/2026 em
+`docs/DECISOES.md`, cartões **R-PLN-01 a R-PLN-06** e **R-REV-03** em
 [`docs/regras/estoque.md`](docs/regras/estoque.md). O que parece bug e não é:
 
 - **`planilha_estado.js` é o dono único de "que linha é o quê"** (a tabela §3-B,
@@ -528,10 +529,51 @@ Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), sete linhas 
 - **Estado novo não trava:** conta como venda (e como futura se trouxer "dia N
   de mês"), e o resumo do import lista o texto. Nunca vira zero calado.
 - **A Atrasada conta no comprometido**, e empurra para "despacha até amanhã".
-  ⚠️ **Por isso o comprometido fica alto entre a Conferência baixar a caixa e a
-  próxima planilha** (o A3 da spec): a mesma peça sai do saldo e continua no
-  comprometido. O dono decidiu construir assim e tratar a correção num plano à
-  parte (07/11/2026). A planilha sobe de manhã e no fim do dia (R12).
+  ~~O comprometido fica alto entre a Conferência baixar a caixa e a próxima
+  planilha (o A3 da spec)~~ — **consertado em 09/11/2026**, bloco logo abaixo.
+- ⚠️ **A VENDA COM ETIQUETA SAI DO PLANEJAMENTO** (REGRA de 09/11/2026, decisão
+  do dono, linha em `docs/DECISOES.md`, cartão R-PLN-06; o dono: *"assim que
+  der saída com a embalagem feita já deve sair do planejamento da produção"*).
+  A planilha só troca o Estado quando o caminhão bipa; até lá a venda ficava no
+  comprometido **e** a peça já tinha saído do saldo na Conferência. A consulta
+  de 09/11 achou **84 peças** assim: a 401 mostrava **269** de falta, e a real
+  era **199**. Agora:
+  - **o comprometido** (a 401, a tela azul, a TV, a compra — o
+    `demanda_dominio`, uma conta só) **não conta a venda que já tem etiqueta
+    impressa no PCP** (`lote.embalado_em`), achada pela venda **ou** pelo pack,
+    como no cancelamento; a caixa do modo teste não conta;
+  - **e a conta usa o LIVRE** (saldo − peça em caixa com etiqueta, o
+    `baixa_dominio.reservados`): `precisa = comprometido + alvo − livre`, e a
+    falta por dia também. Uma sem a outra contaria a mesma peça duas vezes;
+  - **a falta só se mexe quando a venda chega e quando a peça é embalada** — a
+    etiqueta e a Conferência não mexem nela;
+  - ⚠️ **a venda que o PCP não acha continua contando** (na dúvida, produz-se):
+    a venda nova que ainda não veio no PDF, e o item de um pacote de vários
+    produtos cuja venda não é a da caixa (a `venda_futura` não guarda o pack do
+    item) — esse fica contado e com a peça reservada, a falta sai **a mais**;
+  - ⚠️ **o `estoque` que o `calcular` devolve continua sendo o SALDO** (o que a
+    aba Estoque mostra e soma, e o custo); o livre vai em `livre`, e a peça em
+    caixa em `em_caixa`. **Tudo o que decide conta pelo livre** (③ REVISÃO): o
+    `precisa`, a cobertura, o degrau "sem estoque", e na aba Estoque a sobra
+    ("excesso") e o "zerado" — pelo saldo, a peça em caixa virava sobra. A
+    caixa impressa de venda que a planilha ainda não trouxe reserva a peça e
+    sobe o `precisa` em 1 — certo. ⚠️ **A "Cobertura média" do topo da aba
+    Estoque e a do fechamento continuam pelo SALDO** (`fluxo_estoque`), e é de
+    propósito: mudar o fechamento partiria a série "produzi × vendi" já
+    gravada. O "zerado" da aba se lê "sem peça livre";
+  - **o `lote` ganhou índice pela venda e pelo pack** (`exp_route.js`): a conta
+    roda a cada 3 s na tela azul de cada tablet, e sem índice era uma varredura
+    do lote por venda futura;
+  - **a 401 mostra a coluna "Livre"** (com *"+N em caixa"*), a linha *"N vendas
+    … já têm etiqueta de venda impressa — saíram da lista"*, e **se atualiza
+    sozinha a cada minuto**, sem redesenhar com alguém digitando num campo
+    (§12) nem com a aba do navegador escondida — e o campo da configuração
+    mexido e ainda não salvo **não é reescrito**, mesmo sem o foco (`cfgCampo`;
+    o testador de tela achou o "recalcular" gravando o valor antigo).
+  ⚠️ **CONSTRUÍDO EM 09/11/2026, FALTA SUBIR**, e não provado com dado real. A
+  prova: depois do deploy, a consulta do dia 09/11 rodada de novo dá a "falta
+  tela" igual à "falta real", e a falta da 401 não sobe quando a Conferência
+  baixa uma caixa. Prova que não foi feita se escreve como não feita.
 - **A linha de antes desta fase (sem `grupo`) conta como antes**: 1 peça, e só
   de hoje em diante. Ela não sai por ausência se tiver data passada (#11).
 - **O ritmo (fase 3) é `max(média da janela, média de config.janela_curta=14)`**
@@ -581,7 +623,7 @@ Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), sete linhas 
   ✅ **No ar desde 08/11/2026** (PRs #315 e #316): o dono fez o deploy e disse
   *"deu tudo certo no deploy"*.
 
-**Rode `node teste_vendas_futuras.js` (102) ao mexer no `planilha_estado.js`, no
+**Rode `node teste_vendas_futuras.js` (118) ao mexer no `planilha_estado.js`, no
 import do `plan_route.js`, no `demanda_dominio.js` ou na 401** — ele importa o
 relatório real de 07/11/2026 (`casos/planilha-ml-2026-11-07.csv`, só as sete
 colunas que a conta usa: sem nome, CPF ou endereço). **E `node simular_ritmo.js
@@ -3771,7 +3813,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). ~~**Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa~~ — **fechado em 08/11/2026**: a 905 Minha produção e a aba Por pessoa da 904 (§21) · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (86), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (306), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (102), `teste_relatorios.js` (68); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (306), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (118), `teste_relatorios.js` (68); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4178,7 +4220,7 @@ Compare com a §3 do `docs/ARQUITETURA.md`. Diferença ali é dívida nova.
 | R-EST-12 | A falta de estoque tem uma conta só (`demanda_dominio`): aba, tela azul, TV e gerencial (#12) |
 | R-EST-13 | O gráfico conta em PEÇA a embalagem, a baixa (`baixado_em`) e, à parte, a sobra ("voltou"); ajuste e contagem ficam fora (`fluxo_estoque`) |
 | R-EST-14 | Custo sem preço é piso, nunca zero; sem `custo.ver` o valor não viaja |
-| R-EST-15 | O reservado (sem etiqueta + em caixa) é leitura e não muda o `precisa` |
+| R-EST-15 | O reservado (sem etiqueta + em caixa) aparece ao lado do saldo; desde 09/11/2026 o `precisa` conta pelo livre (R-PLN-06) |
 | R-EST-16 | Toda correção aplica a DIFERENÇA sobre o saldo de agora (#32) |
 | R-EST-17 | Quem conta não vê o saldo, nem no JSON; conta-se toda caixa embalada SEM etiqueta de venda, contra o LIVRE |
 | R-EST-18 | Ninguém conta duas vezes o mesmo SKU nem resolve o que contou, nem o Admin Geral; o aprovador único do ajuste espera |

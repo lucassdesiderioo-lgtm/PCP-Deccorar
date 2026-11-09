@@ -217,7 +217,12 @@ module.exports = function(app, db){
     const lista = linhas.filter(l => l.cadastrado).map(l => {
       const e = extra[l.codigo] || {};
       const estoque = l.estoque || 0;
-      const sobra = Math.max(0, estoque - (l.alvo + l.comprometido));
+      /* A SOBRA E O "ZERADO" CONTAM PELO LIVRE (09/11/2026, R-PLN-06): a venda
+         com etiqueta saiu do comprometido, e a peca dela, em caixa esperando a
+         Conferencia, ainda esta no saldo. Pelo saldo, ela viraria "excesso"
+         (③ REVISAO). O que a aba mostra e soma continua sendo o saldo. */
+      const livre = l.livre != null ? l.livre : estoque;
+      const sobra = Math.max(0, livre - (l.alvo + l.comprometido));
       /* Cobertura POR SKU: quantos dias essa peca aguenta no ritmo dela. E o
          numero que decide — 40 pecas de um SKU que vende 1 por semana e
          excesso; 40 de um que vende 10 por dia e falta. Sem venda na janela
@@ -245,7 +250,7 @@ module.exports = function(app, db){
          que é situação normal e ninguém investiga. */
       let situacao;
       if(estoque < 0)     situacao = 'negativo';
-      else if(l.precisa > 0)   situacao = estoque === 0 ? 'zerado' : 'baixo';
+      else if(l.precisa > 0)   situacao = livre <= 0 ? 'zerado' : 'baixo';
       else if(sobra > 0)  situacao = 'excesso';
       else                situacao = 'ok';
 

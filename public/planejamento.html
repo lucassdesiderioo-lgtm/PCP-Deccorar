@@ -79,6 +79,10 @@
   .ord .est{font-weight:800}.ord .est.lig{color:#7ee2a0}.ord .est.des{color:var(--muted)}
   .subindo{color:#7ee2a0;font-size:11px}
   .apl{background:transparent;color:var(--blue);border:1px solid var(--line);border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}.apl:hover{border-color:var(--blue)}
+  /* A linha das vendas que sairam da lista por ja ter etiqueta (09/11/2026). */
+  .etq{margin:8px 0 10px;padding:9px 12px;border-radius:10px;background:#10251a;border:1px solid #23573a;color:#9be3b4;font-size:13px}
+  .etq b{color:#e6edf3}
+  .emcx{font-size:11px;color:var(--muted);white-space:nowrap}
 </style></head><body>
 <header><div class="mark">P</div>
   <div><h1>Planejamento</h1>
@@ -126,9 +130,10 @@
   <!-- FASE 1: as vendas futuras por dia de envio, com a falta acumulada. So
        leitura; a conta e do demanda_dominio.porDia (R1). -->
   <div class="vf">
-    <div class="sub">O que já foi vendido e ainda não saiu da fábrica, por dia de envio. Embaixo de cada número,
-      a <b style="color:#e6edf3">falta acumulada</b>: o estoque cobre primeiro o dia mais cedo.
+    <div class="sub">O que já foi vendido e ainda <b style="color:#e6edf3">não tem etiqueta de venda</b>, por dia de envio. Embaixo de cada número,
+      a <b style="color:#e6edf3">falta acumulada</b>: o <b style="color:#e6edf3">livre</b> (o estoque menos as peças já em caixa com etiqueta) cobre primeiro o dia mais cedo.
       A coluna <b style="color:#ffb4ae">Atrasada</b> é venda com data já passada que a planilha ainda mostra na fábrica.</div>
+    <div class="etq" id="vfEtq" hidden></div>
     <div class="tbwrap"><table id="vfTab"><tbody><tr><td class="dim" style="text-align:center;padding:18px">carregando…</td></tr></tbody></table></div>
     <div class="sub" id="vfExtra" style="margin-top:8px"></div>
   </div>
@@ -162,7 +167,7 @@
     <thead>
       <tr class="cols">
         <th class="l">SKU</th>
-        <th>Vendas na janela</th><th>Comprometido</th><th>Estoque</th><th>Cobertura</th><th>Precisa</th><th>Alvo</th><th></th>
+        <th>Vendas na janela</th><th>Comprometido</th><th>Livre</th><th>Cobertura</th><th>Precisa</th><th>Alvo</th><th></th>
       </tr>
     </thead>
     <tbody id="corpo"></tbody>
@@ -173,10 +178,10 @@
   <div class="sub" style="margin-top:12px">
     <b style="color:var(--blue)">A ordem é de prioridade, não de quantidade:</b>
     quem tem cliente com prazo curto vem primeiro, depois quem está sem estoque, depois quem cobre poucos dias.
-    <b>Cobertura</b> = quantos dias o estoque atual aguenta a venda desse SKU.
+    <b>Cobertura</b> = quantos dias o livre aguenta a venda desse SKU.
     <br><b style="color:var(--blue)">Como o número sai:</b>
     alvo = ritmo × dias de cobertura, com piso no alvo mínimo — o ritmo é o maior entre a média da janela e a da janela curta.
-    &nbsp;·&nbsp; precisa = comprometido (envios futuros da planilha) + alvo − estoque.
+    &nbsp;·&nbsp; precisa = comprometido (envios futuros da planilha, sem as vendas que já têm etiqueta de venda) + alvo − livre (o estoque menos as peças já em caixa com etiqueta).
   </div>
   </section>
 
@@ -229,12 +234,23 @@ const dataBr=d=>d?d.slice(8,10)+'/'+d.slice(5,7):'';
    andaria nos dias em que alguem abrisse a 904. */
 function fechamento(){ fetch('/api/fechamento').catch(()=>{}); }
 
+/* O CAMPO DA CONFIGURACAO SO RECEBE O VALOR GRAVADO SE NINGUEM O MEXEU desde a
+   ultima carga (③ REVISAO, 09/11/2026): a atualizacao de 60 s reescrevia o
+   numero digitado e ainda nao salvo assim que o campo perdia o foco, e o
+   "recalcular" gravava o antigo (§12). Depois de salvar, o gravado e o digitado
+   sao o mesmo, e o campo volta a acompanhar. */
+const CFG_CARREGADO={};
+function cfgCampo(id, valor){
+  const el=$('#'+id);
+  if(CFG_CARREGADO[id]===undefined || String(el.value)===String(CFG_CARREGADO[id])) el.value=valor;
+  CFG_CARREGADO[id]=valor;
+}
 async function load(){
   const d=await (await fetch('/api/planejamento')).json();
-  $('#diasCob').value=d.config.dias_cobertura;
-  $('#janela').value=d.config.janela_media;
-  $('#alvoMin').value=d.config.alvo_minimo;
-  $('#janCurta').value=d.config.janela_curta;
+  cfgCampo('diasCob', d.config.dias_cobertura);
+  cfgCampo('janela', d.config.janela_media);
+  cfgCampo('alvoMin', d.config.alvo_minimo);
+  cfgCampo('janCurta', d.config.janela_curta);
   ORDEM=d.config.ordem_por_falta===1; desenharOrdem();
   $('#totPrecisa').textContent=d.total_precisa;
 
@@ -313,7 +329,7 @@ function desenhar(){
             ${r.motivo?`<div class="dim" style="font-size:11px;font-family:system-ui">${r.motivo}</div>`:''}</td>
         <td>${r.vendas_janela}<div class="dim" style="font-size:11px">${r.media_dia}/d</div>${r.subindo?`<div class="subindo">subindo: ${dec1(r.media_dia)} → ${dec1(r.media_curta)}/dia</div>`:''}</td>
         <td>${comp}</td>
-        <td>${fmt(r.estoque)}</td>
+        <td>${fmt(r.livre)}${r.em_caixa?`<div class="emcx">+${r.em_caixa} em caixa</div>`:''}</td>
         <td>${cob}</td>
         <td class="${r.precisa>0?'precisa':'zero'}">${r.precisa>0?r.precisa:'—'}</td>
         <td><b>${fmt(r.alvo)}</b></td>
@@ -396,6 +412,9 @@ async function salvarConfig(){
     janela_curta:+$('#janCurta').value||14};
   await fetch('/api/planejamento/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   $('#msgCfg').textContent='recalculado'; setTimeout(()=>$('#msgCfg').textContent='',2000);
+  /* Salvo, o campo mostra o que o servidor GRAVOU (o 0 vira 10, o 2,5 vira 2):
+     esquece o carregado, e o load() reescreve os quatro (③ REVISAO). */
+  Object.keys(CFG_CARREGADO).forEach(k => delete CFG_CARREGADO[k]);
   load(); fechamento(); recarregarAba();
 }
 /* A tabela da comparacao. Mostra os 12 maiores desvios; o resto a um clique —
@@ -461,12 +480,20 @@ async function futuras(){
   if(!d||!d.ok){ tab.innerHTML='<tbody><tr><td class="dim" style="padding:18px">Não foi possível carregar as vendas futuras.</td></tr></tbody>'; return; }
   if(!d.dias.length){ tab.innerHTML='<tbody><tr><td class="dim" style="padding:18px">Nenhuma venda futura na planilha.</td></tr></tbody>'; $('#vfExtra').textContent=''; return; }
   const cl=x=>x.dia==='atrasada'?' atr':'';
-  let h='<thead><tr class="cols"><th class="l">SKU</th><th>Estoque</th><th>Total</th><th class="l">Falta a partir de</th>'
+  /* A venda com etiqueta ja saiu da lista (a producao dela acabou): a linha
+     diz quantas, para o total que cai ao longo do dia nao parecer sumir. */
+  const ce=d.com_etiqueta||{vendas:0,pecas:0};
+  $('#vfEtq').hidden=!ce.vendas;
+  if(ce.vendas) $('#vfEtq').innerHTML='✔ <b>'+ce.vendas+(ce.vendas===1?' venda':' vendas')+'</b> ('+ce.pecas+(ce.pecas===1?' peça':' peças')
+    +') que a planilha ainda mostra na fábrica já '+(ce.vendas===1?'tem':'têm')+' etiqueta de venda impressa — '
+    +(ce.vendas===1?'saiu':'saíram')+' da lista: a produção delas acabou.';
+  const livreTd=l=>'<td>'+l.livre+(l.em_caixa?'<div class="emcx">+'+l.em_caixa+' em caixa</div>':'')+'</td>';
+  let h='<thead><tr class="cols"><th class="l">SKU</th><th>Livre</th><th>Total</th><th class="l">Falta a partir de</th>'
     +d.dias.map(x=>'<th class="dia'+cl(x)+'">'+x.rotulo+'</th>').join('')+'</tr></thead><tbody>';
   for(const l of d.linhas){
     /* Dia sem venda do SKU mostra so o ponto: a falta acumulada nao muda ali, e
        repetir "falta 28" em vinte colunas escondia os dias que importam. */
-    h+='<tr><td class="l code sk">'+esc(l.codigo)+'</td><td>'+l.estoque+'</td><td><b>'+l.total+'</b></td>'
+    h+='<tr><td class="l code sk">'+esc(l.codigo)+'</td>'+livreTd(l)+'<td><b>'+l.total+'</b></td>'
       +'<td class="l">'+(l.falta_desde?'<span class="fdesde">'+l.falta_desde_rotulo+'</span> <span class="dim">· falta '+l.falta_total+'</span>':'<span class="sem">estoque cobre</span>')+'</td>'
       +l.celulas.map((c,i)=>'<td class="dcel'+cl(d.dias[i])+'">'+(c.vendas?'<div class="vn">'+c.vendas+'</div>'
           +(c.falta?'<div class="vfal">falta '+c.falta+'</div>':'<div class="vok">ok</div>')
@@ -549,6 +576,19 @@ function abrirAba(a, semHash){
 /* Quem chama já rodou o load() (a hora da planilha do topo); na aba "O que
    produzir" ele é a própria carga, e não precisa rodar duas vezes. */
 function recarregarAba(){ if(ABA!=='produzir') ABAS[ABA].carregar(); }
+/* A TELA SE ATUALIZA SOZINHA A CADA MINUTO (09/11/2026, pedido do dono): a
+   embalagem e a etiqueta de venda mexem na lista durante o dia. Nao redesenha
+   com alguém digitando num campo (o redesenho apagaria o digitado, §12), nem
+   com a aba do navegador escondida. A "O que produzir" e o load(); as outras
+   recarregam a delas. */
+function atualizarSozinha(){
+  if(document.hidden) return;
+  const a=document.activeElement;
+  if(a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && a.type!=='button') return;
+  if(ABA==='produzir'){ load(); return; }
+  if(ABA==='dia'){ load(); futuras(); }
+}
+setInterval(atualizarSozinha, 60000);
 document.getElementById('tabs').addEventListener('click',function(e){
   const t=e.target.closest('.tab'); if(t) abrirAba(t.getAttribute('data-t'));
 });
