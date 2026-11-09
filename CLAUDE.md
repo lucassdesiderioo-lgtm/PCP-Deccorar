@@ -533,9 +533,10 @@ Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), as linhas de
   às 12:15 passou. Por favor, entregue o pacote na próxima coleta."* — sem dia
   da semana, e elas caíam em **amanhã "a confirmar"**, sendo da coleta das 15h
   de hoje. Agora o import pergunta ao `coleta_horario.proximaColeta` (dono dos
-  horários): a coleta **lançada** do mesmo dia cuja janela ainda não
-  **fechou** na **hora do relatório** (pelo fim, e não pelo início: com a
-  janela aberta o caminhão pode não ter passado — ③ REVISÃO); senão o próximo
+  horários): a coleta **lançada** do mesmo dia que ainda vai **começar**
+  depois da **hora do relatório**; a que está com a **janela aberta** vale, mas
+  **"a confirmar"** (o caminhão pode não ter passado, e pode ser a que o ML diz
+  que passou — ③ REVISÃO); senão o próximo
   dia com coleta lançada (o "sem coleta" é pulado); o próximo dia sem nada
   lançado fica **"a confirmar"** (domingo é pulado, inclusive o do próprio
   relatório); **sem nada lançado no dia do relatório, o dia do relatório "a

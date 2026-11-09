@@ -404,10 +404,11 @@ function agenciaDeHoje(db){
    O relatório do ML diz "entregue o pacote na próxima coleta", sem dia; o
    planejamento pergunta aqui qual é. Só vale o horário LANÇADO (o rascunho da
    semana copiada não vale, R-HCO-13), e o dia "sem coleta" é pulado.
-   - no dia do relatório, a coleta cuja janela ainda não FECHOU na hora dele →
-     esse dia (pelo fim, e não pelo início: com a janela aberta o caminhão pode
-     não ter passado — na dúvida, mais cedo; ③ REVISÃO). Sem hora lida, a
-     coleta do dia vale, mas "a confirmar";
+   - no dia do relatório, a coleta que ainda vai COMEÇAR depois da hora dele →
+     esse dia; a que está com a janela ABERTA → esse dia, "a confirmar" (o
+     caminhão pode não ter passado, e pode ser a que o ML diz que passou — na
+     dúvida, mais cedo; ③ REVISÃO). Sem hora lida, a coleta do dia vale, mas
+     "a confirmar";
    - senão, o próximo dia com coleta lançada → esse dia;
    - o próximo dia sem nada lançado → esse dia, "a confirmar" (o domingo, que
      a 206 não tem, é pulado);
@@ -430,8 +431,12 @@ function proximaColeta(db, data, hora){
   const deHoje = coletas(data);
   if(!deHoje.length && !semColeta(data) && !domingo(data)) return null;
   const temHora = HM.test(String(hora || ''));
-  if(!semColeta(data) && deHoje.some(c => !temHora || min(c.fim || c.inicio) > min(hora)))
-    return { data, confirmar: temHora ? 0 : 1 };
+  if(!semColeta(data)){
+    /* A coleta que ainda vai COMEÇAR é certeza; a que está com a janela aberta
+       vale, mas "a confirmar" — pode ser a que o ML diz que passou (③ REVISÃO). */
+    if(temHora && deHoje.some(c => min(c.inicio || c.fim) > min(hora))) return { data, confirmar:0 };
+    if(deHoje.some(c => !temHora || min(c.fim || c.inicio) > min(hora))) return { data, confirmar:1 };
+  }
   for(let i = 1; i <= 14; i++){
     const d = mais(data, i);
     if(semColeta(d)) continue;

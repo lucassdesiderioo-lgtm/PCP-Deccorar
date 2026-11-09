@@ -533,8 +533,8 @@ const csv64 = txt => 'data:text/csv;base64,' + Buffer.from(txt, 'utf8').toString
     CH.garantirSchema(dr);
     const hr = dr.prepare("INSERT INTO saida_horario (data,tipo,ordem,inicio,fim,rascunho,removido_em) VALUES (?,?,?,?,?,0,?)");
     hr.run('2026-11-10', 'coleta', 1, '10:15', '12:15', null);
-    ok('a coleta com a janela ainda aberta na hora do relatório vale (10:53 dentro de 10:15–12:15 → hoje)',
-       JSON.stringify(CH.proximaColeta(dr, '2026-11-10', '10:53')) === JSON.stringify({ data:'2026-11-10', confirmar:0 }), CH.proximaColeta(dr, '2026-11-10', '10:53'));
+    ok('a coleta com a janela ainda aberta vale, mas "a confirmar" — pode ser a que o ML disse que passou (③ REVISÃO, 2ª rodada)',
+       JSON.stringify(CH.proximaColeta(dr, '2026-11-10', '10:53')) === JSON.stringify({ data:'2026-11-10', confirmar:1 }), CH.proximaColeta(dr, '2026-11-10', '10:53'));
     hr.run('2026-11-12', 'coleta', 1, '15:00', '17:00', '2026-11-11 08:00:00');   // removida
     hr.run('2026-11-12', 'agencia', 1, null, '15:00', null);                       // agência não é coleta
     ok('a coleta removida e o horário da agência não contam como coleta (quinta sem coleta lançada → a confirmar)',
