@@ -141,6 +141,7 @@ function calcularFicha(db, sku){
            mesmo jeito. A bobina nao foi escolhida, entao o nome e o das
            candidatas, e o corte e avaliado na mais estreita. Nada disto soma
            custo — `componente_id` continua vazio. */
+        l.unidade = 'm linear';   // sem `quantidade`: sem bobina escolhida, a metragem nao existe
         l.tecido_sem_preco = { cor:s.cor_codigo, familia:f.familia,
           nomes: opcoes.map(o => o.nome) };
         l.corte = medidaDeCorte(f, Object.assign({ largura_bobina:opcoes[0].bobina_cm }, base));

@@ -237,6 +237,64 @@ caso('a folga do dono numa expressão só: +15, e +10 na 1,80 (10/11/2026)', () 
   }
 });
 
+/* ── ③ REVISÃO (10/11/2026): os cinco achados confirmados ───────────────── */
+caso('R2: tecido sem preço E sem medida de corte não vira zero — fica indefinido', () => {
+  db.prepare("UPDATE ficha_formula SET corte_largura=NULL, corte_altura=NULL WHERE id=?").run(F_TEC);
+  try{
+    const r2 = CORTE.lista(db, [{ codigo:'BK150150CINZA', precisa:3 }]);
+    const l = r2.blocos.find(b => b.tecido).linhas[0];
+    igual(l.qtd, null, 'quantidade indefinida, nunca 0');
+    verdade(l.indefinido, 'marcada como indefinida');
+    verdade(l.skus.every(k => k.qtd !== 0), 'nenhum SKU com 0');
+  } finally {
+    db.prepare("UPDATE ficha_formula SET corte_largura='largura - 3', corte_altura='altura + 15' WHERE id=?").run(F_TEC);
+  }
+});
+
+caso('R3: o mesmo material em dois modelos soma num bloco só', () => {
+  db.prepare("INSERT INTO modelo (id,codigo,nome,exige_medida,sob_medida) VALUES (9,'ROMANA','Romana',1,0)").run();
+  db.prepare("INSERT INTO skus (codigo,modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo,tem_ficha) VALUES ('RM150150BEGE',9,150,150,'BEGE','BLACKOUT',1)").run();
+  const id = db.prepare("INSERT INTO ficha_formula (modelo_id,componente_id,expressao,ordem,corte_largura,planejamento) VALUES (9,?, 'largura / 100', 1, 'largura - 3', 1)").run(TUBO).lastInsertRowid;
+  try{
+    const r2 = CORTE.lista(db, [{ codigo:'BK150150BEGE', precisa:5 }, { codigo:'RM150150BEGE', precisa:2 }]);
+    const tubos = r2.blocos.filter(b => b.material === 'Tubo 32 mm');
+    igual(tubos.length, 1, 'um bloco só de tubo');
+    igual(tubos[0].linhas.find(l => l.corte === '147 cm').qtd, 7);
+  } finally {
+    db.prepare('DELETE FROM ficha_formula WHERE id=?').run(id);
+    db.prepare("DELETE FROM skus WHERE codigo='RM150150BEGE'").run();
+    db.prepare('DELETE FROM modelo WHERE id=9').run();
+  }
+});
+
+caso('R4: SKU com linha marcada em erro fica fora INTEIRO, uma vez, e não conta', () => {
+  db.prepare("INSERT INTO cor (codigo,nome) VALUES ('VERDE','VERDE')").run();
+  db.prepare("INSERT INTO skus (codigo,modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo,tem_ficha) VALUES ('BK150150VERDE',1,150,150,'VERDE','BLACKOUT',1)").run();
+  try{
+    const r2 = CORTE.lista(db, [{ codigo:'BK150150BEGE', precisa:5 }, { codigo:'BK150150VERDE', precisa:4 }]);
+    igual(r2.persianas, 5, 'o verde não conta');
+    const naLista = JSON.stringify(r2.blocos).indexOf('BK150150VERDE') >= 0;
+    verdade(!naLista, 'o verde não pode estar dentro da lista');
+    igual(r2.fora.filter(f => f.codigo === 'BK150150VERDE').length, 1, 'uma vez só em fora');
+  } finally {
+    db.prepare("DELETE FROM skus WHERE codigo='BK150150VERDE'").run();
+  }
+});
+
+caso('R1: a folha de impressão só vale ao apertar o Imprimir da aba (classe no body)', () => {
+  const h = fs.readFileSync(path.join(__dirname, 'public/planejamento.html'), 'utf8');
+  const pr = h.slice(h.indexOf('@media print'), h.indexOf('@media print') + 900);
+  verdade(!/^\s*\.aba\{display:none/m.test(pr), 'a regra de impressão não pode valer sem condição');
+  verdade(/body\.imprimirCorte/.test(pr), 'regra presa à classe body.imprimirCorte');
+  verdade(/classList\.add\('imprimirCorte'\)/.test(h) && /afterprint/.test(h), 'o botão põe a classe e o afterprint tira');
+});
+
+caso('R5: o redesenho de 60 s devolve os "de quais SKUs" que estavam abertos', () => {
+  const h = fs.readFileSync(path.join(__dirname, 'public/planejamento.html'), 'utf8');
+  const fn = h.slice(h.indexOf('async function corte()'), h.indexOf("document.getElementById('ctImprimir')"));
+  verdade(/details\[open\]/.test(fn) && /data-k=/.test(fn), 'guarda os abertos (data-k) e reabre');
+});
+
 /* ── A ROTA DA FICHA GRAVA A CAIXINHA, E AUSENTE NÃO APAGA ───────────────── */
 function rotaFicha(){
   const rotas = {};

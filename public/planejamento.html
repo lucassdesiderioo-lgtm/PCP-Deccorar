@@ -92,11 +92,16 @@
   .ct .fora{color:var(--muted);font-size:13px}
   .ct .ctopo{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
   .ct .ctopo button{border:1px solid var(--line);border-radius:9px;padding:10px 16px;font-weight:700;cursor:pointer;background:transparent;color:var(--txt)}
+  /* A FOLHA DA BANCADA SO NO BOTAO "Imprimir" DA ABA (③ REVISAO): a classe
+     vai no body ao clicar e sai no afterprint. O Ctrl+P de outra aba continua
+     imprimindo a aba aberta, como antes. */
   @media print{
-    header,.topo,.tabs,#recorte,.ct .ctopo button,.ct details,#sessBar,#menuTelas,#colBar,#colTarefas,#invBar{display:none !important}
-    body{background:#fff;color:#000}.ct .cbloco{border-color:#999;background:#fff}
-    .ct .cq{color:#000}.ct .cav{color:#000}.sub,.dim,.fora{color:#333 !important}
-    .aba{display:none !important} #secCorte{display:block !important}
+    body.imprimirCorte header,body.imprimirCorte .topo,body.imprimirCorte .tabs,body.imprimirCorte #recorte,body.imprimirCorte .ct .ctopo button,body.imprimirCorte .ct details,body.imprimirCorte #sessBar,body.imprimirCorte #menuTelas,body.imprimirCorte #colBar,body.imprimirCorte #colTarefas,body.imprimirCorte #invBar{display:none !important}
+    body.imprimirCorte{background:#fff;color:#000}
+    body.imprimirCorte .ct .cbloco{border-color:#999;background:#fff}
+    body.imprimirCorte .ct .cq,body.imprimirCorte .ct .cav{color:#000}
+    body.imprimirCorte .sub,body.imprimirCorte .dim,body.imprimirCorte .fora{color:#333 !important}
+    body.imprimirCorte .aba{display:none !important} body.imprimirCorte #secCorte{display:block !important}
   }
   .apl{background:transparent;color:var(--blue);border:1px solid var(--line);border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}.apl:hover{border-color:var(--blue)}
   /* A linha das vendas que sairam da lista por ja ter etiqueta (09/11/2026). */
@@ -213,8 +218,8 @@
        corte_dominio, que pergunta a falta ao demanda_dominio (#12). -->
   <div class="ct">
     <div class="ctopo">
-      <div class="sub" style="flex:1;min-width:240px">A falta da aba <b style="color:#e6edf3">O que produzir</b>
-        (<b id="ctPers" style="color:#e6edf3">—</b> persianas) virada em material, pelo que está marcado
+      <div class="sub" style="flex:1;min-width:240px"><b id="ctPers" style="color:#e6edf3">—</b> persianas da falta da aba
+        <b style="color:#e6edf3">O que produzir</b> viradas em material (o que não entra está em "Ficou fora", no fim), pelo que está marcado
         <b style="color:#e6edf3">"vai para o planejamento da produção"</b> na ficha técnica (tela 404).
         A medida é a de <b style="color:#e6edf3">corte</b>, lançada na ficha.</div>
       <button id="ctImprimir" type="button">Imprimir</button>
@@ -596,6 +601,9 @@ $('#ordBtn').addEventListener('click', async function(){
 const fmtQ=v=>{ const n=+v||0; return Number.isInteger(n)?String(n):n.toLocaleString('pt-BR',{maximumFractionDigits:2}); };
 async function corte(){
   const box=$('#ctCorpo');
+  /* O REDESENHO DE 60 s NAO FECHA O QUE A PESSOA ABRIU (③ REVISAO, §12): guarda
+     quais "de quais SKUs" estavam abertos e reabre depois. */
+  const abertos=new Set([...box.querySelectorAll('details[open]')].map(d=>d.getAttribute('data-k')));
   let r; try{ r=await (await fetch('/api/planejamento/corte')).json(); }
   catch(e){ box.innerHTML='<div class="aviso" style="display:block">Sem conexão — não deu para montar a lista.</div>'; return; }
   if(!r||r.erro){ box.innerHTML='<div class="aviso" style="display:block">'+esc((r&&r.erro)||'não deu para montar a lista')+'</div>'; return; }
@@ -611,12 +619,14 @@ async function corte(){
       +(b.sem_corte?' <span class="cav">⚠ sem medida de corte na ficha</span>':'')+'</h2>'
       +'<table><thead><tr class="cols"><th class="l">'+(b.tecido?'Tecido':'Material')+'</th><th class="l">Medida de corte</th><th>Quantidade</th></tr></thead><tbody>';
     for(const l of b.linhas){
-      const det=l.skus.map(k=>esc(k.codigo)+' <b>'+fmtQ(k.qtd)+'</b>').join(' · ');
+      const k=(b.tecido?'tecido':b.material)+'|'+l.material+'|'+(l.corte||'');
+      const det=l.skus.map(x=>esc(x.codigo)+' <b>'+(x.qtd==null?'—':fmtQ(x.qtd))+'</b>').join(' · ');
       h+='<tr><td class="l"><b>'+esc(l.material)+'</b>'
         +(l.aviso?'<div class="cav">⚠ '+esc(l.aviso)+'</div>':'')
-        +'<details><summary>de quais SKUs</summary><div class="sub">'+det+'</div></details></td>'
+        +'<details data-k="'+esc(k)+'"'+(abertos.has(k)?' open':'')+'><summary>de quais SKUs</summary><div class="sub">'+det+'</div></details></td>'
         +'<td class="l cmed">'+(l.corte?esc(l.corte):'<span class="dim">—</span>')+'</td>'
-        +'<td><span class="cq">'+fmtQ(l.qtd)+'</span> <span class="sub">'+esc(l.unidade==='peça'?(l.qtd===1?'peça':'peças'):l.unidade)+'</span></td></tr>';
+        +'<td>'+(l.qtd==null?'<span class="cq">—</span>'
+            :'<span class="cq">'+fmtQ(l.qtd)+'</span> <span class="sub">'+esc(l.unidade==='peça'?(l.qtd===1?'peça':'peças'):l.unidade)+'</span>')+'</td></tr>';
     }
     h+='</tbody></table></div>';
   }
@@ -626,7 +636,10 @@ async function corte(){
   }
   box.innerHTML=h;
 }
-document.getElementById('ctImprimir').addEventListener('click',function(){ window.print(); });
+document.getElementById('ctImprimir').addEventListener('click',function(){
+  document.body.classList.add('imprimirCorte'); window.print();
+});
+window.addEventListener('afterprint',function(){ document.body.classList.remove('imprimirCorte'); });
 
 /* ── AS ABAS (AJUSTE de 08/11/2026) ─────────────────────────────────────
    Uma aba aberta por vez, no estilo das Devoluções em andamento. Cada uma

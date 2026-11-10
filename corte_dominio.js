@@ -62,28 +62,40 @@ function lista(db, faltas){
     const doPlano = (fx.linhas || []).filter(l => l.planejamento);
     if(!doPlano.length){ fora.push({ codigo:s.codigo, qtd:n, motivo:'nenhuma linha da ficha marcada "vai para o planejamento da produção"' }); continue; }
 
+    /* ③ REVISAO (R4): o SKU fica DENTRO ou FORA, nunca nos dois. Linha
+       marcada em erro (sem tecido na cor, formula quebrada) tira o SKU inteiro
+       da lista, uma vez, com os motivos juntos — senao ele contava nas
+       persianas, aparecia no tubo e tambem em "ficou fora". */
+    const erros = doPlano.filter(l => !l.componente_id && !l.tecido_sem_preco)
+      .map(l => l.erro || 'linha sem material');
+    if(erros.length){
+      fora.push({ codigo:s.codigo, qtd:n, motivo:'linha da ficha com erro: ' + [...new Set(erros)].join(' · ') });
+      continue;
+    }
+
     persianas += n;
     for(const l of doPlano){
       /* O material da linha: o componente da ficha; no tecido, a bobina
          escolhida, ou (sem preco) as candidatas daquela cor. */
       let chaveMat, material, aviso = null;
       if(l.componente_id){ chaveMat = 'c' + l.componente_id; material = l.componente_nome; }
-      else if(l.tecido_sem_preco){
+      else {
         const t = l.tecido_sem_preco;
         chaveMat = 'f' + t.familia + '|' + t.cor;
         material = t.nomes.join(' ou ');
         aviso = 'bobina não escolhida: nenhuma tem preço cadastrado';
-      } else {
-        fora.push({ codigo:s.codigo, qtd:n, motivo:'linha da ficha com erro: ' + (l.erro || 'sem material') });
-        continue;
       }
       const corte = l.corte && l.corte.texto ? l.corte.texto : null;
 
-      let b = blocos.get(l.formula_id);
+      /* ③ REVISAO (R3): o BLOCO e o material (ou "o tecido"), e nao a linha da
+         ficha — dois modelos com o mesmo tubo somam num bloco so. A ordem do
+         bloco e a da primeira linha da ficha que o trouxe. */
+      const chaveBloco = l.tecido ? 'tecido' : ('c' + l.componente_id);
+      let b = blocos.get(chaveBloco);
       if(!b){
         b = { formula_id:l.formula_id, tecido:!!l.tecido,
-              material: l.tecido ? 'Tecido' : material, linhas:new Map(), sem_corte:false, ordem:blocos.size };
-        blocos.set(l.formula_id, b);
+              material: l.tecido ? 'Tecido' : material, linhas:new Map(), sem_corte:false };
+        blocos.set(chaveBloco, b);
       }
       if(!corte && l.corte && l.corte.erro) aviso = 'medida de corte com erro: ' + l.corte.erro;
       const chave = chaveMat + '#' + (corte || '');
@@ -92,12 +104,19 @@ function lista(db, faltas){
         li = { material, corte, cor: l.tecido ? (s.cor_codigo || null) : null,
                largura: l.corte && l.corte.largura != null ? l.corte.largura : null,
                altura:  l.corte && l.corte.altura  != null ? l.corte.altura  : null,
-               qtd:0, unidade: corte ? 'peça' : (l.unidade || 'un'), aviso, skus:[] };
+               qtd:0, unidade: corte ? 'peça' : (l.unidade || 'un'), aviso, indefinido:false, skus:[] };
         b.linhas.set(chave, li);
       }
-      /* Com medida de corte: uma peca por persiana. Sem: o consumo da ficha. */
-      const q = corte ? n : arred(n * (+l.quantidade || 0));
-      li.qtd = arred(li.qtd + q);
+      /* Com medida de corte: uma peca por persiana. Sem: o consumo da ficha.
+         ③ REVISAO (R2): consumo DESCONHECIDO (o tecido sem preco nao escolhe
+         bobina, entao nao ha metragem) e INDEFINIDO, nunca zero (§7-B, regra 4):
+         a linha sai com quantidade vazia e o aviso. */
+      let q;
+      if(corte) q = n;
+      else if(l.quantidade == null || isNaN(+l.quantidade)) q = null;
+      else q = arred(n * (+l.quantidade));
+      if(q == null){ li.indefinido = true; li.aviso = li.aviso || 'quantidade desconhecida'; }
+      li.qtd = (li.indefinido || q == null) ? null : arred(li.qtd + q);
       li.skus.push({ codigo:s.codigo, qtd:q });
       if(!corte) b.sem_corte = true;
     }
@@ -119,7 +138,7 @@ function lista(db, faltas){
      que a bancada trabalha. */
   const ordem = {};
   db.prepare('SELECT id, ordem FROM ficha_formula').all().forEach(r => { ordem[r.id] = r.ordem || 0; });
-  saida.sort((a, b) => (ordem[a.formula_id] - ordem[b.formula_id]) || (a.formula_id - b.formula_id));
+  saida.sort((a, b) => ((ordem[a.formula_id]||0) - (ordem[b.formula_id]||0)) || (a.formula_id - b.formula_id));
 
   return { persianas, blocos:saida, fora, sem_marcadas: marcadas === 0 };
 }
