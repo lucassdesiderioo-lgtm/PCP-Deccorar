@@ -63,20 +63,19 @@ function digitoDoAtalho(e){
    por baixo (§20, Regra A). A aparência do menu é da conversa de design; aqui
    ele é funcional, no visual atual. */
 var MENU={ telas:null };
-function menuHtml(d, atual){
-  var mods=d.modulos||{}, grupos={}, ordem=[];
-  (d.telas||[]).forEach(function(t){
-    var m=String(t.modulo); if(!grupos[m]){ grupos[m]=[]; ordem.push(m); } grupos[m].push(t);
-  });
-  ordem.sort(function(a,b){ return (+a)-(+b); });
-  if(!ordem.length) return '<div class="mnVazio">Seu acesso não alcança nenhuma tela.</div>';
-  return ordem.map(function(m){
-    return '<div class="mnMod"><div class="mnTit">'+(mods[m]||m)+'</div>'+grupos[m].map(function(t){
-      var on=(t.rota===atual);
-      return '<a class="mnTela'+(on?' on':'')+'" href="'+t.rota+'"'+(on?' aria-current="page"':'')+'><b>'+t.n+'</b> '+t.nome+'</a>';
-    }).join('')+'</div>';
-  }).join('');
+/* O DESENHO DO MENU MORA NO public/menu_telas.js (spec ORGANIZACAO-DO-SISTEMA,
+   fase 3, menu único): o mesmo arquivo desenha o ☰ Menu do sob medida, por
+   módulo do assunto → bloco → tela. Ele chega por uma tag de script que este
+   arquivo põe na página; enquanto não chega, o menu diz "carregando…". */
+function desenharMenu(){
+  var m=document.getElementById('menuTelas');
+  if(m && MENU.telas && typeof MENU_TELAS!=='undefined') m.innerHTML=MENU_TELAS.html(MENU.telas, location.pathname.replace(/\/$/,'')||'/');
 }
+(function(){
+  if(location.pathname.indexOf('/login')===0 || typeof MENU_TELAS!=='undefined') return;
+  var sc=document.createElement('script'); sc.src='/menu_telas.js'; sc.onload=desenharMenu;
+  document.head.appendChild(sc);
+})();
 /* SÓ ESCONDE, NUNCA FORÇA A APARECER: a regra pega o botão cuja marca não
    tem NENHUMA chave da pessoa. O que ela tem segue a tela — se a própria tela
    esconde o botão (`display:none` no estilo), ele continua escondido. Um
@@ -96,8 +95,7 @@ function estiloDasPermissoes(d){
   fetch('/api/telas/minhas',{credentials:'same-origin'}).then(function(r){ return r.json(); }).then(function(d){
     MENU.telas=d||{};
     st.textContent=estiloDasPermissoes(MENU.telas);
-    var m=document.getElementById('menuTelas');
-    if(m) m.innerHTML=menuHtml(MENU.telas, location.pathname.replace(/\/$/,'')||'/');
+    desenharMenu();
   }).catch(function(){});
 })();
 
@@ -138,6 +136,7 @@ function estiloDasPermissoes(d){
     '#menuTelas .mnTela.on{background:'+CH.planBg+';color:'+CH.planTx+'}'+
     '#menuTelas .mnTela.on b{color:'+CH.planTx+'}'+
     '#menuTelas .mnVazio{color:'+CH.sTx+'}'+
+    '#menuTelas .mnBloco{color:'+CH.sTx+';font-weight:700;font-size:12px;margin:8px 0 2px 10px}'+
     '@media (max-width:600px){#sessBar{flex-wrap:wrap}}'+
     '@media print{#sessBar,#menuTelas{display:none}}';
   document.head.appendChild(css);
@@ -166,8 +165,9 @@ function estiloDasPermissoes(d){
        no botão; quem tem uma tela só vê só ela. */
     var pn=document.createElement('nav'); pn.id='menuTelas'; pn.setAttribute('aria-label','Telas');
     pn.style.display='none';
-    pn.innerHTML=MENU.telas?menuHtml(MENU.telas, location.pathname.replace(/\/$/,'')||'/'):'<div class="mnVazio">carregando…</div>';
+    pn.innerHTML='<div class="mnVazio">carregando…</div>';
     document.body.insertBefore(pn, d.nextSibling||null);
+    desenharMenu();
     var bm=document.getElementById('sessMenu');
     if(bm) bm.onclick=function(){ var ab=pn.style.display==='none'; pn.style.display=ab?'block':'none'; bm.setAttribute('aria-expanded',ab?'true':'false'); };
     document.getElementById('sessSair').onclick=sair;

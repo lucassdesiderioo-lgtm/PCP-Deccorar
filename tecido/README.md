@@ -311,7 +311,10 @@ As três telas de venda são **escritório** (tema escuro):
 > `cadastro.ler` de carona, e com ela a lista inteira de tecido, endereço e
 > motivo.
 
-> ⚠️ **TELA QUE NÃO ESTÁ NO `public/nav.js` NASCE INVISÍVEL.** O rodapé monta
+> ⚠️ ~~**TELA QUE NÃO ESTÁ NO `public/nav.js` NASCE INVISÍVEL.**~~ **O RODAPÉ
+> SAIU EM 10/11/2026** (menu único, `CLAUDE.md` §22): a tela entra no ☰ Menu
+> pelo `nucleo/telas.js`, com `modulo` e `bloco`, e o `nav.js` não tem mais
+> lista de telas. A história: o rodapé montava
 > `ORDEM.filter(...)`: uma tela declarada em `nucleo/telas.js` e liberada pela
 > permissão, mas esquecida lá, simplesmente **não tem botão** — sem erro, sem
 > log, e só quem souber o endereço de cor chega nela. É a armadilha #13 do

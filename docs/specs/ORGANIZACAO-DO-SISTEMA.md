@@ -5,8 +5,8 @@ STATUS
 Situação: EM CONSTRUÇÃO · aprovada pelo dono em 10/11/2026
 Criada em: 10/11/2026
 Última atualização: 10/11/2026
-Fase atual: 2 em código (10/11/2026), falta subir
-Fases: 1 ☑  2 ☑  (3 ☐ menu único — ver a divergência D1 abaixo)
+Fase atual: 3 em código (10/11/2026), falta subir · 1 e 2 no ar
+Fases: 1 ☑  2 ☑  3 ☑  (3 ☐ menu único — ver a divergência D1 abaixo)
 Risco: 🟡 (não mexe em estoque, banco, permissão nem em tela; cria regra, mapa e teste)
 Depende de: ACESSO-POR-TELA-E-NIVEL (o mapa de telas, `telas.js`) · NAVEGACAO-E-LINGUAGEM (§20)
 Conferida contra: o `main` de 09/11/2026 (PR #325)
@@ -72,6 +72,23 @@ na 404: nenhuma tela nova. O sob medida ainda usa o rodapé (`tecido/public/nav.
   no "pode seguir":** o `modulo` declarado é o do assunto (o certo), e "fora do
   lugar" é ele diferente do bloco de hoje; a 902 mora em Cadastros, com os
   horários como parte de Administração.
+- **Fase 2 no ar desde 10/11/2026** (PR #328): o dono fez o deploy e disse *"deu
+  tudo certo no deploy"*.
+- **Fase 3 — o menu único (10/11/2026):** o `/api/telas/minhas` devolve cada tela
+  com o módulo do assunto e o bloco, e os módulos em lista na ordem do
+  `modulos.js`; o desenho é um só (`public/menu_telas.js`), carregado pelo `nav.js`
+  das duas operações; o sob medida perdeu o rodapé (NOMES, ORDEM, `rodape()` e o
+  estilo) e ganhou o ☰ Menu na barra de cima. A lista do que está fora do lugar
+  caiu de 34 para 8 (só abas e partes) e o Financeiro foi inaugurado (a 616).
+  **Escolhas confirmadas pelo dono no "pode seguir":** a ordem dos módulos é a da
+  tabela do §4-A; o título do bloco só aparece com telas de mais de um bloco no
+  módulo; a 601 Início fica em Administração. **Fica de fora:** a tela de Acessos
+  (901) continua agrupando pela centena. `teste_menu_unico.js` (26), escrito antes
+  do código, sete defeitos reintroduzidos; `teste_mapa.js` sem mudar o esperado;
+  o `teste_menu.js` mudou o exemplo para o formato novo; o `telas_listas.test.js`
+  do sob medida trocou o caso do rodapé por dois (módulo e bloco em toda tela, e o
+  rodapé que não volta). **Ainda não provado:** as telas abertas com os três
+  perfis num tablet de verdade, na fábrica.
 - **D3 — "Conferida contra o main de 09/11 (PR #325)"**: o `main` andou até o PR
   #326 sem tela nova. Vale a conferência acima.
 

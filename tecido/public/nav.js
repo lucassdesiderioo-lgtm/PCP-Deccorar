@@ -14,24 +14,14 @@
 'use strict';
 
 var BASE='/sobmedida';
-// ⚠️ TELA QUE NAO ESTA NESTES DOIS MAPAS NASCE INVISIVEL. O rodape monta
-// `ORDEM.filter(...)`, entao uma tela declarada em nucleo/telas.js e liberada
-// pela permissao, mas esquecida aqui, simplesmente nao tem botao — sem erro,
-// sem log, e so quem souber o endereco de cor chega nela. E a armadilha #13
-// do CLAUDE.md por mais uma porta: a ponta que some em silencio e sempre a
-// ultima. Tela nova pede a linha aqui, no mesmo commit.
-var NOMES={'/':'Inicio','/bancada':'Bancada','/corte':'Plano de corte','/sobras':'Sobras',
-           '/rolos':'Rolos','/etiquetas':'Etiquetas','/cadastros':'Cadastros',
-           '/painel':'Painel','/simulador':'Simulador','/catalogo':'Catalogo',
-           '/revendas':'Revendas','/pedidos':'Pedidos','/producao':'Produção',
-           '/kanban':'Quadro','/indicadores':'Indicadores',
-           '/financeiro':'Financeiro'};
-// A ordem do rodape segue o FLUXO da bancada, nao o alfabeto: o rolo entra,
-// vira plano de corte, sobra o retalho, a sobra ganha etiqueta.
-var ORDEM=['/','/bancada','/corte','/producao','/rolos','/sobras','/etiquetas','/simulador','/pedidos','/kanban','/indicadores','/revendas','/financeiro','/painel','/cadastros','/catalogo'];
-
+// ⚠️ O RODAPÉ DE ATALHOS SAIU (spec ORGANIZACAO-DO-SISTEMA, fase 3, menu
+// único, 10/11/2026), e com ele as listas NOMES e ORDEM. O sob medida usa o
+// mesmo ☰ Menu da medida padrão: as telas vêm do `/api/telas/minhas` do PCP
+// (as das duas operações, pela mesma conta dos portões) e o desenho é o
+// `/menu_telas.js`, o mesmo arquivo — duas cópias divergiriam. Tela nova do
+// sob medida entra no menu pelo mapa (`nucleo/telas.js`, com módulo e bloco),
+// e não por uma lista daqui.
 var aqui=location.pathname.replace(/\/$/,'')||BASE;
-var rel=aqui.indexOf(BASE)===0 ? (aqui.slice(BASE.length)||'/') : '/';
 
 // ── Ajuste de fonte, so na bancada ────────────────────────────────────────
 // Tres niveis, salvos POR APARELHO: o tablet da bancada pode ficar grande sem
@@ -48,24 +38,21 @@ var FONTE=(function(){
           proximo:function(){ try{ localStorage.setItem('sm_fonte',String((nivel()+1)%3)); }catch(e){} aplicar(); }};
 })();
 
-function elo(caminho,atual){
-  var a=document.createElement('a');
-  a.href=BASE+(caminho==='/'?'':caminho);
-  a.textContent=NOMES[caminho]||caminho;
-  if(caminho===atual) a.setAttribute('aria-current','page');
-  return a;
+// ── O ☰ Menu ──────────────────────────────────────────────────────────────
+var MENU={telas:null, painel:null};
+function desenharMenu(){
+  if(MENU.painel && MENU.telas && typeof MENU_TELAS!=='undefined')
+    MENU.painel.innerHTML=MENU_TELAS.html(MENU.telas, aqui);
 }
-
-function rodape(telas){
-  var bar=document.createElement('nav');
-  bar.className='rodape';
-  bar.setAttribute('aria-label','Atalhos do sob medida');
-  ORDEM.filter(function(c){ return telas.indexOf(c)>=0; })
-       .forEach(function(c){ bar.appendChild(elo(c,rel)); });
-  // A volta para a medida padrao SAIU daqui (spec NAVEGACAO-E-LINGUAGEM,
-  // fase 1): ela apontava para '/', que e o admin, e quem nao tem admin caia
-  // em "sem permissao". Ela mora agora na barra de cima, com destino calculado.
-  document.body.appendChild(bar);
+function carregarMenu(){
+  if(typeof MENU_TELAS==='undefined'){
+    var sc=document.createElement('script'); sc.src='/menu_telas.js'; sc.onload=desenharMenu;
+    document.head.appendChild(sc);
+  }
+  fetch('/api/telas/minhas',{credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){ MENU.telas=d||{}; desenharMenu(); })
+    .catch(function(){ if(MENU.painel) MENU.painel.innerHTML='<div class="mnVazio">Não deu para carregar as telas.</div>'; });
 }
 
 function sessao(eu,dest){
@@ -103,6 +90,12 @@ function sessao(eu,dest){
       headers:{'content-type':'application/json'},body:JSON.stringify({para:'padrao'})}).catch(function(){}); }catch(e){} });
     b.appendChild(at);
   }
+  // O ☰ Menu (menu único): o mesmo da medida padrão, ao lado do "Trocar setor".
+  var bm=document.createElement('button');
+  bm.className='menuBt'; bm.textContent='☰ Menu';
+  bm.setAttribute('aria-expanded','false'); bm.setAttribute('aria-controls','menuTelas');
+  b.appendChild(bm);
+
   var trocar=document.createElement('a');
   trocar.className='trocaOp'; trocar.href='/setor'; trocar.textContent='Trocar setor';
   b.appendChild(trocar);
@@ -118,6 +111,14 @@ function sessao(eu,dest){
   b.appendChild(sair);
 
   document.body.insertBefore(b,document.body.firstChild);
+
+  var pn=document.createElement('nav');
+  pn.id='menuTelas'; pn.className='menuTelas'; pn.setAttribute('aria-label','Telas');
+  pn.style.display='none'; pn.innerHTML='<div class="mnVazio">carregando…</div>';
+  document.body.insertBefore(pn,b.nextSibling||null);
+  MENU.painel=pn;
+  bm.onclick=function(){ var ab=pn.style.display==='none'; pn.style.display=ab?'flex':'none'; bm.setAttribute('aria-expanded',ab?'true':'false'); };
+  desenharMenu();
 }
 
 fetch(BASE+'/api/eu',{credentials:'same-origin'})
@@ -131,7 +132,7 @@ fetch(BASE+'/api/eu',{credentials:'same-origin'})
       .catch(function(){ return {}; })
       .then(function(u){
         sessao(j.dados,(u&&u.destino)||null);
-        rodape(j.dados.telas||[]);
+        carregarMenu();
       });
   })
   .catch(function(){ /* moldura e conforto: a tela funciona sem ela */ });

@@ -10,9 +10,9 @@
  * linha em docs/DECISOES.md. As faixas de 1000 em diante foram confirmadas
  * pelo dono em 10/11/2026.
  *
- * ⚠️ NESTA FASE NADA AQUI MUDA O QUE AS PESSOAS VEEM. O menu ainda agrupa pela
- * centena (`MODULOS`/`moduloDe` do `telas.js`); quem passa a ler daqui é o
- * menu único (fase 3).
+ * ⚠️ O ☰ MENU DAS DUAS OPERAÇÕES LÊ DAQUI (fase 3, menu único): os módulos
+ * na ordem desta lista, e os blocos na ordem de BLOCOS. A tela de Acessos
+ * continua agrupando pela centena (`moduloDe` do `telas.js`).
  */
 
 /* tipo: 'producao' (blocos de operação), 'venda' (blocos de canal), 'misto'
@@ -31,7 +31,7 @@ const MODULOS = [
   { chave:'compras',       nome:'Compras',                    faixa:500,  tipo:'demais',   situacao:'existe' },
   { chave:'cadastros',     nome:'Cadastros',                  faixa:1100, tipo:'producao', situacao:'existe' },
   { chave:'fiscal',        nome:'Fiscal',                     faixa:1300, tipo:'demais',   situacao:'reservado' },
-  { chave:'financeiro',    nome:'Financeiro',                 faixa:1400, tipo:'venda',    situacao:'reservado' },
+  { chave:'financeiro',    nome:'Financeiro',                 faixa:1400, tipo:'venda',    situacao:'existe' },   // inaugurado pela 616 no menu único (10/11/2026)
   { chave:'relatorios',    nome:'Relatórios e indicadores',   faixa:1600, tipo:'misto',    situacao:'existe' },
   { chave:'administracao', nome:'Administração',              faixa:900,  tipo:'demais',   situacao:'existe' },
   { chave:'frota',         nome:'Frota',                      faixa:700,  tipo:'demais',   situacao:'reservado' },
@@ -68,25 +68,19 @@ const NUMEROS_ANTIGOS = [101,102,103,104,105, 201,202,203,204,205,206, 251,252,2
    parte (`501/materiais`, `302/material`): o assunto não é o da tela.
    ⚠️ A LISTA SÓ ENCOLHE: o item arrumado que continua aqui reprova o teste, e
    o fora do lugar que não está aqui também. `spec` diz quem arruma. */
-const MENU = 'MENU-UNICO (fase 3 da ORGANIZACAO-DO-SISTEMA)';
 const FORA_DO_LUGAR = [
-  { item:'103',  spec:MENU },
+  /* ⚠️ DESDE A FASE 3 (menu único, 10/11/2026) NENHUMA TELA ESTÁ AQUI: o menu
+     agrupa pelo módulo do assunto, e as 26 telas que estavam fora do lugar
+     (103, 402–404, 502–504, 902, 904, 905 e as 16 do sob medida) saíram. Ficam
+     as abas e as partes de outro assunto, que só se arrumam movendo-as. */
   { item:'302/material', spec:'ALMOXARIFADO-E-FISCAL' },
-  { item:'402',  spec:MENU }, { item:'403', spec:MENU }, { item:'404', spec:MENU },
-  { item:'502',  spec:MENU }, { item:'503', spec:MENU }, { item:'504', spec:MENU },
-  { item:'902',  spec:MENU }, { item:'902/horarios', spec:'a definir: Parâmetros, em Administração (§4-A da spec)' },
-  { item:'904',  spec:MENU }, { item:'905', spec:MENU },
+  { item:'902/horarios', spec:'a definir: Parâmetros, em Administração (§4-A da spec)' },
   { item:'501/materiais',    spec:'CADASTRO-DE-MATERIAL' },
   { item:'501/fornecedores', spec:'CADASTRO-DE-MATERIAL' },
   { item:'501/almox',        spec:'CADASTRO-DE-MATERIAL' },
   { item:'501/retidos',      spec:'ALMOXARIFADO-E-FISCAL' },
   { item:'501/notas',        spec:'ALMOXARIFADO-E-FISCAL' },
-  { item:'501/certificado',  spec:'ALMOXARIFADO-E-FISCAL' },
-  // as 16 do sob medida: nenhuma aparece hoje no módulo do assunto (o bloco é "Sob medida")
-  { item:'601', spec:MENU }, { item:'602', spec:MENU }, { item:'603', spec:MENU }, { item:'604', spec:MENU },
-  { item:'605', spec:MENU }, { item:'606', spec:MENU }, { item:'607', spec:MENU }, { item:'608', spec:MENU },
-  { item:'609', spec:MENU }, { item:'610', spec:MENU }, { item:'611', spec:MENU }, { item:'612', spec:MENU },
-  { item:'613', spec:MENU }, { item:'614', spec:MENU }, { item:'615', spec:MENU }, { item:'616', spec:MENU }
+  { item:'501/certificado',  spec:'ALMOXARIFADO-E-FISCAL' }
 ];
 
 function porChave(k){ return MODULOS.find(m => m.chave === k) || null; }

@@ -8,8 +8,9 @@
 > ⚠️ **Desde a fase 2 (10/11/2026) o mapa declara o lugar e o `teste_lugar.js`
 > trava** os cartões 01, 02, 04, 05, 06, 07 e 14. A lista dos módulos, os blocos,
 > as faixas, os números antigos e a lista do que está fora do lugar moram no
-> `modulos.js`. **O menu ainda agrupa pela centena** — a troca é a fase 3 (menu
-> único), e é ela que faz as telas saírem da lista do que está fora do lugar.
+> `modulos.js`. **Desde a fase 3 (menu único) o ☰ Menu das duas operações agrupa
+> pelo módulo do assunto** (`teste_menu_unico.js`), e as telas saíram da lista do
+> que está fora do lugar.
 
 ---
 
@@ -20,7 +21,7 @@
 - Por quê:          com a lista aberta, cada spec inventa o lugar onde nasceu (a causa da 501 com dez abas).
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_lugar.js` (módulo fora da lista, faixa ou chave repetida, tela no lugar num módulo reservado)
-- Status:           em código desde 10/11/2026 (fase 2); o menu ainda agrupa pela centena.
+- Status:           no ar desde 10/11/2026 (fase 2, PR #328); desde a fase 3 o ☰ Menu agrupa pelo módulo do assunto.
 - História:         spec `ORGANIZACAO-DO-SISTEMA` §1 e §4-A.
 
 ## B. A regra do lugar
@@ -30,7 +31,7 @@
 - Por quê:          "conforme a gente vai criando as coisas, a gente não está organizando no local correto de cada coisa" (o dono, 10/11/2026).
 - Exceções:         o que já está fora do lugar fica na lista nomeada (R-ORG-14) até a spec que o arruma.
 - Teste que trava:  `teste_lugar.js` (tela sem módulo; o inventário do §5 tela a tela, nas 45 telas e nas duas partes)
-- Status:           em código desde 10/11/2026 (fase 2); o menu ainda agrupa pela centena.
+- Status:           no ar desde 10/11/2026 (fase 2, PR #328); desde a fase 3 o ☰ Menu agrupa pelo módulo do assunto.
 - História:         spec §1.
 
 ### R-ORG-03 · Nenhuma tela nasce solta
@@ -46,7 +47,7 @@
 - Por quê:          a `COMPRAS-E-RECEBIMENTO` pôs material, fornecedor, almoxarifado, retido, nota e certificado como abas da 501.
 - Exceções:         as abas da 501 de hoje, na lista nomeada (R-ORG-14).
 - Teste que trava:  `teste_lugar.js` (aba **declarada** de outro assunto fora da lista; aba registrada no `compras_abas.js` sem declaração no mapa). ⚠️ **Só as abas da 501 estão declaradas e comparadas com o código** (é o que o §9 da spec pede): uma aba nova numa tela que não declara abas (a 401, a 904, a 252) não é vista pelo teste — ali a regra vale pelo 📍 LUGAR do PLANO
-- Status:           em código desde 10/11/2026 (fase 2); o menu ainda agrupa pela centena.
+- Status:           no ar desde 10/11/2026 (fase 2, PR #328); desde a fase 3 o ☰ Menu agrupa pelo módulo do assunto.
 - História:         spec §1 e §5.
 
 ### R-ORG-05 · Dentro do módulo, o segundo nível é o bloco
@@ -54,7 +55,7 @@
 - Por quê:          é assim que o sistema fica um só e as operações continuam separadas.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_lugar.js` (bloco "Revenda" numa tela de Produção reprova)
-- Status:           em código desde 10/11/2026 (fase 2); o menu ainda agrupa pela centena.
+- Status:           no ar desde 10/11/2026 (fase 2, PR #328); desde a fase 3 o ☰ Menu agrupa pelo módulo do assunto.
 - História:         spec §3 e §4-B.
 
 ### R-ORG-06 · O número não muda; tela nova na faixa do módulo
@@ -78,9 +79,9 @@
 ### R-ORG-08 · Um menu só
 - Regra:            as duas operações usam o mesmo ☰ Menu: módulo → bloco → tela com o número. O rodapé do sob medida sai. Cada pessoa continua vendo só o que alcança.
 - Por quê:          hoje parecem dois sistemas.
-- Exceções:         até a fase 3 da spec, o sob medida continua com o rodapé.
-- Teste que trava:  ⚠ sem teste (fase 3); `teste_mapa.js` e `teste_menu.js` provam que ninguém ganha nem perde tela.
-- Status:           decidida em 10/11/2026; não construída.
+- Exceções:         a tela de Acessos (901) continua agrupando pela centena, de propósito (fica para depois).
+- Teste que trava:  `teste_menu_unico.js` (o agrupamento por módulo → bloco, a ordem, o desenho único, o rodapé que não volta e, pessoa a pessoa, as telas iguais às que o portão de cada operação deixa abrir); `teste_mapa.js` prova que ninguém ganha nem perde tela.
+- Status:           em código desde 10/11/2026 (fase 3), falta subir.
 - História:         spec §4-C e STATUS (divergência D1).
 
 ### R-ORG-09 · Um cadastro só por coisa
@@ -130,7 +131,7 @@
 - Por quê:          lista de exceção que só cresce é onde a bagunça volta a entrar.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_lugar.js` (item arrumado esquecido na lista; fora do lugar sem estar na lista; item sem a spec que o arruma)
-- Status:           em código desde 10/11/2026 (`modulos.js`, `FORA_DO_LUGAR`, 34 itens).
+- Status:           em código desde 10/11/2026 (`modulos.js`, `FORA_DO_LUGAR`); com o menu único a lista caiu de 34 para 8 itens (só abas e partes).
 - História:         spec §5.
 
 ### R-ORG-15 · O Decorsoft é referência de organização, não de regra
@@ -145,7 +146,7 @@
 
 ## Regras sem teste
 
-R-ORG-08 (menu único, fase 3), R-ORG-09, 10 e 11 (das specs seguintes). A
+R-ORG-09, 10 e 11 (das specs seguintes). A
 R-ORG-03 e a R-ORG-13 valem pelo papel (a quarta trava da 13 é o
 `teste_lugar.js`); a R-ORG-15 é critério de desenho e não terá teste.
 

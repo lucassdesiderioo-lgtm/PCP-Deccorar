@@ -25,6 +25,7 @@
  */
 const fs = require('fs'), path = require('path');
 const M = require('./telas');
+const MO = require('./modulos');
 
 module.exports = function(app, db){
   const ARQ = path.join(__dirname, 'public', 'index.html');
@@ -38,13 +39,17 @@ module.exports = function(app, db){
     const ac = app.locals.acesso;
     if(!u || !ac) return [];
     const pode = r => { try{ return !!ac.decidir(u, r, 'GET').ok; }catch(e){ return false; } };
-    const lista = M.TELAS.filter(t => pode(t.rota)).map(t => ({ n:t.n, nome:t.nome, rota:t.rota, modulo:M.moduloDe(t.n), aba:t.aba || null }));
+    /* O MENU ÚNICO (spec ORGANIZACAO-DO-SISTEMA, fase 3): cada tela sai com o
+       módulo do ASSUNTO e o bloco declarados no mapa, e não mais pela centena
+       do número (R-ORG-06, R-ORG-08). Quem decide o que entra continua sendo
+       o portão. */
+    const lista = M.TELAS.filter(t => pode(t.rota)).map(t => ({ n:t.n, nome:t.nome, rota:t.rota, modulo:t.modulo, bloco:t.bloco, aba:t.aba || null }));
     /* O sob medida tem portão próprio (tecido/montar.js): a tela aparece para
        quem tem a chave `sobmedida.<permissao>` dela — a mesma que o portão
        de lá pergunta ao `permissoesDe`. */
     try{
       const ag = ac.ehAdminGeral(u.id), perms = ac.permissoesDe(u.id);
-      M.telasSobMedida().forEach(t => { if(ag || t.perms.some(c => perms.has(c))) lista.push({ n:t.n, nome:t.nome, rota:t.rota, modulo:600, aba:null }); });
+      M.telasSobMedida().forEach(t => { if(ag || t.perms.some(c => perms.has(c))) lista.push({ n:t.n, nome:t.nome, rota:t.rota, modulo:t.modulo, bloco:t.bloco, aba:null }); });
     }catch(e){}
     return lista;
   }
@@ -76,7 +81,11 @@ module.exports = function(app, db){
     const u = req.usuario, ac = app.locals.acesso;
     let perms = [], ag = false;
     try{ if(u && ac){ ag = !!ac.ehAdminGeral(u.id); perms = Array.from(ac.permissoesDe(u.id)).sort(); } }catch(e){}
-    res.json({ telas: telasDe(u), rota_da_aba: ROTA_DA_ABA, modulos: M.MODULOS, perms: ag ? [] : perms, admin_geral: ag });
+    /* `modulos` é a lista dos 18, NA ORDEM do menu (a da spec, `modulos.js`);
+       `blocos`, o nome de cada bloco. O desenho é o `public/menu_telas.js`,
+       o mesmo nas duas operações. */
+    res.json({ telas: telasDe(u), rota_da_aba: ROTA_DA_ABA, perms: ag ? [] : perms, admin_geral: ag,
+      modulos: MO.MODULOS.map(m => ({ chave:m.chave, nome:m.nome })), blocos: MO.BLOCOS });
   });
 
   app.locals.telasDe = telasDe;
