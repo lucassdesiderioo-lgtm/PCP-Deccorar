@@ -86,7 +86,8 @@
   .ct th,.ct td{padding:8px 8px}
   .ct td.l,.ct th.l{white-space:normal}
   .ct .cq{font-weight:800;font-size:16px;color:var(--blue);font-variant-numeric:tabular-nums}
-  .ct .cmed{font-weight:700;font-variant-numeric:tabular-nums}
+  .ct .cmed{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .ct details .sub{word-break:break-all}
   .ct .cav{font-size:12px;color:#ffd85c}
   .ct details summary{cursor:pointer;color:var(--muted);font-size:12px}
   .ct .fora{color:var(--muted);font-size:13px}
@@ -101,6 +102,8 @@
     body.imprimirCorte .ct .cbloco{border-color:#999;background:#fff}
     body.imprimirCorte .ct .cq,body.imprimirCorte .ct .cav{color:#000}
     body.imprimirCorte .sub,body.imprimirCorte .dim,body.imprimirCorte .fora{color:#333 !important}
+    body.imprimirCorte .ct b{color:#000 !important}
+    body.imprimirCorte .ct thead th{background:#fff !important;color:#000 !important}
     body.imprimirCorte .aba{display:none !important} body.imprimirCorte #secCorte{display:block !important}
   }
   .apl{background:transparent;color:var(--blue);border:1px solid var(--line);border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}.apl:hover{border-color:var(--blue)}
