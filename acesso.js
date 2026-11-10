@@ -622,8 +622,13 @@ module.exports = function(app, db){
      ação novas aparecem aqui sozinhas, sem setor nenhum marcado (R-TEL-03). */
   function todasAsTelas(){
     const MP = require('./telas');
-    return MP.TELAS.map(t => Object.assign({ modulo:MP.moduloDe(t.n) }, t))
-      .concat(MP.telasSobMedida().map(t => Object.assign({ modulo:600 }, t)));
+    /* A tela de Acessos agrupa pela CENTENA, como o menu de hoje. O mapa ganhou
+       `modulo` (o do assunto, spec ORGANIZACAO-DO-SISTEMA fase 2), e por isso a
+       centena vem POR ÚLTIMO: com ela primeiro, o `modulo` da tela passava por
+       cima e a tela de Acessos quebrava. A troca para o módulo do assunto é do
+       menu único (fase 3). */
+    return MP.TELAS.map(t => Object.assign({}, t, { modulo:MP.moduloDe(t.n) }))
+      .concat(MP.telasSobMedida().map(t => Object.assign({}, t, { modulo:600 })));
   }
   function mapaDeAcessos(){
     const MP = require('./telas');

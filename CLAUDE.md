@@ -3890,7 +3890,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). ~~**Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa~~ — **fechado em 08/11/2026**: a 905 Minha produção e a aba Por pessoa da 904 (§21) · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (306), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (306), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (23); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4963,11 +4963,28 @@ gente vai criando as coisas, a gente não está organizando no local correto de
 cada coisa"*. **A causa é uma só: a tela nascia onde a spec nasceu, e não onde o
 assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 
-> ⚠️ **ATÉ A FASE 2, ISTO É PAPEL.** O menu ainda agrupa pela centena do número
-> (`MODULOS`/`moduloDe` no `telas.js`), nenhuma tela foi movida e o
-> `teste_lugar.js` ainda não existe. O que já vale **desde já** é o bloco 📍
-> LUGAR no PLANO e a linha "Lugar conferido" no FECHAMENTO (§0), e a seção "Onde
-> mora" em toda spec nova (`docs/specs/README.md`, regra 5).
+> ⚠️ **O MAPA JÁ SABE O LUGAR, MAS O MENU AINDA NÃO** (fase 2, 10/11/2026). Toda
+> tela das duas operações declara `modulo` (o do **assunto**), `bloco` e `liga`
+> no `telas.js` e no `tecido/nucleo/telas.js`; as dez abas da 501 e as "partes"
+> da 302 e da 902 também têm módulo. A lista dos 18 módulos, os blocos, as
+> faixas, os números antigos e a lista do que está fora do lugar moram **num
+> lugar só**, o `modulos.js`. **O menu e a tela de Acessos continuam agrupando
+> pela centena** (`moduloDe`): ninguém viu diferença, e o `teste_mapa.js` e o
+> `teste_menu.js` passaram sem mudar o esperado. Quem passa a ler o `modulo` é o
+> menu único (fase 3). Valem também o 📍 LUGAR (§0) e a seção "Onde mora"
+> (`docs/specs/README.md`, regra 5).
+>
+> ⚠️ **NO MAPA, `modulo` É O DO ASSUNTO, NÃO A CENTENA.** Código que copia a linha
+> da tela e põe a centena num campo `modulo` tem que pôr a centena **depois**:
+> `Object.assign({ modulo:centena }, t)` deixava o `modulo` da tela passar por
+> cima, e a tela de Acessos (`acesso.js`, `mapaDeAcessos`) quebrou assim no
+> `teste_acesso.js`. Hoje é `Object.assign({}, t, { modulo:centena })`.
+>
+> ⚠️ **FORA DO LUGAR, POR ENQUANTO, É O MÓDULO DO ASSUNTO DIFERENTE DO BLOCO EM
+> QUE A TELA APARECE HOJE NO MENU** (`moduloHoje`, a centena traduzida). A aba e
+> a parte estão fora quando o assunto delas não é o da tela. Quando o menu passar
+> a agrupar pelo módulo (fase 3), as telas saem da lista `FORA_DO_LUGAR` — e o
+> teste **exige** que saiam: item arrumado que fica na lista reprova.
 
 **A fábrica tem duas operações; a venda tem três canais.**
 
@@ -5000,10 +5017,20 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 | 1700 | Pessoas | reservado |
 | 1800 | Portal da revenda | reservado |
 
-> ⚠️ **AS FAIXAS DE 1000 EM DIANTE SÃO PROPOSTA DA SPEC, A CONFIRMAR PELO DONO**
-> antes de entrarem no código (fase 2). As nove centenas de três dígitos já estão
+> ✅ **AS FAIXAS DE 1000 EM DIANTE FORAM CONFIRMADAS PELO DONO EM 10/11/2026**
+> (linha em `docs/DECISOES.md`): as nove centenas de três dígitos já estavam
 > ocupadas. **Reservado** = está no mapa e só aparece no menu com a primeira tela;
-> a spec que a cria diz que está **inaugurando** o módulo.
+> a spec que a cria diz que está **inaugurando** o módulo — e o `teste_lugar.js`
+> recusa tela **no lugar** dentro de módulo reservado (tem que virar "existe").
+>
+> ⚠️ **RELATÓRIOS ACEITA OS DOIS TIPOS DE BLOCO** (decisão do dono, 10/11/2026,
+> tipo `misto` no `modulos.js`): o relatório de produção sai por operação (905,
+> 607, 615), o de venda por canal. O R-ORG-05 da spec o punha só em canal.
+>
+> ⚠️ **TELA NOVA NASCE NA FAIXA DO MÓDULO DELA, E A LISTA DE NÚMEROS ANTIGOS NÃO
+> CRESCE.** `NUMEROS_ANTIGOS` (os 45 de 10/11/2026 e a 203 vaga) é o que deixa a
+> 402 ficar com o número sendo de Cadastros; o `teste_lugar.js` a compara com a
+> de 10/11/2026.
 
 | Cartão | Regra em uma linha |
 |---|---|
@@ -5022,6 +5049,14 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 | R-ORG-13 | Quatro travas: a conversa, a seção "Onde mora", o 📍 LUGAR e o `teste_lugar.js` |
 | R-ORG-14 | O que está fora do lugar é uma lista nomeada que só encolhe; item arrumado e ainda na lista reprova |
 | R-ORG-15 | O Decorsoft é referência de organização, não de regra |
+
+**Rode `node teste_lugar.js` (23) ao criar tela, aba (inclusive no
+`compras_abas.js`) ou módulo, ou ao mexer no `modulos.js`, no `telas.js` ou no
+`tecido/nucleo/telas.js`.** Nove defeitos foram reintroduzidos um a um, e cada
+um reprova: tela sem módulo (2), módulo inventado (3), aba de outro assunto fora
+da lista (2), aba registrada sem declaração no mapa (1), tela nova na faixa 600
+(3), item arrumado esquecido na lista (2), bloco "Revenda" numa tela de Produção
+(2), a lista de números antigos crescendo (1) e tela nova fora da faixa do módulo (2).
 
 > ⚠️ **O QUE ESTÁ FORA DO LUGAR HOJE, E NÃO É PARA "CONSERTAR" DE PASSAGEM**
 > (R-ORG-14): 103 (→ Comercial · ML), 302 na parte de material (o cartão que leva à

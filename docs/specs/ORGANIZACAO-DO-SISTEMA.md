@@ -5,8 +5,8 @@ STATUS
 Situação: EM CONSTRUÇÃO · aprovada pelo dono em 10/11/2026
 Criada em: 10/11/2026
 Última atualização: 10/11/2026
-Fase atual: 1 feita (papel, 10/11/2026); a 2 espera o dono confirmar as faixas ≥ 1000
-Fases: 1 ☑  2 ☐  (3 ☐ menu único — ver a divergência D1 abaixo)
+Fase atual: 2 em código (10/11/2026), falta subir
+Fases: 1 ☑  2 ☑  (3 ☐ menu único — ver a divergência D1 abaixo)
 Risco: 🟡 (não mexe em estoque, banco, permissão nem em tela; cria regra, mapa e teste)
 Depende de: ACESSO-POR-TELA-E-NIVEL (o mapa de telas, `telas.js`) · NAVEGACAO-E-LINGUAGEM (§20)
 Conferida contra: o `main` de 09/11/2026 (PR #325)
@@ -47,6 +47,25 @@ na 404: nenhuma tela nova. O sob medida ainda usa o rodapé (`tecido/public/nav.
   produto e ficha"; o R-ORG-05 dá o bloco de operação a Cadastros e a **Estoque de
   produto pronto** também. Vale o R-ORG-05 (é a regra; o §3 é a apresentação), e é
   ele que o `CLAUDE.md` §22 e o cartão seguem.
+- **D5 — Relatórios aceita os dois tipos de bloco** (decisão do dono, 10/11/2026,
+  linha em `DECISOES.md`): o R-ORG-05 o punha só em canal, e o §5 punha a 905 em
+  Medida padrão e a 607 e a 615 em Sob medida. Vale o §5; o `modulos.js` tem o
+  tipo `misto`. **As faixas de 1000 a 1800 ficam como o R-ORG-06 propôs** (o
+  dono, 10/11/2026).
+- **Fase 2 (10/11/2026):** `modulos.js` (novo, dono único dos 18 módulos, blocos,
+  faixas, números antigos e da lista do que está fora do lugar — 34 itens);
+  `telas.js` e `tecido/nucleo/telas.js` com `modulo`, `bloco` e `liga` em toda
+  tela, as dez abas da 501 e as partes da 302 (material) e da 902 (horários)
+  declaradas; `moduloHoje` (a centena traduzida, o "bloco de hoje"). O menu e a
+  tela de Acessos **continuam pela centena**; `teste_mapa.js`, `teste_menu.js` e
+  `teste_acesso.js` passaram sem mudar o esperado. **Uma linha do `acesso.js`
+  mudou de ordem** (`mapaDeAcessos`): ela punha a centena antes de copiar a tela,
+  e o `modulo` novo passava por cima — a tela de Acessos quebrava. Comportamento
+  igual ao de antes. `teste_lugar.js` (23), escrito antes do código; nove
+  defeitos reintroduzidos, cada um reprovando. **Escolhas confirmadas pelo dono
+  no "pode seguir":** o `modulo` declarado é o do assunto (o certo), e "fora do
+  lugar" é ele diferente do bloco de hoje; a 902 mora em Cadastros, com os
+  horários como parte de Administração.
 - **D3 — "Conferida contra o main de 09/11 (PR #325)"**: o `main` andou até o PR
   #326 sem tela nova. Vale a conferência acima.
 
