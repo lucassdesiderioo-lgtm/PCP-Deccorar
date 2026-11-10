@@ -72,6 +72,11 @@ Regra de negócio muda? NÃO  |  SIM → antes: … / depois: …
 Como vou testar: …
 Fica de fora: …
 
+📍 LUGAR
+Telas novas: nº · nome · módulo · bloco · liga-se a      (ou "nenhuma")
+Abas novas: tela · aba · mesmo assunto da tela? sim      (ou "nenhuma")
+Módulo novo ou inaugurado: nome                          (ou "nenhum")
+
 🔐 ALÇADA
 Telas novas: nº · nome · módulo · nível        (ou "nenhuma")
 Ações novas: chave · nível · tela · sensível?   (ou "nenhuma")
@@ -83,6 +88,13 @@ Quem recebe: só o Admin Geral, até o dono marcar
 > decisão do dono em 04/11/2026: *"tudo que for novo no sistema, a partir de
 > hoje, tem que ser revisado e entrar no controle de alçadas"*). Tarefa sem nada
 > novo escreve "nenhuma / nenhum" — o bloco vazio é a prova de que alguém olhou.
+
+> ⚠️ **O BLOCO 📍 LUGAR TAMBÉM NUNCA SOME** (R-ORG-13, spec
+> `ORGANIZACAO-DO-SISTEMA`, decisão do dono em 10/11/2026: *"a spec não pode criar
+> uma tela nova do nada"*). Toda tela, aba ou função nova diz o **módulo do
+> assunto** dela (um dos 18 da §22), o **bloco** e a que se liga. Aba de outro
+> assunto é tela. Módulo que não está na lista: **pare e proponha ao dono** —
+> nada se desenha antes da aprovação (R-ORG-03).
 
 4. **✋ Espere o "pode seguir".**
 
@@ -157,6 +169,7 @@ Papel em dia: CLAUDE.md §… · DECISOES.md · spec … · README das specs
 Commit/PR: …   Falta mesclar? …
 Deploy: não precisa  |  precisa → comandos · melhor horário
 Alçada conferida: telas, ações e setores novos com nível e lugar · só o Admin Geral recebe  |  nada novo
+Lugar conferido: cada tela e aba nova no módulo do assunto, com bloco e a que se liga · módulo inaugurado  |  nada novo
 Revisão: quem revisou · N achados → N confirmados (consertados, com o teste) · N descartados (por quê) · N em dúvida  |  🟢, não precisa
 Achei no caminho (não mexi): …
 ```
@@ -4068,6 +4081,12 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Rejeitar o cookie antigo (só com o id) ou pôr `sessao`/`sessao_evento` no
   modo teste: o deploy deslogaria os tablets, e o login em teste é de verdade (§10)
 - ❌ Chamar `getDocument` do pdf.js sem `isEvalSupported:false`, ou rodar `npm audit fix --force` "para zerar o aviso": o force troca o pdfjs para a 6, que muda a leitura do PDF do ML (§12, dívida 22)
+- ❌ Pôr tela nova no módulo da spec que a criou, ou numa faixa que não é a do
+  módulo do assunto dela — e nunca na faixa 600, que está fechada (§22, R-ORG-02 e 06)
+- ❌ Pendurar aba de outro assunto numa tela "para não criar tela nova": aba de
+  outro assunto é tela, no módulo dela (§22, R-ORG-04)
+- ❌ Criar módulo que não está na lista dos 18 sem o dono aprovar antes, ou
+  entregar PLANO sem o bloco 📍 LUGAR (§0, §22, R-ORG-01 e 13)
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor
 - ❌ Criar tabela de equivalências de SKU (decisão explícita do dono)
@@ -4932,3 +4951,91 @@ tela**: os números do resumo são texto montado.
 > de segunda; o crescimento mês a mês com a planilha do ano importada; a 905
 > aberta por alguém da bancada; e o primeiro dia de pendências gravado. Prova
 > que não foi feita se escreve como não feita.
+
+---
+
+## 22. Como o sistema se organiza — módulo, bloco e o lugar de cada tela (10/11/2026)
+
+Spec `docs/specs/ORGANIZACAO-DO-SISTEMA.md`, dez linhas em `docs/DECISOES.md`,
+cartões **R-ORG-01 a R-ORG-15** em
+[`docs/regras/organizacao.md`](docs/regras/organizacao.md). O dono: *"conforme a
+gente vai criando as coisas, a gente não está organizando no local correto de
+cada coisa"*. **A causa é uma só: a tela nascia onde a spec nasceu, e não onde o
+assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
+
+> ⚠️ **ATÉ A FASE 2, ISTO É PAPEL.** O menu ainda agrupa pela centena do número
+> (`MODULOS`/`moduloDe` no `telas.js`), nenhuma tela foi movida e o
+> `teste_lugar.js` ainda não existe. O que já vale **desde já** é o bloco 📍
+> LUGAR no PLANO e a linha "Lugar conferido" no FECHAMENTO (§0), e a seção "Onde
+> mora" em toda spec nova (`docs/specs/README.md`, regra 5).
+
+**A fábrica tem duas operações; a venda tem três canais.**
+
+| | Quais são | Onde aparece |
+|---|---|---|
+| **Operação** | Medida padrão · Sob medida | Produção, Planejamento, Almoxarifado, Estoque de produto pronto, Cadastros |
+| **Canal** | Mercado Livre · Revenda · Consumidor final | Comercial, Financeiro, Pós-venda, Relatórios |
+
+**Os 18 módulos — a lista é fechada (R-ORG-01).** Módulo novo só com o dono.
+
+| Faixa | Módulo | Situação em 10/11/2026 |
+|---|---|---|
+| 100 | Produção | existe |
+| 200 | Expedição | existe |
+| 250 | Pós-venda | existe (hoje "Devoluções") |
+| 300 | Estoque de produto pronto | existe (hoje "Estoque") |
+| 400 | Planejamento | existe |
+| 500 | Compras | existe, carregando o que não é dela |
+| 600 | **fechada** — as 16 telas do sob medida ficam com o número; nenhuma nasce aqui | — |
+| 700 | Frota | reservado |
+| 800 | Mercado Livre (integração) | reservado |
+| 900 | Administração | existe (hoje "Sistema") |
+| 1000 | Comercial | existe em parte (609–611) · consumidor final reservado |
+| 1100 | Cadastros | existe espalhado (402–404, 902, 606/608, abas da 501) |
+| 1200 | Almoxarifado | existe espalhado (502–504, 603–605) |
+| 1300 | Fiscal | reservado · hoje só abas da 501 |
+| 1400 | Financeiro | reservado · hoje só a 616 |
+| 1500 | Instalação e entrega | reservado |
+| 1600 | Relatórios e indicadores | existe (904, 905, 607, 615) |
+| 1700 | Pessoas | reservado |
+| 1800 | Portal da revenda | reservado |
+
+> ⚠️ **AS FAIXAS DE 1000 EM DIANTE SÃO PROPOSTA DA SPEC, A CONFIRMAR PELO DONO**
+> antes de entrarem no código (fase 2). As nove centenas de três dígitos já estão
+> ocupadas. **Reservado** = está no mapa e só aparece no menu com a primeira tela;
+> a spec que a cria diz que está **inaugurando** o módulo.
+
+| Cartão | Regra em uma linha |
+|---|---|
+| R-ORG-01 | A lista de módulos é fechada (18); módulo novo só com o dono e linha em `DECISOES.md` |
+| R-ORG-02 | A tela mora no módulo do **assunto** dela, nunca no da spec que a criou |
+| R-ORG-03 | Nenhuma tela nasce solta: módulo que existe, reservado que se inaugura, ou módulo novo proposto — e aí para |
+| R-ORG-04 | Aba só do mesmo assunto da tela; aba de outro assunto é tela |
+| R-ORG-05 | O segundo nível é o **bloco**: operação (produção), canal (venda) ou Comum |
+| R-ORG-06 | O número não muda (R-TEL-02); tela nova na faixa do módulo; o menu sai do módulo, não da centena |
+| R-ORG-07 | Toda tela declara a que se liga (de que depende e o que alimenta) |
+| R-ORG-08 | Um menu só para as duas operações: módulo → bloco → tela; o rodapé do sob medida sai |
+| R-ORG-09 | Um cadastro só por coisa (material, parceiro, almoxarifado), com a marca da operação |
+| R-ORG-10 | Um saldo só por material; a separação é na ficha, no relatório e no custo |
+| R-ORG-11 | Duas fichas técnicas, um cadastro de material |
+| R-ORG-12 | Dois bancos; o `dados.db` é dono do que é comum, o sob medida lê pela porta; fundir não está decidido |
+| R-ORG-13 | Quatro travas: a conversa, a seção "Onde mora", o 📍 LUGAR e o `teste_lugar.js` |
+| R-ORG-14 | O que está fora do lugar é uma lista nomeada que só encolhe; item arrumado e ainda na lista reprova |
+| R-ORG-15 | O Decorsoft é referência de organização, não de regra |
+
+> ⚠️ **O QUE ESTÁ FORA DO LUGAR HOJE, E NÃO É PARA "CONSERTAR" DE PASSAGEM**
+> (R-ORG-14): 103 (→ Comercial · ML), 302 na parte de material (o cartão que leva à
+> 504 e os ajustes antigos aguardando aprovação), 402/403/404 (→ Cadastros),
+> 502/503/504 (→ Almoxarifado), 902 (listas e kit → Cadastros; horários →
+> Administração), 904 e 905 (→ Relatórios), as seis abas da 501 (Materiais,
+> Fornecedores, Almoxarifados → Cadastros; Recebimento retido → Almoxarifado;
+> Notas e Certificado → Fiscal) e as 16 do sob medida até o menu único. Mover
+> qualquer uma é das specs seguintes (§8 da spec: `CADASTRO-DE-MATERIAL`,
+> `ALMOXARIFADO-E-FISCAL`, `FICHAS-NO-CADASTRO-UNICO`, `FINANCEIRO`), cada uma com
+> conversa própria no Projeto.
+>
+> ⚠️ **"NÃO CRIAR TELA NOVA" DEIXOU DE SER MOTIVO PARA PENDURAR ABA** (R-ORG-04).
+> Foi exatamente o que a `COMPRAS-E-RECEBIMENTO` fez com a 501.
+>
+> ⚠️ **A 204 PENDÊNCIAS FICA EM EXPEDIÇÃO** de propósito: ela junta pendência de
+> vários módulos, e a maior parte das linhas é de lá, até uma spec decidir.

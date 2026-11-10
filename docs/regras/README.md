@@ -11,6 +11,7 @@ que provocou a regra, as datas, as conferências na fábrica — fica em
 | Coleta, carregamento e saída da fábrica | [`carregamento.md`](carregamento.md) | [`historia/carregamento.md`](../historia/carregamento.md) |
 | Sob medida (`/sobmedida`) | [`sobmedida.md`](sobmedida.md) | [`historia/sobmedida.md`](../historia/sobmedida.md) |
 | Compras e Recebimento (501, 502, 503, 504) | [`compras.md`](compras.md) | [`historia/compras.md`](../historia/compras.md) |
+| Como o sistema se organiza: módulos, bloco e o lugar de cada tela | [`organizacao.md`](organizacao.md) | spec [`ORGANIZACAO-DO-SISTEMA`](../specs/ORGANIZACAO-DO-SISTEMA.md) |
 
 As outras áreas continuam no `CLAUDE.md` até serem passadas para cá, uma por vez.
 
