@@ -16,11 +16,11 @@
  *   - aba registrada no `compras_abas.js` sem declaração no mapa (R-ORG-04);
  *   - tela num módulo reservado fora da lista (quem cria inaugura, R-ORG-01).
  *
- * ⚠️ FORA DO LUGAR, NESTA FASE, É O MÓDULO DECLARADO DIFERENTE DO BLOCO EM QUE A
- * TELA APARECE HOJE NO MENU (a centena, `moduloHoje`). A aba e a parte estão
- * fora quando o assunto delas não é o da tela. Quando o menu passar a agrupar
- * pelo módulo (fase 3), as telas saem da lista sozinhas — e o teste exige que
- * saiam (item arrumado esquecido na lista reprova).
+ * ⚠️ FORA DO LUGAR É O MÓDULO DECLARADO DIFERENTE DO MÓDULO EM QUE O MENU MOSTRA A
+ * TELA (`moduloHoje`). Na fase 2 o menu ia pela centena; desde a fase 3 (menu
+ * único) ele vai pelo módulo declarado, e por isso nenhuma tela está mais fora.
+ * A aba e a parte estão fora quando o assunto delas não é o da tela. Item
+ * arrumado esquecido na lista reprova.
  */
 const fs = require('fs'), path = require('path');
 const MO = require('./modulos');
@@ -108,7 +108,7 @@ ok('toda aba e toda parte declarada aponta um módulo da lista', !abaSemModulo.l
 /* ── 7. a lista nomeada do que está fora do lugar (R-ORG-14) ──────────── */
 const foraDeFato = [];
 TODAS.forEach(t => {
-  const hoje = t.sobmedida ? null : M.moduloHoje(t.n);
+  const hoje = M.moduloHoje(t.n);
   if(t.modulo !== hoje) foraDeFato.push(String(t.n));
   (t.abas || []).concat(t.partes || []).forEach(a => { if(a.modulo !== t.modulo) foraDeFato.push(t.n + '/' + a.id); });
 });

@@ -5,8 +5,8 @@ STATUS
 Situação: EM CONSTRUÇÃO · aprovada pelo dono em 10/11/2026
 Criada em: 10/11/2026
 Última atualização: 10/11/2026
-Fase atual: 2 em código (10/11/2026), falta subir
-Fases: 1 ☑  2 ☑  (3 ☐ menu único — ver a divergência D1 abaixo)
+Fase atual: 3 em código (10/11/2026), falta subir · 1 e 2 no ar
+Fases: 1 ☑  2 ☑  3 ☑ (o menu único — a fase 3 veio do prompt do dono, divergência D1 abaixo)
 Risco: 🟡 (não mexe em estoque, banco, permissão nem em tela; cria regra, mapa e teste)
 Depende de: ACESSO-POR-TELA-E-NIVEL (o mapa de telas, `telas.js`) · NAVEGACAO-E-LINGUAGEM (§20)
 Conferida contra: o `main` de 09/11/2026 (PR #325)
@@ -30,9 +30,10 @@ na 404: nenhuma tela nova. O sob medida ainda usa o rodapé (`tecido/public/nav.
   por módulo → bloco). Esta spec diz no §6 que o menu **não** muda e no §8 põe o
   menu na spec própria `MENU-UNICO`. **Vale o prompt do dono, que é posterior:** a
   fase 3 é desta spec, com as regras do prompt (ninguém ganha nem perde tela,
-  `teste_mapa.js` sem mudar o esperado, conferida com três perfis em 1440 px e em
+  `teste_mapa.js` sem mudar o esperado, a conferir com três perfis em 1440 px e em
   tablet). O §6 "Mudar o menu que as pessoas veem hoje" vale para as fases 1 e 2;
-  a `MENU-UNICO` do §8 deixa de ser spec separada. A confirmar no PLANO da fase 3.
+  a `MENU-UNICO` do §8 deixa de ser spec separada. Confirmado no "pode seguir" do
+  PLANO da fase 3 (10/11/2026).
 - **D2 — a 302 Contagem, "a parte de material".** Desde 07/11/2026 (R-CMP-42) a
   contagem de material **não se faz mais** na 302: as rotas antigas respondem 410 e
   material se conta só na 504. O que sobrou de material na 302 é um cartão que
@@ -72,6 +73,30 @@ na 404: nenhuma tela nova. O sob medida ainda usa o rodapé (`tecido/public/nav.
   no "pode seguir":** o `modulo` declarado é o do assunto (o certo), e "fora do
   lugar" é ele diferente do bloco de hoje; a 902 mora em Cadastros, com os
   horários como parte de Administração.
+- **Fase 2 no ar desde 10/11/2026** (PR #328): o dono fez o deploy e disse *"deu
+  tudo certo no deploy"*.
+- **Fase 3 — o menu único (10/11/2026):** o `/api/telas/minhas` devolve cada tela
+  com o módulo do assunto e o bloco, e os módulos em lista na ordem do
+  `modulos.js`; o desenho é um só (`public/menu_telas.js`), carregado pelo `nav.js`
+  das duas operações; o sob medida perdeu o rodapé (NOMES, ORDEM, `rodape()` e o
+  estilo) e ganhou o ☰ Menu na barra de cima. A lista do que está fora do lugar
+  caiu de 34 para 8 (só abas e partes) e o Financeiro foi inaugurado (a 616).
+  **Escolhas confirmadas pelo dono no "pode seguir":** a ordem dos módulos é a da
+  tabela do §4-A; o título do bloco só aparece com telas de mais de um bloco no
+  módulo; a 601 Início fica em Administração. **Fica de fora:** a tela de Acessos
+  (901) continua agrupando pela centena. `teste_menu_unico.js` (27), escrito antes
+  do código, oito defeitos reintroduzidos; `teste_mapa.js` sem mudar o esperado;
+  o `teste_menu.js` mudou o exemplo para o formato novo; o `telas_listas.test.js`
+  do sob medida trocou o caso do rodapé por dois (módulo e bloco em toda tela, e o
+  rodapé que não volta). **Na ③ REVISÃO** o revisor achou o menu perguntando ao
+  sob medida pela chave escrita (`sobmedida.X`), e não pelo portão de lá:
+  quem está só num setor de bancada (que dá a entrada e a bancada pelo SETOR)
+  ficava com o ☰ Menu vazio, e quem tem uma chave solta sem a entrada via
+  telas que o portão nega. Confirmado pelo verificador; o menu passou a usar
+  `daSessaoDoPcp` + `pode`, a conta do portão, e o teste ganhou os cinco setores
+  de bancada e a exceção solta (o banco de exemplo não os tinha). O menu também
+  ganhou a frase quando o `/menu_telas.js` não carrega. **Ainda não provado:**
+  as telas abertas com os três perfis num tablet de verdade, na fábrica.
 - **D3 — "Conferida contra o main de 09/11 (PR #325)"**: o `main` andou até o PR
   #326 sem tela nova. Vale a conferência acima.
 
