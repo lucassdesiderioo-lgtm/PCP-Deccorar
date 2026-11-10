@@ -277,6 +277,16 @@ module.exports = function(app, db){
     catch(e){ console.error(e); res.status(500).json({ erro:String(e.message||e) }); }
   });
 
+  /* A ABA "CORTE E SEPARACAO" (PLANEJAMENTO-CORTE-E-SEPARACAO, 10/11/2026):
+     a falta da "O que produzir" explodida pelas linhas da ficha marcadas "vai
+     para o planejamento da producao". So leitura; cai na linha
+     pre('/api/planejamento') -> @admin, a mesma da 401. A conta e do
+     corte_dominio, que pergunta a falta ao demanda_dominio (#12). */
+  app.get('/api/planejamento/corte',(req,res)=>{
+    try{ res.json(Object.assign({ ok:true }, require('./corte_dominio').lista(db))); }
+    catch(e){ console.error(e); res.status(500).json({ erro:String(e.message||e) }); }
+  });
+
   app.get('/api/planejamento',(req,res)=>{
     const { config, linhas } = calcular();
     let meta = { imp:null, linhas:0, skus:0 };

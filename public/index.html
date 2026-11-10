@@ -897,6 +897,7 @@ function render(){
     h+='<tr class="fxRow" data-id="'+l.id+'" style="cursor:pointer">'
       +'<td><b>'+nome+'</b>'
         +(l.observacao?'<div class="sub">'+esc(l.observacao)+'</div>':'')
+        +(l.planejamento?'<div class="sub" style="color:var(--blue,#4493f8)">📋 vai para o planejamento da produção</div>':'')
         +(cego?'<div class="sub" style="color:var(--amber)">⚠ não olha a bobina</div>':'')+'</td>'
       +'<td class="n">'+(r.erro?'<span style="color:var(--amber)">⚠</span>':qtd(r.quantidade))
         +(r.unidade&&!r.erro?' <span class="sub">'+esc(r.unidade)+'</span>':'')
@@ -949,6 +950,12 @@ function editorHTML(l){
         +'<div><label>Corta a — altura (cm)</label>'
           +'<input id="edCA" placeholder="— sem corte —" value="'+esc(novo?'':l.corte_altura)+'"></div>'
       +'</div>'
+      /* "VAI PARA O PLANEJAMENTO DA PRODUCAO" (PLANEJAMENTO-CORTE-E-SEPARACAO,
+         10/11/2026): a linha marcada entra na aba Corte e separação da 401,
+         pela medida de corte acima. Não muda o custo. */
+      +'<label style="display:flex;gap:8px;align-items:center;margin-top:12px;cursor:pointer">'
+        +'<input type="checkbox" id="edPlan" style="width:20px;height:20px"'+(!novo&&l.planejamento?' checked':'')+'>'
+        +'<span>Vai para o planejamento da produção <span class="sub">— entra na aba Corte e separação do Planejamento</span></span></label>'
       +'<div style="margin-top:12px"><label>Por quê — fica no cadastro</label>'
         +'<input id="edObs" placeholder="a folga de 20 cm é bainha + volta no tubo" value="'+esc(novo?'':l.observacao)+'"></div>'
       +'<div id="edPrev" style="margin-top:10px;font-size:13px;min-height:18px"></div>'
@@ -1085,7 +1092,7 @@ async function salvarEditor(){
   const l=novo?null:FXLINHAS.find(x=>x.id==FXEDIT);
   const corpo={ modelo_id:+$('#fxModelo').value, expressao:$('#edExpr').value.trim(),
     observacao:$('#edObs').value.trim(), corte_largura:$('#edCL').value.trim(),
-    corte_altura:$('#edCA').value.trim() };
+    corte_altura:$('#edCA').value.trim(), planejamento: $('#edPlan').checked };
   if(novo){
     const v=$('#edComp').value;
     if(!v){ aviso('#edMsg','Escolha o material','var(--red)'); return; }

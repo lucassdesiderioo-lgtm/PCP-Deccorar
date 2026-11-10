@@ -78,6 +78,26 @@
   .ord{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
   .ord .est{font-weight:800}.ord .est.lig{color:#7ee2a0}.ord .est.des{color:var(--muted)}
   .subindo{color:#7ee2a0;font-size:11px}
+  /* A ABA "CORTE E SEPARACAO" (PLANEJAMENTO-CORTE-E-SEPARACAO, 10/11/2026) */
+  .ct{margin:0 0 22px}
+  .ct .cbloco{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:12px}
+  .ct .cbloco h2{font-size:15px;margin:0 0 8px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+  .ct table{min-width:0;background:transparent}
+  .ct th,.ct td{padding:8px 8px}
+  .ct td.l,.ct th.l{white-space:normal}
+  .ct .cq{font-weight:800;font-size:16px;color:var(--blue);font-variant-numeric:tabular-nums}
+  .ct .cmed{font-weight:700;font-variant-numeric:tabular-nums}
+  .ct .cav{font-size:12px;color:#ffd85c}
+  .ct details summary{cursor:pointer;color:var(--muted);font-size:12px}
+  .ct .fora{color:var(--muted);font-size:13px}
+  .ct .ctopo{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+  .ct .ctopo button{border:1px solid var(--line);border-radius:9px;padding:10px 16px;font-weight:700;cursor:pointer;background:transparent;color:var(--txt)}
+  @media print{
+    header,.topo,.tabs,#recorte,.ct .ctopo button,.ct details,#sessBar,#menuTelas,#colBar,#colTarefas,#invBar{display:none !important}
+    body{background:#fff;color:#000}.ct .cbloco{border-color:#999;background:#fff}
+    .ct .cq{color:#000}.ct .cav{color:#000}.sub,.dim,.fora{color:#333 !important}
+    .aba{display:none !important} #secCorte{display:block !important}
+  }
   .apl{background:transparent;color:var(--blue);border:1px solid var(--line);border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}.apl:hover{border-color:var(--blue)}
   /* A linha das vendas que sairam da lista por ja ter etiqueta (09/11/2026). */
   .etq{margin:8px 0 10px;padding:9px 12px;border-radius:10px;background:#10251a;border:1px solid #23573a;color:#9be3b4;font-size:13px}
@@ -118,10 +138,11 @@
 
   <!-- AS ABAS (AJUSTE de 08/11/2026): no estilo das Devoluções em andamento.
        Cada aba carrega quando abre; a tela lembra a ultima aberta neste
-       computador, e o endereco aceita #dia, #produzir, #janelas e #comparar. -->
+       computador, e o endereco aceita #dia, #produzir, #corte, #janelas e #comparar. -->
   <div class="tabs" id="tabs">
     <button class="tab" data-t="dia">Vendas por dia</button>
     <button class="tab" data-t="produzir">O que produzir</button>
+    <button class="tab" data-t="corte">Corte e separação</button>
     <button class="tab" data-t="janelas">Médias por janela</button>
     <button class="tab" data-t="comparar">Planilha × sistema</button>
   </div>
@@ -182,6 +203,23 @@
     <br><b style="color:var(--blue)">Como o número sai:</b>
     alvo = ritmo × dias de cobertura, com piso no alvo mínimo — o ritmo é o maior entre a média da janela e a da janela curta.
     &nbsp;·&nbsp; precisa = comprometido (envios futuros da planilha, sem as vendas que já têm etiqueta de venda) + alvo − livre (o estoque menos as peças já em caixa com etiqueta).
+  </div>
+  </section>
+
+  <section id="secCorte" class="aba" style="display:none">
+  <!-- CORTE E SEPARACAO (PLANEJAMENTO-CORTE-E-SEPARACAO, 10/11/2026): a falta
+       da "O que produzir" explodida pelas linhas da ficha tecnica marcadas "vai
+       para o planejamento da producao" (tela 404). So quantidade. A conta e do
+       corte_dominio, que pergunta a falta ao demanda_dominio (#12). -->
+  <div class="ct">
+    <div class="ctopo">
+      <div class="sub" style="flex:1;min-width:240px">A falta da aba <b style="color:#e6edf3">O que produzir</b>
+        (<b id="ctPers" style="color:#e6edf3">—</b> persianas) virada em material, pelo que está marcado
+        <b style="color:#e6edf3">"vai para o planejamento da produção"</b> na ficha técnica (tela 404).
+        A medida é a de <b style="color:#e6edf3">corte</b>, lançada na ficha.</div>
+      <button id="ctImprimir" type="button">Imprimir</button>
+    </div>
+    <div id="ctCorpo"><div class="dim" style="padding:18px">carregando…</div></div>
   </div>
   </section>
 
@@ -552,6 +590,44 @@ $('#ordBtn').addEventListener('click', async function(){
   load();
 });
 
+/* ── CORTE E SEPARACAO (PLANEJAMENTO-CORTE-E-SEPARACAO, 10/11/2026) ──────
+   So desenha: os blocos, as linhas e o que ficou fora vem prontos do
+   corte_dominio. Cada linha abre e mostra de quais SKUs veio. */
+const fmtQ=v=>{ const n=+v||0; return Number.isInteger(n)?String(n):n.toLocaleString('pt-BR',{maximumFractionDigits:2}); };
+async function corte(){
+  const box=$('#ctCorpo');
+  let r; try{ r=await (await fetch('/api/planejamento/corte')).json(); }
+  catch(e){ box.innerHTML='<div class="aviso" style="display:block">Sem conexão — não deu para montar a lista.</div>'; return; }
+  if(!r||r.erro){ box.innerHTML='<div class="aviso" style="display:block">'+esc((r&&r.erro)||'não deu para montar a lista')+'</div>'; return; }
+  $('#ctPers').textContent=r.persianas;
+  let h='';
+  if(r.sem_marcadas)
+    h+='<div class="aviso" style="display:block">Nenhuma linha da ficha técnica está marcada <b>"vai para o planejamento da produção"</b>. '
+      +'Marque na tela <b>404 Ficha técnica</b> o tecido, o tubo, a base, a corrente e o kit, com a medida de corte de cada um.</div>';
+  else if(!r.blocos.length)
+    h+='<div class="dim" style="padding:18px">Nada a produzir agora — a aba <b>O que produzir</b> não tem falta.</div>';
+  for(const b of r.blocos){
+    h+='<div class="cbloco"><h2>'+esc(b.tecido?'Tecido':b.material)
+      +(b.sem_corte?' <span class="cav">⚠ sem medida de corte na ficha</span>':'')+'</h2>'
+      +'<table><thead><tr class="cols"><th class="l">'+(b.tecido?'Tecido':'Material')+'</th><th class="l">Medida de corte</th><th>Quantidade</th></tr></thead><tbody>';
+    for(const l of b.linhas){
+      const det=l.skus.map(k=>esc(k.codigo)+' <b>'+fmtQ(k.qtd)+'</b>').join(' · ');
+      h+='<tr><td class="l"><b>'+esc(l.material)+'</b>'
+        +(l.aviso?'<div class="cav">⚠ '+esc(l.aviso)+'</div>':'')
+        +'<details><summary>de quais SKUs</summary><div class="sub">'+det+'</div></details></td>'
+        +'<td class="l cmed">'+(l.corte?esc(l.corte):'<span class="dim">—</span>')+'</td>'
+        +'<td><span class="cq">'+fmtQ(l.qtd)+'</span> <span class="sub">'+esc(l.unidade==='peça'?(l.qtd===1?'peça':'peças'):l.unidade)+'</span></td></tr>';
+    }
+    h+='</tbody></table></div>';
+  }
+  if(r.fora&&r.fora.length){
+    h+='<div class="cbloco"><h2>Ficou fora da lista <span class="sub">('+r.fora.length+' SKU'+(r.fora.length===1?'':'s')+')</span></h2>'
+      +'<div class="fora">'+r.fora.map(f=>'<div>'+esc(f.codigo)+' · '+fmtQ(f.qtd)+' — '+esc(f.motivo)+'</div>').join('')+'</div></div>';
+  }
+  box.innerHTML=h;
+}
+document.getElementById('ctImprimir').addEventListener('click',function(){ window.print(); });
+
 /* ── AS ABAS (AJUSTE de 08/11/2026) ─────────────────────────────────────
    Uma aba aberta por vez, no estilo das Devoluções em andamento. Cada uma
    carrega o que é dela quando abre (a "O que produzir" é o load(), que também
@@ -561,6 +637,7 @@ $('#ordBtn').addEventListener('click', async function(){
    dia": é a decisão do dia. */
 const ABAS={ dia:{sec:'secDia', carregar:function(){ futuras(); }},
              produzir:{sec:'secProduzir', carregar:function(){ load(); }},
+             corte:{sec:'secCorte', carregar:function(){ corte(); }},
              janelas:{sec:'secJanelas', carregar:function(){ janelas(); }},
              comparar:{sec:'secComparar', carregar:function(){ comparar(); }} };
 let ABA='dia';
@@ -587,6 +664,7 @@ function atualizarSozinha(){
   if(a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && a.type!=='button') return;
   if(ABA==='produzir'){ load(); return; }
   if(ABA==='dia'){ load(); futuras(); }
+  if(ABA==='corte'){ load(); corte(); }
 }
 setInterval(atualizarSozinha, 60000);
 document.getElementById('tabs').addEventListener('click',function(e){

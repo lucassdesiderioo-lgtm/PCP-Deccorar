@@ -112,8 +112,13 @@ function calcularFicha(db, sku){
   const linhas = []; let custo = 0, indefinido = false;
 
   for(const f of formulas){
-    const l = { formula_id:f.id, expressao:f.expressao, observacao:f.observacao };
+    /* `planejamento`: a caixinha "vai para o planejamento da producao" da 404
+       (PLANEJAMENTO-CORTE-E-SEPARACAO). So a aba Corte e separacao le; nao
+       entra em custo. */
+    const l = { formula_id:f.id, expressao:f.expressao, observacao:f.observacao,
+                planejamento: f.planejamento ? 1 : 0 };
     if(f.familia){
+      l.tecido = true;
       const r = resolverTecido(db, f.familia, s.cor_codigo);
       if(r.erro){ l.erro = r.erro; indefinido = true; linhas.push(l); continue; }
       let melhor = null; const opcoes = [];
@@ -129,7 +134,18 @@ function calcularFicha(db, sku){
       }
       if(l.erro){ linhas.push(l); continue; }
       l.opcoes = opcoes;
-      if(!melhor){ l.erro = 'nenhuma bobina desta família tem preço cadastrado'; indefinido = true; linhas.push(l); continue; }
+      if(!melhor){
+        l.erro = 'nenhuma bobina desta família tem preço cadastrado'; indefinido = true;
+        /* Falta de PRECO nao apaga a medida de CORTE (a regra do ramo de baixo,
+           que este ramo nao cumpria): a bancada corta o tecido daquela cor do
+           mesmo jeito. A bobina nao foi escolhida, entao o nome e o das
+           candidatas, e o corte e avaliado na mais estreita. Nada disto soma
+           custo — `componente_id` continua vazio. */
+        l.tecido_sem_preco = { cor:s.cor_codigo, familia:f.familia,
+          nomes: opcoes.map(o => o.nome) };
+        l.corte = medidaDeCorte(f, Object.assign({ largura_bobina:opcoes[0].bobina_cm }, base));
+        linhas.push(l); continue;
+      }
       Object.assign(l, { componente_id:melhor.componente_id, componente_nome:melhor.nome,
         unidade:'m linear', quantidade:melhor.quantidade, preco_unitario:melhor.preco_linear,
         custo:melhor.custo,

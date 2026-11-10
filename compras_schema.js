@@ -570,6 +570,7 @@ function garantirSchemaCompras(db){
       corte_largura TEXT,
       corte_altura  TEXT,
       corte_unidade TEXT,
+      planejamento  INTEGER DEFAULT 0,   -- "vai para o planejamento da producao" (PLANEJAMENTO-CORTE-E-SEPARACAO): so a aba Corte e separacao da 401 le; NAO entra em custo nem compra
       CHECK ( (componente_id IS NULL) <> (familia IS NULL) )
     );
     CREATE INDEX IF NOT EXISTS idx_formula_modelo ON ficha_formula(modelo_id, ordem);
@@ -649,7 +650,11 @@ function garantirSchemaCompras(db){
     }
   }catch(e){ console.log('[compras] migracao do status comprado falhou: ' + e.message); }
   colunas('ficha_formula', [
-    ['corte_largura','TEXT'], ['corte_altura','TEXT'], ['corte_unidade','TEXT']
+    ['corte_largura','TEXT'], ['corte_altura','TEXT'], ['corte_unidade','TEXT'],
+    /* A caixinha "vai para o planejamento da producao" (10/11/2026), no fim,
+       na mesma ordem do CREATE (§17). Nasce 0: nenhuma linha vai para a aba
+       ate uma pessoa marcar na 404. */
+    ['planejamento','INTEGER DEFAULT 0']
   ]);
   /* §8: a contagem de componente usa O MESMO fluxo que ja existe — o operador
      conta, o ajuste fica pendente, o admin aprova. Uma mecanica so no sistema
