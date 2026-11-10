@@ -1,7 +1,7 @@
 # PLANEJAMENTO-CORTE-E-SEPARACAO — a lista do que cortar e separar
 
-> **STATUS · 10/11/2026 — RASCUNHO, esperando a aprovação do dono.** Nada
-> construído. Nasceu da conversa de 10/11/2026: o dono quer, dentro do
+> **STATUS · 10/11/2026 — RASCUNHO, as quatro perguntas respondidas pelo dono;
+> falta o "pode seguir" do plano.** Nada construído. Nasceu da conversa de 10/11/2026: o dono quer, dentro do
 > Planejamento (401), uma aba que transforme "quantas persianas fazer" em
 > "quanto tecido cortar, quantos tubos e bases, quantos kits e correntes".
 > `NOVIDADE` · risco 🟡 (cálculo exibido; não mexe em estoque, saldo, etiqueta
@@ -33,9 +33,9 @@ compra (#12). A aba nova **não tem conta de quantidade própria**.
 | Material | Medida de corte | Agrupa por |
 |---|---|---|
 | **Tecido** | largura **− 3** × altura **+ 15** (cm) | tecido + **cor** + medida de corte |
-| **Tubo** | largura **− 3** | só a medida — **todas as cores juntas** |
-| **Base** | largura **− 3** | só a medida — **todas as cores juntas** |
-| **Kit de comando (corrente)** | altura **− 10** | só a medida |
+| **Tubo** | largura **− 3** | só a medida — **todas as cores juntas** (linha própria) |
+| **Base** | largura **− 3** | só a medida — **todas as cores juntas** (linha própria) |
+| **Kit de comando** (só a corrente) | altura **− 10** | só a medida — escrito *"Kit de comando com 140 cm de altura"* |
 | **Kit de instalação** | um por persiana | o total |
 
 Exemplo do dono: 150×150 branco 30 · cinza 21 · bege 11 →
@@ -44,12 +44,27 @@ Exemplo do dono: 150×150 branco 30 · cinza 21 · bege 11 →
 TECIDO          Blackout branco  147 × 165  = 30
                 Blackout cinza   147 × 165  = 21
                 Blackout bege    147 × 165  = 11
-TUBO E BASE     147 cm                      = 62   (de todas as alturas de 150 de largura)
-CORRENTE        140 cm                      = 62
+TUBO            147 cm                      = 62   (de todas as alturas de 150 de largura)
+BASE            147 cm                      = 62
+KIT DE COMANDO  com 140 cm de altura        = 62
 KIT INSTALAÇÃO                              = 62
 ```
 
-> ⚠️ **ONDE A REGRA MORA: NA FICHA DO MODELO ROLÔ, e não no código.** A
+> ⚠️ **ONDE A REGRA MORA: NA FICHA TÉCNICA, e não no código** (o dono, 10/11/2026:
+> *"sempre é o que está na ficha técnica"*). A aba **lê** a 404; quem lança as
+> medidas de corte é uma pessoa, **pela tela 404** (decisão do dono: sem script).
+> SKU cuja ficha não tem medida de corte aparece em "ficou fora: sem medida de
+> corte na ficha" — nunca some, nunca vira zero.
+>
+> ⚠️ **O NOME DA LINHA NA LISTA TAMBÉM É DA FICHA**: coluna nova
+> `ficha_formula.corte_rotulo` (texto, opcional), editável na 404 ao lado da
+> medida de corte. É ela que faz a linha da corrente sair como *"Kit de
+> comando"*; vazia, a lista usa o nome do material. Sem ela o sistema teria de
+> adivinhar pelo nome do material ("começa com Corrente"), que quebra no dia em
+> que alguém renomeia. Entra no `CREATE` e no `ALTER` guardado do
+> `compras_schema.js` (§17). Só lida pela aba e pela 404; não entra em custo.
+>
+> Antes (texto do rascunho): A
 > `ficha_formula` já tem `corte_largura` e `corte_altura` desde 04/09/2026
 > (armadilha #18), vazias até hoje. A construção lança nelas as expressões
 > acima (`largura - 3`, `altura + 15`, `altura - 10`) nas linhas do tecido, do
@@ -63,13 +78,13 @@ KIT INSTALAÇÃO                              = 62
 > regra do dono: um laço de **altura − 10** de cada lado consome
 > 2 × (altura − 10).
 
-### Divergência com o `CLAUDE.md` §7-B — a confirmar com o dono
+### Divergência com o `CLAUDE.md` §7-B — RESPONDIDA
 
-O §7-B (armadilha #19) escreve a folga do tecido como **+20 de pé** e **+10
-invertida** (a 1,80, cortada deitada). O dono disse em 10/11/2026: **altura +
-15, sempre**. Pergunta da §7: o +15 vale para todas as larguras, inclusive a
-1,80? Aprovada a resposta, ela entra no §7-B e numa linha do `DECISOES.md`, no
-mesmo commit da construção.
+O §7-B (armadilha #19) escrevia a folga do tecido como **+20 de pé** e **+10
+invertida** (a 1,80). O dono, 10/11/2026: **altura + 15 para todas as
+larguras, inclusive a 1,80**. Entra no §7-B e numa linha do `DECISOES.md` no
+commit da construção. A **orientação** (de pé ou deitada na bobina) continua
+sendo decisão de quem corta; muda só a folga da medida de corte.
 
 ## 4. A tela
 
@@ -103,10 +118,16 @@ quantidade") — sem estoque de material, sem custo, sem fornecedor.
   (`GET /api/planejamento/corte`) cai na linha `pre('/api/planejamento')` →
   `@admin`, a mesma da 401.
 - **Setores novos: nenhum.**
-- Lançar as medidas de corte na ficha usa a 404 (`ficha.editar`), que já
-  existe, ou um script com simulação e backup.
+- Lançar as medidas de corte e o rótulo na ficha usa a 404 e a chave que já
+  salva a fórmula da ficha (`modelo.cadastrar`, `POST /api/formulas`).
 
-## 7. Perguntas ao dono
+## 7. Perguntas ao dono — respondidas em 10/11/2026
+
+1. Sim, +15 em todas, inclusive a 1,80. 2. Duas linhas separadas. 3. Só a
+corrente, escrita "Kit de comando com N de altura". 4. Pela tela 404; a aba
+lê sempre o que está na ficha técnica.
+
+O texto original das perguntas:
 
 1. O **+15** da altura do tecido vale para **todas** as larguras, inclusive a
    1,80 (que o §7-B diz ser cortada invertida, com +10)?
@@ -119,8 +140,8 @@ quantidade") — sem estoque de material, sem custo, sem fornecedor.
 
 ## 8. Construção (uma fase só)
 
-1. Script `lancar_corte_ficha.js`: simula e `--aplicar` lança as quatro
-   medidas de corte na ficha do Rolô, com backup; não toca na `expressao`.
+1. Coluna `ficha_formula.corte_rotulo` e o campo dela na 404 (a ficha grava e
+   mostra; não entra em custo). Sem script: as medidas são lançadas pela 404.
 2. `corte_dominio.js` (dono único da lista): lê `aProduzir`, explode a ficha
    pela medida de corte e agrupa. Sem SQL de quantidade próprio.
 3. Rota `GET /api/planejamento/corte` e a aba na 401.
