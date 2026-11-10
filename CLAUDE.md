@@ -664,10 +664,12 @@ Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), as linhas de
   (`modelo.cadastrar`), e campo **ausente não apaga** a marca. O bloco junta
   pelo material, e a ordem dos blocos é a da ficha (a menor `ordem` das linhas
   que o trouxeram), não a da falta.
-  ⚠️ **EM CÓDIGO, AINDA NÃO ESTÁ NO AR** (10/11/2026). Depois do deploy, alguém
-  lança na 404 as medidas de corte e marca as linhas; até lá a aba lista os SKUs
-  em "ficou fora". **AINDA NÃO PROVADO COM DADO REAL:** a lista batendo com o que
-  a bancada corta. Prova que não foi feita se escreve como não feita.
+  ✅ **NO AR DESDE 10/11/2026** (PR #326): o dono fez o deploy e abriu a aba —
+  "0 persianas", a tarja de nenhuma linha marcada e 25 SKUs em "ficou fora",
+  cada um com o motivo, como devia antes da ficha ser preenchida. **FALTA:**
+  lançar na 404 as medidas de corte e marcar as linhas. **AINDA NÃO PROVADO COM
+  DADO REAL:** a lista batendo com o que a bancada corta. Prova que não foi
+  feita se escreve como não feita.
   **Rode `node teste_corte_separacao.js` (32) e `node teste_ficha.js` ao mexer no
   `corte_dominio.js`, na caixinha da ficha ou na aba.** ⚠️ Três coisas que parecem
   bug e não são: o tecido sem preço e sem medida de corte sai **"—"** (indefinido,

@@ -1,7 +1,7 @@
 # PLANEJAMENTO-CORTE-E-SEPARACAO — a lista do que cortar e separar
 
-> **STATUS · 10/11/2026 — EM CÓDIGO, falta subir** (branch
-> `claude/peaceful-mendel-r69tw0`). A aba "Corte e separação" na 401, a caixinha
+> **STATUS · 10/11/2026 — NO AR** (PR #326; o dono fez o deploy e abriu a
+> aba: 0 persianas e 25 SKUs em "ficou fora", como devia antes da ficha). A aba "Corte e separação" na 401, a caixinha
 > "vai para o planejamento da produção" na 404 (`ficha_formula.planejamento`), o
 > `corte_dominio.js` e o `teste_corte_separacao.js` (32). A ③ REVISÃO achou 5
 > defeitos (todos confirmados e consertados, com teste) e o testador de tela 3
@@ -10,7 +10,7 @@
 > cor), consertados. **Mudou na construção, com o dono:** a folga do
 > tecido ficou +15 e **+10 na 1,80** (duas de 165 não cabem na 3,20); o nome na
 > lista é o do cadastro de material; o bloco agrupa pelo material (dois modelos
-> com o mesmo tubo somam). **Falta:** o deploy; lançar na 404 as medidas de
+> com o mesmo tubo somam). **Falta:** lançar na 404 as medidas de
 > corte e marcar as linhas; e a prova com dado real — a lista batendo com o que
 > a bancada corta. `NOVIDADE` · risco 🔴 (uma coluna nova na ficha).
 ---
