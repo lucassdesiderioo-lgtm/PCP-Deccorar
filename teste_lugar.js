@@ -127,15 +127,23 @@ const emReservado = TODAS.filter(t => (MO.porChave(t.modulo) || {}).situacao ===
 ok('tela no lugar num módulo reservado inaugura o módulo (situação "existe")', !emReservado.length, lista(emReservado));
 
 /* ── 9. o inventário da spec §5, tela a tela ──────────────────────────── */
-const INV = {
-  101:['producao','medida_padrao'], 103:['comercial','mercado_livre'], 201:['expedicao','comum'],
-  251:['posvenda','mercado_livre'], 301:['estoque','medida_padrao'], 302:['estoque','medida_padrao'],
-  401:['planejamento','medida_padrao'], 402:['cadastros','medida_padrao'], 404:['cadastros','medida_padrao'],
-  501:['compras','comum'], 502:['almoxarifado','comum'], 504:['almoxarifado','comum'],
-  901:['administracao','comum'], 902:['cadastros','comum'], 904:['relatorios','comum'], 905:['relatorios','medida_padrao'],
-  601:['administracao','comum'], 602:['producao','sob_medida'], 603:['almoxarifado','sob_medida'],
-  606:['cadastros','sob_medida'], 607:['relatorios','sob_medida'], 609:['comercial','revenda'],
-  612:['producao','sob_medida'], 614:['planejamento','sob_medida'], 615:['relatorios','sob_medida'], 616:['financeiro','revenda'] };
+const INV = {   // as 45 telas do §5 da spec, sem faltar nenhuma (③ REVISÃO: eram 26)
+  101:['producao','medida_padrao'], 102:['producao','medida_padrao'], 103:['comercial','mercado_livre'],
+  104:['producao','medida_padrao'], 105:['producao','medida_padrao'],
+  201:['expedicao','comum'], 202:['expedicao','comum'], 204:['expedicao','comum'], 205:['expedicao','comum'], 206:['expedicao','comum'],
+  251:['posvenda','mercado_livre'], 252:['posvenda','mercado_livre'], 253:['posvenda','mercado_livre'],
+  301:['estoque','medida_padrao'], 302:['estoque','medida_padrao'], 303:['estoque','medida_padrao'],
+  401:['planejamento','medida_padrao'], 402:['cadastros','medida_padrao'], 403:['cadastros','medida_padrao'], 404:['cadastros','medida_padrao'],
+  501:['compras','comum'], 502:['almoxarifado','comum'], 503:['almoxarifado','comum'], 504:['almoxarifado','comum'],
+  901:['administracao','comum'], 902:['cadastros','comum'], 903:['administracao','comum'], 904:['relatorios','comum'], 905:['relatorios','medida_padrao'],
+  601:['administracao','comum'], 602:['producao','sob_medida'], 603:['almoxarifado','sob_medida'], 604:['almoxarifado','sob_medida'],
+  605:['almoxarifado','sob_medida'], 606:['cadastros','sob_medida'], 607:['relatorios','sob_medida'], 608:['cadastros','sob_medida'],
+  609:['comercial','revenda'], 610:['comercial','revenda'], 611:['comercial','revenda'], 612:['producao','sob_medida'],
+  613:['producao','sob_medida'], 614:['planejamento','sob_medida'], 615:['relatorios','sob_medida'], 616:['financeiro','revenda'] };
+const semInv = TODAS.filter(t => !INV[t.n]).map(t => t.n), semMapa = Object.keys(INV).filter(k => !NUMS.has(+k));
+ok('o inventário tem as telas do mapa, e só elas (as 45 de 10/11/2026)', !semInv.length && !semMapa.length,
+  (semInv.length ? 'tela nova fora do inventário: ' + lista(semInv) + ' — declare-a no INV com o módulo e o bloco do "Onde mora" da spec dela. ' : '')
+  + (semMapa.length ? 'no inventário e fora do mapa: ' + lista(semMapa) : ''));
 const divergeInv = Object.entries(INV).filter(([num, [mod, bl]]) => {
   const t = TODAS.find(x => x.n === +num); return !t || t.modulo !== mod || t.bloco !== bl;
 }).map(([num]) => num);
@@ -144,6 +152,12 @@ const abaEsperada = { lista:'compras', pedidos:'compras', rapida:'compras', prog
   fornecedores:'cadastros', almox:'cadastros', retidos:'almoxarifado', notas:'fiscal', certificado:'fiscal' };
 const abaDiverge = (t501.abas || []).filter(a => abaEsperada[a.id] !== a.modulo).map(a => a.id);
 ok('as abas da 501 batem com o inventário do §5', !abaDiverge.length, lista(abaDiverge));
+const PARTES = { '302/material':'almoxarifado', '902/horarios':'administracao' };
+const partesMapa = {};
+TODAS.forEach(t => (t.partes || []).forEach(p => { partesMapa[t.n + '/' + p.id] = p.modulo; }));
+const parteDiverge = Object.keys(PARTES).filter(k => partesMapa[k] !== PARTES[k])
+  .concat(Object.keys(partesMapa).filter(k => !PARTES[k]));
+ok('as partes (302/material e 902/horarios) batem com o inventário do §5, e não há outra', !parteDiverge.length, lista(parteDiverge));
 
 console.log('\n' + (n - falhas) + ' ok, ' + falhas + ' falha(s)');
 process.exit(falhas ? 1 : 0);

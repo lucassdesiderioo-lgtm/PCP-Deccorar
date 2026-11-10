@@ -29,7 +29,7 @@
 - Regra:            nunca no módulo da spec que a criou.
 - Por quê:          "conforme a gente vai criando as coisas, a gente não está organizando no local correto de cada coisa" (o dono, 10/11/2026).
 - Exceções:         o que já está fora do lugar fica na lista nomeada (R-ORG-14) até a spec que o arruma.
-- Teste que trava:  `teste_lugar.js` (tela sem módulo; o inventário do §5 tela a tela)
+- Teste que trava:  `teste_lugar.js` (tela sem módulo; o inventário do §5 tela a tela, nas 45 telas e nas duas partes)
 - Status:           em código desde 10/11/2026 (fase 2); o menu ainda agrupa pela centena.
 - História:         spec §1.
 
@@ -45,7 +45,7 @@
 - Regra:            aba de assunto diferente é tela, no módulo dela. "Não criar tela nova" deixa de ser motivo para pendurar aba.
 - Por quê:          a `COMPRAS-E-RECEBIMENTO` pôs material, fornecedor, almoxarifado, retido, nota e certificado como abas da 501.
 - Exceções:         as abas da 501 de hoje, na lista nomeada (R-ORG-14).
-- Teste que trava:  `teste_lugar.js` (aba de outro assunto fora da lista; aba registrada no `compras_abas.js` sem declaração no mapa)
+- Teste que trava:  `teste_lugar.js` (aba **declarada** de outro assunto fora da lista; aba registrada no `compras_abas.js` sem declaração no mapa). ⚠️ **Só as abas da 501 estão declaradas e comparadas com o código** (é o que o §9 da spec pede): uma aba nova numa tela que não declara abas (a 401, a 904, a 252) não é vista pelo teste — ali a regra vale pelo 📍 LUGAR do PLANO
 - Status:           em código desde 10/11/2026 (fase 2); o menu ainda agrupa pela centena.
 - História:         spec §1 e §5.
 

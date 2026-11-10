@@ -59,10 +59,16 @@ na 404: nenhuma tela nova. O sob medida ainda usa o rodapé (`tecido/public/nav.
   declaradas; `moduloHoje` (a centena traduzida, o "bloco de hoje"). O menu e a
   tela de Acessos **continuam pela centena**; `teste_mapa.js`, `teste_menu.js` e
   `teste_acesso.js` passaram sem mudar o esperado. **Uma linha do `acesso.js`
-  mudou de ordem** (`mapaDeAcessos`): ela punha a centena antes de copiar a tela,
+  mudou de ordem** (`todasAsTelas`, usada pelo `mapaDeAcessos` e pela grade): ela punha a centena antes de copiar a tela,
   e o `modulo` novo passava por cima — a tela de Acessos quebrava. Comportamento
-  igual ao de antes. `teste_lugar.js` (23), escrito antes do código; nove
-  defeitos reintroduzidos, cada um reprovando. **Escolhas confirmadas pelo dono
+  igual ao de antes. `teste_lugar.js` (25), escrito antes do código; nove
+  defeitos reintroduzidos, cada um reprovando. **Na ③ REVISÃO** o revisor achou o
+  inventário conferindo 26 das 45 telas e nenhuma parte (confirmado pelo
+  verificador; agora são as 45 e as duas partes, seis mutações reprovando) e o
+  cartão R-ORG-04 prometendo travar aba de qualquer tela (só a 501 é declarada,
+  como o §9 pede; o cartão diz isso agora). ⚠️ O §10 e o §9 deste texto ainda
+  dizem que o teste reprova "aba de outro assunto" sem a ressalva: vale o cartão
+  R-ORG-04 (só as abas declaradas, hoje as da 501). **Escolhas confirmadas pelo dono
   no "pode seguir":** o `modulo` declarado é o do assunto (o certo), e "fora do
   lugar" é ele diferente do bloco de hoje; a 902 mora em Cadastros, com os
   horários como parte de Administração.
