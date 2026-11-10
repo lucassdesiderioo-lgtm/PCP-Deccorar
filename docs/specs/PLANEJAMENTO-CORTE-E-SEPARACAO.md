@@ -5,7 +5,9 @@
 > "vai para o planejamento da produção" na 404 (`ficha_formula.planejamento`), o
 > `corte_dominio.js` e o `teste_corte_separacao.js` (32). A ③ REVISÃO achou 5
 > defeitos (todos confirmados e consertados, com teste) e o testador de tela 3
-> pequenos de tela (consertados). **Mudou na construção, com o dono:** a folga do
+> pequenos de tela (consertados). A 2ª rodada do revisor achou dois detalhes (a ordem
+> dos blocos dependia da ordem da falta; a chave do "de quais SKUs" aberto sem a
+> cor), consertados. **Mudou na construção, com o dono:** a folga do
 > tecido ficou +15 e **+10 na 1,80** (duas de 165 não cabem na 3,20); o nome na
 > lista é o do cadastro de material; o bloco agrupa pelo material (dois modelos
 > com o mesmo tubo somam). **Falta:** o deploy; lançar na 404 as medidas de

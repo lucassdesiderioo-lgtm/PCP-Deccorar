@@ -622,7 +622,7 @@ async function corte(){
       +(b.sem_corte?' <span class="cav">⚠ sem medida de corte na ficha</span>':'')+'</h2>'
       +'<table><thead><tr class="cols"><th class="l">'+(b.tecido?'Tecido':'Material')+'</th><th class="l">Medida de corte</th><th>Quantidade</th></tr></thead><tbody>';
     for(const l of b.linhas){
-      const k=(b.tecido?'tecido':b.material)+'|'+l.material+'|'+(l.corte||'');
+      const k=(b.tecido?'tecido':b.material)+'|'+l.material+'|'+(l.cor||'')+'|'+(l.corte||'');
       const det=l.skus.map(x=>esc(x.codigo)+' <b>'+(x.qtd==null?'—':fmtQ(x.qtd))+'</b>').join(' · ');
       h+='<tr><td class="l"><b>'+esc(l.material)+'</b>'
         +(l.aviso?'<div class="cav">⚠ '+esc(l.aviso)+'</div>':'')

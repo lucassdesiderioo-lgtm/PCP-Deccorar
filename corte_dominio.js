@@ -43,7 +43,9 @@ function lista(db, faltas){
   if(!faltas) faltas = require('./demanda_dominio').aProduzir(db);
   const marcadas = db.prepare('SELECT COUNT(*) n FROM ficha_formula WHERE ativo=1 AND planejamento=1').get().n;
 
-  const blocos = new Map();   // formula_id → bloco
+  const blocos = new Map();   // material (ou 'tecido') → bloco
+  const ordem = {};
+  db.prepare('SELECT id, ordem FROM ficha_formula').all().forEach(r => { ordem[r.id] = r.ordem || 0; });
   const fora = [];
   let persianas = 0;
 
@@ -89,14 +91,15 @@ function lista(db, faltas){
 
       /* ③ REVISAO (R3): o BLOCO e o material (ou "o tecido"), e nao a linha da
          ficha — dois modelos com o mesmo tubo somam num bloco so. A ordem do
-         bloco e a da primeira linha da ficha que o trouxe. */
+         bloco e a MENOR `ordem` entre as linhas da ficha que o trouxeram (2ª
+         rodada da revisao: a "primeira que chegou" dependia da ordem da falta). */
       const chaveBloco = l.tecido ? 'tecido' : ('c' + l.componente_id);
       let b = blocos.get(chaveBloco);
       if(!b){
         b = { formula_id:l.formula_id, tecido:!!l.tecido,
               material: l.tecido ? 'Tecido' : material, linhas:new Map(), sem_corte:false };
         blocos.set(chaveBloco, b);
-      }
+      } else if((ordem[l.formula_id]||0) < (ordem[b.formula_id]||0)) b.formula_id = l.formula_id;
       if(!corte && l.corte && l.corte.erro) aviso = 'medida de corte com erro: ' + l.corte.erro;
       const chave = chaveMat + '#' + (corte || '');
       let li = b.linhas.get(chave);
@@ -136,8 +139,6 @@ function lista(db, faltas){
 
   /* A ordem dos blocos e a da ficha (a `ordem` das linhas), que e a ordem em
      que a bancada trabalha. */
-  const ordem = {};
-  db.prepare('SELECT id, ordem FROM ficha_formula').all().forEach(r => { ordem[r.id] = r.ordem || 0; });
   saida.sort((a, b) => ((ordem[a.formula_id]||0) - (ordem[b.formula_id]||0)) || (a.formula_id - b.formula_id));
 
   return { persianas, blocos:saida, fora, sem_marcadas: marcadas === 0 };

@@ -254,12 +254,16 @@ caso('R2: tecido sem preço E sem medida de corte não vira zero — fica indefi
 caso('R3: o mesmo material em dois modelos soma num bloco só', () => {
   db.prepare("INSERT INTO modelo (id,codigo,nome,exige_medida,sob_medida) VALUES (9,'ROMANA','Romana',1,0)").run();
   db.prepare("INSERT INTO skus (codigo,modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo,tem_ficha) VALUES ('RM150150BEGE',9,150,150,'BEGE','BLACKOUT',1)").run();
-  const id = db.prepare("INSERT INTO ficha_formula (modelo_id,componente_id,expressao,ordem,corte_largura,planejamento) VALUES (9,?, 'largura / 100', 1, 'largura - 3', 1)").run(TUBO).lastInsertRowid;
+  const id = db.prepare("INSERT INTO ficha_formula (modelo_id,componente_id,expressao,ordem,corte_largura,planejamento) VALUES (9,?, 'largura / 100', 9, 'largura - 3', 1)").run(TUBO).lastInsertRowid;
   try{
     const r2 = CORTE.lista(db, [{ codigo:'BK150150BEGE', precisa:5 }, { codigo:'RM150150BEGE', precisa:2 }]);
     const tubos = r2.blocos.filter(b => b.material === 'Tubo 32 mm');
     igual(tubos.length, 1, 'um bloco só de tubo');
     igual(tubos[0].linhas.find(l => l.corte === '147 cm').qtd, 7);
+    /* 2ª rodada: a ordem do bloco é a da ficha, e não a de quem chegou primeiro. */
+    const r3 = CORTE.lista(db, [{ codigo:'RM150150BEGE', precisa:2 }, { codigo:'BK150150BEGE', precisa:5 }]);
+    igual(r3.blocos.map(b => b.tecido ? 'tecido' : b.material), r2.blocos.map(b => b.tecido ? 'tecido' : b.material),
+      'a ordem dos blocos não depende da ordem da falta');
   } finally {
     db.prepare('DELETE FROM ficha_formula WHERE id=?').run(id);
     db.prepare("DELETE FROM skus WHERE codigo='RM150150BEGE'").run();

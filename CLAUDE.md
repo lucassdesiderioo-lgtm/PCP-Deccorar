@@ -648,7 +648,13 @@ Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), as linhas de
   acessório e SKU sem ficha ou sem linha marcada aparecem em "ficou fora", com
   o motivo. Nenhum número em reais. A rota (`GET /api/planejamento/corte`) cai
   em `@admin`, como a 401; a caixinha grava pela rota da fórmula
-  (`modelo.cadastrar`), e campo **ausente não apaga** a marca.
+  (`modelo.cadastrar`), e campo **ausente não apaga** a marca. O bloco junta
+  pelo material, e a ordem dos blocos é a da ficha (a menor `ordem` das linhas
+  que o trouxeram), não a da falta.
+  ⚠️ **EM CÓDIGO, AINDA NÃO ESTÁ NO AR** (10/11/2026). Depois do deploy, alguém
+  lança na 404 as medidas de corte e marca as linhas; até lá a aba lista os SKUs
+  em "ficou fora". **AINDA NÃO PROVADO COM DADO REAL:** a lista batendo com o que
+  a bancada corta. Prova que não foi feita se escreve como não feita.
   **Rode `node teste_corte_separacao.js` (32) e `node teste_ficha.js` ao mexer no
   `corte_dominio.js`, na caixinha da ficha ou na aba.** ⚠️ Três coisas que parecem
   bug e não são: o tecido sem preço e sem medida de corte sai **"—"** (indefinido,
@@ -1482,8 +1488,10 @@ cabem **duas peças por faixa** em qualquer bobina, de qualquer largura.
 > por fora inventa uma fábrica que não existe** — inclusive a minha.
 
 O corte real é `largura − 3` de largura por `altura + folga` de altura, e a
-folga muda com a orientação: **+20 de pé, +10 invertida**. Os 10 cm não são
-economia de tecido — são o que faz `1,60 + 1,60` fechar em 3,20.
+folga muda com a orientação: ~~**+20 de pé, +10 invertida**~~ — **desde
+10/11/2026 é +15, e +10 na 1,80** (bloco logo abaixo; a fórmula "honesta" mais
+adiante usa a folga de antes). Os 10 cm não são economia de tecido — são o que
+faz `1,60 + 1,60` fechar em 3,20.
 
 > ⚠️ **DESDE 10/11/2026 A MEDIDA DE CORTE DO TECIDO É ALTURA + 15, E + 10 NA
 > 1,80** (decisão do dono, linha em `docs/DECISOES.md`, spec
