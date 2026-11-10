@@ -74,6 +74,8 @@ function desenharMenu(){
 (function(){
   if(location.pathname.indexOf('/login')===0 || typeof MENU_TELAS!=='undefined') return;
   var sc=document.createElement('script'); sc.src='/menu_telas.js'; sc.onload=desenharMenu;
+  /* sem o desenho, o menu diz que não carregou — e não fica em "carregando…" para sempre */
+  sc.onerror=function(){ var m=document.getElementById('menuTelas'); if(m) m.innerHTML='<div class="mnVazio">Não deu para carregar o menu. Recarregue a página.</div>'; };
   document.head.appendChild(sc);
 })();
 /* SÓ ESCONDE, NUNCA FORÇA A APARECER: a regra pega o botão cuja marca não

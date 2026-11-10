@@ -44,12 +44,23 @@ module.exports = function(app, db){
        do número (R-ORG-06, R-ORG-08). Quem decide o que entra continua sendo
        o portão. */
     const lista = M.TELAS.filter(t => pode(t.rota)).map(t => ({ n:t.n, nome:t.nome, rota:t.rota, modulo:t.modulo, bloco:t.bloco, aba:t.aba || null }));
-    /* O sob medida tem portão próprio (tecido/montar.js): a tela aparece para
-       quem tem a chave `sobmedida.<permissao>` dela — a mesma que o portão
-       de lá pergunta ao `permissoesDe`. */
+    /* O SOB MEDIDA TEM PORTÃO PRÓPRIO (tecido/montar.js), e o menu pergunta A
+       ELE, pela mesma conta: as chaves do PCP (`permissoesDe`, as que o
+       server.js passa ao portão) viram o usuário de lá (`daSessaoDoPcp`), e
+       cada tela vale pelo `pode` de lá. ⚠️ NÃO É "TEM A CHAVE sobmedida.X":
+       quem está só num setor de bancada recebe a entrada e a bancada PELO
+       SETOR (POR_SETOR), sem a chave escrita, e quem tem uma chave solta sem a
+       entrada não entra. Com a régua da chave, o menu do bancadista vinha
+       vazio — e desde o menu único ele é a navegação do sob medida (③ REVISÃO
+       da fase 3, ORGANIZACAO-DO-SISTEMA). */
     try{
-      const ag = ac.ehAdminGeral(u.id), perms = ac.permissoesDe(u.id);
-      M.telasSobMedida().forEach(t => { if(ag || t.perms.some(c => perms.has(c))) lista.push({ n:t.n, nome:t.nome, rota:t.rota, modulo:t.modulo, bloco:t.bloco, aba:null }); });
+      const SMA = require('./tecido/nucleo/acesso'), SMP = require('./tecido/nucleo/permissoes');
+      const TSM = require('./tecido/nucleo/telas').TELAS;
+      const sm = SMA.daSessaoDoPcp({ id:u.id, nome:u.nome }, Array.from(ac.permissoesDe(u.id)));
+      if(sm) M.telasSobMedida().forEach(t => {
+        const decl = TSM[t.rota.slice('/sobmedida'.length) || '/'];
+        if(decl && SMP.pode(sm, decl.permissao)) lista.push({ n:t.n, nome:t.nome, rota:t.rota, modulo:t.modulo, bloco:t.bloco, aba:null });
+      });
     }catch(e){}
     return lista;
   }

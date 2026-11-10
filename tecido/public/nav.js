@@ -47,6 +47,8 @@ function desenharMenu(){
 function carregarMenu(){
   if(typeof MENU_TELAS==='undefined'){
     var sc=document.createElement('script'); sc.src='/menu_telas.js'; sc.onload=desenharMenu;
+    // sem o desenho, o menu diz que nao carregou — e nao fica em "carregando…" para sempre
+    sc.onerror=function(){ if(MENU.painel) MENU.painel.innerHTML='<div class="mnVazio">Não deu para carregar o menu. Recarregue a página.</div>'; };
     document.head.appendChild(sc);
   }
   fetch('/api/telas/minhas',{credentials:'same-origin'})

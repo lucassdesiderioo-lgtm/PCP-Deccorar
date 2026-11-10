@@ -88,6 +88,27 @@ ok('cada tela do menu sai com o módulo e o bloco declarados no mapa (não a cen
   'erradas: ' + errMod.join(', '));
 
 const ac = B.app.locals.acesso;
+/* OS PERFIS QUE O BANCO DE EXEMPLO NÃO TEM (③ REVISÃO da fase 3): quem está só
+   num dos cinco setores de bancada do sob medida — o portão de lá dá a entrada
+   e a bancada pelo SETOR (POR_SETOR), sem a chave `modulo.entrar` escrita —, e
+   quem tem uma exceção do sob medida sem a entrada, que o portão de lá recusa.
+   Ficam só aqui: o `perfis_acesso.js` é a base do retrato de antes. */
+const sidDe = n => (B.db.prepare('SELECT id FROM setores WHERE nome=?').get(n) || {}).id;
+const extra = (nome, setores, concede, nivel) => {
+  const id = B.db.prepare("INSERT INTO usuarios (nome,pin_hash,salt) VALUES (?,'x','y')").run(nome).lastInsertRowid;
+  setores.forEach(sn => { const sid = sidDe(sn); if(!sid) throw new Error('setor que não existe: ' + sn);
+    B.db.prepare('INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)').run(id, sid); });
+  (concede || []).forEach(c => B.db.prepare('INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,?,1)').run(id, c));
+  if(nivel) B.db.prepare('UPDATE usuarios SET nivel=? WHERE id=?').run(nivel, id);
+  ac.sincronizarAreas(id); B.pessoas.push({ id, nome });
+};
+['Sob medida / Serralheria','Sob medida / Coleção','Sob medida / Montagem','Sob medida / Revisão','Sob medida / Embalagem']
+  .forEach((sn, i) => extra('Banc' + i + ' (' + sn + ')', [sn]));
+extra('Xu (só a exceção painel.ler)', [], ['sobmedida.painel.ler'], 'supervisor');
+extra('Yara (Revisão + a bancada de Serralheria)', ['Operador / Revisão','Sob medida / Serralheria']);
+const banc = minhas(usuario(B.pessoas.find(p => /^Banc0/.test(p.nome))));
+ok('quem só está na bancada de Serralheria vê no menu a 601 e a 613 (o portão de lá as abre pelo setor)',
+  [601, 613].every(x => (banc.telas || []).some(t => t.n === x)), JSON.stringify((banc.telas || []).map(t => t.n)));
 const difPcp = [], difSm = [];
 B.pessoas.forEach(p => {
   const u = usuario(p), out = minhas(u), rotas = new Set((out.telas || []).map(t => t.rota));
