@@ -2,11 +2,11 @@
 
 ```
 STATUS
-Situação: APROVADA pelo dono em 10/11/2026 · nada construído ainda
+Situação: EM CONSTRUÇÃO · aprovada pelo dono em 10/11/2026
 Criada em: 10/11/2026
 Última atualização: 10/11/2026
-Fase atual: PLANO da fase 1 entregue, esperando o "pode seguir"
-Fases: 1 ☐  2 ☐  (3 ☐ menu único — ver a divergência D1 abaixo)
+Fase atual: 1 feita (papel, 10/11/2026); a 2 espera o dono confirmar as faixas ≥ 1000
+Fases: 1 ☑  2 ☐  (3 ☐ menu único — ver a divergência D1 abaixo)
 Risco: 🟡 (não mexe em estoque, banco, permissão nem em tela; cria regra, mapa e teste)
 Depende de: ACESSO-POR-TELA-E-NIVEL (o mapa de telas, `telas.js`) · NAVEGACAO-E-LINGUAGEM (§20)
 Conferida contra: o `main` de 09/11/2026 (PR #325)
@@ -39,6 +39,14 @@ na 404: nenhuma tela nova. O sob medida ainda usa o rodapé (`tecido/public/nav.
   aponta para a 504 e a lista "Ajustes aguardando aprovação" das contagens antigas
   (`/api/contagem/pendentes`). O ↗ continua valendo, mas é **isso** que está fora
   do lugar, e não uma contagem.
+- **Fase 1 (10/11/2026):** `CLAUDE.md` §22 (nova) e §0 (📍 LUGAR no PLANO,
+  "Lugar conferido" no FECHAMENTO) e três itens no §15; `docs/regras/organizacao.md`
+  com os cartões R-ORG-01 a 15 (sem teste até a fase 2, e dizendo isso);
+  `docs/specs/README.md` regra 5 ("Onde mora"). Nenhum código.
+- **D4 — o §3 contra o R-ORG-05.** A tabela do §3 põe a operação em "Cadastros de
+  produto e ficha"; o R-ORG-05 dá o bloco de operação a Cadastros e a **Estoque de
+  produto pronto** também. Vale o R-ORG-05 (é a regra; o §3 é a apresentação), e é
+  ele que o `CLAUDE.md` §22 e o cartão seguem.
 - **D3 — "Conferida contra o main de 09/11 (PR #325)"**: o `main` andou até o PR
   #326 sem tela nova. Vale a conferência acima.
 
