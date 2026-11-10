@@ -5,10 +5,11 @@
 > [`ORGANIZACAO-DO-SISTEMA`](../specs/ORGANIZACAO-DO-SISTEMA.md); o resumo está no
 > `CLAUDE.md` §22. Formato do cartão: [`README.md`](README.md).
 >
-> ⚠️ **Até a fase 2 da spec, estas regras valem pelo papel**: o PLANO (📍 LUGAR),
-> o FECHAMENTO ("Lugar conferido") e a seção "Onde mora" das specs. O
-> `teste_lugar.js` que vai travá-las é escrito na fase 2, antes do código; até lá
-> os cartões dizem "⚠ sem teste (a escrever na fase 2)".
+> ⚠️ **Desde a fase 2 (10/11/2026) o mapa declara o lugar e o `teste_lugar.js`
+> trava** os cartões 01, 02, 04, 05, 06, 07 e 14. A lista dos módulos, os blocos,
+> as faixas, os números antigos e a lista do que está fora do lugar moram no
+> `modulos.js`. **O menu ainda agrupa pela centena** — a troca é a fase 3 (menu
+> único), e é ela que faz as telas saírem da lista do que está fora do lugar.
 
 ---
 
@@ -18,8 +19,8 @@
 - Regra:            são dezoito: Comercial · Portal da revenda · Planejamento · Produção · Expedição · Instalação e entrega · Pós-venda · Estoque de produto pronto · Almoxarifado · Compras · Cadastros · Fiscal · Financeiro · Relatórios e indicadores · Administração · Frota · Mercado Livre (integração) · Pessoas. Módulo novo só entra com aprovação do dono e linha em `docs/DECISOES.md`. Módulo **reservado** está no mapa e só aparece no menu quando tiver a primeira tela; a spec que cria essa tela diz que está inaugurando.
 - Por quê:          com a lista aberta, cada spec inventa o lugar onde nasceu (a causa da 501 com dez abas).
 - Exceções:         nenhuma.
-- Teste que trava:  ⚠ sem teste (a escrever na fase 2: `teste_lugar.js` — módulo fora da lista reprova).
-- Status:           decidida em 10/11/2026; no papel.
+- Teste que trava:  `teste_lugar.js` (módulo fora da lista, faixa ou chave repetida, tela no lugar num módulo reservado)
+- Status:           em código desde 10/11/2026 (fase 2); o menu ainda agrupa pela centena.
 - História:         spec `ORGANIZACAO-DO-SISTEMA` §1 e §4-A.
 
 ## B. A regra do lugar
@@ -28,8 +29,8 @@
 - Regra:            nunca no módulo da spec que a criou.
 - Por quê:          "conforme a gente vai criando as coisas, a gente não está organizando no local correto de cada coisa" (o dono, 10/11/2026).
 - Exceções:         o que já está fora do lugar fica na lista nomeada (R-ORG-14) até a spec que o arruma.
-- Teste que trava:  ⚠ sem teste (a escrever na fase 2: tela sem módulo reprova).
-- Status:           decidida em 10/11/2026; no papel.
+- Teste que trava:  `teste_lugar.js` (tela sem módulo; o inventário do §5 tela a tela, nas 45 telas e nas duas partes)
+- Status:           em código desde 10/11/2026 (fase 2); o menu ainda agrupa pela centena.
 - História:         spec §1.
 
 ### R-ORG-03 · Nenhuma tela nasce solta
@@ -44,32 +45,32 @@
 - Regra:            aba de assunto diferente é tela, no módulo dela. "Não criar tela nova" deixa de ser motivo para pendurar aba.
 - Por quê:          a `COMPRAS-E-RECEBIMENTO` pôs material, fornecedor, almoxarifado, retido, nota e certificado como abas da 501.
 - Exceções:         as abas da 501 de hoje, na lista nomeada (R-ORG-14).
-- Teste que trava:  ⚠ sem teste (a escrever na fase 2: aba de outro assunto fora da lista reprova).
-- Status:           decidida em 10/11/2026; no papel.
+- Teste que trava:  `teste_lugar.js` (aba **declarada** de outro assunto fora da lista; aba registrada no `compras_abas.js` sem declaração no mapa). ⚠️ **Só as abas da 501 estão declaradas e comparadas com o código** (é o que o §9 da spec pede): uma aba nova numa tela que não declara abas (a 401, a 904, a 252) não é vista pelo teste — ali a regra vale pelo 📍 LUGAR do PLANO
+- Status:           em código desde 10/11/2026 (fase 2); o menu ainda agrupa pela centena.
 - História:         spec §1 e §5.
 
 ### R-ORG-05 · Dentro do módulo, o segundo nível é o bloco
-- Regra:            módulo de produção (Produção, Planejamento, Almoxarifado, Estoque de produto pronto, Cadastros): Medida padrão · Sob medida · Comum. Módulo de venda (Comercial, Financeiro, Pós-venda, Relatórios e indicadores): Mercado Livre · Revenda · Consumidor final · Comum. Os demais: Comum.
+- Regra:            módulo de produção (Produção, Planejamento, Almoxarifado, Estoque de produto pronto, Cadastros): Medida padrão · Sob medida · Comum. Módulo de venda (Comercial, Financeiro, Pós-venda): Mercado Livre · Revenda · Consumidor final · Comum. **Relatórios e indicadores aceita os dois** (decisão do dono, 10/11/2026): o de produção por operação, o de venda por canal. Os demais: Comum.
 - Por quê:          é assim que o sistema fica um só e as operações continuam separadas.
 - Exceções:         nenhuma.
-- Teste que trava:  ⚠ sem teste (a escrever na fase 2: bloco "Revenda" numa tela de Produção reprova).
-- Status:           decidida em 10/11/2026; no papel.
+- Teste que trava:  `teste_lugar.js` (bloco "Revenda" numa tela de Produção reprova)
+- Status:           em código desde 10/11/2026 (fase 2); o menu ainda agrupa pela centena.
 - História:         spec §3 e §4-B.
 
 ### R-ORG-06 · O número não muda; tela nova na faixa do módulo
 - Regra:            o número da tela continua não mudando nem se reaproveitando (R-TEL-02). O bloco do menu deixa de sair da centena e passa a sair do módulo declarado. Faixas: 100 Produção · 200 Expedição · 250 Pós-venda · 300 Estoque de produto pronto · 400 Planejamento · 500 Compras · 600 **fechada** · 700 Frota · 800 Mercado Livre · 900 Administração · 1000 Comercial · 1100 Cadastros · 1200 Almoxarifado · 1300 Fiscal · 1400 Financeiro · 1500 Instalação e entrega · 1600 Relatórios e indicadores · 1700 Pessoas · 1800 Portal da revenda.
 - Por quê:          "libera a 204" continua sem ambiguidade, e o número passa a dizer o módulo da tela nova.
-- Exceções:         as faixas de 1000 em diante são proposta da spec, **a confirmar pelo dono** antes da fase 2.
-- Teste que trava:  ⚠ sem teste (a escrever na fase 2: tela nova na faixa 600 reprova). O número que não muda já é do `teste_mapa.js`.
-- Status:           decidida em 10/11/2026 (faixas ≥ 1000 a confirmar); no papel.
+- Exceções:         a tela com número de antes de 10/11/2026 (`NUMEROS_ANTIGOS`) fica com ele, mesmo fora da faixa do módulo. As faixas de 1000 em diante foram confirmadas pelo dono em 10/11/2026.
+- Teste que trava:  `teste_lugar.js` (tela nova na faixa 600, tela nova fora da faixa do módulo, a lista de números antigos crescendo). O número que não muda é do `teste_mapa.js`.
+- Status:           em código desde 10/11/2026 (`modulos.js`).
 - História:         spec §4-B.
 
 ### R-ORG-07 · Toda tela declara a que se liga
 - Regra:            no mapa, cada tela lista as telas ou os cadastros de que depende e os que ela alimenta (`liga`).
 - Por quê:          mostra, antes de construir, o que quebra se mexer.
 - Exceções:         nenhuma.
-- Teste que trava:  ⚠ sem teste (a escrever na fase 2).
-- Status:           decidida em 10/11/2026; no papel.
+- Teste que trava:  `teste_lugar.js` (tela sem `liga`, ou ligada a número que não existe)
+- Status:           no mapa desde 10/11/2026 (fase 2); as ligações foram lidas do código e esperam a conferência do dono.
 - História:         spec §4-B.
 
 ## C. Um sistema só
@@ -128,8 +129,8 @@
 - Regra:            o teste conhece, uma a uma, as telas e abas que hoje moram no módulo errado (§5 da spec): elas passam; qualquer outra reprova. Item arrumado que continua na lista **também reprova**.
 - Por quê:          lista de exceção que só cresce é onde a bagunça volta a entrar.
 - Exceções:         nenhuma.
-- Teste que trava:  ⚠ sem teste (a escrever na fase 2: item arrumado esquecido na lista reprova).
-- Status:           decidida em 10/11/2026; a lista está no §5 da spec e no `CLAUDE.md` §22.
+- Teste que trava:  `teste_lugar.js` (item arrumado esquecido na lista; fora do lugar sem estar na lista; item sem a spec que o arruma)
+- Status:           em código desde 10/11/2026 (`modulos.js`, `FORA_DO_LUGAR`, 34 itens).
 - História:         spec §5.
 
 ### R-ORG-15 · O Decorsoft é referência de organização, não de regra
@@ -144,8 +145,9 @@
 
 ## Regras sem teste
 
-Todas, menos a R-ORG-12, até a fase 2 da spec (`teste_lugar.js`). A R-ORG-13
-vale pelo papel; a R-ORG-15 é critério de desenho e não terá teste.
+R-ORG-08 (menu único, fase 3), R-ORG-09, 10 e 11 (das specs seguintes). A
+R-ORG-03 e a R-ORG-13 valem pelo papel (a quarta trava da 13 é o
+`teste_lugar.js`); a R-ORG-15 é critério de desenho e não terá teste.
 
 ## O que NÃO fazer
 
