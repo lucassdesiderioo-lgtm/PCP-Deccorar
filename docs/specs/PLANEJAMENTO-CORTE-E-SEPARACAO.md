@@ -1,15 +1,16 @@
 # PLANEJAMENTO-CORTE-E-SEPARACAO — a lista do que cortar e separar
 
-> **STATUS · 10/11/2026 — RASCUNHO (2ª versão), perguntas respondidas, esperando o
-> "pode seguir" do dono.** Nada construído. Nasceu da conversa de 10/11/2026: o dono quer, dentro
-> do Planejamento (401), uma aba que transforme "quantas persianas fazer" em
-> "quanto tecido cortar, quantos tubos, bases, kits de comando e de instalação".
-> A 2ª versão segue a ideia do dono: **a ficha técnica ganha uma caixinha "vai
-> para o planejamento da produção"**, e a aba lista o que estiver marcado. Sai a
-> coluna de rótulo da 1ª versão.
-> `NOVIDADE` · risco 🔴 (uma coluna nova na ficha — schema); não mexe em
-> estoque, saldo, custo, etiqueta nem permissão.
-
+> **STATUS · 10/11/2026 — EM CÓDIGO, falta subir** (branch
+> `claude/peaceful-mendel-r69tw0`). A aba "Corte e separação" na 401, a caixinha
+> "vai para o planejamento da produção" na 404 (`ficha_formula.planejamento`), o
+> `corte_dominio.js` e o `teste_corte_separacao.js` (32). A ③ REVISÃO achou 5
+> defeitos (todos confirmados e consertados, com teste) e o testador de tela 3
+> pequenos de tela (consertados). **Mudou na construção, com o dono:** a folga do
+> tecido ficou +15 e **+10 na 1,80** (duas de 165 não cabem na 3,20); o nome na
+> lista é o do cadastro de material; o bloco agrupa pelo material (dois modelos
+> com o mesmo tubo somam). **Falta:** o deploy; lançar na 404 as medidas de
+> corte e marcar as linhas; e a prova com dado real — a lista batendo com o que
+> a bancada corta. `NOVIDADE` · risco 🔴 (uma coluna nova na ficha).
 ---
 
 ## 1. O problema
