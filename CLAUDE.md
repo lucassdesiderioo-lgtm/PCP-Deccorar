@@ -1478,14 +1478,14 @@ O corte real é `largura − 3` de largura por `altura + folga` de altura, e a
 folga muda com a orientação: **+20 de pé, +10 invertida**. Os 10 cm não são
 economia de tecido — são o que faz `1,60 + 1,60` fechar em 3,20.
 
-> ⚠️ **DESDE 10/11/2026 A MEDIDA DE CORTE DO TECIDO É ALTURA + 15, EM TODAS AS
-> LARGURAS, INCLUSIVE A 1,80** (decisão do dono, linha em `docs/DECISOES.md`,
-> spec `PLANEJAMENTO-CORTE-E-SEPARACAO`). O parágrafo acima é a história de
-> como a conta foi feita em 04/09/2026. A folga mora na **ficha** (a
-> `corte_altura` da linha do tecido, tela 404), e não no código. ⚠️ Conta que
-> ficou anotada para o dono: a 1,80 × 1,50 deitada com +15 dá 165 cm por peça,
-> e duas (330) não cabem na bobina de 3,20 — a orientação continua sendo
-> decisão de quem corta. A `expressao` do consumo (`/200`) não mudou.
+> ⚠️ **DESDE 10/11/2026 A MEDIDA DE CORTE DO TECIDO É ALTURA + 15, E + 10 NA
+> 1,80** (decisão do dono, linha em `docs/DECISOES.md`, spec
+> `PLANEJAMENTO-CORTE-E-SEPARACAO`; ele primeiro disse "+15 em todas" e, avisado
+> de que duas peças de 165 não cabem na bobina de 3,20, manteve o +10 da 1,80).
+> A folga mora na **ficha** (a `corte_altura` da linha do tecido, tela 404), e
+> não no código — numa expressão só: `altura + 15 - 5 * piso(largura / 180)`
+> (travada no `teste_corte_separacao.js`). A `expressao` do consumo (`/200`) não
+> mudou.
 
 Contra o corte de pé, que é o que a fábrica faz em seis das sete larguras:
 
@@ -1712,7 +1712,7 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 | `componente` é **provisória** | O dono é `PRODUCAO-MONTAGEM.md` §6, não implementado. O que faltar entra por `ALTER`, nunca recriando |
 | Não segue a forma do `ARQUITETURA-ALVO.md` | O `COMPRAS.md` §11 manda `dominio/ dados/ rotas/`. Foi construído no padrão atual do projeto — o documento não estava no repositório (hoje está em `docs/specs/ARQUITETURA-ALVO.md`) |
 | Fórmula do tecido | ~~As oito medidas da planilha fecham em 6 de 8~~ — a fórmula passou a usar `largura_bobina` em 04/09/2026 (armadilha #19). O que sobra: **quando** o corte é encaixado e quando é sozinho ainda é decisão de quem produz, e a ficha guarda uma das duas |
-| Medida de corte sem valor lançado | A `ficha_formula` já tem `corte_largura`/`corte_altura` (armadilha #18), mas as folgas reais — tubo, base redonda, tecido — ainda não foram preenchidas. Enquanto forem vazias a coluna "corta a" mostra traço, que é resposta e não erro. **Desde 10/11/2026 o dono deu as medidas** (tecido largura − 3 × altura + 15; tubo e base largura − 3; corrente altura − 10) **e elas são lançadas pela 404**, junto com a caixinha "vai para o planejamento da produção" — enquanto não forem, a aba Corte e separação da 401 lista os SKUs em "ficou fora" |
+| Medida de corte sem valor lançado | A `ficha_formula` já tem `corte_largura`/`corte_altura` (armadilha #18), mas as folgas reais — tubo, base redonda, tecido — ainda não foram preenchidas. Enquanto forem vazias a coluna "corta a" mostra traço, que é resposta e não erro. **Desde 10/11/2026 o dono deu as medidas** (tecido largura − 3 × altura + 15, e + 10 na 1,80; tubo e base largura − 3; corrente altura − 10) **e elas são lançadas pela 404**, junto com a caixinha "vai para o planejamento da produção" — enquanto não forem, a aba Corte e separação da 401 lista os SKUs em "ficou fora" |
 | Mínimos são placeholder | Foram semeados com um valor padrão ("depois eu edito"). Enquanto forem, o gatilho 1 vence quase sempre e a demanda quase não aparece na lista — não é bug da fase 6, é dado a revisar |
 | Modelo ACESSORIO sem ficha | Os dois kits têm venda e nenhuma linha de ficha. Ou lançam ficha, ou viram `tem_ficha=0` (revenda) com custo direto |
 

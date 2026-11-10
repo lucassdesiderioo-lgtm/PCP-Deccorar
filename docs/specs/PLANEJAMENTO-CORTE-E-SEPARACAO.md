@@ -71,7 +71,7 @@ corte, é a fórmula da linha × persianas, na unidade dela (kit `1` → 62 kits
 
 | Linha | Medida de corte |
 |---|---|
-| Tecido | largura **− 3** × altura **+ 15** (todas as larguras, inclusive a 1,80) |
+| Tecido | largura **− 3** × altura **+ 15**, e **+ 10 na 1,80** — na ficha: `altura + 15 - 5 * piso(largura / 180)` |
 | Tubo | largura **− 3** |
 | Base | largura **− 3** |
 | Kit de comando (corrente) | altura **− 10** |
@@ -102,8 +102,9 @@ TECIDO     Blackout branco               147 × 165 cm   30
 ### Muda o `CLAUDE.md` §7-B
 
 O §7-B (armadilha #19) escrevia a folga do tecido como **+20 de pé** e **+10
-deitada** (a 1,80). O dono, 10/11/2026: **altura + 15 em todas, inclusive a
-1,80**. Entra no §7-B e numa linha do `DECISOES.md` no commit da construção. A
+deitada** (a 1,80). O dono, 10/11/2026: **altura + 15, e + 10 na 1,80** (primeiro
+disse "+15 em todas"; avisado de que duas peças de 165 não cabem na bobina de
+3,20, manteve o +10 da 1,80). Entra no §7-B e numa linha do `DECISOES.md` no commit da construção. A
 **orientação** na bobina continua sendo decisão de quem corta.
 
 ## 4. A tela

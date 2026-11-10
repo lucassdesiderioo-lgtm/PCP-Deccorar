@@ -223,6 +223,20 @@ caso('o corte_dominio não tem SQL de quantidade própria (não lê venda nem sa
     'corte_dominio lê venda ou saldo por conta própria');
 });
 
+caso('a folga do dono numa expressão só: +15, e +10 na 1,80 (10/11/2026)', () => {
+  const EXPR = 'altura + 15 - 5 * piso(largura / 180)';
+  db.prepare("INSERT INTO skus (codigo,modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo,tem_ficha) VALUES ('BK180150BEGE',1,180,150,'BEGE','BLACKOUT',1)").run();
+  db.prepare('UPDATE ficha_formula SET corte_altura=? WHERE id=?').run(EXPR, F_TEC);
+  try{
+    const r2 = CORTE.lista(db, [{ codigo:'BK150150BEGE', precisa:3 }, { codigo:'BK180150BEGE', precisa:2 }]);
+    const tec = r2.blocos.find(b => b.tecido);
+    igual(tec.linhas.map(l => l.corte + '=' + l.qtd), ['147 × 165 cm=3', '177 × 160 cm=2']);
+  } finally {
+    db.prepare("UPDATE ficha_formula SET corte_altura='altura + 15' WHERE id=?").run(F_TEC);
+    db.prepare("DELETE FROM skus WHERE codigo='BK180150BEGE'").run();
+  }
+});
+
 /* ── A ROTA DA FICHA GRAVA A CAIXINHA, E AUSENTE NÃO APAGA ───────────────── */
 function rotaFicha(){
   const rotas = {};
