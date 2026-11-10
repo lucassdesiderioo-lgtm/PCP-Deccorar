@@ -8,9 +8,9 @@
 > ⚠️ **Desde a fase 2 (10/11/2026) o mapa declara o lugar e o `teste_lugar.js`
 > trava** os cartões 01, 02, 04, 05, 06, 07 e 14. A lista dos módulos, os blocos,
 > as faixas, os números antigos e a lista do que está fora do lugar moram no
-> `modulos.js`. **Desde a fase 3 (menu único) o ☰ Menu das duas operações agrupa
-> pelo módulo do assunto** (`teste_menu_unico.js`), e as telas saíram da lista do
-> que está fora do lugar.
+> `modulos.js`. **Com a fase 3 (menu único, em código desde 10/11/2026, falta
+> subir) o ☰ Menu das duas operações agrupa pelo módulo do assunto**
+> (`teste_menu_unico.js`), e as telas saíram da lista do que está fora do lugar.
 
 ---
 

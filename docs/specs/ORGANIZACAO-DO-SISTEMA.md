@@ -32,7 +32,8 @@ na 404: nenhuma tela nova. O sob medida ainda usa o rodapé (`tecido/public/nav.
   fase 3 é desta spec, com as regras do prompt (ninguém ganha nem perde tela,
   `teste_mapa.js` sem mudar o esperado, a conferir com três perfis em 1440 px e em
   tablet). O §6 "Mudar o menu que as pessoas veem hoje" vale para as fases 1 e 2;
-  a `MENU-UNICO` do §8 deixa de ser spec separada. A confirmar no PLANO da fase 3.
+  a `MENU-UNICO` do §8 deixa de ser spec separada. Confirmado no "pode seguir" do
+  PLANO da fase 3 (10/11/2026).
 - **D2 — a 302 Contagem, "a parte de material".** Desde 07/11/2026 (R-CMP-42) a
   contagem de material **não se faz mais** na 302: as rotas antigas respondem 410 e
   material se conta só na 504. O que sobrou de material na 302 é um cartão que
