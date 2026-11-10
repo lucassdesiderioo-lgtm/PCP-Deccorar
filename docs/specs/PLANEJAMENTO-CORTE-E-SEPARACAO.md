@@ -1,7 +1,7 @@
 # PLANEJAMENTO-CORTE-E-SEPARACAO — a lista do que cortar e separar
 
-> **STATUS · 10/11/2026 — RASCUNHO (2ª versão), esperando o "pode seguir" do
-> dono.** Nada construído. Nasceu da conversa de 10/11/2026: o dono quer, dentro
+> **STATUS · 10/11/2026 — RASCUNHO (2ª versão), perguntas respondidas, esperando o
+> "pode seguir" do dono.** Nada construído. Nasceu da conversa de 10/11/2026: o dono quer, dentro
 > do Planejamento (401), uma aba que transforme "quantas persianas fazer" em
 > "quanto tecido cortar, quantos tubos, bases, kits de comando e de instalação".
 > A 2ª versão segue a ideia do dono: **a ficha técnica ganha uma caixinha "vai
@@ -88,9 +88,8 @@ TECIDO     Blackout branco               147 × 165 cm   30
            Kit de instalação                            62
 ```
 
-> ⚠️ **O NOME QUE APARECE É O DO MATERIAL NO CADASTRO.** Para a lista dizer
-> "Kit de comando", o material da corrente tem que se chamar assim (ou a
-> palavra estar no nome). Pergunta ao dono na §7.
+> ⚠️ **O NOME QUE APARECE É O DO MATERIAL NO CADASTRO** (decisão do dono). Para
+> a lista dizer "Kit de comando", renomeia-se o material na 501.
 >
 > ⚠️ **A MEDIDA DE CORTE NÃO MEXE EM CUSTO** (#18): o consumo continua sendo a
 > `expressao` de cada linha. A corrente bate com a regra do dono: um laço de
@@ -133,16 +132,14 @@ Só quantidade (decisão do dono): sem estoque de material, custo ou fornecedor.
   já salva a fórmula (`POST /api/formulas`, `modelo.cadastrar`).
 - **Setores novos: nenhum.**
 
-## 7. Perguntas ao dono
+## 7. Perguntas ao dono — todas respondidas (10/11/2026)
 
-1. A lista mostra o **nome do material do cadastro** (ex.: "Corrente bola 10
-   branca — 140 cm"). Para sair "Kit de comando", renomear o material no
-   cadastro resolve — ou a lista deve sempre chamar a corrente de "Kit de
-   comando com N cm de altura"?
-
-Respondidas antes (10/11/2026): falta da "O que produzir" (1a); medida de corte
-(2b); tubo e base pela largura, em linhas separadas; kit de comando é só a
-corrente; só quantidade; a lista lê sempre a ficha técnica (404).
+- O nome na lista é **o nome do material no cadastro** (o dono: *"deve buscar o
+  nome do cadastro de material"*). Para sair "Kit de comando", renomeia-se o
+  material na 501. Sem campo extra na ficha.
+- Antes: a falta da "O que produzir" (1a); medida de corte (2b); tubo e base
+  pela largura, em linhas separadas; kit de comando é só a corrente; só
+  quantidade; a lista lê sempre a ficha técnica (404), pela caixinha.
 
 ## 8. Construção (uma fase só)
 
