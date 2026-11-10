@@ -169,14 +169,28 @@ module.exports = function(app, db){
         (par[0]==='corte_largura'?'largura':'altura')+'): '+c.erro, testes:c.testes});
     }
 
+    /* "VAI PARA O PLANEJAMENTO DA PRODUCAO" (PLANEJAMENTO-CORTE-E-SEPARACAO,
+       10/11/2026). Campo AUSENTE preserva o gravado (a regra da #25): a tela
+       de um tablet sem refresh manda a linha sem ele, e apagaria a marca de
+       quem marcou. Valor que nao e sim/nao e recusado, nunca vira "nao". So a
+       aba Corte e separacao le; nao muda custo. */
+    let plan;
+    if(b.planejamento !== undefined && b.planejamento !== null){
+      const p = b.planejamento;
+      if(p === true || p === 1 || p === '1') plan = 1;
+      else if(p === false || p === 0 || p === '0') plan = 0;
+      else return res.status(400).json({erro:'"vai para o planejamento da produção" tem que ser sim ou não'});
+    }
+
     const campos={ modelo_id:modelo, componente_id:comp, familia, expressao:expr,
       observacao:txt(b.observacao), ordem:(b.ordem!=null?+b.ordem:0),
       corte_largura:cl, corte_altura:ca, corte_unidade:txt(b.corte_unidade)||'cm' };
     if(b.id){
       db.prepare(`UPDATE ficha_formula SET modelo_id=@modelo_id,componente_id=@componente_id,
         familia=@familia,expressao=@expressao,observacao=@observacao,ordem=@ordem,ativo=1,
-        corte_largura=@corte_largura,corte_altura=@corte_altura,corte_unidade=@corte_unidade
-        WHERE id=@id`).run(Object.assign({id:+b.id},campos));
+        corte_largura=@corte_largura,corte_altura=@corte_altura,corte_unidade=@corte_unidade,
+        planejamento=COALESCE(@planejamento, planejamento)
+        WHERE id=@id`).run(Object.assign({id:+b.id, planejamento: plan===undefined ? null : plan},campos));
       /* O recalculo de custo continua sendo disparado pela linha inteira, e nao
          so pela `expressao`: mexer no corte nao muda centavo, mas o carimbo de
          "quando esta ficha foi tocada" tem que valer para a linha toda. */
@@ -184,9 +198,9 @@ module.exports = function(app, db){
       return res.json({ok:true,id:+b.id,testes:v.testes});
     }
     const r=db.prepare(`INSERT INTO ficha_formula (modelo_id,componente_id,familia,expressao,observacao,ordem,
-        corte_largura,corte_altura,corte_unidade)
+        corte_largura,corte_altura,corte_unidade,planejamento)
       VALUES (@modelo_id,@componente_id,@familia,@expressao,@observacao,@ordem,
-        @corte_largura,@corte_altura,@corte_unidade)`).run(campos);
+        @corte_largura,@corte_altura,@corte_unidade,@planejamento)`).run(Object.assign({planejamento: plan||0}, campos));
     CUSTO.porModelo(db, modelo, 'linha acrescentada à ficha', {usuario_nome:QUEM.nomeDe(req), usuario_id:QUEM.idDe(req)});
     res.json({ok:true,id:r.lastInsertRowid,testes:v.testes});
   });

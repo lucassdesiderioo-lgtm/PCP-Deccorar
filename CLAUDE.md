@@ -631,6 +631,37 @@ Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), as linhas de
   abre; sem nada, abre em **Vendas por dia**; a tela lembra a última aba **neste
   computador** (`localStorage`, só conveniência) e o endereço aceita `#dia`,
   `#produzir`, `#janelas` e `#comparar`. Nenhum número, rota ou permissão mudou.
+- ⚠️ **A ABA "CORTE E SEPARAÇÃO" (10/11/2026, spec `PLANEJAMENTO-CORTE-E-SEPARACAO`,
+  hash `#corte`) LÊ A FICHA TÉCNICA, E NÃO TEM CONTA DE QUANTIDADE PRÓPRIA.** A
+  falta é o `precisa` do `demanda_dominio.aProduzir` (#12); o que cada persiana
+  usa são as linhas da ficha marcadas **"vai para o planejamento da produção"**
+  (`ficha_formula.planejamento`, caixinha da 404, nasce desmarcada).
+  `corte_dominio.js` é o dono da lista, e **agrupa por uma regra só: o material e
+  a medida de corte** — por isso o tecido sai por cor (a família resolve um
+  material por cor), e tubo, base e corrente saem com as cores juntas. Linha sem
+  medida de corte soma o consumo da ficha (o kit de instalação, 1 por
+  persiana). O nome é o do **cadastro de material** (decisão do dono): para
+  aparecer "Kit de comando", renomeia-se a corrente na 501. ⚠️ **O tecido sem
+  preço de fornecedor continua na lista** (as candidatas daquela cor, com
+  aviso): a falta de preço não apaga a medida de corte — o `ficha_dominio`
+  passou a cumprir isso também no tecido, sem mudar centavo. Sob medida, kit,
+  acessório e SKU sem ficha ou sem linha marcada aparecem em "ficou fora", com
+  o motivo. Nenhum número em reais. A rota (`GET /api/planejamento/corte`) cai
+  em `@admin`, como a 401; a caixinha grava pela rota da fórmula
+  (`modelo.cadastrar`), e campo **ausente não apaga** a marca. O bloco junta
+  pelo material, e a ordem dos blocos é a da ficha (a menor `ordem` das linhas
+  que o trouxeram), não a da falta.
+  ⚠️ **EM CÓDIGO, AINDA NÃO ESTÁ NO AR** (10/11/2026). Depois do deploy, alguém
+  lança na 404 as medidas de corte e marca as linhas; até lá a aba lista os SKUs
+  em "ficou fora". **AINDA NÃO PROVADO COM DADO REAL:** a lista batendo com o que
+  a bancada corta. Prova que não foi feita se escreve como não feita.
+  **Rode `node teste_corte_separacao.js` (32) e `node teste_ficha.js` ao mexer no
+  `corte_dominio.js`, na caixinha da ficha ou na aba.** ⚠️ Três coisas que parecem
+  bug e não são: o tecido sem preço e sem medida de corte sai **"—"** (indefinido,
+  nunca 0); o SKU com uma linha marcada em erro sai **inteiro** em "ficou fora"
+  (nunca dentro e fora); e o **Ctrl+P** de outra aba imprime a aba aberta — a
+  folha da bancada só sai pelo botão "Imprimir" da aba (classe
+  `body.imprimirCorte`).
 - **O fechamento do dia mora na 904 Relatórios desde 08/11/2026** (AJUSTE, o
   dono: *"relatório fica concentrado num lugar só"*), com a mesma conta e a
   mesma rota (`GET /api/fechamento`, `@admin`: quem não alcança não vê o
@@ -1457,8 +1488,19 @@ cabem **duas peças por faixa** em qualquer bobina, de qualquer largura.
 > por fora inventa uma fábrica que não existe** — inclusive a minha.
 
 O corte real é `largura − 3` de largura por `altura + folga` de altura, e a
-folga muda com a orientação: **+20 de pé, +10 invertida**. Os 10 cm não são
-economia de tecido — são o que faz `1,60 + 1,60` fechar em 3,20.
+folga muda com a orientação: ~~**+20 de pé, +10 invertida**~~ — **desde
+10/11/2026 é +15, e +10 na 1,80** (bloco logo abaixo; a fórmula "honesta" mais
+adiante usa a folga de antes). Os 10 cm não são economia de tecido — são o que
+faz `1,60 + 1,60` fechar em 3,20.
+
+> ⚠️ **DESDE 10/11/2026 A MEDIDA DE CORTE DO TECIDO É ALTURA + 15, E + 10 NA
+> 1,80** (decisão do dono, linha em `docs/DECISOES.md`, spec
+> `PLANEJAMENTO-CORTE-E-SEPARACAO`; ele primeiro disse "+15 em todas" e, avisado
+> de que duas peças de 165 não cabem na bobina de 3,20, manteve o +10 da 1,80).
+> A folga mora na **ficha** (a `corte_altura` da linha do tecido, tela 404), e
+> não no código — numa expressão só: `altura + 15 - 5 * piso(largura / 180)`
+> (travada no `teste_corte_separacao.js`). A `expressao` do consumo (`/200`) não
+> mudou.
 
 Contra o corte de pé, que é o que a fábrica faz em seis das sete larguras:
 
@@ -1685,7 +1727,7 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 | `componente` é **provisória** | O dono é `PRODUCAO-MONTAGEM.md` §6, não implementado. O que faltar entra por `ALTER`, nunca recriando |
 | Não segue a forma do `ARQUITETURA-ALVO.md` | O `COMPRAS.md` §11 manda `dominio/ dados/ rotas/`. Foi construído no padrão atual do projeto — o documento não estava no repositório (hoje está em `docs/specs/ARQUITETURA-ALVO.md`) |
 | Fórmula do tecido | ~~As oito medidas da planilha fecham em 6 de 8~~ — a fórmula passou a usar `largura_bobina` em 04/09/2026 (armadilha #19). O que sobra: **quando** o corte é encaixado e quando é sozinho ainda é decisão de quem produz, e a ficha guarda uma das duas |
-| Medida de corte sem valor lançado | A `ficha_formula` já tem `corte_largura`/`corte_altura` (armadilha #18), mas as folgas reais — tubo, base redonda, tecido — ainda não foram preenchidas. Enquanto forem vazias a coluna "corta a" mostra traço, que é resposta e não erro |
+| Medida de corte sem valor lançado | A `ficha_formula` já tem `corte_largura`/`corte_altura` (armadilha #18), mas as folgas reais — tubo, base redonda, tecido — ainda não foram preenchidas. Enquanto forem vazias a coluna "corta a" mostra traço, que é resposta e não erro. **Desde 10/11/2026 o dono deu as medidas** (tecido largura − 3 × altura + 15, e + 10 na 1,80; tubo e base largura − 3; corrente altura − 10) **e elas são lançadas pela 404**, junto com a caixinha "vai para o planejamento da produção" — enquanto não forem, a aba Corte e separação da 401 lista os SKUs em "ficou fora" |
 | Mínimos são placeholder | Foram semeados com um valor padrão ("depois eu edito"). Enquanto forem, o gatilho 1 vence quase sempre e a demanda quase não aparece na lista — não é bug da fase 6, é dado a revisar |
 | Modelo ACESSORIO sem ficha | Os dois kits têm venda e nenhuma linha de ficha. Ou lançam ficha, ou viram `tem_ficha=0` (revenda) com custo direto |
 
@@ -3835,7 +3877,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). ~~**Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa~~ — **fechado em 08/11/2026**: a 905 Minha produção e a aba Por pessoa da 904 (§21) · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (306), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (306), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
