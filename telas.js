@@ -148,16 +148,17 @@ function porNumero(n){ return TELAS.find(t => t.n === +n) || null; }
 function porRota(r){ return TELAS.find(t => t.rota === r) || null; }
 function moduloDe(n){ const c = Math.floor(+n / 100) * 100; return (+n >= 250 && +n < 300) ? 250 : c; }
 
-/* O MÓDULO DE HOJE (spec ORGANIZACAO-DO-SISTEMA, fase 2): o bloco do menu em
-   que a tela aparece hoje, pela centena (`moduloDe`), traduzido para a lista
-   única de módulos (`modulos.js`). O 600 "Sob medida" não é módulo de assunto
-   (null). Cada tela declara o módulo do ASSUNTO em `modulo`; o
-   `teste_lugar.js` compara os dois para achar o que está fora do lugar.
-   ⚠️ O MENU CONTINUA LENDO `moduloDe`: nesta fase ninguém vê diferença. Quando
-   o menu único (fase 3) passar a agrupar por `modulo`, esta conta muda junto. */
-const MENU_HOJE = { 100:'producao', 200:'expedicao', 250:'posvenda', 300:'estoque', 400:'planejamento',
-  500:'compras', 600:null, 900:'administracao' };
-function moduloHoje(n){ const k = moduloDe(n); return Object.prototype.hasOwnProperty.call(MENU_HOJE, k) ? MENU_HOJE[k] : null; }
+/* O MÓDULO DE HOJE (spec ORGANIZACAO-DO-SISTEMA): o módulo em que a tela
+   aparece no menu. Na fase 2 era a centena (`moduloDe`) traduzida; desde a
+   fase 3 (menu único, 10/11/2026) o menu agrupa pelo `modulo` declarado, e o
+   módulo de hoje É o declarado, nas duas operações. O `teste_lugar.js` usa
+   isto para achar o que está fora do lugar: desde a fase 3, só aba e parte de
+   outro assunto (`modulos.js`). `moduloDe` continua para a tela de Acessos,
+   que ainda agrupa pela centena. */
+function moduloHoje(n){
+  const t = porNumero(n); if(t) return t.modulo || null;
+  const s = telasSobMedida().find(x => x.n === +n); return s ? s.modulo || null : null;
+}
 
 /* As telas do sob medida, com o número e o nível delas (tecido/nucleo/telas.js). */
 function telasSobMedida(){
@@ -166,10 +167,10 @@ function telasSobMedida(){
   const out = [];
   for(const [rota, t] of Object.entries(T)){
     if(t.apelido) continue;
-    out.push({ n:t.numero, nome:t.nome, rota:'/sobmedida' + (rota === '/' ? '' : rota), nivel:t.nivel,
+    out.push({ n:t.numero, nome:t.nome, rota:'/sobmedida' + (rota === '/' ? '' : rota), nivel:t.nivel, modulo:t.modulo, bloco:t.bloco,
       onde:t.contexto === 'operacao' ? 'tablet' : 'computador', perms:['sobmedida.' + t.permissao], sobmedida:true });
   }
   return out.sort((a, b) => a.n - b.n);
 }
 
-module.exports = { TELAS, MODULOS, CHEGADA, NIVEIS, NOME_NIVEL, ordemNivel, porNumero, porRota, moduloDe, moduloHoje, MENU_HOJE, telasSobMedida };
+module.exports = { TELAS, MODULOS, CHEGADA, NIVEIS, NOME_NIVEL, ordemNivel, porNumero, porRota, moduloDe, moduloHoje, telasSobMedida };

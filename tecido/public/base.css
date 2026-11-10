@@ -205,25 +205,27 @@ td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
 .vazio{padding:26px; text-align:center; color:var(--tinta-fraca)}
 .ajuda{font-size:14px; color:var(--tinta-fraca); margin:6px 0 0; max-width:62ch}
 
-/* ── Barra de atalhos do rodape ───────────────────────────────────────────
-   O mesmo lugar e o mesmo gesto da barra do PCP (public/nav.js). Ela e a
-   razao pratica de o modulo PARECER o mesmo sistema: o operador que trabalha
-   nas duas operacoes no mesmo dia acha a navegacao onde ela sempre esteve.
-   Montada por nav.js — aqui so a aparencia. */
-.rodape{
-  position:fixed; left:0; right:0; bottom:0; z-index:90;
-  display:flex; gap:2px; justify-content:center; flex-wrap:wrap;
-  padding:6px; background:var(--cartao); border-top:1px solid var(--linha);
+/* ── O ☰ Menu (spec ORGANIZACAO-DO-SISTEMA, fase 3, menu único) ─────────
+   O rodapé de atalhos SAIU: o sob medida usa o mesmo ☰ Menu da medida padrão,
+   desenhado pelo mesmo arquivo (`/menu_telas.js`), com as telas das duas
+   operações por módulo do assunto → bloco → tela. Aqui só a aparência, nas
+   cores deste módulo. Sem rodapé fixo, a página não precisa mais da folga
+   embaixo. */
+.menuTelas{
+  display:flex; flex-wrap:wrap; gap:18px; padding:10px 18px;
+  background:var(--cartao); border-bottom:1px solid var(--linha); font-size:14px;
 }
-.rodape a{
-  text-decoration:none; font-size:13px; font-weight:600;
-  padding:9px 14px; border-radius:8px; color:var(--tinta-fraca);
-}
-.rodape a[aria-current="page"]{background:var(--alerta); color:var(--papel)}
-/* O rodape e fixo: sem esta folga ele cobre a ultima linha da tabela, e a
-   linha coberta e justamente a que a pessoa rolou ate o fim para ler. */
-body{padding-bottom:64px}
-@media print{ .rodape,.sessao{display:none} body{padding-bottom:0} }
+.menuTelas .mnMod{display:inline-block; vertical-align:top; margin:0 22px 10px 0; min-width:180px}
+.menuTelas .mnTit{color:var(--tinta-fraca); font-weight:800; font-size:12px; text-transform:uppercase;
+  letter-spacing:.04em; margin-bottom:4px}
+.menuTelas .mnBloco{color:var(--tinta-fraca); font-weight:700; font-size:12px; margin:8px 0 2px 10px}
+.menuTelas .mnTela{display:block; min-height:34px; line-height:34px; padding:0 10px; border-radius:8px;
+  text-decoration:none; color:var(--tinta)}
+.menuTelas .mnTela b{color:var(--tinta-fraca); margin-right:6px}
+.menuTelas .mnTela.on{background:var(--alerta); color:var(--papel)}
+.menuTelas .mnTela.on b{color:var(--papel)}
+.menuTelas .mnVazio{color:var(--tinta-fraca)}
+@media print{ .menuTelas,.sessao{display:none} }
 
 /* ── Barra de sessao ──────────────────────────────────────────────────── */
 .sessao{

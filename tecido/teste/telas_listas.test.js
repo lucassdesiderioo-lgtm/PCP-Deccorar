@@ -13,7 +13,7 @@
 //
 // Sem nada acusar, a proxima tela nova repete os dois: ela se escreve
 // copiando a de cima, e a de cima nao lembra das outras listas.
-const fs=require('fs'), path=require('path'), vm=require('vm');
+const fs=require('fs'), path=require('path');
 
 const PUB=path.join(__dirname,'..','public');
 const {TELAS}=require('../nucleo/telas');
@@ -24,12 +24,6 @@ function portas(){
   return [...s.slice(s.indexOf('const PORTAS=['),s.indexOf('];',s.indexOf('const PORTAS=[')))
     .matchAll(/caminho:'([^']+)'/g)].map(m=>m[1]);
 }
-function nav(){
-  const s=fs.readFileSync(path.join(PUB,'nav.js'),'utf8');
-  const pega=nome=>vm.runInNewContext('('+s.match(new RegExp('var '+nome+'=([\\s\\S]*?);\\n'))[1]+')');
-  return {NOMES:pega('NOMES'), ORDEM:pega('ORDEM')};
-}
-
 module.exports=[
 
 {nome:'a lista de telas declaradas e lida (a varredura nao pode ficar vazia)',
@@ -49,13 +43,21 @@ module.exports=[
   if(sobra.length) throw new Error('porta sem tela: '+sobra.join(', '));
 }},
 
-{nome:'TODA TELA DECLARADA ESTA NO RODAPE, com nome — o "/bancada" saia escrito como caminho',
+// ⚠️ O RODAPE SAIU (spec ORGANIZACAO-DO-SISTEMA, fase 3, menu unico,
+// 10/11/2026), e com ele as listas NOMES e ORDEM do nav.js — a terceira lista
+// deixou de existir. A tela entra no ☰ Menu pelo MAPA: `nucleo/telas.js` com
+// modulo e bloco (o `teste_lugar.js` e o `teste_menu_unico.js` da raiz
+// conferem o resto).
+{nome:'TODA TELA DECLARADA TEM MODULO E BLOCO — e assim que ela entra no ☰ Menu',
  executar(){
-  const {NOMES,ORDEM}=nav();
-  const foraOrdem=DECLARADAS.filter(c=>!ORDEM.includes(c));
-  const semNome=ORDEM.filter(c=>!NOMES[c]);
-  if(foraOrdem.length) throw new Error('fora do ORDEM do nav.js: '+foraOrdem.join(', '));
-  if(semNome.length) throw new Error('no ORDEM e sem nome no NOMES: '+semNome.join(', '));
+  const falta=Object.entries(TELAS).filter(([,t])=>!t.modulo||!t.bloco).map(([c])=>c);
+  if(falta.length) throw new Error('sem modulo ou bloco: '+falta.join(', '));
+}},
+
+{nome:'o rodape nao volta: o nav.js nao tem mais NOMES, ORDEM nem rodape()',
+ executar(){
+  const s=fs.readFileSync(path.join(PUB,'nav.js'),'utf8');
+  if(/var NOMES=|var ORDEM=|function rodape\(/.test(s)) throw new Error('o rodape voltou ao nav.js');
 }},
 
 ];

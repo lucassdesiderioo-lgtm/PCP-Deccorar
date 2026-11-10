@@ -1,11 +1,14 @@
 # FICHA-UNICA-ML — uma ficha técnica só para as persianas padrão do Mercado Livre
 
-> **STATUS · 10/11/2026 — RASCUNHO, esperando o dono.** Nada construído.
-> Nasceu da conversa de 10/11/2026. O dono: *"A ideia é BK ML. Quando for
-> mudar é acrescentar o item em todos os SKUs e remover se for necessário"*.
-> Blackout e screen usam **o mesmo tubo, base, corrente e kit** (o dono); só o
-> tecido muda. `NOVIDADE` · risco 🔴 (custo, compra e uma coluna no cadastro).
-
+> **STATUS · 10/11/2026 — EM ESPERA, nada a construir agora.** O dono
+> respondeu (10/11/2026): o modelo continua **Rolô** (1); o screen corta igual
+> (2); **"não quero pensar nos screen agora, apenas nas persianas de medida
+> padrão que vendemos no Mercado Livre com tecido BK"** (3); o screen está
+> cadastrado como material (4). Para as persianas BK do ML, **a ficha do modelo
+> Rolô já é a ficha única** pedida: uma linha lançada vale para todos os SKUs do
+> Rolô, e tirá-la tira de todos (§1 abaixo). A §2 (o tecido do SKU) só é
+> necessária quando o screen entrar na mesma ficha — aí esta spec volta.
+> `NOVIDADE` · risco 🔴 quando voltar.
 ---
 
 ## 1. O que já existe e o que falta

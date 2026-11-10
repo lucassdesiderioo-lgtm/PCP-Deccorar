@@ -3892,7 +3892,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). ~~**Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa~~ — **fechado em 08/11/2026**: a 905 Minha produção e a aba Por pessoa da 904 (§21) · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (306), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (306), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4143,8 +4143,10 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Escrever chefia, chefe, patrão, dono ou gestão em texto que aparece para
   quem usa o sistema — nomeie a etapa, ou o nível de acesso (§20, Regra B)
 - ❌ Declarar tela no `tecido/nucleo/telas.js` sem a porta na `inicio.html` e
-  o nome no `NOMES` do `nav.js` — o vendedor lia "nenhuma tela" com as telas
-  dele no rodapé (§20)
+  sem `modulo` e `bloco` — o vendedor lia "nenhuma tela" com as telas dele no
+  rodapé (§20), e sem módulo a tela não entra no ☰ Menu (§22)
+- ❌ Pôr de volta o rodapé do sob medida, ou uma segunda cópia do desenho do
+  menu: o ☰ Menu das duas operações sai do `public/menu_telas.js` (§22, R-ORG-08)
 - ❌ Escrever uma segunda lista de "para onde a pessoa vai": é o `destino.js`,
   e foi a cópia do login que mandava o vendedor de volta ao PIN (§20)
 - ❌ Deixar o "Fechar vencidos" aceitar HOJE como corte, ou o "Dar saída" valer para a venda que vence hoje: em 28/10/2026 isso fechou como "saiu" as 50 vendas da fila do dia, e a lista da Etiqueta de Venda sumiu sem erro (§5, R-COR-04)
@@ -4619,7 +4621,7 @@ de material do PCP (marca e modelo): `node teste_componentes.js`. Todos os
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 856 casos
+cd tecido && npm test          # 857 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
@@ -4648,14 +4650,17 @@ com as duas linhas em `docs/DECISOES.md`.
 junto: ele mostrava os mesmos atalhos a todo mundo, ninguém usava, e aparecia
 duplicado no Admin. No lugar dele, o botão **☰ Menu** da barra de sessão abre
 as telas que **a pessoa** alcança, por módulo, com o número ao lado do nome
-(*"253 Devoluções — baixa"*). Módulo sem tela dela não aparece; a tela aberta
+(*"253 Devoluções — baixa"*). **Com o menu único (10/11/2026, em código, falta
+subir) o módulo é o do ASSUNTO, com o bloco** (§22): a 402 aparece em Cadastros, a 609 em Comercial →
+Revenda — e o sob medida usa o mesmo menu. Módulo sem tela dela não aparece; a tela aberta
 vem marcada. Ficam **"Trocar setor"**, o atalho para a outra operação (Regra A
 abaixo) e o **Alt+0** do "Sair".
 
 > ⚠️ **O MENU SAI DO MAPA, PELA CONTA DO PORTÃO** (`GET /api/telas/minhas`,
 > `admin_telas.js`): as telas do `telas.js` que o `decidir` deixa abrir, mais as
 > do sob medida pela chave `sobmedida.<permissão>` delas. Não há lista de telas
-> no `nav.js`. As devoluções são o **bloco 250** (251, 252, 253), e a porta
+> no `nav.js`. **O desenho é o `public/menu_telas.js`** (desde 10/11/2026), que
+> o `nav.js` carrega por uma tag de script. As devoluções são o **bloco 250** (251, 252, 253), e a porta
 > `/devolucoes` deixou de ser `@logado`: abre para quem tem alguma chave delas.
 >
 > ⚠️ **O BOTÃO DE AÇÃO QUE A PESSOA NÃO TEM SOME** (R-TEL-04): `data-perm="chave
@@ -4801,9 +4806,15 @@ barra e tela com a barra da outra operação. Um comentário com a palavra
 > feito de verdade para aparecer. Prova que não foi feita se escreve como não
 > feita (§4).
 
-### ⚠️ TRÊS LISTAS DE TELAS NO SOB MEDIDA, e a tela nova entra nas três (02/10/2026)
+### ⚠️ ~~TRÊS~~ DUAS LISTAS DE TELAS NO SOB MEDIDA, e a tela nova entra nas duas (02/10/2026; o rodapé saiu em 10/11/2026)
 
-O módulo diz que telas existem em **três** lugares: `tecido/nucleo/telas.js`
+> ⚠️ **DESDE 10/11/2026 O RODAPÉ DO SOB MEDIDA NÃO EXISTE** (menu único, §22):
+> saíram o `NOMES`, o `ORDEM` e o `rodape()` do `tecido/public/nav.js`, e o sob
+> medida usa o mesmo ☰ Menu da medida padrão. Ficam duas listas: a declaração
+> (`tecido/nucleo/telas.js`, agora com `modulo` e `bloco`, que é como a tela
+> entra no menu) e as portas da tela inicial. O texto abaixo é a história.
+
+O módulo dizia que telas existem em **três** lugares: `tecido/nucleo/telas.js`
 (a declaração, com a permissão), as **portas** da tela inicial
 (`telas/inicio.html`) e o `NOMES`/`ORDEM` do `tecido/public/nav.js` (o
 rodapé). Tela nova que entra só na primeira nasce com dois defeitos, e os dois
@@ -4818,8 +4829,8 @@ estiveram no ar até 02/10/2026:
   e não no `NOMES`.
 
 **Rode `cd tecido && npm test` ao criar tela** — o `telas_listas.test.js`
-(4 casos) recusa tela declarada sem porta na inicial ou sem nome no rodapé, e
-porta que aponta para tela que não existe. Os dois defeitos foram
+(5 casos) recusa tela declarada sem porta na inicial ou sem `modulo` e `bloco`,
+porta que aponta para tela que não existe, e o rodapé de volta no `nav.js`. Os dois defeitos foram
 reintroduzidos, e cada um reprova o seu caso.
 
 > ✅ **NO AR E CONFERIDO EM 02/10/2026** (PR #176). O dono fez o deploy e
@@ -4965,16 +4976,55 @@ gente vai criando as coisas, a gente não está organizando no local correto de
 cada coisa"*. **A causa é uma só: a tela nascia onde a spec nasceu, e não onde o
 assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 
-> ⚠️ **O MAPA JÁ SABE O LUGAR, MAS O MENU AINDA NÃO** (fase 2, 10/11/2026). Toda
+> ⚠️ **O ☰ MENU AGRUPA POR MÓDULO → BLOCO → TELA NAS DUAS OPERAÇÕES** (fase 3,
+> menu único, 10/11/2026), e o rodapé do sob medida saiu. **Em código, falta
+> subir**; ⚠️ **ainda não provado** com os três perfis num tablet de verdade, na
+> fábrica (foi aberto num Chromium a 1440, 1024 e 768 px). Quem manda:
+> - `GET /api/telas/minhas` (`admin_telas.js`) devolve cada tela com o `modulo`
+>   e o `bloco` declarados, os módulos **em lista, na ordem do `modulos.js`** (a
+>   da spec: Comercial, Planejamento, Produção…) e o nome dos blocos;
+> - `public/menu_telas.js` é o **desenho único**, carregado pelo `nav.js` das
+>   duas operações (`public/nav.js` e `tecido/public/nav.js`, que ganhou o
+>   ☰ Menu na barra de cima). O título do bloco só aparece quando a pessoa tem
+>   telas de mais de um bloco no módulo; dentro do bloco, a ordem é o número
+>   (escolhas confirmadas pelo dono);
+> - a 601 Início fica em Administração, como o §5 manda;
+> - **ninguém ganhou nem perdeu tela**: o `teste_mapa.js` passou sem mudar o
+>   esperado, e o `teste_menu_unico.js` confere, pessoa a pessoa, que o menu tem
+>   exatamente as telas que o portão de cada operação deixa abrir;
+> - a lista do que está fora do lugar encolheu de 34 para **8** (as seis abas da
+>   501, `302/material` e `902/horarios`), e o **Financeiro foi inaugurado** (a 616);
+> - ⚠️ **a tela de Acessos (901) continua agrupando pela centena** (`moduloDe`),
+>   de propósito: mudá-la é na tela de permissão, e ficou para depois.
+>
+> ⚠️ **AS TELAS DO SOB MEDIDA NO MENU SAEM DO PORTÃO DE LÁ, E NÃO DA CHAVE
+> ESCRITA** (③ REVISÃO): `admin_telas.js` monta o usuário do sob medida
+> (`daSessaoDoPcp`, com as chaves do `permissoesDe`, as que o portão recebe) e
+> pergunta o `pode` de lá. Quem está só num dos cinco setores de bancada recebe a
+> entrada e a bancada **pelo setor** (POR_SETOR), sem `sobmedida.modulo.entrar`
+> escrita: pela chave, o menu dele vinha **vazio**, e desde o menu único o menu é
+> a navegação do sob medida. E quem tem uma chave `sobmedida.*` solta, sem a
+> entrada, não vê no menu tela que o portão nega.
+>
+> **Rode `node teste_menu_unico.js` (27) ao mexer no `menu_telas.js`, nos dois
+> `nav.js`, no `/api/telas/minhas` ou no `modulos.js`.** Ele acrescenta ao banco
+> de exemplo, só para ele, os cinco setores de bancada, a exceção solta e uma
+> pessoa com as duas operações. Oito defeitos foram reintroduzidos um a um, e cada
+> um reprova: a tela no bloco da centena (1), o rodapé de volta (3), tela do sob
+> medida a mais (1) e a menos (1) que o portão, a régua da chave escrita (2), os
+> módulos fora da ordem no servidor (1) e no desenho (1), e o título do bloco
+> sempre (1). Se o `/menu_telas.js` não carrega, o menu diz *"Não deu para
+> carregar o menu"*. ⚠️ O `teste_menu.js` mudou o exemplo dele para o formato novo (o
+> módulo pela chave, com o bloco); o que ele trava não mudou.
+
+> **Fase 2 (10/11/2026), o que veio antes do menu:** Toda
 > tela das duas operações declara `modulo` (o do **assunto**), `bloco` e `liga`
 > no `telas.js` e no `tecido/nucleo/telas.js`; as dez abas da 501 e as "partes"
 > da 302 e da 902 também têm módulo. A lista dos 18 módulos, os blocos, as
 > faixas, os números antigos e a lista do que está fora do lugar moram **num
-> lugar só**, o `modulos.js`. **O menu e a tela de Acessos continuam agrupando
-> pela centena** (`moduloDe`): ninguém viu diferença, e o `teste_mapa.js` e o
-> `teste_menu.js` passaram sem mudar o esperado. Quem passa a ler o `modulo` é o
-> menu único (fase 3). Valem também o 📍 LUGAR (§0) e a seção "Onde mora"
-> (`docs/specs/README.md`, regra 5).
+> lugar só**, o `modulos.js`. ✅ No ar desde 10/11/2026 (PR #328): o dono fez o
+> deploy e disse *"deu tudo certo"*. Valem também o 📍 LUGAR (§0) e a seção
+> "Onde mora" (`docs/specs/README.md`, regra 5).
 >
 > ⚠️ **NO MAPA, `modulo` É O DO ASSUNTO, NÃO A CENTENA.** Código que copia a linha
 > da tela e põe a centena num campo `modulo` tem que pôr a centena **depois**:
@@ -4983,11 +5033,11 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 > a grade usam) quebrou assim no
 > `teste_acesso.js`. Hoje é `Object.assign({}, t, { modulo:centena })`.
 >
-> ⚠️ **FORA DO LUGAR, POR ENQUANTO, É O MÓDULO DO ASSUNTO DIFERENTE DO BLOCO EM
-> QUE A TELA APARECE HOJE NO MENU** (`moduloHoje`, a centena traduzida). A aba e
-> a parte estão fora quando o assunto delas não é o da tela. Quando o menu passar
-> a agrupar pelo módulo (fase 3), as telas saem da lista `FORA_DO_LUGAR` — e o
-> teste **exige** que saiam: item arrumado que fica na lista reprova.
+> ⚠️ **FORA DO LUGAR É A ABA OU A PARTE DE OUTRO ASSUNTO** (desde a fase 3). A
+> tela está fora quando o módulo em que o menu a mostra (`moduloHoje`) não é o
+> do assunto — e desde o menu único os dois são o mesmo, então nenhuma tela está
+> na lista `FORA_DO_LUGAR`. O teste **exige** isso: item arrumado que fica na
+> lista reprova.
 
 **A fábrica tem duas operações; a venda tem três canais.**
 
@@ -5014,7 +5064,7 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 | 1100 | Cadastros | existe espalhado (402–404, 902, 606/608, abas da 501) |
 | 1200 | Almoxarifado | existe espalhado (502–504, 603–605) |
 | 1300 | Fiscal | reservado · hoje só abas da 501 |
-| 1400 | Financeiro | reservado · hoje só a 616 |
+| 1400 | Financeiro | existe desde o menu único (10/11/2026): a 616 |
 | 1500 | Instalação e entrega | reservado |
 | 1600 | Relatórios e indicadores | existe (904, 905, 607, 615) |
 | 1700 | Pessoas | reservado |
@@ -5069,12 +5119,11 @@ mora" da spec dela — o caso do inventário exige as telas do mapa, todas, e
 reprova a tela nova que não está lá. Não é para mexer no número: é para declarar.
 
 > ⚠️ **O QUE ESTÁ FORA DO LUGAR HOJE, E NÃO É PARA "CONSERTAR" DE PASSAGEM**
-> (R-ORG-14): 103 (→ Comercial · ML), 302 na parte de material (o cartão que leva à
-> 504 e os ajustes antigos aguardando aprovação), 402/403/404 (→ Cadastros),
-> 502/503/504 (→ Almoxarifado), 902 (listas e kit → Cadastros; horários →
-> Administração), 904 e 905 (→ Relatórios), as seis abas da 501 (Materiais,
-> Fornecedores, Almoxarifados → Cadastros; Recebimento retido → Almoxarifado;
-> Notas e Certificado → Fiscal) e as 16 do sob medida até o menu único. Mover
+> (R-ORG-14): a 302 na parte de material (o cartão que leva à 504 e os ajustes
+> antigos aguardando aprovação), os horários da 902 (→ Administração) e as seis
+> abas da 501 (Materiais, Fornecedores, Almoxarifados → Cadastros; Recebimento
+> retido → Almoxarifado; Notas e Certificado → Fiscal). ~~103, 402–404, 502–504,
+> 902, 904, 905 e as 16 do sob medida~~ saíram com o menu único. Mover
 > qualquer uma é das specs seguintes (§8 da spec: `CADASTRO-DE-MATERIAL`,
 > `ALMOXARIFADO-E-FISCAL`, `FICHAS-NO-CADASTRO-UNICO`, `FINANCEIRO`), cada uma com
 > conversa própria no Projeto.
