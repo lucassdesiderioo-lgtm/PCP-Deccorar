@@ -2,7 +2,7 @@
 
 ```
 STATUS
-Situação: RASCUNHO · aguardando o desenho no Projeto do Claude e a aprovação do dono
+Situação: APROVADA pelo dono em 11/11/2026 ("spec aprovada") · nada construído
 Criada em: 11/11/2026
 Última atualização: 11/11/2026
 Fase atual: nenhuma — nada construído
@@ -257,7 +257,11 @@ linhas da ficha da medida padrão) e a contagem (ficha baixa, contagem corrige).
 Respondidas também: o momento da baixa (a embalagem, nas duas), a peça refeita
 (não baixa sozinha) e a peça com problema (o Supervisor decide no fim do dia).
 
-Abertas:
+Respondidas em 11/11/2026 (com a aprovação): o material extra se decide numa
+**tela nova no módulo Produção, nível Supervisor**, e a ação "Decidir material
+extra" nasce **só para o Admin Geral**, que a dá pela tela de Acessos.
+
+Como foram perguntadas:
 
 8. **Onde o Supervisor decide o material extra?** A 104 Problemas é do mesmo
    assunto (peças com problema), mas é de nível Admin, e o Supervisor não a
