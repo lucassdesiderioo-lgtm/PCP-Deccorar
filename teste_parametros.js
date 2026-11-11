@@ -58,8 +58,11 @@ const CAD = ler('tecido/public/telas/cadastros.html');
 ok('a 606 não tem mais a aba Parâmetros', !/id:'parametro'/.test(CAD) && !/function telaParametro/.test(CAD) && !/\/api\/parametros/.test(CAD));
 const REV = ler('tecido/public/telas/revendas.html');
 ok('a 610 continua com a prévia do prazo, só leitura ("Enviando agora: pronto na …")', /Enviando agora: pronto na/.test(REV) && /\/api\/prazo/.test(REV));
-ok('a 610 não muda mais número do prazo nem feriado', !/\/api\/parametros\//.test(REV) && !/\/api\/feriados/.test(REV) && !/posso\('parametro\.editar'\)/.test(REV));
-ok('a 610 diz onde se mudam os números e os feriados (a 906)', /906/.test(REV));
+ok('a 610 não muda mais número do prazo nem feriado (sem PUT, POST ou DELETE)', !/\/api\/parametros\//.test(REV) && !/metodo:'(POST|DELETE)'[^\n]*feriad|\/api\/feriados[^\n]*metodo/.test(REV) && !/abertaId='par'/.test(REV));
+/* ③ REVISÃO: o vendedor (revenda.ler, nível Operação) LIA os números do prazo e
+   os feriados na 610, e não abre a 906 — eles continuam ali, só leitura. */
+ok('a 610 continua MOSTRANDO os números do prazo e os feriados, só leitura (o vendedor não abre a 906)', /Os quatro números do prazo/.test(REV) && /api\('\/api\/feriados'\)/.test(REV));
+ok('a 610 diz onde se mudam (a 906) só a quem tem a parametro.editar', /posso\('parametro\.editar'\)[^\n]*906|906[^\n]*posso\('parametro\.editar'\)/.test(REV) || /if\(posso\('parametro\.editar'\)\)[\s\S]{0,200}906/.test(REV));
 
 console.log('\n── 3. a caixinha de cada ação na tela de Acessos ──');
 const info = {}; PERMISSOES.forEach(p => info[p.chave] = p);
@@ -107,6 +110,8 @@ console.log('\n── 5. o horário impossível é recusado, e nada grava ──
     ok('hora fora do formato (9h) é 400', r.s === 400, JSON.stringify(r));
     r = await chamar({ seg:{ corte:'11:00' } });
     ok('hora certa grava (o campo ausente fica como estava)', r.s === 200 && val('corte_seg') === '11:00' && val('despacho_seg') === '15:00', JSON.stringify([r, val('corte_seg'), val('despacho_seg')]));
+    let r2; try{ r2 = await chamar({ seg:'10:30' }); }catch(e){ r2 = { s:500, o:{ erro:e.message } }; }
+    ok('③ REVISÃO: o dia que não vem como objeto é 400 (não estoura)', r2.s === 400 && val('corte_seg') === '11:00', JSON.stringify(r2));
     r = await chamar({ seg:{ corte:'' } });
     ok('campo vazio não apaga o horário (é recusado, dizendo o dia)', r.s === 400 && val('corte_seg') === '11:00', JSON.stringify(r));
     db.close();

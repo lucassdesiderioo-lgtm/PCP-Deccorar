@@ -47,7 +47,10 @@ async function jsend(u,metodo,corpo){
 }
 /* O sob medida responde {ok,dados,mensagem}; a medida padrão responde o objeto ou {erro}. */
 function erroDe(x){ return (x.j && (x.j.erro || x.j.mensagem)) || ('não deu para salvar (' + x.s + ')'); }
-function card(id){ var d=document.createElement('div'); d.className='card'; d.id=id; document.getElementById('corpo').appendChild(d); return d; }
+/* card(id): o card da parte; se ele já existe (redesenho depois de salvar), é
+   o mesmo lugar — a ordem das partes não muda. */
+function card(id){ var d=document.getElementById(id); if(d){ d.innerHTML=''; return d; }
+  d=document.createElement('div'); d.className='card'; d.id=id; document.getElementById('corpo').appendChild(d); return d; }
 
 /* ── Horários de corte e despacho (medida padrão) ─────────────────────────── */
 var DIAS=[['seg','Segunda'],['ter','Terça'],['qua','Quarta'],['qui','Quinta'],['sex','Sexta'],['sab','Sábado'],['dom','Domingo']];
@@ -105,7 +108,7 @@ function ligarSalvar(c, depois){
     i.classList.remove('erro');
     if(String(i.value).trim()==='' || !isFinite(n)){ i.classList.add('erro'); m.className='msg err'; m.textContent='Digite um número, com vírgula ou ponto.'; return; }
     var r=await jsend('/sobmedida/api/parametros/'+encodeURIComponent(k),'PUT',{valor:n});
-    if(r.s===200 && r.j && r.j.ok){ m.className='msg ok'; m.textContent='Salvo.'; if(depois) depois(); }
+    if(r.s===200 && r.j && r.j.ok){ if(depois) await depois(k); else { m.className='msg ok'; m.textContent='Salvo.'; } }
     else { i.classList.add('erro'); m.className='msg err'; m.textContent=erroDe(r); }
   }; });
 }
@@ -115,7 +118,15 @@ async function partCorte(lista){
   var h='<h2>Sob medida — parâmetros do plano de corte</h2><p class="ajuda">Os números que governam o cálculo do corte. Mudar é um campo, não um deploy — e muda a bobina que o sistema escolhe para a fábrica inteira.</p>';
   h+= corte.length ? '<div class="rola"><table>'+corte.map(function(p){ return linhaParam(p,pode); }).join('')+'</table></div>' : '<div class="vazio">Nenhum parâmetro.</div>';
   if(!pode) h+='<p class="nota">Mudar é de quem tem a permissão de editar os parâmetros do cálculo.</p>';
-  c.innerHTML=h; if(pode) ligarSalvar(c);
+  c.innerHTML=h; if(pode) ligarSalvar(c, redesenharSm);
+}
+/* Depois de salvar, o card volta com o valor, o extenso e o "alterado em" de
+   agora (③ REVISÃO: o "Salvo." aparecia ao lado do extenso de antes). */
+async function redesenharSm(chave){
+  var px=await jget('/sobmedida/api/parametros'); if(!(px.j && px.j.ok)) return;
+  var l=px.j.dados||[], prazo=String(chave).indexOf('prazo')===0;
+  if(prazo) await partPrazo(l); else await partCorte(l);
+  var m=document.querySelector('[data-msg="'+chave+'"]'); if(m){ m.className='msg ok'; m.textContent='Salvo.'; }
 }
 async function partPrazo(lista){
   var c=card('pPrazo'), pode=tem('sobmedida.parametro.editar');
@@ -128,7 +139,7 @@ async function partPrazo(lista){
   h+='<h2 style="margin-top:14px;font-size:15px">Feriados</h2><div id="ferLista"><div class="vazio">carregando…</div></div>';
   if(pode) h+='<div class="linha"><input type="date" id="ferData"> <input id="ferNome" placeholder="Feriado (ex.: Natal)"> <button class="p" id="ferAdd" type="button">Cadastrar feriado</button></div><div class="msg" id="ferMsg"></div>';
   c.innerHTML=h;
-  if(pode) ligarSalvar(c, function(){ recarregarPrazo(); });
+  if(pode) ligarSalvar(c, redesenharSm);
   await desenharFeriados(c, pode);
   if(!pode) return;
   document.getElementById('ferAdd').onclick=async function(){

@@ -72,7 +72,9 @@ module.exports=function(app,db){
     const b=req.body||{};
     const grava=[];
     for(const d of DIAS){
-      if(!b[d]) continue;
+      if(!(d in b)) continue;
+      if(!b[d]||typeof b[d]!=='object'||Array.isArray(b[d]))
+        return res.status(400).json({erro:'Os horários de '+NOME_DIA[d]+' vêm como {corte, despacho}. Nada foi gravado.'});
       for(const campo of ['corte','despacho']){
         if(!(campo in b[d])) continue;
         const v=b[d][campo];
