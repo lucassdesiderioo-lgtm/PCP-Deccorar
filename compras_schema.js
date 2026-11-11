@@ -116,25 +116,37 @@ function backfillMaterial(db){
    mesmo contador de id. Roda só enquanto a coluna ainda exige número: a segunda
    vez não acha nada para fazer. Nada aponta para esta tabela (sem FK). */
 function historicoAceitaIndefinido(db){
-  const col = db.prepare(`SELECT "notnull" n FROM pragma_table_info('custo_sku_historico') WHERE name='custo_material'`).get();
-  if(!col || !col.n) return;
-  const t = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='custo_sku_historico'").get();
-  const novo = t.sql
-    .replace(/^CREATE TABLE\s+("?)custo_sku_historico\1/i, 'CREATE TABLE custo_sku_historico_novo')
-    .replace(/(custo_material\s+REAL)\s+NOT\s+NULL/i, '$1')
-    .replace(/(custo_total\s+REAL)\s+NOT\s+NULL/i, '$1');
-  if(novo === t.sql || /custo_material\s+REAL\s+NOT\s+NULL/i.test(novo))
-    throw new Error('custo_sku_historico: não reconheci o SQL da tabela para tirar o NOT NULL — nada foi mudado');
-  const seq = db.prepare("SELECT seq FROM sqlite_sequence WHERE name='custo_sku_historico'").get();
-  db.transaction(() => {
-    db.exec(novo);
-    db.exec('INSERT INTO custo_sku_historico_novo SELECT * FROM custo_sku_historico');
-    db.exec('DROP TABLE custo_sku_historico');
-    db.exec('ALTER TABLE custo_sku_historico_novo RENAME TO custo_sku_historico');
-    db.exec('CREATE INDEX IF NOT EXISTS idx_custo_sku ON custo_sku_historico(sku, data)');
-    if(seq) db.prepare("UPDATE sqlite_sequence SET seq=? WHERE name='custo_sku_historico'").run(seq.seq);
-  })();
-  console.log('[compras] custo_sku_historico passou a aceitar o custo indefinido (vazio)');
+  /* ⚠️ A FALHA AQUI NÃO DERRUBA O SERVIDOR (③ REVISÃO). Isto roda no
+     require('./db'), sem try: um throw pararia a fábrica inteira (bancada,
+     Conferência, upload) por causa de uma tabela de histórico. Falhou, a
+     transação desfaz tudo, o log diz que NÃO migrou, e o boot segue — o
+     histórico continua recusando o indefinido, como antes, e a 404 grava. */
+  try{
+    const nn = (tabela, c) => { const r = db.prepare(`SELECT "notnull" n FROM pragma_table_info('${tabela}') WHERE name=?`).get(c); return r ? r.n : 0; };
+    const exige = t => nn(t, 'custo_material') || nn(t, 'custo_total');
+    if(!exige('custo_sku_historico')) return;
+    const t = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='custo_sku_historico'").get();
+    const sqlNovo = t.sql
+      .replace(/^CREATE TABLE\s+("?)custo_sku_historico\1/i, 'CREATE TABLE custo_sku_historico_novo')
+      .replace(/(custo_material\s+REAL)\s+NOT\s+NULL/i, '$1')
+      .replace(/(custo_total\s+REAL)\s+NOT\s+NULL/i, '$1');
+    const seq = db.prepare("SELECT seq FROM sqlite_sequence WHERE name='custo_sku_historico'").get();
+    db.transaction(() => {
+      db.exec(sqlNovo);
+      /* A prova é a tabela nova, e não o texto: se as duas colunas não ficaram
+         livres, nada se troca (a transação desfaz a tabela nova). */
+      if(exige('custo_sku_historico_novo'))
+        throw new Error('não reconheci o SQL da tabela para tirar o NOT NULL');
+      db.exec('INSERT INTO custo_sku_historico_novo SELECT * FROM custo_sku_historico');
+      db.exec('DROP TABLE custo_sku_historico');
+      db.exec('ALTER TABLE custo_sku_historico_novo RENAME TO custo_sku_historico');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_custo_sku ON custo_sku_historico(sku, data)');
+      if(seq) db.prepare("UPDATE sqlite_sequence SET seq=? WHERE name='custo_sku_historico'").run(seq.seq);
+    })();
+    console.log('[compras] custo_sku_historico passou a aceitar o custo indefinido (vazio)');
+  }catch(e){
+    console.log('[compras] custo_sku_historico NÃO foi migrado (o custo indefinido continua recusado; nada foi mudado): ' + e.message);
+  }
 }
 
 function garantirSchemaCompras(db){

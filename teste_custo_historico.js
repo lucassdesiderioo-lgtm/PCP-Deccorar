@@ -115,7 +115,9 @@ db.prepare("INSERT INTO ficha_formula (id,modelo_id,componente_id,expressao,orde
 
 /* A rota de verdade, num app de mentira (sem porta). */
 const rotas = {};
-const app = { get(){}, delete(p, ...h){ rotas['DELETE ' + p] = h[h.length - 1]; }, use(){},
+const AUDIT = [];
+const app = { locals:{ acesso:{ auditar:(req, cat, acao, alvo, det) => AUDIT.push({ cat, acao, alvo, det }) } },
+  get(){}, delete(p, ...h){ rotas['DELETE ' + p] = h[h.length - 1]; }, use(){},
   post(p, ...h){ rotas['POST ' + p] = h[h.length - 1]; } };
 require('./ficha_route')(app, db);
 function salvar(body){
@@ -171,7 +173,46 @@ caso('o histórico estourando por outro motivo: a linha grava e o salvar respond
   igual(r.st, 200, JSON.stringify(r.out));
   igual(db.prepare('SELECT expressao FROM ficha_formula WHERE id=2').get().expressao, '2 * largura / 100');
   sim(linhasLog.some(l => /falha simulada/.test(l)), 'o erro tem que ir para o log, e não sumir calado');
+  sim(AUDIT.some(x => x.acao === 'historico_custo_falhou' && /falha simulada/.test(x.det || '')), 'e para a auditoria, onde alguém vê sem abrir o servidor: ' + JSON.stringify(AUDIT));
   db.prepare("UPDATE ficha_formula SET expressao='largura / 100' WHERE id=2").run();
+});
+
+/* ── A MIGRAÇÃO QUE FALHA NÃO DERRUBA O SERVIDOR (③ REVISÃO) ───────────────
+   O garantirSchemaCompras roda no require('./db'), sem try: um throw ali para
+   a fábrica inteira por causa de uma tabela de histórico. */
+function bancoCom(ddl){
+  const d = new Database(':memory:');
+  d.exec("CREATE TABLE skus (codigo TEXT PRIMARY KEY, descricao TEXT DEFAULT '', cor TEXT DEFAULT '', estoque INTEGER DEFAULT 0, alvo INTEGER DEFAULT 0)");
+  d.exec(ddl);
+  d.exec("INSERT INTO custo_sku_historico (sku,custo_material,custo_total) VALUES ('A',1,1)");
+  return d;
+}
+const nnDe = (d, c) => d.prepare("SELECT \"notnull\" n FROM pragma_table_info('custo_sku_historico') WHERE name=?").get(c).n;
+caso('SQL fora do padrão: o boot NÃO estoura, avisa no log, e a tabela fica como estava', () => {
+  const d = bancoCom("CREATE TABLE custo_sku_historico (id INTEGER PRIMARY KEY AUTOINCREMENT, sku TEXT NOT NULL, custo_material DOUBLE NOT NULL, custo_mo REAL DEFAULT 0, custo_total DOUBLE NOT NULL, custo_medio REAL, origem TEXT, motivo TEXT, referencia TEXT, usuario_nome TEXT, criado_em TEXT, data TEXT, usuario_id INTEGER)");
+  const log = console.log; const L = [];
+  console.log = (...a) => L.push(a.join(' '));
+  try{
+    require('./sku_schema').garantirSchema(d);
+    require('./compras_schema').garantirSchemaCompras(d);
+  }finally{ console.log = log; }
+  igual(nnDe(d, 'custo_material'), 1);
+  igual(d.prepare('SELECT COUNT(*) c FROM custo_sku_historico').get().c, 1);
+  sim(L.some(l => /custo_sku_historico/.test(l) && /NÃO/.test(l)), 'tem que dizer no log que NÃO migrou: ' + JSON.stringify(L));
+  sim(!L.some(l => /passou a aceitar/.test(l)), 'e não pode anunciar que migrou: ' + JSON.stringify(L));
+  d.close();
+});
+caso('a guarda olha as DUAS colunas: só custo_total NOT NULL também migra', () => {
+  const d = bancoCom("CREATE TABLE custo_sku_historico (id INTEGER PRIMARY KEY AUTOINCREMENT, sku TEXT NOT NULL, custo_material REAL, custo_mo REAL DEFAULT 0, custo_total REAL NOT NULL, custo_medio REAL, origem TEXT, motivo TEXT, referencia TEXT, usuario_nome TEXT, criado_em TEXT, data TEXT, usuario_id INTEGER)");
+  const log = console.log; console.log = () => {};
+  try{
+    require('./sku_schema').garantirSchema(d);
+    require('./compras_schema').garantirSchemaCompras(d);
+  }finally{ console.log = log; }
+  igual(nnDe(d, 'custo_total'), 0, 'custo_total');
+  igual(nnDe(d, 'custo_material'), 0, 'custo_material');
+  igual(d.prepare('SELECT COUNT(*) c FROM custo_sku_historico').get().c, 1);
+  d.close();
 });
 
 /* ── O BANCO NOVO nasce aceitando o vazio ─────────────────────────────────── */

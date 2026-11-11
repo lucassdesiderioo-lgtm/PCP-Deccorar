@@ -29,7 +29,12 @@ module.exports = function(app, db){
      que a troca de preço já tinha (compras_route): o erro vai para o log. */
   function historico(modelo, motivo, req){
     try{ CUSTO.porModelo(db, modelo, motivo, {usuario_nome:QUEM.nomeDe(req), usuario_id:QUEM.idDe(req)}); }
-    catch(e){ console.log('[ficha] histórico de custo do modelo '+modelo+' falhou ('+motivo+'): '+e.message); }
+    catch(e){
+      /* E NA AUDITORIA (③ REVISÃO): só o log faria o histórico parar de novo
+         sem sinal nenhum — o defeito de 07/11 só apareceu porque a 404 dava 500. */
+      console.log('[ficha] histórico de custo do modelo '+modelo+' falhou ('+motivo+'): '+e.message);
+      QUEM.auditar(app, req, 'compras', 'historico_custo_falhou', 'modelo '+modelo, motivo+': '+e.message);
+    }
   }
 
   /* ── AS MEDIDAS DE TESTE VEM DO CATALOGO, NAO DE UMA LISTA FIXA ───────────
