@@ -78,13 +78,13 @@
 - Status:           em código desde 07/11/2026.
 - História:         fase 1.
 
-### R-CMP-09 · "Como sai do estoque" diz que está esperando
-- Regra:            `componente.como_sai` = `contagem` (o único que funciona hoje) · `ficha`. `ficha` é recusada dizendo "depende da montagem (PRODUCAO-MONTAGEM.md)", e a tela a mostra desabilitada com o mesmo texto (`material_dominio.COMO_SAI_FICHA_LIGADA`).
-- Por quê:          a regra inerte que diz que está inerte (dívida 18).
-- Exceções:         quando a montagem existir, liga-se a constante; a baixa é de lá.
-- Teste que trava:  `teste_material.js` (escolhível, reprova 2)
-- Status:           em código desde 07/11/2026.
-- História:         fase 1.
+### R-CMP-09 · "Como sai do estoque": pela contagem, ou pela ficha na embalagem
+- Regra:            `componente.como_sai` = `contagem` · `ficha`. **Desde 11/11/2026** (spec `FICHAS-NO-CADASTRO-UNICO`, decisão do dono) `ficha` existe, material por material, com duas condições (`material_dominio.podeSairPelaFicha`): o material é **por quantidade** e tem **uma contagem resolvida na 504** (o saldo de partida). Saindo pela ficha, ele baixa na EMBALAGEM, nas duas operações (`baixa_material_dominio.js`), pelo `componente_dominio`, com a operação na linha do livro. A devolução reembalada não baixa. ~~`ficha` é recusada dizendo "depende da montagem"~~ (até 11/11/2026).
+- Por quê:          o dono quer o saldo andando pela persiana produzida, e a contagem continua corrigindo — a diferença é a perda.
+- Exceções:         material por volume (o rolo) e sem saldo nunca saem pela ficha; o material que sai pela ficha não muda para "por volume" pelo cadastro.
+- Teste que trava:  `teste_material.js`, `teste_fichas_material.js`
+- Status:           em código desde 11/11/2026, falta subir.
+- História:         fase 1 da COMPRAS-E-RECEBIMENTO; fase 4 da FICHAS-NO-CADASTRO-UNICO.
 
 ### R-CMP-10 · Cadastro rápido, e a #33 inteira nas colunas novas
 - Regra:            nome e modo de saldo bastam para nascer (categoria, unidade e almoxarifado são o resto do formulário curto). Campo ausente preserva, vazio de propósito apaga, número impossível é recusado (400) dizendo qual campo — nunca clampado.

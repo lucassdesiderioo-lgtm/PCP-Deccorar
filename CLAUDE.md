@@ -3476,7 +3476,7 @@ Esperado: telas `302`, API `401`, `/login` `200`.
 `/admin/ficha`, `/admin/compras`, `/admin/cadastros` e `/admin/teste` — e, desde
 11/11/2026, `/admin/materiais`, `/admin/fornecedores`, `/admin/almoxarifados`,
 `/admin/recebimento-retido`, `/admin/notas` e `/admin/certificado` (ARRUMAR-O-LUGAR
-fase 2) — e, desde
+fase 2), e a 106 `/material-extra` (FICHAS-NO-CADASTRO-UNICO) — e, desde
 05/11/2026, a tela 206 `/coleta-horarios` (HORARIOS-DE-COLETA) — e, desde
 08/11/2026, a 905 `/minha-producao` (RELATORIOS-UNIFICADOS).
 
@@ -3936,7 +3936,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). ~~**Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa~~ — **fechado em 08/11/2026**: a 905 Minha produção e a aba Por pessoa da 904 (§21) · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (308), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (67), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (109), `teste_501_so_compra.js` (93), `teste_custo_historico.js` (15); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (308), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (67), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (109), `teste_501_so_compra.js` (93), `teste_custo_historico.js` (15), `teste_fichas_material.js` (42); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4136,6 +4136,11 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   outro assunto é tela, no módulo dela (§22, R-ORG-04)
 - ❌ Criar módulo que não está na lista dos 18 sem o dono aprovar antes, ou
   entregar PLANO sem o bloco 📍 LUGAR (§0, §22, R-ORG-01 e 13)
+- ❌ Baixar material pela ficha fora do `baixa_material_dominio.js`, deixar o
+  material por volume sair pela ficha, ou baixar na revisão: o momento é a
+  embalagem, e a peça com problema vai para o Supervisor decidir (§24)
+- ❌ Fazer a baixa de material travar a embalagem, ou baixar duas vezes a peça
+  sob medida embalada de novo depois de uma recusa (§24)
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor
 - ❌ Criar tabela de equivalências de SKU (decisão explícita do dono)
@@ -5299,3 +5304,75 @@ mapa ou na tela de Acessos.**
 > a caixinha marcada e desmarcada na tela de Acessos com uma pessoa de verdade, e
 > o vendedor do sob medida sem a `custo.ver`. Prova que não foi feita se escreve
 > como não feita.
+
+---
+
+## 24. As duas fichas no cadastro único de material (11/11/2026)
+
+Spec `docs/specs/FICHAS-NO-CADASTRO-UNICO.md` (as cinco fases numa entrega só),
+quatro linhas de 11/11/2026 em `docs/DECISOES.md`, cartão **R-CMP-09** em
+[`docs/regras/compras.md`](docs/regras/compras.md). O dono: *"se a gente não
+unificar esse cadastro de materiais já vamos começar bagunçado. Cadastro de
+materiais é uma coisa, ficha técnica é outra."*
+
+| Dono único | O quê |
+|---|---|
+| `material_dominio.js` | o código de cadastro (`codigoCadastro`), o "usado em" das duas fichas e a regra de "pela ficha" (`podeSairPelaFicha`) |
+| `baixa_material_dominio.js` | o que a peça embalada tira do material (a baixa pela ficha) e o consumido por operação |
+| `material_extra_dominio.js` | a tabela `material_extra`: a peça com problema, a recusada e a baixa que falhou, decididas na 106 |
+| `tecido/dominio/ficha_material.js` | a lista de material da ficha do sob medida, o custo dela, a lista congelada na aprovação e a baixa uma vez por peça |
+
+O que parece bug e não é:
+
+- ⚠️ **O CÓDIGO `MAT-0001` NÃO TEM COLUNA**: sai do id do `componente`, que é
+  AUTOINCREMENT (nunca repete, nunca muda, nunca se reaproveita). O material de
+  antes ganha o dele na hora. O "Código (opcional)" de sempre é outro campo
+  (código de barras ou do fornecedor).
+- ⚠️ **O `sm_componente` NÃO É MATERIAL**: é a peça de produção do sob medida
+  (setor, etiqueta, o preço do bandô). Ele fica; o material vem numa **lista ao
+  lado** (`sm_ficha_material`, aba "Lista de material" do Catálogo 608),
+  apontando o material da 1101 pela porta. **Nenhuma etapa da produção mudou**,
+  nas duas operações.
+- ⚠️ **A FÓRMULA DO SOB MEDIDA É A DA 404** (`formula.js`, a única porta, sem
+  eval), com largura e altura em **centímetros** — o sob medida guarda mm por
+  dentro e divide por 10. O custo da lista é a conta da 404 (o melhor preço das
+  ofertas); sem preço, indefinido, nunca zero. **O preço de venda não mudou.**
+  O custo tem rota própria (`/api/sm/simular/material`) e é podado por
+  `custo.ver`, e **não** pela poda de venda: o vendedor vê o preço, não o custo.
+- ⚠️ **"PELA FICHA" SÓ POR QUANTIDADE E COM CONTAGEM NA 504** (muda a R-CMP-09).
+  O rolo (por volume) tem o saldo pela soma dos volumes e nunca sai pela ficha.
+  O material marcado sai na **EMBALAGEM**: na medida padrão na mesma transação do
+  +1 (num ponto de salvamento próprio — falhou, desfaz só a baixa, a peça embala
+  e a falha vira material extra, #6); no sob medida **depois** da transação da
+  bancada (o saldo é do outro banco), uma vez por peça (`baixado_em`). **A
+  devolução reembalada não baixa** (`montagem.modo` guarda o modo da fila).
+- ⚠️ **A PEÇA COM PROBLEMA E A REFEITA NÃO BAIXAM SOZINHAS**: viram "material
+  extra a decidir" (a ficha como sugestão), e quem tem `material.extra` decide
+  na **106 Material extra** (Produção · Comum · Supervisor). **Quem registrou o
+  problema não decide**; decidida não se decide de novo; só baixa material por
+  quantidade. A linha parada aparece na central de Pendências.
+- ⚠️ **`material.extra` NASCE SÓ PARA O ADMIN GERAL** (R-ALC-06), e sai do
+  retrato do `teste_mapa` pelo nome (`perfis_acesso.js`). O dono a dá aos
+  Supervisores pela tela de Acessos.
+- ⚠️ **O CONSUMIDO POR OPERAÇÃO É ESTIMATIVA** para o material que sai pela
+  contagem (embalagens × ficha; a 1101 escreve "estimado"). O livro de material
+  ganhou a coluna `operacao` (`padrao` · `sobmedida`), no `CREATE` e no `ALTER`
+  (§17).
+- ⚠️ **A 404 VIROU "CATÁLOGO E FICHA TÉCNICA"** (fase 5): os modelos da medida
+  padrão no seletor de sempre, e os produtos do sob medida num bloco com o
+  caminho para a 608 de cada um (`/sobmedida/catalogo?modelo=N`), só para quem
+  abre a 608. A conta continua diferente em cada operação: juntou-se o lugar.
+  O nome "Rolo medida padrão ML" é cadastro: renomeia-se o modelo na 402.
+- **As migrações de schema:** no PCP, `movimento_componente.operacao`,
+  `montagem.modo` e a tabela `material_extra` (no modo teste); no sob medida, a
+  migração 42 (`sm_ficha_material` e `sm_pedido_material`).
+
+**Rode `node teste_fichas_material.js` e `cd tecido && npm test`
+(`ficha_material.test.js`) ao mexer em qualquer um dos donos acima, na
+embalagem (`mont_route.js`), na peça com problema (`cad_route.js`), na bancada
+ou na recusa do sob medida, ou na 1101, 404, 106 e 608.**
+
+> ⚠️ **AINDA NÃO NO AR, E NADA PROVADO COM DADO REAL.** A baixa só começa a
+> valer quando o dono marcar um material como "pela ficha" depois de contado na
+> 504 — até lá nenhum saldo muda. Prova que não foi feita se escreve como não
+> feita.

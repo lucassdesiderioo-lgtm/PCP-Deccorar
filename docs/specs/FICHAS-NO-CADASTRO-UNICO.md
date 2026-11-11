@@ -2,21 +2,38 @@
 
 ```
 STATUS
-Situação: APROVADA pelo dono em 11/11/2026 ("spec aprovada") · nada construído
+Situação: EM CÓDIGO (11/11/2026), falta subir · aprovada pelo dono em 11/11/2026 ("spec aprovada")
 Criada em: 11/11/2026
 Última atualização: 11/11/2026
-Fase atual: nenhuma — nada construído
-Fases: 1 ☐  2 ☐  3 ☐  4 ☐  (a 4 pode vir logo depois da 1 na medida padrão — §7)
+Fase atual: as cinco em código, numa entrega só (pedido do dono: "para por último fazer um teste só")
+Fases: 1 ◐  2 ◐  3 ◐  4 ◐  5 ◐  (◐ = em código, falta subir)
 Risco: 🔴 (schema nos dois bancos, cadastro de material, e a fase 4 mexe em saldo)
 Depende de: ORGANIZACAO-DO-SISTEMA (R-ORG-09 a 12), ARRUMAR-O-LUGAR fase 2 (a 1101 Materiais)
              a fase 4 depende também de PRODUCAO-MONTAGEM (a baixa pela ficha, R-CMP-09)
 Conferida contra: o `main` de 11/11/2026 (PR #338)
+Testes: teste_fichas_material.js (PCP), tecido/teste/ficha_material.test.js (sob medida)
 Tipo: NOVIDADE (+ REGRA na fase 4)
 ```
 
 > É a spec nº 4 da lista do `ORGANIZACAO-DO-SISTEMA.md` §8. O dono pediu para
 > trazê-la para a frente (11/11/2026): *"se a gente não unificar esse cadastro de
 > materiais já vamos começar bagunçado"*.
+
+### O que mudou na construção (11/11/2026)
+
+- **A 106 Material extra** nasceu no módulo Produção, bloco Comum, nível
+  Supervisor (decisão do dono), com a chave `material.extra` só para o Admin Geral.
+- **O código `MAT-` não tem coluna**: sai do id (AUTOINCREMENT).
+- **"Pela ficha" só por quantidade**: o rolo (por volume) tem o saldo pela soma
+  dos volumes (R-CMP-39) e não pode baixar pela ficha — não estava escrito na
+  spec, e é a única leitura que não desmancha a R-CMP-39.
+- **A baixa do sob medida roda depois da transação da bancada** (o saldo é do
+  outro banco), uma vez por peça; a falha vira "material extra a decidir".
+- **A lista de material do sob medida é uma aba do Catálogo (608)**, mesma
+  ficha do produto, ao lado das peças.
+- **A fase 5 juntou o LUGAR**: a 404 se chama "Catálogo e ficha técnica" e lista
+  os produtos do sob medida com o caminho para a 608; as duas telas continuam,
+  porque a conta é diferente em cada operação.
 
 ## Onde mora
 
