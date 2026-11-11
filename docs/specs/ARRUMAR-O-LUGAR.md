@@ -5,7 +5,7 @@ STATUS
 Situação: EM CONSTRUÇÃO · aprovada pelo dono em 11/11/2026
 Criada em: 11/11/2026
 Última atualização: 11/11/2026
-Fase atual: 3 no ar desde 11/11/2026 (PR #340; o dono fez o deploy e disse "deu tudo certo no deploy") · a 2 no ar desde 11/11/2026 (PR #336) · a 1 no ar desde 11/11/2026 (PR #334) · ⚠️ ainda não provado com dado real: a 1201 e a 1301 abertas por alguém sem chave da 501, a aprovação de material feita na 504, e a 906 usada por alguém do setor "Sob medida / Cadastros" · próxima: fase 4
+Fase atual: 3 no ar desde 11/11/2026 (PR #340; o dono fez o deploy e disse "deu tudo certo no deploy"), e o AJUSTE D12 (os horários na 206) construído, falta subir · a 2 no ar desde 11/11/2026 (PR #336) · a 1 no ar desde 11/11/2026 (PR #334) · ⚠️ ainda não provado com dado real: a 1201 e a 1301 abertas por alguém sem chave da 501, a aprovação de material feita na 504, e a 906 usada por alguém do setor "Sob medida / Cadastros" · próxima: fase 4
 Fases: 1 ☑  2 ☑  3 ☑  4 ☐  5 ☐
 Risco: 🔴 (cria tela, mexe em permissão e na tela de Acessos; a fase 4 muda regra do sob medida)
 Depende de: ORGANIZACAO-DO-SISTEMA (os 18 módulos, o mapa com módulo e bloco, o menu único)
@@ -56,7 +56,7 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
   horário recusado não ficava marcado; e o último número de pedido do Decorsoft,
   agora mandado como texto, aceitava letra — o `config.js` do sob medida passou
   a gravá-lo só inteiro, ou vazio ("ainda não lançado", §4.18).
-- `teste_parametros.js` (111; 63 na entrega, 48 no AJUSTE da D12), escrito antes; o `teste_lugar.js` e o
+- `teste_parametros.js` (113; 63 na entrega, 50 no AJUSTE da D12), escrito antes; o `teste_lugar.js` e o
   `teste_501_so_compra.js` passaram a esperar a lista vazia e a 906 no inventário.
 
 ### Fase 2 — a 501 fica só com compra (11/11/2026, no ar, PR #336)

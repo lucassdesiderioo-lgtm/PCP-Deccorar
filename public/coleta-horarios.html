@@ -165,7 +165,12 @@ document.getElementById('grade').addEventListener('click',async function(ev){
   }
 });
 async function carregar(de){
-  var j=await (await fetch('/api/saidas/semana'+(de?'?de='+de:''))).json();
+  var rs=await fetch('/api/saidas/semana'+(de?'?de='+de:''));
+  /* A rota das semanas recusou (quem não tem coleta.horario, quando a tela não
+     soube o acesso): diz o motivo, em vez de "nada" (③ REVISÃO, §12). */
+  if(rs.status===403){ document.querySelector('.abas').style.display='none'; document.getElementById('ajudaSemana').style.display='none';
+    document.getElementById('grade').innerHTML='<div class="vazio">As semanas das coletas são de quem lança os horários de coleta. Aqui você vê o horário padrão.</div>'; return; }
+  var j=await rs.json();
   estado.hoje=j.hoje; estado.dias=j.dias||[]; estado.edit={}; estado.msg={}; estado.hist={}; estado.semana=j.semana||null; estado.ver=de||null;
   if(!estado.de) estado.de=estado.dias.length?estado.dias[0].data:null;
   desenhar();
@@ -179,7 +184,7 @@ document.getElementById('abaP').onclick=function(){ this.classList.add('on'); do
    aqui ele morava na 906 Parâmetros, longe do assunto. A rota é a de sempre
    (`/api/config/horarios`): muda quem tem horarios.editar; quem só tem
    coleta.horario vê. O horário impossível é recusado pelo servidor, sem gravar. */
-var semAcima=false;
+var naoVeSemanas=false;
 var PADRAO_DIAS=[['seg','Segunda'],['ter','Terça'],['qua','Quarta'],['qui','Quinta'],['sex','Sexta'],['sab','Sábado'],['dom','Domingo']];
 async function padrao(pode){
   var c=document.getElementById('padrao'); c.style.display='block';
@@ -188,9 +193,9 @@ async function padrao(pode){
      pareceriam "não há horário padrão". */
   if(!x){ c.innerHTML='<h3>Horário padrão da semana</h3><div class="msg err" id="padraoErro">Não deu para ler o horário padrão. Recarregue a tela.</div>'; return; }
   /* "acima" só para quem vê as semanas lançadas acima (③ REVISÃO) */
-  var acimaTxt=semAcima?'na tela':'acima';
+  var acimaTxt=naoVeSemanas?'nesta tela 206, por quem lança os horários de coleta':'acima';
   var h='<h3>Horário padrão da semana <small>vale quando o dia não tem horário lançado</small></h3>'
-    +'<p class="ajuda" style="margin:0 0 8px">O <b>corte</b> é o que a Revisão mostra ("passou do corte"). O <b>despacho</b> é o limite para levar à agência quando o dia não tem a agência lançada '+acimaTxt+'. As coletas do Mercado Livre continuam sendo lançadas dia a dia, '+acimaTxt+(semAcima?', por quem lança os horários de coleta':'')+'.</p>'
+    +'<p class="ajuda" style="margin:0 0 8px">O <b>corte</b> é o que a Revisão mostra ("passou do corte"). O <b>despacho</b> é o limite para levar à agência quando o dia não tem a agência lançada '+acimaTxt+'. As coletas do Mercado Livre continuam sendo lançadas dia a dia, '+(naoVeSemanas?'por essas pessoas':'acima')+'.</p>'
     +'<table><tr><th>Dia</th><th>Corte</th><th>Despacho</th></tr>';
   PADRAO_DIAS.forEach(function(d){ var v=x[d[0]]||{};
     h+='<tr><td>'+d[1]+'</td><td><input type="time" data-pdia="'+d[0]+'" data-pcampo="corte" value="'+esc(v.corte)+'"'+(pode?'':' disabled')+'></td>'
@@ -219,7 +224,7 @@ async function padrao(pode){
   var tem=function(c){ return semPerms || !!eu.admin_geral || (eu.perms||[]).indexOf(c)>=0; };
   if(tem('coleta.horario')) carregar();
   else {
-    semAcima=true;
+    naoVeSemanas=true;
     document.querySelector('.abas').style.display='none';
     document.getElementById('ajudaSemana').style.display='none';
     document.getElementById('grade').innerHTML='<div class="vazio">As semanas das coletas são de quem lança os horários de coleta. Aqui você vê o horário padrão.</div>';

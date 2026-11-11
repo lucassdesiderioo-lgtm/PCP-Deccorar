@@ -83,7 +83,9 @@ ok('   quem não tem coleta.horario não pede as semanas (as rotas delas são de
 ok('   o horário recusado fica marcado no campo', /padrao[\s\S]*classList\.add\('erro'\)/.test(COL));
 ok('③ REVISÃO: a leitura do padrão que falha diz que falhou (não mostra campos vazios calada)', /padraoErro|Não deu para ler o horário padrão/.test(COL));
 ok('③ REVISÃO: sem resposta do /api/telas/minhas, a 206 tenta as semanas (não diz à pessoa que ela não tem acesso)', /semPerms|eu\s*===\s*null|minhasFalhou/.test(COL));
-ok('③ REVISÃO: quem não vê as semanas não lê a instrução de lançar a semana nem o "acima"', /ajudaSemana/.test(COL) && /acimaTxt|semAcima/.test(COL));
+ok('③ REVISÃO r2: a rota das semanas que recusa (403) diz o motivo, e não "nada"', /status===403[\s\S]{0,300}As semanas das coletas são de quem lança/.test(COL));
+ok('③ REVISÃO r2: a ajuda do padrão nomeia a tela (206), e não "na tela"', /nesta tela 206/.test(COL) && !/'na tela'/.test(COL));
+ok('③ REVISÃO: quem não vê as semanas não lê a instrução de lançar a semana nem o "acima"', /ajudaSemana/.test(COL) && /acimaTxt|naoVeSemanas/.test(COL));
 ok('sobmedida.parametro.editar aparece pendurada na 906', info['sobmedida.parametro.editar'] && info['sobmedida.parametro.editar'].tela === 906,
   JSON.stringify(info['sobmedida.parametro.editar'] && info['sobmedida.parametro.editar'].tela));
 ok('sobmedida.parametro.ler aparece na 602 Corte (é o Corte e as Sobras que leem os parâmetros)', info['sobmedida.parametro.ler'] && info['sobmedida.parametro.ler'].tela === 602,
