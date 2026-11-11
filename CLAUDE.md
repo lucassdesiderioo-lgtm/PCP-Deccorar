@@ -1805,8 +1805,9 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 > num backfill de uma vez só (`config.cmp_material_backfill_1`) — rodá-lo de novo
 > desfaria o que alguém mudou depois.
 >
-> ⚠️ **`como_sai = 'ficha'` É RECUSADO DE PROPÓSITO** até a montagem existir
-> (R-CMP-09): é a regra que diz que está esperando.
+> ⚠️ ~~**`como_sai = 'ficha'` É RECUSADO DE PROPÓSITO** até a montagem existir~~
+> — **desde 11/11/2026 a saída pela ficha existe** (R-CMP-09, §24): só material
+> por quantidade, com uma contagem resolvida na 504, e a baixa é na embalagem.
 >
 > ⚠️ **A FICHA RECUSA NO SERVIDOR o material com `vai_ficha = 0`** — esconder da
 > lista da 404 não basta (R-CMP-02).
@@ -3520,7 +3521,8 @@ cancelada, recusada e desfeita — QUEM-FEZ-E-REVISAO), `lote_reimpressao`
 `volume_material`, `volume_evento`, `contagem_material` (+ `_item` e `_linha`),
 `nota_compra` (+ `_item`), `pagamento_parcela` e `compra_anexo` (07/11/2026,
 COMPRAS-E-RECEBIMENTO — a `dfe_documento` fica fora: a nota apagada não se baixa de
-novo). (`foto_estoque` saiu na Fase 3.)
+novo), `material_extra` (11/11/2026, FICHAS-NO-CADASTRO-UNICO; a linha da recusa
+do sob medida nasce de verdade, §24). (`foto_estoque` saiu na Fase 3.)
 
 A lista fica em `TABELAS`, no topo do `teste_route.js`. Cada entrada traz a coluna
 de chave primária — hoje todas usam `id`. O campo ficou genérico por causa da
@@ -4673,7 +4675,7 @@ de material do PCP (marca e modelo): `node teste_componentes.js`. Todos os
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 869 casos
+cd tecido && npm test          # 885 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
@@ -5197,7 +5199,7 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 `tecido/nucleo/telas.js`.** Nove defeitos foram reintroduzidos um a um, e cada
 um reprova (mais seis na ③ REVISÃO, um a um: o módulo ou o bloco trocado numa
 tela ou numa parte que o inventário não conferia — ele passou de 26 para as 45
-telas e as duas partes; hoje são 51 telas e uma parte): tela sem módulo (2), módulo inventado (3), aba de outro assunto fora
+telas e as duas partes; hoje são 52 telas e uma parte): tela sem módulo (2), módulo inventado (3), aba de outro assunto fora
 da lista (2), aba registrada sem declaração no mapa (1), tela nova na faixa 600
 (3), item arrumado esquecido na lista (2), bloco "Revenda" numa tela de Produção
 (2), a lista de números antigos crescendo (1) e tela nova fora da faixa do módulo (2).
@@ -5363,7 +5365,9 @@ O que parece bug e não é:
   material pela ficha **vira "material extra a decidir"**, nas duas operações —
   e ⚠️ **a sugestão dessa linha é SÓ o material que faltou, sem quantidade**: o
   resto da ficha já baixou, e sugeri-lo faria o "baixar" sem mexer tirar duas
-  vezes. O Supervisor digita a quantidade; vazio é recusado.
+  vezes. O Supervisor digita a quantidade; vazio é recusado. **A fórmula que dá
+  negativo** também vira essa linha. **O SKU de revenda** (custo pendente) não:
+  só a medida pendente conta a ficha do modelo.
 - ⚠️ **A BAIXA QUE ESPEROU SAI EM NOME DE QUEM EMBALOU** (`sm_pedido_material.
   embalado_por`, `_id`, `_em`), e o `baixado_em` é a data da embalagem. A linha do
   livro de material nasce com a hora em que a baixa andou (o saldo anda quando

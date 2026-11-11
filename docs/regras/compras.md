@@ -509,7 +509,7 @@
 ## O que NÃO fazer
 
 - ❌ Dar padrão escondido ao `modo_saldo` de material novo (armadilha #30)
-- ❌ Ligar `como_sai = 'ficha'` antes de a montagem existir
+- ❌ Deixar sair pela ficha o material por volume, ou o material sem contagem resolvida na 504 (R-CMP-09, desde 11/11/2026)
 - ❌ Deixar a ficha aceitar material com `vai_ficha = 0`, ou desmarcar `vai_ficha` com o material numa ficha
 - ❌ Apagar almoxarifado: desativa
 - ❌ Voltar a gravar `enviado` como status de pedido, ou pôr na fila do Recebimento pedido que não está comprado

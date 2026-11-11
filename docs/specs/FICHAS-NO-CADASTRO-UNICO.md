@@ -36,6 +36,12 @@ Tipo: NOVIDADE (+ REGRA na fase 4)
   quantidade vira material extra; **o custo da lista saiu do simulador** (o
   vendedor tem a `custo.ver` de lá) — onde mostrar o custo da persiana sob
   medida é pergunta ao dono.
+- **③ REVISÃO, rodadas 2 e 3:** a linha "a ficha não deu a quantidade" sugere
+  só o material que faltou, sem quantidade (o resto já baixou); a baixa que
+  esperou sai em nome de quem embalou (`sm_pedido_material.embalado_por/_id/_em`);
+  a fórmula negativa vira essa linha; o SKU de revenda não gera linha; a 106
+  guarda a unidade e o digitado entre abas; a linha de falha não sugere a ficha
+  que já baixou; o mesmo material em duas fórmulas sai uma vez.
 - **A fase 5 juntou o LUGAR**: a 404 se chama "Catálogo e ficha técnica" e lista
   os produtos do sob medida com o caminho para a 608; as duas telas continuam,
   porque a conta é diferente em cada operação.
@@ -45,10 +51,12 @@ Tipo: NOVIDADE (+ REGRA na fase 4)
 | Tela, aba ou função nova | Nº | Módulo | Bloco | Liga-se a |
 |---|---|---|---|---|
 | "Código de cadastro" e "Usado em" no material (função na tela que já existe) | 1101 | Cadastros | Comum | 404 e a ficha do sob medida (606/608) apontam o material; 501 e 504 leem |
-| A lista de material da ficha do sob medida (função na tela que já existe) | 606 ou 608 (pergunta 1) | Cadastros | Sob medida | 1101 (o material), 501 (a compra), 504 (a contagem) |
+| A lista de material da ficha do sob medida (aba "Lista de material") | 608 | Cadastros | Sob medida | 1101 (o material), 501 (a compra), 504 (a contagem) |
 | "Consumido por operação" no material (função) | 1101 | Cadastros | Comum | as duas fichas e o que cada operação produziu |
+| **106 Material extra** (tela nova, fase 4) | 106 | Produção | Comum | 101 Revisão, 613 Bancada, 1101 Materiais, 204 Pendências |
+| A 404 vira "Catálogo e ficha técnica", com os produtos do sob medida (fase 5) | 404 | Cadastros | Medida padrão | 608 Catálogo do sob medida |
 
-Nenhuma tela nova. Nenhum módulo novo ou inaugurado.
+Uma tela nova (a 106). Nenhum módulo novo ou inaugurado.
 
 ## 1. O problema
 
@@ -227,11 +235,11 @@ entra no custo, não entra na compra e não sai do saldo.
 
 ## 6. Alçada
 
-- **Telas novas: nenhuma.**
-- **Ações novas:** nenhuma prevista. Montar a lista de material da ficha do sob
-  medida usa a chave que já edita o produto (`catalogo.editar` do sob medida);
-  ver o custo usa a `custo.ver` de lá (a regra do valor, §23). Se o desenho pedir
-  uma chave própria, ela nasce só para o Admin Geral (R-ALC-06).
+- **Telas novas:** 106 · Material extra · Produção · nível Supervisor.
+- **Ações novas:** `material.extra` · Supervisor · tela 106 · sensível (mexe em
+  saldo) — nasce só para o Admin Geral (R-ALC-06). Montar a lista de material da
+  ficha do sob medida usa `catalogo.editar` do sob medida; a rota do custo da
+  lista é de `catalogo.editar`, podada por `custo.ver` (nenhuma tela a mostra).
 - **Setores novos: nenhum.**
 
 ## 7. Fases
