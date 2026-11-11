@@ -38,7 +38,17 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
   /api/config/horarios` deixou de ser descartado calado — 400 dizendo o dia e o
   campo, e nada grava.
 - **A lista do que está fora do lugar está vazia.**
-- `teste_parametros.js` (55), escrito antes; o `teste_lugar.js` e o
+- **③ REVISÃO (três rodadas, `revisor-fabrica` e `testador-tela`), consertado
+  com o teste antes:** a 610 continua mostrando, só leitura, os números do prazo
+  e os feriados (o vendedor os lia ali e não abre a 906); o dia que não vem como
+  objeto no `POST /api/config/horarios` dava 500 (hoje 400); a hora do corte do
+  prazo (parâmetro de texto) não se salvava mais em tela nenhuma — a 906 a
+  convertia em número, como a aba antiga da 606; o redesenho depois de salvar
+  apagava o digitado nas outras linhas (hoje volta marcado "Não salvo"); o
+  horário recusado não ficava marcado; e o último número de pedido do Decorsoft,
+  agora mandado como texto, aceitava letra — o `config.js` do sob medida passou
+  a gravá-lo só inteiro, ou vazio ("ainda não lançado", §4.18).
+- `teste_parametros.js` (63), escrito antes; o `teste_lugar.js` e o
   `teste_501_so_compra.js` passaram a esperar a lista vazia e a 906 no inventário.
 
 ### Fase 2 — a 501 fica só com compra (11/11/2026, no ar, PR #336)

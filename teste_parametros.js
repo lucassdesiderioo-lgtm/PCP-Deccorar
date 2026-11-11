@@ -89,6 +89,7 @@ ok('③ REVISÃO: o parâmetro de tipo texto (a hora do corte do prazo) vai como
 ok('③ REVISÃO: o horário recusado fica marcado no campo, e não só na mensagem', /partHorarios[\s\S]*classList\.add\('erro'\)[\s\S]*function partBipe/.test(PAG));
 ok('③ REVISÃO: o card do sob medida não se chama "plano de corte" (ele lista etiqueta, rolo, crédito…)', !/parâmetros do plano de corte<\/h2>/.test(PAG));
 ok('③ REVISÃO r2: o redesenho depois de salvar devolve o que estava digitado e não salvo nas outras linhas (§12)', /function guardarDigitado/.test(PAG) && /function devolverDigitado/.test(PAG) && /redesenharSm[\s\S]{0,400}guardarDigitado[\s\S]{0,400}devolverDigitado/.test(PAG));
+ok('③ REVISÃO r3: o campo devolvido volta marcado como não salvo', /Não salvo — clique em Salvar/.test(PAG));
 ok('③ REVISÃO r2: o parâmetro de texto vazio é recusado na tela (como a 606 recusava)', /data-tipo|dataset\.tipo/.test(PAG) && /Não deixe o campo vazio/.test(PAG));
 ok('o /api/telas/minhas diz se a pessoa é de nível Admin (o segundo bipe)', /nivel_admin/.test(ler('admin_telas.js')));
 ok('nenhum texto proibido (chefia, dono…)', !/\b(chefia|chefe|patr[aã]o|gest[aã]o)\b/i.test(PAG.replace(/<!--[\s\S]*?-->/g,'').replace(/\/\*[\s\S]*?\*\//g,'')));

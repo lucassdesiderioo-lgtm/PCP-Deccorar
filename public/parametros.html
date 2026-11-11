@@ -152,7 +152,11 @@ function devolverDigitado(c, g){
   if(!c) return;
   Object.keys(g).forEach(function(k){
     var i=c.querySelector('input[data-chave="'+k+'"]') || c.querySelector('#'+k);
-    if(i) i.value=g[k]; });
+    if(!i) return;
+    i.value=g[k];
+    /* volta MARCADO como não salvo (rodada 3): um campo em branco sem aviso
+       parecia salvo, com o banco no valor de antes */
+    if(i.dataset.chave){ i.classList.add('erro'); var m=c.querySelector('[data-msg="'+k+'"]'); if(m){ m.className='msg err'; m.textContent='Não salvo — clique em Salvar.'; } } });
 }
 async function redesenharSm(chave){
   var px=await jget('/sobmedida/api/parametros'); if(!(px.j && px.j.ok)) return;
