@@ -68,6 +68,9 @@ const TELAS={
   '/inventario':'inventario','/inventario.html':'inventario',
   '/devolucao-casos':'devolucao_casos','/devolucao-casos.html':'devolucao_casos',
   '/coleta-horarios':'coleta_horarios','/coleta-horarios.html':'coleta_horarios',
+  /* A 906 Parâmetros (ARRUMAR-O-LUGAR fase 3, 11/11/2026): tela fora do /admin/,
+     então entra aqui, senão sem sessão ela seria servida do disco (#3). */
+  '/parametros':'parametros','/parametros.html':'parametros',
   /* COMPRAS-E-RECEBIMENTO (07/11/2026): a 503 Almoxarifado e a 504 Contagem de
      material. Fora desta lista, sem sessao, o pedido cairia no next() e a tela
      seria servida do disco — o teste de seguranca da §10 pegou a 503 com 200

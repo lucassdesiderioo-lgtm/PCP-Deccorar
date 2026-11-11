@@ -96,8 +96,9 @@ module.exports = function(app, db){
      acao que ela nao tem (R-TEL-04). Sao as dela, e so as dela. */
   app.get('/api/telas/minhas', (req, res) => {
     const u = req.usuario, ac = app.locals.acesso;
-    let perms = [], ag = false;
-    try{ if(u && ac){ ag = !!ac.ehAdminGeral(u.id); perms = Array.from(ac.permissoesDe(u.id)).sort(); } }catch(e){}
+    let perms = [], ag = false, nivelAdmin = false;
+    try{ if(u && ac){ ag = !!ac.ehAdminGeral(u.id); perms = Array.from(ac.permissoesDe(u.id)).sort();
+      nivelAdmin = ag || !!(ac.ehNivelAdmin && ac.ehNivelAdmin(u.id)); } }catch(e){}
     /* `modulos` é a lista dos 18, NA ORDEM do menu (a da spec, `modulos.js`);
        `blocos`, o nome de cada bloco. O desenho é o `public/menu_telas.js`,
        o mesmo nas duas operações. */
@@ -105,7 +106,9 @@ module.exports = function(app, db){
        principal dela — a barra diz isso uma vez. Quem decide é o valor.js. */
     const comPerms = new Set(perms);
     const telas = telasDe(u).map(t => Object.assign(t, { sem_valor: VA.semValor(t, comPerms, ag) }));
-    res.json({ telas, rota_da_aba: ROTA_DA_ABA, perms: ag ? [] : perms, admin_geral: ag,
+    /* `nivel_admin`: a pessoa é de nível Admin ou acima — a regra '@admin' das
+       ações sem chave (o segundo bipe da 906). É o nível DELA, e só isso. */
+    res.json({ telas, rota_da_aba: ROTA_DA_ABA, perms: ag ? [] : perms, admin_geral: ag, nivel_admin: nivelAdmin,
       modulos: MO.MODULOS.map(m => ({ chave:m.chave, nome:m.nome })), blocos: MO.BLOCOS });
   });
 

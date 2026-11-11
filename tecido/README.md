@@ -1379,7 +1379,7 @@ Sem prazo de fornecedor — que este módulo não tem, e não é escopo dele —
 existe ponto de pedido honesto**. O que existe é uma pergunta que o gestor
 responde: *"quantos dias de consumo eu quero ter na prateleira?"*
 
-Os dois números vivem em **Cadastros → Parâmetros**, com rótulo e ajuda ao
+Os dois números vivem em **906 Parâmetros** (até 11/11/2026, Cadastros → Parâmetros), com rótulo e ajuda ao
 lado. Um `× 1,3` escondido numa função seria um número que ninguém sabe de onde
 saiu e que ninguém muda sem deploy.
 
@@ -2042,7 +2042,7 @@ ensina qual cadastrar.
 
 ---
 
-## Os parâmetros do corte (Cadastros → Parâmetros)
+## Os parâmetros do corte (906 Parâmetros; até 11/11/2026, Cadastros → Parâmetros)
 
 | Chave | Padrão | O que faz |
 |---|---|---|
@@ -2083,7 +2083,7 @@ SVG (por `/barras.js`), o servidor desenha
 as mesmas barras dentro do PDF. Duas tabelas CODE128 seriam duas etiquetas
 diferentes para o mesmo codigo, e a divergencia so apareceria na bancada.
 
-### As medidas sao CADASTRAVEIS (Cadastros -> Parametros)
+### As medidas sao CADASTRAVEIS (906 Parametros; ate 11/11/2026, Cadastros -> Parametros)
 
 Nenhuma medida mora no codigo. A etiqueta e um objeto fisico que a equipe
 ajusta olhando o resultado na bancada — *"a letra ta pequena"*, *"a barra some
@@ -2207,7 +2207,7 @@ caminho para dar errado.
 
 ### ⚠️ Os limites da lista NÃO são a regra do refugo
 
-Quatro parâmetros em **Cadastros → Parâmetros**: `sobraLarguraMin` (0,50),
+Quatro parâmetros em **906 Parâmetros** (até 11/11/2026, Cadastros → Parâmetros): `sobraLarguraMin` (0,50),
 `sobraLarguraMax` (3,00), `sobraAlturaMin` (0,50), `sobraAlturaMax` (6,00).
 
 Começar a lista em `larguraMinimaSobra` (0,80) pareceria coerente e seria a

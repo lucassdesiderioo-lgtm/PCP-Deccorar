@@ -75,8 +75,9 @@ const FORA_DO_LUGAR = [
      as abas e as partes de outro assunto, que só se arrumam movendo-as. */
   /* As seis abas da 501 e a parte de material da 302 saíram em 11/11/2026
      (ARRUMAR-O-LUGAR fase 2): viraram as telas 1101–1103, 1201, 1301 e 1302, e
-     a aprovação de material foi para a 504. */
-  { item:'902/horarios', spec:'ARRUMAR-O-LUGAR fase 3 (906 Parâmetros)' }
+     a aprovação de material foi para a 504. E o último, os horários da 902,
+     saiu na fase 3 (11/11/2026): eles moram na 906 Parâmetros. A lista está
+     vazia — e o que sair do lugar amanhã entra aqui, com a spec que arruma. */
 ];
 
 function porChave(k){ return MODULOS.find(m => m.chave === k) || null; }

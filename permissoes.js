@@ -341,7 +341,8 @@ module.exports = [
      não corrige horário — esta chave é de Supervisor e Admin. */
   { chave:'coleta.horario',       grupo:'Expedição',    tela:206, nivel:'supervisor',
     rotulo:'Lançar horários de coleta', desc:'As coletas e a agência do dia, e a saída do PDF' },
-  { chave:'horarios.editar',      grupo:'Configuração', tela:902, nivel:'admin',
+  { chave:'horarios.editar',      grupo:'Configuração', tela:906,   // a 906 Parâmetros (ARRUMAR-O-LUGAR fase 3)
+    nivel:'admin',
     rotulo:'Editar horários',     desc:'Corte e despacho por dia',
     sensivel:true },
 

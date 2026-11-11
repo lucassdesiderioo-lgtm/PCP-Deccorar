@@ -126,13 +126,13 @@ function editor(campos, aoSalvar, aoCancelar){
 async function carregar(){
   eu=await api('/api/eu');
   $('#quem').textContent=eu.nome;
-  const [revendas,carteiras,tabelas,formas,prazo,feriados]=await Promise.all([
+  const [revendas,carteiras,tabelas,formas,prazo]=await Promise.all([
     api('/api/revendas'), api('/api/revendas/carteiras'), api('/api/tabelas'),
-    api('/api/formas-pagamento'), api('/api/prazo'), api('/api/feriados')
+    api('/api/formas-pagamento'), api('/api/prazo')
   ]);
   let pessoas=[];
   if(posso('revenda.editar')) pessoas=await api('/api/pessoas').catch(()=>null)||[];
-  dados={revendas,carteiras,tabelas,formas,prazo,feriados,pessoas};
+  dados={revendas,carteiras,tabelas,formas,prazo,pessoas};
   /* ⚠️ A LISTA NAO TRAZ ENDERECO NEM CONTATO — quem os traz e o
      GET /api/revendas/:id. A ficha aberta e recarregada inteira aqui, e nao
      lida da lista: lendo da lista, os dois cards apareceriam SEMPRE vazios,
@@ -491,53 +491,10 @@ function desPrazo(){
   if(p.empurrado_por.length) c.appendChild(el('p',{class:'nota falta'},[
     'Empurrado por: '+p.empurrado_por.map(f=>f.nome+' ('+f.data+')').join(', ')]));
 
-  c.appendChild(el('p',{class:'subtitulo'},['Os quatro números do prazo']));
-  const t=el('table',{class:'lista'});
-  dados.prazo.parametros.forEach(par=>{
-    const tr=el('tr');
-    tr.appendChild(el('td',{},[el('b',{},[par.rotulo]),el('br'),
-      el('span',{class:'nota'},[par.ajuda||''])]));
-    tr.appendChild(el('td',{class:'n'},[par.valor_extenso||par.valor,
-      par.unidade?el('span',{class:'nota'},[' ('+par.unidade+')']):'']));
-    tr.appendChild(el('td',{},[posso('parametro.editar')
-      ? (()=>{ const b=el('button',{class:'bt',type:'button'},['Mudar']);
-               b.onclick=()=>{ abertaId='par'+par.chave; erro=null; desenhar(); }; return b; })()
-      : '']));
-    t.appendChild(tr);
-    if(abertaId==='par'+par.chave){
-      const td=el('td',{colspan:'3'});
-      td.appendChild(editor([{chave:'valor',rotulo:par.rotulo,valor:par.valor}], async v=>{
-        erro=null;
-        try{ await api('/api/parametros/'+par.chave,{metodo:'PUT',corpo:{valor:v.valor},silencioso:true});
-             abertaId=null; banner('Parâmetro salvo.'); await carregar(); }
-        catch(e){ erro=e.message; desenhar(); }
-      }, ()=>{ abertaId=null; aberta=null; erro=null; desenhar(); }));
-      t.appendChild(el('tr',{},[td]));
-    }
-  });
-  c.appendChild(rolaH(t));
-
-  c.appendChild(el('p',{class:'subtitulo'},['Feriados']));
-  if(!dados.feriados.length) c.appendChild(el('p',{class:'nota'},['Nenhum cadastrado.']));
-  const chips=el('div',{class:'chips'});
-  dados.feriados.forEach(f=>{
-    chips.appendChild(el('span',{class:'chip'},[f.data+' · '+f.nome]));
-    if(posso('parametro.editar')){
-      const x=el('button',{class:'bt',type:'button'},['apagar']);
-      x.onclick=async()=>{ await api('/api/feriados/'+f.data,{metodo:'DELETE'});
-                           banner('Feriado apagado.'); await carregar(); };
-      chips.appendChild(x);
-    }
-  });
-  c.appendChild(chips);
-  if(posso('parametro.editar'))
-    c.appendChild(editor([{chave:'data',rotulo:'Data',dica:'2026-12-25'},
-                          {chave:'nome',rotulo:'Feriado',dica:'Natal'}], async v=>{
-      erro=null;
-      try{ await api('/api/feriados',{metodo:'POST',corpo:v,silencioso:true});
-           banner('Feriado cadastrado.'); await carregar(); }
-      catch(e){ erro=e.message; desenhar(); }
-    }, ()=>{ erro=null; desenhar(); }));
+  /* Os números do prazo e os feriados se mudam na 906 Parâmetros (ARRUMAR-O-LUGAR
+     fase 3, decisão do dono): aqui fica a prévia, que é o que o vendedor diz à
+     revenda. */
+  c.appendChild(el('p',{class:'nota'},['Os números do prazo e os feriados se mudam na tela 906 Parâmetros.']));
 }
 
 carregar().catch(()=>{});

@@ -1804,5 +1804,5 @@ module.exports = function(app, db){
    que remonta a coluna pela propria leitura concorda com o defeito — e a
    licao do QR (§4 do CLAUDE.md): ele pergunta a si mesmo. Nenhuma rota usa
    este campo; ele e leitura para teste e diagnostico. */
-  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar, podePermissao, ehAdminGeral, ehUltimoAdminGeral, coberturaDeRotas, sincronizarAreas, migrarNiveis, nivelAlcancado, cortadasPeloNivel, setoresAcimaDoNivel, nivelDaPessoa, permissoesBrutas };
+  app.locals.acesso = { permissoesDe, compararDivergencias, AREA_CHAVE, decidir, modoAcesso, permDaRota, auditar, podePermissao, ehAdminGeral, ehUltimoAdminGeral, coberturaDeRotas, sincronizarAreas, migrarNiveis, nivelAlcancado, cortadasPeloNivel, setoresAcimaDoNivel, nivelDaPessoa, permissoesBrutas, ehNivelAdmin };
 };

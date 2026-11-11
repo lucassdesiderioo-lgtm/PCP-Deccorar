@@ -5,8 +5,8 @@ STATUS
 Situação: EM CONSTRUÇÃO · aprovada pelo dono em 11/11/2026
 Criada em: 11/11/2026
 Última atualização: 11/11/2026
-Fase atual: 2 no ar desde 11/11/2026 (PR #336; o dono fez o deploy e disse "deu tudo certo no deploy") · a 1 no ar desde 11/11/2026 (PR #334) · ⚠️ ainda não provado com dado real: a 1201 e a 1301 abertas por alguém sem chave da 501, e a aprovação de material feita na 504 · próxima: fase 3
-Fases: 1 ☑  2 ◐  3 ☐  4 ☐  5 ☐
+Fase atual: 3 em código, falta subir (11/11/2026) · a 2 no ar desde 11/11/2026 (PR #336) · a 1 no ar desde 11/11/2026 (PR #334) · ⚠️ ainda não provado com dado real: a 1201 e a 1301 abertas por alguém sem chave da 501, a aprovação de material feita na 504, e a 906 usada por alguém do setor "Sob medida / Cadastros" · próxima: fase 4
+Fases: 1 ☑  2 ☑  3 ◐  4 ☐  5 ☐
 Risco: 🔴 (cria tela, mexe em permissão e na tela de Acessos; a fase 4 muda regra do sob medida)
 Depende de: ORGANIZACAO-DO-SISTEMA (os 18 módulos, o mapa com módulo e bloco, o menu único)
              ACESSO-POR-TELA-E-NIVEL (o mapa de telas, a tela de Acessos pelo mapa)
@@ -14,6 +14,32 @@ Conferida contra: o `main` de 11/11/2026 (PR #331), varredura das 45 telas no na
 Tipo: REGRA + NOVIDADE
 Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
 ```
+
+### Fase 3 — Parâmetros (11/11/2026, em código, falta subir)
+
+- **A tela 906 Parâmetros** (`/parametros`, Administração · Comum), página
+  própria como a 206, com quatro partes, cada uma pela rota de sempre e só para
+  quem tem a chave dela: horários de corte e despacho (`horarios.editar`; a rota
+  existia sem tela, dívida 18), o segundo bipe na Conferência (era da 902; nível
+  Admin), os parâmetros do plano de corte do sob medida (era a aba Parâmetros da
+  606) e os números do prazo e os feriados (eram o card da 610).
+- **Divergência D10 — o nível da 906:** o §8 dizia Admin; **o dono decidiu
+  Supervisor** (11/11/2026, linha em `docs/DECISOES.md`), porque as chaves do sob
+  medida são de Supervisor (R-SMA-02) e o setor "Sob medida / Cadastros" perderia
+  os parâmetros e os feriados. As partes da medida padrão continuam de Admin.
+- **Divergência D11 — a prévia do prazo fica na 610:** o §4 mandava o
+  "Calendário e feriados" inteiro à 906; **o dono decidiu** (11/11/2026) que a
+  prévia "Enviando agora: pronto na …" fica na 610, só leitura — é o vendedor
+  dizendo o prazo à revenda. Os números e os feriados se mudam na 906.
+- **A caixinha da `sobmedida.parametro.ler` pendura na 602 Corte** (quem lê os
+  parâmetros é o Corte e as Sobras); a `parametro.editar` e a `horarios.editar`
+  na 906. Nenhuma chave mudou de nome nem de nível.
+- **Junto, porque a tela nova mentiria sem isso:** o horário impossível no `POST
+  /api/config/horarios` deixou de ser descartado calado — 400 dizendo o dia e o
+  campo, e nada grava.
+- **A lista do que está fora do lugar está vazia.**
+- `teste_parametros.js` (55), escrito antes; o `teste_lugar.js` e o
+  `teste_501_so_compra.js` passaram a esperar a lista vazia e a 906 no inventário.
 
 ### Fase 2 — a 501 fica só com compra (11/11/2026, no ar, PR #336)
 
