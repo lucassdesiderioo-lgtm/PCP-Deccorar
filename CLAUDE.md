@@ -3474,7 +3474,7 @@ Esperado: telas `302`, API `401`, `/login` `200`.
 `ACESSO-POR-TELA-E-NIVEL` a lista inclui as telas do Admin: `/admin/producao`,
 `/admin/problemas`, `/admin/pendencias`, `/admin/correcoes`, `/admin/devolucoes`,
 `/admin/estoque`, `/admin/contagem`, `/admin/skus`, `/admin/sku-incompleto`,
-`/admin/ficha`, `/admin/compras`, `/admin/cadastros` e `/admin/teste` — e, desde
+`/admin/ficha`, `/admin/compras` e `/admin/cadastros` (a `/admin/teste` saiu com o modo teste, 11/11/2026) — e, desde
 11/11/2026, `/admin/materiais`, `/admin/fornecedores`, `/admin/almoxarifados`,
 `/admin/recebimento-retido`, `/admin/notas` e `/admin/certificado` (ARRUMAR-O-LUGAR
 fase 2), e a 106 `/material-extra` (FICHAS-NO-CADASTRO-UNICO) — e, desde
@@ -3495,6 +3495,25 @@ exigido e contado na trava; cadastro só com 6; banco antigo ganhando a coluna) 
 ---
 
 ## 11. Modo teste
+
+> ⚠️ **O MODO TESTE FOI APOSENTADO EM 11/11/2026** (decisão do dono, linha em
+> `docs/DECISOES.md`: *"não usamos mais"*, *"não treinamos mais ninguém"*). Tudo
+> o que se faz no sistema conta como produção real.
+> - **Ligar é recusado** (`POST /api/teste/ligar` → 410, para todos). A **903 saiu
+>   do mapa** (o número fica vago, R-TEL-02) e a chave `teste.operar` saiu do
+>   registro, das exceções e dos setores (uma vez só, `config.acesso_teste_operar`).
+> - **O que ficou, de propósito:** o "apagar" e o "manter" (`/api/teste/limpar`,
+>   `/manter`, só o Admin Geral, `@ag`) e a tarja — para encerrar um modo teste
+>   que estivesse **ligado no dia do deploy**; o boot avisa no log se estiver.
+>   Os gatilhos das tabelas, as travas "esta caixa é de verdade" e a espera da
+>   baixa do sob medida ficaram no código: só agem com o modo ligado, e com ele
+>   aposentado nunca agem — tirá-los mexeria em dez arquivos de estoque sem
+>   mudar comportamento nenhum.
+> - **As marcas `teste=1` antigas ficam no banco**: são história.
+> - Os testes que exercitam o encerrar simulam o banco que chegou ligado com o
+>   `util_modo_teste_antigo.js` (não é código de produção).
+>
+> O texto abaixo é como o modo funcionava.
 
 Marca tudo que acontece enquanto ligado, fotografa o estoque na ativação, e ao
 encerrar permite **apagar** (restaurando o estoque à foto) ou **manter** (promovendo
@@ -4143,6 +4162,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   embalagem, e a peça com problema vai para o Supervisor decidir (§24)
 - ❌ Fazer a baixa de material travar a embalagem, ou baixar duas vezes a peça
   sob medida embalada de novo depois de uma recusa (§24)
+- ❌ Voltar a ligar o modo teste, ou pôr de volta uma rota que o ligue: ele foi aposentado, e tudo é produção real (§11)
 - ❌ Usar `cp dados.db` como backup
 - ❌ Editar arquivos direto no servidor
 - ❌ Criar tabela de equivalências de SKU (decisão explícita do dono)
@@ -5339,11 +5359,15 @@ O que parece bug e não é:
   eval), com largura e altura em **centímetros** — o sob medida guarda mm por
   dentro e divide por 10. O custo da lista é a conta da 404 (o melhor preço das
   ofertas); sem preço, indefinido, nunca zero. **O preço de venda não mudou.**
-  ⚠️ **O CUSTO DA LISTA NÃO APARECE EM TELA NENHUMA AINDA** (③ REVISÃO): o
-  simulador é do lado do preço (R-VAL-05) e o vendedor tem a `custo.ver` do sob
-  medida — ele veria o preço de compra do PCP. A rota (`/api/sm/simular/material`)
-  ficou só para `catalogo.editar`, podada por `custo.ver`; onde mostrar o custo
-  da persiana sob medida é decisão do dono. O simulador mostra só a quantidade.
+  ⚠️ **O CUSTO DA LISTA APARECE SÓ NA 404, E NÃO NO SIMULADOR** (decisão do
+  dono, 11/11/2026): o simulador é do lado do preço (R-VAL-05) e o vendedor tem
+  a `custo.ver` do sob medida — ele veria o preço de compra do PCP. Na 404, o
+  "Conferir numa medida" de cada produto do sob medida (`GET
+  /api/catalogo/sobmedida/:id/medida`, as chaves da 404, medida em cm) mostra a
+  lista e o R$ **só a quem tem a `custo.ver` do PCP** (o servidor poda), e o total
+  separa **o que entra sempre** do que depende de escolha (bandô, comando…):
+  somar tudo seria o custo de uma persiana que ninguém vende. A porta do sob
+  medida é a `naMedida` (`ficha_material.js`). O simulador mostra só a quantidade.
 - ⚠️ **"PELA FICHA" SÓ POR QUANTIDADE E COM CONTAGEM NA 504** (muda a R-CMP-09).
   O rolo (por volume) tem o saldo pela soma dos volumes e nunca sai pela ficha.
   O material marcado sai na **EMBALAGEM**: na medida padrão na mesma transação do

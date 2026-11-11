@@ -291,7 +291,7 @@ bate('depois do sob medida');
 
 console.log('\n── o modo teste, que e onde a soma quebraria calada ──');
 
-chamar2('POST','/api/teste/ligar',{});
+require('./util_modo_teste_antigo')(d2);   // aposentado: simula o banco que chegou ligado ao deploy
 chamar2('POST','/api/montagem',{codigo:'BK120120BEGE',segundos:10});
 chamar2('POST','/api/montagem',{codigo:'BK120120BEGE',segundos:10});
 eq('em modo teste a embalagem soma igual', saldo2('BK120120BEGE'), 6);
@@ -305,7 +305,7 @@ eq('   e as linhas de teste sumiram do livro',
    d2.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE teste=1").get().n, 0);
 bate('depois de APAGAR os testes');
 
-chamar2('POST','/api/teste/ligar',{});
+require('./util_modo_teste_antigo')(d2);   // aposentado: simula o banco que chegou ligado ao deploy
 chamar2('POST','/api/montagem',{codigo:'BK120120BEGE',segundos:10});
 chamar2('POST','/api/teste/manter',{});
 eq('MANTER promove a producao de teste', saldo2('BK120120BEGE'), 5);

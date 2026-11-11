@@ -158,6 +158,7 @@ module.exports=function(app, db){
      O painel acima traz as contagens e e de `teste.operar`; este traz so o
      booleano, e e de qualquer pessoa logada — sem ele a tarja nao acendia para
      quem nao tem a chave (CONSERTO de 07/11/2026). */
+  try{ if(get('modo_teste')==='1') console.log('[teste] ATENCAO: o modo teste esta LIGADO, e foi aposentado. Encerre pelo POST /api/teste/limpar ou /manter (Admin Geral).'); }catch(e){}
   app.get('/api/teste/ativo',function(req,res){
     res.json({ativo:get('modo_teste')==='1'});
   });
@@ -167,19 +168,13 @@ module.exports=function(app, db){
               itens:conta(), rotulos:rotulos(), naoCobertas:FALHOU});
   });
 
+  /* O MODO TESTE FOI APOSENTADO (11/11/2026, decisao do dono: "nao usamos
+     mais"). Ligar e recusado; o "apagar" e o "manter" ficam so para encerrar um
+     que estivesse ligado no dia do deploy, e o boot avisa se estiver. As marcas
+     `teste=1` antigas ficam no banco: sao historia. */
   app.post('/api/teste/ligar',function(req,res){
-    if(get('modo_teste')==='1') return res.json({ok:true,ja:true});
-    set('teste_snapshot',JSON.stringify(db.prepare('SELECT codigo,estoque,alvo FROM skus').all()));
-    // Foto do material tambem. Apagar as linhas de movimento nao desfaz o saldo
-    // — quem guarda o saldo e a coluna componente.estoque, e o custo medio anda
-    // junto com ela no recebimento.
-    try{ set('teste_snapshot_comp',JSON.stringify(db.prepare('SELECT id,estoque,custo_medio FROM componente').all())); }
-    catch(e){ set('teste_snapshot_comp','[]'); }
-    set('teste_desde',new Date().toLocaleString('pt-BR'));
-    set('modo_teste','1');
-    res.json({ok:true,naoCobertas:FALHOU});
+    return res.status(410).json({erro:'O modo teste foi aposentado: tudo o que se faz no sistema conta como produção real.'});
   });
-
   app.post('/api/teste/limpar',function(req,res){
     var snap=[]; try{ snap=JSON.parse(get('teste_snapshot')||'[]'); }catch(e){}
     var snapC=[]; try{ snapC=JSON.parse(get('teste_snapshot_comp')||'[]'); }catch(e){}

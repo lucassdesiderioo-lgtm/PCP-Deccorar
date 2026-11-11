@@ -359,9 +359,9 @@ module.exports = [
   { chave:'setores.gerenciar',    grupo:'Sistema',    tela:901, nivel:'admin_geral',
     rotulo:'Criar e editar setores', desc:'Estrutura de cargos da empresa',
     sensivel:true, intransferivel:true },
-  { chave:'teste.operar',         grupo:'Sistema',    tela:903, nivel:'admin',
-    rotulo:'Operar modo teste',   desc:'Ligar, desligar e apagar testes',
-    sensivel:true },
+  /* `teste.operar` SAIU em 11/11/2026: o modo teste foi aposentado (decisao do
+     dono, DECISOES.md), e a 903 saiu do mapa. O que sobrou de /api/teste e do
+     Admin Geral (@ag), so para encerrar um modo teste que estivesse ligado. */
   { chave:'auditoria.ver',        grupo:'Sistema',    tela:901, nivel:'admin_geral',
     rotulo:'Ver auditoria',       desc:'Histórico de ações e cobertura',
     sensivel:true, intransferivel:true },

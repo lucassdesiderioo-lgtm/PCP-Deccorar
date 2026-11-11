@@ -154,8 +154,8 @@ const TELAS = [
   { n:902, nome:'Cadastros',             rota:'/admin/cadastros', nivel:'admin',    onde:'computador', perms:['listas.editar','kit.editar','kit.imprimir','horarios.editar'], aba:'cd',
     modulo:'cadastros', bloco:'comum', liga:[102, 206, 'listas'],
     partes:[{ id:'horarios', nome:'Horários de corte e despacho', modulo:'administracao' }] },
-  { n:903, nome:'Modo teste',            rota:'/admin/teste',   nivel:'admin',      onde:'computador', perms:['teste.operar'],          aba:'tst',
-    modulo:'administracao', bloco:'comum', liga:['todas as tabelas do modo teste'] },
+  // 903 Modo teste SAIU em 11/11/2026 (aposentado, decisao do dono): o numero
+  // fica vago para sempre (R-TEL-02).
   { n:904, nome:'Relatórios',            rota:'/relatorios',    nivel:'supervisor', onde:'computador', perms:['relatorios.ver'],        area:'relatorios', aba:'rel',
     modulo:'relatorios', bloco:'comum', liga:[401, 301, 252, 615, 'pendencias_dia'] },
   // RELATORIOS-UNIFICADOS (08/11/2026): o que a pessoa logada fez. Nível Operação, do tablet ou do computador (D4).
