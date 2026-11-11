@@ -5076,7 +5076,8 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 > lista reprova.
 
 > ⚠️ **A 501 FICOU SÓ COM COMPRA, E O FISCAL FOI INAUGURADO** (spec
-> `ARRUMAR-O-LUGAR` fase 2, 11/11/2026, em código, falta subir). Seis abas da 501
+> `ARRUMAR-O-LUGAR` fase 2, 11/11/2026, no ar desde 11/11/2026, PR #336 — o dono fez o
+> deploy e disse *"deu tudo certo no deploy"*). Seis abas da 501
 > viraram telas: **1101 Materiais**, **1102 Fornecedores**, **1103 Almoxarifados e
 > endereços** (Cadastros), **1201 Recebimento retido** (Almoxarifado), **1301
 > Notas fiscais de compra** e **1302 Certificado digital** (Fiscal). O que parece

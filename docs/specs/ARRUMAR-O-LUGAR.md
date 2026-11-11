@@ -5,7 +5,7 @@ STATUS
 Situação: EM CONSTRUÇÃO · aprovada pelo dono em 11/11/2026
 Criada em: 11/11/2026
 Última atualização: 11/11/2026
-Fase atual: 2 em código (11/11/2026), falta subir · a 1 no ar desde 11/11/2026 (PR #334)
+Fase atual: 2 no ar desde 11/11/2026 (PR #336; o dono fez o deploy e disse "deu tudo certo no deploy") · a 1 no ar desde 11/11/2026 (PR #334) · ⚠️ ainda não provado com dado real: a 1201 e a 1301 abertas por alguém sem chave da 501, e a aprovação de material feita na 504 · próxima: fase 3
 Fases: 1 ☑  2 ◐  3 ☐  4 ☐  5 ☐
 Risco: 🔴 (cria tela, mexe em permissão e na tela de Acessos; a fase 4 muda regra do sob medida)
 Depende de: ORGANIZACAO-DO-SISTEMA (os 18 módulos, o mapa com módulo e bloco, o menu único)
@@ -15,7 +15,7 @@ Tipo: REGRA + NOVIDADE
 Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
 ```
 
-### Fase 2 — a 501 fica só com compra (11/11/2026, em código)
+### Fase 2 — a 501 fica só com compra (11/11/2026, no ar, PR #336)
 
 - **Seis telas novas**, o mesmo `index.html` do Admin servido com a aba de
   Compras e o `cmp` dela (o `compras_abas.js` desenha só aquela aba, sem a
