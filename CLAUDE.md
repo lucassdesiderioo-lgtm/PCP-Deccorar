@@ -5266,7 +5266,8 @@ reprova a tela nova que não está lá. Não é para mexer no número: é para d
 
 > ⚠️ **O QUE ESTÁ FORA DO LUGAR HOJE, E NÃO É PARA "CONSERTAR" DE PASSAGEM**
 > (R-ORG-14): **nada desde 11/11/2026** — ~~os horários da 902~~ foram para a 906
-> Parâmetros (ARRUMAR-O-LUGAR fase 3).
+> Parâmetros (ARRUMAR-O-LUGAR fase 3), e no mesmo dia para a 206 Horários de
+> coleta (D12, §8).
 > ~~103, 402–404, 502–504, 902, 904, 905 e as 16 do sob medida~~ saíram com o
 > menu único; ~~a 302 na parte de material e as seis abas da 501~~ saíram em
 > 11/11/2026 (ARRUMAR-O-LUGAR fase 2). O que sair do lugar amanhã e não for movido
