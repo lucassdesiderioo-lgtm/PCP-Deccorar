@@ -164,6 +164,8 @@ const MAT = require('./material_dominio');
     r.corpo.linhas[0].quantidade === 6 && !/custo/.test(JSON.stringify(r.corpo)), () => JSON.stringify(r.corpo));
   r = await get('/api/catalogo/sobmedida/3/medida?largura=abc&altura=200', CUS);
   ok('medida impossivel e recusada (400), e nao vira zero', r.status === 400, () => JSON.stringify([r.status, r.corpo]));
+  r = await get('/api/catalogo/sobmedida/3/medida?largura=0.04&altura=0.04', CUS);
+  ok('medida que arredonda a 0 mm e recusada com a mesma frase', r.status === 400 && /centímetros/.test(r.corpo.erro), () => JSON.stringify([r.status, r.corpo]));
   require('./sobmedida_material').ligarFicha(null);
   r = await get('/api/catalogo/sobmedida/3/medida?largura=150&altura=200', CUS);
   ok('sem o sob medida ligado, a resposta diz que esta fora', r.status === 200 && r.corpo.fora === true, () => JSON.stringify(r.corpo));

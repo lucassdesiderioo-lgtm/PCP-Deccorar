@@ -269,7 +269,7 @@ module.exports = function(app, db){
   app.get('/api/catalogo/sobmedida/:id/medida',(req,res)=>{
     const num = v => (/^\d+([.,]\d+)?$/.test(String(v==null?'':v).trim()) ? +String(v).replace(',','.') : null);
     const l = num(req.query.largura), a = num(req.query.altura);
-    if(!l || !a) return res.status(400).json({ erro:'Digite a largura e a altura em centímetros.' });
+    if(!l || !a || Math.round(l*10) < 1 || Math.round(a*10) < 1) return res.status(400).json({ erro:'Digite a largura e a altura em centímetros.' });
     let r;
     try{ r = require('./sobmedida_material').naMedida(+req.params.id, Math.round(l*10), Math.round(a*10)); }
     catch(e){ return res.status(400).json({ erro:e.message }); }

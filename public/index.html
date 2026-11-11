@@ -900,9 +900,9 @@ function desenharSmConf(produtos){
   if(!lista.length){ box.innerHTML='<div class="sub">Nenhum produto com lista de material para conferir.</div>'; return; }
   box.innerHTML='<div class="sub" style="margin-bottom:4px">Conferir numa medida:</div>'
     +'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">'
-    +'<select id="smcP">'+lista.map(p=>'<option value="'+p.id+'"'+(String(p.id)===SMCONF.produto?' selected':'')+'>'+esc(p.nome)+'</option>').join('')+'</select>'
-    +'<input id="smcL" inputmode="decimal" placeholder="largura (cm)" style="width:110px" value="'+esc(SMCONF.largura)+'">'
-    +'<span>×</span><input id="smcA" inputmode="decimal" placeholder="altura (cm)" style="width:110px" value="'+esc(SMCONF.altura)+'">'
+    +'<select id="smcP" style="width:auto;max-width:320px">'+lista.map(p=>'<option value="'+p.id+'"'+(String(p.id)===SMCONF.produto?' selected':'')+'>'+esc(p.nome)+'</option>').join('')+'</select>'
+    +'<label>largura <input id="smcL" inputmode="decimal" placeholder="cm" style="width:80px" value="'+esc(SMCONF.largura)+'"> cm</label>'
+    +'<span>×</span><label>altura <input id="smcA" inputmode="decimal" placeholder="cm" style="width:80px" value="'+esc(SMCONF.altura)+'"> cm</label>'
     +'<button class="btn" id="smcB">Conferir</button></div><div id="smcR" style="margin-top:8px"></div>';
   const guarda=()=>{ SMCONF.produto=$('#smcP').value; SMCONF.largura=$('#smcL').value; SMCONF.altura=$('#smcA').value; };
   ['#smcP','#smcL','#smcA'].forEach(q=>$(q).addEventListener('input',guarda));
