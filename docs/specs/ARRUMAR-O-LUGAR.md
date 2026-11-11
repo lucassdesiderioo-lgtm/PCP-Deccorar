@@ -63,7 +63,8 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
   campo que o detalhe nunca traz e sumia para todo mundo (hoje olha o `preco`,
   que é o que a poda tira); o detalhe do pedido de compra listava o orçamento
   a quem não pode abri-lo (a conta dos anexos mora num lugar só, o
-  `anexo_compra.js`); a exceção que o backfill cria ganhou motivo e o boot diz
+  `anexo_compra.js`); a exceção que o backfill cria ganhou motivo e `criado_por` no
+  banco (a tela de Acessos ainda não mostra motivo de exceção) e o boot diz
   quantas; e o botão de WhatsApp deixou de aparecer a quem só lança preço.
   **Fica para o dono (P5):** sem a caixinha, o "Enviado" do item faltante não
   se marca nem para corrigir só o rastreio.
