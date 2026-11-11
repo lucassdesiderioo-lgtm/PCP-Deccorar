@@ -104,6 +104,39 @@ function backfillMaterial(db){
   }catch(e){ console.log('[compras] backfill do cadastro de material falhou: ' + e.message); }
 }
 
+/* ── O HISTÓRICO DE CUSTO ACEITA O CUSTO INDEFINIDO (CONSERTO de 11/11/2026) ──
+   A tabela nasceu com custo_material e custo_total NOT NULL, e o
+   custo_dominio.registrar grava a passagem para INDEFINIDO com o custo vazio, de
+   propósito (regra 4 do §7-B: indefinido nunca vira zero, e deixa rastro). Desde
+   que um material da ficha perdeu o preço (07/11), todo salvar da 404 estourava
+   aqui — depois de gravar a linha — e o histórico parou de andar.
+   O SQLite não muda coluna: a tabela é refeita, numa transação, a partir do SQL
+   DELA MESMA (sqlite_master, que já traz o usuario_id do ALTER no fim), só sem
+   os dois NOT NULL — mesmas colunas, mesma ordem (§17), todas as linhas, o
+   mesmo contador de id. Roda só enquanto a coluna ainda exige número: a segunda
+   vez não acha nada para fazer. Nada aponta para esta tabela (sem FK). */
+function historicoAceitaIndefinido(db){
+  const col = db.prepare(`SELECT "notnull" n FROM pragma_table_info('custo_sku_historico') WHERE name='custo_material'`).get();
+  if(!col || !col.n) return;
+  const t = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='custo_sku_historico'").get();
+  const novo = t.sql
+    .replace(/^CREATE TABLE\s+("?)custo_sku_historico\1/i, 'CREATE TABLE custo_sku_historico_novo')
+    .replace(/(custo_material\s+REAL)\s+NOT\s+NULL/i, '$1')
+    .replace(/(custo_total\s+REAL)\s+NOT\s+NULL/i, '$1');
+  if(novo === t.sql || /custo_material\s+REAL\s+NOT\s+NULL/i.test(novo))
+    throw new Error('custo_sku_historico: não reconheci o SQL da tabela para tirar o NOT NULL — nada foi mudado');
+  const seq = db.prepare("SELECT seq FROM sqlite_sequence WHERE name='custo_sku_historico'").get();
+  db.transaction(() => {
+    db.exec(novo);
+    db.exec('INSERT INTO custo_sku_historico_novo SELECT * FROM custo_sku_historico');
+    db.exec('DROP TABLE custo_sku_historico');
+    db.exec('ALTER TABLE custo_sku_historico_novo RENAME TO custo_sku_historico');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_custo_sku ON custo_sku_historico(sku, data)');
+    if(seq) db.prepare("UPDATE sqlite_sequence SET seq=? WHERE name='custo_sku_historico'").run(seq.seq);
+  })();
+  console.log('[compras] custo_sku_historico passou a aceitar o custo indefinido (vazio)');
+}
+
 function garantirSchemaCompras(db){
   db.exec(`
     /* ── COMPONENTE (provisorio — ver o aviso no topo do arquivo) ─────────── */
@@ -395,9 +428,9 @@ function garantirSchemaCompras(db){
     CREATE TABLE IF NOT EXISTS custo_sku_historico (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       sku            TEXT NOT NULL,
-      custo_material REAL NOT NULL,
+      custo_material REAL,             -- VAZIO = custo indefinido (§7-B, regra 4): nunca zero
       custo_mo       REAL DEFAULT 0,
-      custo_total    REAL NOT NULL,
+      custo_total    REAL,             -- idem
       custo_medio    REAL,
       origem         TEXT,   -- ficha | direto
       motivo         TEXT,
@@ -612,6 +645,7 @@ function garantirSchemaCompras(db){
   colunas('oferta', [['atualizado_por_id','INTEGER']]);
   colunas('preco_historico', [['usuario_id','INTEGER']]);
   colunas('custo_sku_historico', [['usuario_id','INTEGER']]);
+  historicoAceitaIndefinido(db);
   colunas('pedido_compra', [['criado_por_id','INTEGER'], ['pago_por_id','INTEGER']]);
   colunas('recebimento', [['recebido_por_id','INTEGER']]);
   colunas('fornecedor', [['tipo','TEXT'],['pix','TEXT'],['banco','TEXT'],['agencia','TEXT'],['conta','TEXT']]);
