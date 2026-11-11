@@ -5,7 +5,7 @@ STATUS
 Situação: EM CONSTRUÇÃO · aprovada pelo dono em 11/11/2026
 Criada em: 11/11/2026
 Última atualização: 11/11/2026
-Fase atual: 1 em código (11/11/2026), falta subir
+Fase atual: 1 no ar desde 11/11/2026 (PR #334); a próxima é a 2
 Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐
 Risco: 🔴 (cria tela, mexe em permissão e na tela de Acessos; a fase 4 muda regra do sob medida)
 Depende de: ORGANIZACAO-DO-SISTEMA (os 18 módulos, o mapa com módulo e bloco, o menu único)

@@ -5230,7 +5230,8 @@ nunca na 3010) e `cd tecido && npm test` (o `valor.test.js`) ao mexer em tela co
 dinheiro, numa rota que leve valor, no `valor.js`, no `custo.js` do sob medida, no
 mapa ou na tela de Acessos.**
 
-> ⚠️ **EM CÓDIGO DESDE 11/11/2026, FALTA SUBIR.** Ainda não provado com dado real:
+> ✅ **NO AR DESDE 11/11/2026** (PR #334): o dono fez o backup, o deploy e
+> disse *"deu tudo certo no deploy"*. ⚠️ Ainda não provado com dado real:
 > a caixinha marcada e desmarcada na tela de Acessos com uma pessoa de verdade, e
 > o vendedor do sob medida sem a `custo.ver`. Prova que não foi feita se escreve
 > como não feita.
