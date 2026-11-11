@@ -195,9 +195,14 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
         <div style="min-width:220px"><label>Modelo</label><select id="fxModelo"></select></div>
         <!-- A MEDIDA. A tela mostrava `1,80 × 1,50` fixo: a persiana crítica é a
              1,80 e a mais vendida é a 1,60 — mostrava uma e escondia a outra. -->
-        <div style="min-width:260px"><label>Na medida</label><select id="fxSku"></select></div>
+        <!-- A FICHA É DO MODELO, E A MEDIDA SÓ CONFERE (AJUSTE de 11/11/2026, o
+             dono: "parece que eu estou editando uma medida específica"). A tela
+             abre SEM medida, mostrando as fórmulas; escolher uma medida só mostra
+             os números dela, e não muda nada do que se grava. -->
+        <div style="min-width:300px"><label>Conferir numa medida (opcional — não muda a ficha)</label><select id="fxSku"></select></div>
         <div style="flex:1;min-width:120px"><span class="sub" id="fxAviso"></span></div>
       </div>
+      <div id="fxEscopo" style="margin-top:12px"></div>
     </div>
 
     <div class="card">
@@ -855,6 +860,10 @@ function analisarForma(expr){
 async function carregarFicha(){
   try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){ COMPS=[]; }
   if(!Array.isArray(COMPS)) COMPS=[];   // sem compras.ver a rota responde {erro}: lista vazia, e nao estouro (rodada 2)
+  /* A aba pode abrir antes do carregar() geral preencher os SKUS (③ REVISÃO,
+     11/11/2026): sem isto a faixa dizia "nenhum SKU aponta para este modelo"
+     com o modelo cheio de SKU — o §12, cache lido antes de existir. */
+  if(!Array.isArray(SKUS)||!SKUS.length){ try{ const r=await (await fetch('/api/skus')).json(); if(Array.isArray(r)) SKUS=r; }catch(e){} }
   const m=$('#fxModelo');
   if(m && !m.dataset.pronto){
     m.innerHTML=MODELOS.filter(x=>x.ativo).map(x=>'<option value="'+x.id+'">'+esc(rotuloLista(x))+'</option>').join('')
@@ -871,12 +880,64 @@ async function trocarModelo(){
     const lista=SKUS.filter(x=>x.modelo_id===mid && x.tem_ficha!==0)
       .sort((a,b)=>(a.largura_cm||0)-(b.largura_cm||0)||(a.altura_cm||0)-(b.altura_cm||0)
                  ||String(a.codigo).localeCompare(String(b.codigo)));
-    s.innerHTML=lista.map(x=>'<option value="'+esc(x.codigo)+'">'
-      +(x.largura_cm&&x.altura_cm?med(x.largura_cm,x.altura_cm)+' · ':'')+esc(x.codigo)+'</option>').join('')
-      || '<option value="">— este modelo não tem SKU com ficha —</option>';
+    /* A PRIMEIRA OPÇÃO É "NENHUMA", E A TELA ABRE NELA: a ficha é do modelo, e
+       abrir já numa medida fazia parecer que se editava a ficha daquela medida. */
+    s.innerHTML='<option value="">— nenhuma: mostrar as fórmulas —</option>'
+      +lista.map(x=>'<option value="'+esc(x.codigo)+'">'
+      +(x.largura_cm&&x.altura_cm?med(x.largura_cm,x.altura_cm)+' · ':'')+esc(x.codigo)+'</option>').join('');
+    escopoFicha(lista);
   }
   FXEDIT=null;
+  const mm=$('#fxMatMsg'); if(mm) mm.textContent='';
   await recarregar();
+}
+
+/* SEM MEDIDA ESCOLHIDA, OS AVISOS NÃO PODEM SUMIR (③ REVISÃO, 11/11/2026):
+   antes a tela abria numa medida e o âmbar da pendência, do erro e do "sem
+   preço" aparecia na hora (§7-B, regra 4). Agora a ficha de cada SKU do modelo
+   é pedida ao dono único (`/api/ficha/:sku`), e a tela junta o que ele disse —
+   sem conta própria. */
+let FXALERTA=null;
+async function alertasDoModelo(mid){
+  const lista=(Array.isArray(SKUS)?SKUS:[]).filter(x=>x.modelo_id===mid && x.tem_ficha!==0);
+  if(!lista.length) return null;
+  const fichas=await Promise.all(lista.map(x=>fetch('/api/ficha/'+encodeURIComponent(x.codigo))
+    .then(r=>r.json()).catch(()=>null)));
+  const msgs={}; let com=0;
+  fichas.forEach((f,i)=>{
+    if(!f) return;
+    const daqui=[];
+    if(f.pendencia||f.erro||f.aviso) daqui.push(f.pendencia||f.erro||f.aviso);
+    (f.linhas||[]).forEach(l=>{ if(!l.erro) return;
+      const fl=FXLINHAS.find(x=>x.id===l.formula_id)||{};
+      const nome=fl.familia?('Tecido · '+fl.familia):(fl.componente_nome||l.componente_nome||'linha');
+      daqui.push(nome+': '+l.erro); });
+    if(f.incompleto && !daqui.length) daqui.push('alguma linha está sem preço — o custo fica indefinido');
+    if(daqui.length){ com++; daqui.forEach(m=>{ (msgs[m]=msgs[m]||[]).push(lista[i].codigo); }); }
+  });
+  if(!com) return null;
+  return { com, total:lista.length, msgs };
+}
+
+/* A FAIXA DO ESCOPO: diz, antes de tudo, que a ficha é do MODELO e vale para
+   todos os SKUs dele — cada um calculado pela sua própria medida. */
+function escopoFicha(lista){
+  const el=$('#fxEscopo'); if(!el) return;
+  const m=MODELOS.find(x=>x.id===+$('#fxModelo').value);
+  if(!m){ el.innerHTML=''; return; }
+  const n=lista.length;
+  el.innerHTML='<div style="padding:10px 12px;border:1px solid var(--blue,#4493f8);border-radius:8px">'
+    +'<b>Ficha técnica do modelo '+esc(m.nome||m.codigo||'')+'</b> — '
+    +(n ? (n===1 ? 'vale para o SKU deste modelo, pela medida dele. '
+                 : 'vale para os <b>'+n+'</b> SKUs deste modelo, cada um pela sua medida. ')
+          +'Mudar uma linha aqui muda na hora o custo, a compra e o corte '+(n===1?'dele':'de todos')+'. '
+          +'<span class="sub">A ficha da montagem é uma cópia por SKU: só muda quando se grava de novo.</span>'
+        : 'nenhum SKU aponta para este modelo ainda.')
+    +(n ? '<details style="margin-top:6px"><summary class="sub" style="cursor:pointer">ver os SKUs</summary>'
+          +'<div class="sub" style="margin-top:4px;line-height:1.7">'
+          +lista.map(x=>esc(x.codigo)+(x.largura_cm&&x.altura_cm?' ('+med(x.largura_cm,x.altura_cm)+')':'')).join(' · ')
+          +'</div></details>' : '')
+    +'</div>';
 }
 
 async function recarregar(){
@@ -886,6 +947,7 @@ async function recarregar(){
   if(mid){ try{ const fl=await (await fetch('/api/formulas?modelo_id='+mid)).json(); FXLINHAS=Array.isArray(fl)?fl:[]; }catch(e){} }
   const sku=$('#fxSku')&&$('#fxSku').value;
   if(sku){ try{ FXFICHA=await (await fetch('/api/ficha/'+encodeURIComponent(sku))).json(); }catch(e){} }
+  FXALERTA=sku?null:await alertasDoModelo(+mid);
   render();
 }
 
@@ -902,11 +964,21 @@ function render(){
   const f=FXFICHA;
   if(av && f && (f.pendencia||f.erro||f.aviso))
     av.innerHTML='<span style="color:var(--amber)">'+esc(f.pendencia||f.erro||f.aviso)+'</span>';
+  if(av && !f && FXALERTA){
+    const ms=Object.keys(FXALERTA.msgs);
+    av.innerHTML='<span style="color:var(--amber)">⚠ em '+FXALERTA.com+' de '+FXALERTA.total
+      +' medida'+(FXALERTA.total===1?'':'s')+': '
+      +ms.slice(0,3).map(m=>esc(m)+' <span class="sub">('+FXALERTA.msgs[m].length+')</span>').join(' · ')
+      +(ms.length>3?' · e mais '+(ms.length-3):'')
+      +' — escolha uma medida para ver o detalhe</span>';
+  }
 
   const porId={};
   if(f&&f.linhas) f.linhas.forEach(l=>{ porId[l.formula_id]=l; });
 
-  let h='<table><thead><tr><th>Material</th><th class="n">Consome</th>'
+  let h=(f?'':'<div class="sub" style="margin-bottom:8px">Mostrando as <b>fórmulas</b>, que valem para todas as medidas. '
+      +'Para ver os números e o custo de uma medida, escolha-a em "Conferir numa medida".</div>')
+    +'<table><thead><tr><th>Material</th><th class="n">Consome</th>'
     +'<th class="n">Corta a</th><th class="n">R$</th><th></th></tr></thead><tbody>';
 
   for(const l of FXLINHAS){
@@ -926,11 +998,18 @@ function render(){
         +(l.observacao?'<div class="sub">'+esc(l.observacao)+'</div>':'')
         +(l.planejamento?'<div class="sub" style="color:var(--blue,#4493f8)">📋 vai para o planejamento da produção</div>':'')
         +(cego?'<div class="sub" style="color:var(--amber)">⚠ não olha a bobina</div>':'')+'</td>'
-      +'<td class="n">'+(r.erro?'<span style="color:var(--amber)">⚠</span>':qtd(r.quantidade))
+      +(f ? ('<td class="n">'+(r.erro?'<span style="color:var(--amber)">⚠</span>':qtd(r.quantidade))
         +(r.unidade&&!r.erro?' <span class="sub">'+esc(r.unidade)+'</span>':'')
         +(r.motivo?'<div class="sub">'+esc(r.motivo)+'</div>':'')+'</td>'
       +'<td class="n">'+(r.corte&&r.corte.texto?esc(r.corte.texto):'<span class="sub">—</span>')+'</td>'
-      +'<td class="n">'+brl(r.custo)+'</td>'
+      +'<td class="n">'+brl(r.custo)+'</td>')
+        /* SEM MEDIDA ESCOLHIDA, A REGRA: a fórmula como está gravada. O R$ fica
+           em branco, porque o preço depende da medida. */
+        : ('<td class="n"><code>'+esc(l.expressao||'')+'</code></td>'
+          +'<td class="n">'+([l.corte_largura,l.corte_altura].filter(x=>x!=null&&String(x).trim()!=='').length
+              ? '<code>'+[l.corte_largura,l.corte_altura].filter(x=>x!=null&&String(x).trim()!=='').map(esc).join(' × ')+'</code>'
+              : '<span class="sub">—</span>')+'</td>'
+          +'<td class="n"><span class="sub">—</span></td>'))
       +'<td class="n"><span class="sub">editar</span></td></tr>';
     if(r.erro) h+='<tr><td colspan="5" class="sub" style="color:var(--amber);padding-top:0">⚠ '+esc(r.erro)+'</td></tr>';
   }
@@ -1076,7 +1155,6 @@ async function previewEditor(){
   catch(e){ return; }
 
   if(!r.ok){ el.innerHTML='<span style="color:var(--red)">✗ '+esc(r.erro||'')+'</span>'; return; }
-  const t=r.testes[0];
   /* A unidade vem do cadastro do componente, não do resultado: "consome 1,6" e
      "consome 1,6 m" são frases diferentes, e é a segunda que se confere. */
   const uni=fam?'m linear':(function(){
@@ -1084,18 +1162,56 @@ async function previewEditor(){
              : (FXLINHAS.find(x=>x.id==FXEDIT)||{}).componente_id;
     const c=COMPS.find(x=>x.id===id); return c&&c.unidade?c.unidade:'';
   })();
-  let h='<span style="color:var(--green)">✓</span> nesta medida consome <b style="color:var(--amber)">'
-    +qtd(t.resultado)+(uni?' '+esc(uni):'')+'</b>';
-  if(r.corte){
+  /* O corte de uma medida: acha pelo par largura × altura, e não pela posição —
+     a lista do corte pode ter ignorado uma medida que a do consumo não ignorou. */
+  const corteDe=t=>{
+    if(!r.corte) return '';
     const p=[];
     for(const k of ['largura','altura']){
       const c=r.corte[k]; if(!c) continue;
-      p.push(c.ok?(cmN(c.testes[0].resultado)+' cm')
-                 :('<span style="color:var(--red)">'+esc(c.erro||'')+'</span>'));
+      if(!c.ok){ p.push('<span style="color:var(--red)">'+esc(c.erro||'')+'</span>'); continue; }
+      const x=(c.testes||[]).find(y=>y.largura===t.largura&&y.altura===t.altura);
+      p.push(x?cmN(x.resultado)+' cm':'—');
     }
-    if(p.length) h+=' · corta a <b>'+p.join(' × ')+'</b>';
+    return p.length?' · corta a <b>'+p.join(' × ')+'</b>':'';
+  };
+  const umaMedida=!!(s&&s.largura_cm&&s.altura_cm);
+  let h;
+  if(umaMedida){
+    const t=r.testes[0];
+    h='<span style="color:var(--green)">✓</span> na medida '+med(t.largura,t.altura)
+      +' consome <b style="color:var(--amber)">'+qtd(t.resultado)+(uni?' '+esc(uni):'')+'</b>'+corteDe(t);
+  }else{
+    /* SEM MEDIDA ESCOLHIDA: a mesma regra nas medidas de teste do catálogo, lado
+       a lado — é isto que mostra que a linha vale para TODAS as medidas. */
+    /* NO TECIDO, CADA MEDIDA EM CADA BOBINA (③ REVISÃO, 11/11/2026): o número
+       de cima é o da bobina mais estreita, e sem dizer qual a 1,50 aparecia com
+       o dobro do que a ficha cobra na 3,20 (§7-B, armadilha #19). Quem escolhe a
+       bobina é a ficha, pelo custo por peça — a tela só mostra as duas. */
+    const porBobina=(r.bobinas&&r.bobinas.length>1)?r.bobinas:null;
+    const consumoDe=t=>{
+      if(!porBobina) return ' → consome <b style="color:var(--amber)">'+qtd(t.resultado)+(uni?' '+esc(uni):'')+'</b>';
+      return ' → consome '+porBobina.map(b=>{
+        const x=b.ok&&(b.testes||[]).find(y=>y.largura===t.largura&&y.altura===t.altura);
+        return 'bobina '+bob(b.cm)+' m: <b style="color:var(--amber)">'+(x?qtd(x.resultado):(b.ok?'—':'não cabe'))+'</b>';
+      }).join(' · ')+(uni?' '+esc(uni):'');
+    };
+    h='<span style="color:var(--green)">✓</span> a mesma fórmula em cada medida:'
+      +r.testes.map(t=>'<div style="margin-left:18px">'+med(t.largura,t.altura)
+        +consumoDe(t)+corteDe(t)+'</div>').join('');
+    if(porBobina){
+      /* O aviso "não olha a bobina" só quando NENHUMA medida muda de bobina para
+         bobina: numa medida só, o número igual pode ser de verdade. */
+      const muda=r.testes.some(t=>new Set(porBobina.map(b=>{
+        const x=b.ok&&(b.testes||[]).find(y=>y.largura===t.largura&&y.altura===t.altura);
+        return x?Math.round(x.resultado*1000):'x'; })).size>1);
+      if(!muda)
+        h+='<div style="color:var(--amber)">⚠ o mesmo número em toda bobina, em todas as medidas — a fórmula não usa '
+          +'<code>largura_bobina</code>, então a escolha da bobina vira preço por metro linear, '
+          +'que é o critério errado no corte invertido.</div>';
+    }
   }
-  if(r.bobinas&&r.bobinas.length>1){
+  if(umaMedida&&r.bobinas&&r.bobinas.length>1){
     h+='<div style="margin-top:4px">'+r.bobinas.map(b=>{
       const x=b.ok&&b.testes&&b.testes[0];
       return '<span class="sub" style="margin-right:16px">bobina '+bob(b.cm)+' m: <b>'
@@ -1149,7 +1265,7 @@ document.addEventListener('input',function(e){
 document.addEventListener('change',function(e){
   const t=e.target; if(!t) return;
   if(t.id==='fxModelo'){ trocarModelo(); return; }
-  if(t.id==='fxSku'){ recarregar(); return; }
+  if(t.id==='fxSku'){ const mm=$('#fxMatMsg'); if(mm) mm.textContent=''; recarregar(); return; }
   if(t.id==='edTipo'){ montarCampos(null); previewEditor(); return; }
   if(t.id==='edComp'){ previewEditor(); return; }
 });
@@ -1166,6 +1282,8 @@ document.addEventListener('click',async function(e){
   }
   if(alvo.id==='fxNovo'){ FXEDIT='novo'; render(); return; }
   if(alvo.id==='fxMat'){
+    /* Gravar na ficha da montagem é por SKU: sem medida escolhida, diz o que falta. */
+    if(!$('#fxSku').value){ aviso('#fxMatMsg','Escolha uma medida em "Conferir numa medida" para gravar na ficha da montagem','var(--amber)'); return; }
     const r=await fetch('/api/ficha/'+encodeURIComponent($('#fxSku').value)+'/materializar',{method:'POST'});
     const j=await r.json();
     aviso('#fxMatMsg', r.ok?(j.linhas+' linhas gravadas'):(j.pendencia||j.erro||'não deu'),
@@ -3093,7 +3211,11 @@ var CDTIPOS=[
   {t:'rejeicao',n:'Motivos de peça com problema (revisão)'},
   {t:'motivo_devolucao',n:'Motivos de devolução (a baixa e as devoluções em andamento usam a mesma lista)'},
   {t:'doc_devolucao',n:'Documentos exigidos na coleta de devolução (antes de "Documentos ao ML")'},
-  {t:'motivo_estoque',n:'Motivos da conferência de estoque (quem aprova a diferença escolhe um)'}
+  {t:'motivo_estoque',n:'Motivos da conferência de estoque (quem aprova a diferença escolhe um)'},
+  /* AS CATEGORIAS DE MATERIAL (AJUSTE de 11/11/2026, o dono: "deveríamos ter um
+     campo para cadastrar novas categorias"). A lista já existia (R-CMP-04) e não
+     tinha tela. Ela só filtra e agrupa a compra programada — não decide regra. */
+  {t:'categoria_material',n:'Categorias de material (a 501 Compras → Materiais usa ao cadastrar)'}
 ];
 async function carregarCad(){
   var el=document.getElementById('cdBox');

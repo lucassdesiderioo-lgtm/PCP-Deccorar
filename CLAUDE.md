@@ -1686,6 +1686,14 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
   `alert(...)` seguido de redesenho: o texto digitado sumia e voltava a fórmula
   velha, e quem editava via a recusa e uma fórmula que não era a sua. Hoje o
   erro fica na própria linha, com o que foi digitado ainda no campo.
+- **A 404 abre SEM medida, mostrando as fórmulas** (AJUSTE de 11/11/2026, o
+  dono: *"parece que eu estou editando uma medida específica"*). A ficha é do
+  **modelo** e vale para todos os SKUs dele; o campo "Conferir numa medida" só
+  mostra os números e o R$ de um SKU, e não muda nada do que se grava. Sem
+  medida, o teste da linha mostra a fórmula nas medidas do catálogo (o tecido,
+  em cada bobina), e o âmbar das pendências junta o que o `/api/ficha/:sku` de
+  **cada** SKU do modelo diz — uma chamada por SKU, sem conta própria na tela.
+  O "Gravar na ficha da montagem" continua sendo por SKU: sem medida, ele avisa.
 - **A tabela da ficha é só leitura, e editar abre UM material de cada vez.**
   A primeira versão punha dez campos em duas linhas de tabela por material:
   dava para editar e não dava para ler — não se enxergava onde um material
