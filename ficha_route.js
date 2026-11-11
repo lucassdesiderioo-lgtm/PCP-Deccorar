@@ -278,11 +278,21 @@ module.exports = function(app, db){
     const linhas = (r.linhas || []).map(x => ({ nome:x.nome, unidade:x.unidade, quando:x.quando || 'sempre',
       quantidade:x.quantidade, erro:x.erro || null, custo_unitario:x.custo_unitario, custo_centavos:x.custo_centavos }));
     const soma = f => { let t = 0; for(const x of linhas.filter(f)){ if(x.custo_centavos == null) return null; t += x.custo_centavos; } return t; };
+    /* ③ REVISAO: o que depende de escolha sai POR ESCOLHA (com comando e sem
+       comando nao andam juntos; somar os dois seria uma persiana que ninguem
+       vende), e a linha de escolha sem preco nao torna indefinido o que entra
+       sempre. O "sem preco" do topo e so do que entra sempre. */
+    const sempre = linhas.filter(x => x.quando === 'sempre');
+    const grupos = [];
+    for(const x of linhas) if(x.quando !== 'sempre' && grupos.indexOf(x.quando) < 0) grupos.push(x.quando);
     const out = { fora:false, largura_cm:l, altura_cm:a, linhas,
-      custo_sempre_centavos:soma(x => x.quando === 'sempre'), custo_opcional_centavos:soma(x => x.quando !== 'sempre'),
-      sem_custo:r.sem_custo || [] };
+      custo_sempre_centavos:sempre.length ? soma(x => x.quando === 'sempre') : null,
+      nada_sempre:!sempre.length,
+      por_escolha:grupos.map(q => ({ quando:q, custo_centavos:soma(x => x.quando === q) })),
+      sem_custo:sempre.filter(x => x.custo_centavos == null).map(x => x.nome) };
     if(!ve){ for(const x of linhas){ delete x.custo_unitario; delete x.custo_centavos; }
-      delete out.custo_sempre_centavos; delete out.custo_opcional_centavos; delete out.sem_custo; }
+      delete out.custo_sempre_centavos; delete out.sem_custo;
+      for(const g of out.por_escolha) delete g.custo_centavos; }
     res.json(out);
   });
 

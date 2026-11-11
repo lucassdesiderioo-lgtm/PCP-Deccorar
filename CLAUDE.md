@@ -4695,7 +4695,7 @@ de material do PCP (marca e modelo): `node teste_componentes.js`. Todos os
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 886 casos
+cd tecido && npm test          # 889 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
@@ -5364,9 +5364,12 @@ O que parece bug e não é:
   a `custo.ver` do sob medida — ele veria o preço de compra do PCP. Na 404, o
   "Conferir numa medida" de cada produto do sob medida (`GET
   /api/catalogo/sobmedida/:id/medida`, as chaves da 404, medida em cm) mostra a
-  lista e o R$ **só a quem tem a `custo.ver` do PCP** (o servidor poda), e o total
-  separa **o que entra sempre** do que depende de escolha (bandô, comando…):
-  somar tudo seria o custo de uma persiana que ninguém vende. A porta do sob
+  lista e o R$ **só a quem tem a `custo.ver` do PCP** (o servidor poda). O total
+  é **o que entra sempre**, e o que depende de escolha sai **por escolha** (com
+  bandô +R$ X · com comando +R$ Y), nunca somado: com e sem comando não andam
+  juntos, e somar tudo seria o custo de uma persiana que ninguém vende. A linha
+  de escolha sem preço não torna indefinido o que entra sempre, e a **quantidade
+  negativa** tem custo indefinido — nunca desconta do total (③ REVISÃO). A porta do sob
   medida é a `naMedida` (`ficha_material.js`). O simulador mostra só a quantidade.
 - ⚠️ **"PELA FICHA" SÓ POR QUANTIDADE E COM CONTAGEM NA 504** (muda a R-CMP-09).
   O rolo (por volume) tem o saldo pela soma dos volumes e nunca sai pela ficha.

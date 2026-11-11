@@ -199,6 +199,20 @@ module.exports=[
   let recusou=false; try{ FM.naMedida(m.id,0,2000); }catch(e){ recusou=true; }
   igual(recusou,true,'largura zero e recusada');
  }},
+{nome:'③ o custo de uma linha NEGATIVA e indefinido, e nunca desconta do total',
+ executar({igual}){
+  produto();
+  const c=FM.custo([{componente_pcp_id:11,nome:'Parafuso',unidade:'un',quantidade:4},{componente_pcp_id:12,nome:'Corrente',unidade:'m',quantidade:-3}]);
+  const neg=c.linhas.find(x=>x.nome==='Corrente');
+  igual(neg.custo_centavos,null,'a linha negativa nao tem custo');
+  igual(c.custo_material_centavos,null,'o total fica indefinido');
+  igual(c.sem_custo.some(x=>/Corrente/.test(x)),true,'e a linha e nomeada');
+ }},
+{nome:'③ naMedida de produto que nao existe e recusada, e nao vira R$ 0,00',
+ executar({igual}){
+  let recusou=false; try{ FM.naMedida(987654,1500,2000); }catch(e){ recusou=true; }
+  igual(recusou,true,'recusou');
+ }},
 {nome:'③ o catalogo unico da 404 nao mostra produto inativo (R-SMN-01)',
  executar({igual}){
   produto();

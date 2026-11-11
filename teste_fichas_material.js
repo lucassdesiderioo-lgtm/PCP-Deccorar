@@ -144,14 +144,23 @@ const MAT = require('./material_dominio');
   require('./sobmedida_material').ligarFicha({ linhas:() => [], embalado:() => [], produtos:() => [],
     naMedida:(id, l, a) => { pedida = [id, l, a]; return { linhas:[
       { nome:'Parafuso', unidade:'un', quando:'sempre', quantidade:6, custo_unitario:0.1, custo_centavos:60 },
-      { nome:'Bando', unidade:'m', quando:'bando', quantidade:1.5, custo_unitario:10, custo_centavos:1500 }],
+      { nome:'Bando', unidade:'m', quando:'bando', quantidade:1.5, custo_unitario:10, custo_centavos:1500 },
+      { nome:'Corrente', unidade:'m', quando:'com_comando', quantidade:2, custo_unitario:1, custo_centavos:200 },
+      { nome:'Cordao', unidade:'m', quando:'sem_comando', quantidade:2, custo_unitario:null, custo_centavos:null }],
       sem_custo:[], custo_material_centavos:1560, custo_material_piso_centavos:1560 }; } });
   r = await get('/api/catalogo/sobmedida/3/medida?largura=150&altura=200', CUS);
   ok('a medida chega ao sob medida em milimetros', r.status === 200 && pedida && pedida[0] === 3 && pedida[1] === 1500 && pedida[2] === 2000, () => JSON.stringify([r.status, r.corpo, pedida]));
-  ok('com custo.ver: a lista com o R$, e o total do que entra sempre separado do opcional', r.corpo.linhas.length === 2 &&
-    r.corpo.linhas[0].custo_centavos === 60 && r.corpo.custo_sempre_centavos === 60 && r.corpo.custo_opcional_centavos === 1500, () => JSON.stringify(r.corpo));
+  ok('com custo.ver: a lista com o R$, e o total do que entra sempre', r.corpo.linhas.length === 4 &&
+    r.corpo.linhas[0].custo_centavos === 60 && r.corpo.custo_sempre_centavos === 60, () => JSON.stringify(r.corpo));
+  ok('③ o que depende de escolha sai POR ESCOLHA, e nunca somado (com e sem comando nao andam juntos)',
+    !('custo_opcional_centavos' in r.corpo) && Array.isArray(r.corpo.por_escolha) &&
+    r.corpo.por_escolha.find(e => e.quando === 'bando').custo_centavos === 1500 &&
+    r.corpo.por_escolha.find(e => e.quando === 'com_comando').custo_centavos === 200 &&
+    r.corpo.por_escolha.find(e => e.quando === 'sem_comando').custo_centavos === null, () => JSON.stringify(r.corpo));
+  ok('③ a linha de escolha sem preco nao torna indefinido o que entra sempre', r.corpo.custo_sempre_centavos === 60 &&
+    !(r.corpo.sem_custo || []).includes('Cordao'), () => JSON.stringify(r.corpo));
   r = await get('/api/catalogo/sobmedida/3/medida?largura=150&altura=200', CAD);
-  ok('sem custo.ver: a quantidade vem, e nenhum campo de custo viaja', r.status === 200 && r.corpo.linhas.length === 2 &&
+  ok('sem custo.ver: a quantidade vem, e nenhum campo de custo viaja', r.status === 200 && r.corpo.linhas.length === 4 &&
     r.corpo.linhas[0].quantidade === 6 && !/custo/.test(JSON.stringify(r.corpo)), () => JSON.stringify(r.corpo));
   r = await get('/api/catalogo/sobmedida/3/medida?largura=abc&altura=200', CUS);
   ok('medida impossivel e recusada (400), e nao vira zero', r.status === 400, () => JSON.stringify([r.status, r.corpo]));

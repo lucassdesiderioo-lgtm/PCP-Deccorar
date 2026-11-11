@@ -929,8 +929,9 @@ async function conferirSm(){
     +r.linhas.map(x=>'<tr><td>'+esc(x.nome||'')+'</td><td>'+esc(QUANDO_TXT[x.quando]||x.quando)+'</td><td>'
       +(x.erro?'<span style="color:var(--ambar,#f5a524)">'+esc(x.erro)+'</span>':num(x.quantidade)+' '+esc(x.unidade||''))+'</td>'
       +(ve?'<td>'+rs(x.custo_centavos)+'</td>':'')+'</tr>').join('')+'</tbody></table></div>'
-    +(ve?'<div style="margin-top:6px"><b>Custo de material, o que entra sempre: '+rs(r.custo_sempre_centavos)+'</b>'
-      +' <span class="sub">· o que depende de escolha (bandô, comando…), à parte: '+rs(r.custo_opcional_centavos)+'</span></div>'
+    +(ve?'<div style="margin-top:6px"><b>Custo de material, o que entra sempre: '+(r.nada_sempre?'nenhum material entra sempre':rs(r.custo_sempre_centavos))+'</b></div>'
+      +((r.por_escolha||[]).length?'<div class="sub" style="margin-top:2px">Mais, conforme a escolha: '
+        +r.por_escolha.map(g=>esc(QUANDO_TXT[g.quando]||g.quando)+' '+(g.custo_centavos==null?'sem preço':'+'+rs(g.custo_centavos))).join(' · ')+'</div>':'')
       +(r.sem_custo&&r.sem_custo.length?'<div style="color:var(--ambar,#f5a524);margin-top:4px">Sem preço: '+esc(r.sem_custo.join(', '))+' — o custo fica indefinido.</div>':'')
       :'<div class="sub" style="margin-top:6px">Os valores em R$ não aparecem para o seu acesso.</div>');
 }

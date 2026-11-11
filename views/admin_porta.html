@@ -21,7 +21,7 @@
 var ABA_ANTIGA={"prod":"/admin/producao","pb":"/admin/problemas","blq":"/admin/pendencias","cor":"/admin/correcoes",
   "dv":"/admin/devolucoes","est":"/admin/estoque","ct":"/admin/contagem","plan":"/planejamento","cad":"/admin/skus",
   "pend":"/admin/sku-incompleto","ficha":"/admin/ficha","compras":"/admin/compras","acs":"/acessos","cd":"/admin/cadastros",
-  "tst":"/admin/teste","rel":"/relatorios"};
+  "rel":"/relatorios"};
 fetch('/api/telas/minhas',{credentials:'same-origin'}).then(function(r){ return r.json(); }).then(function(d){
   var telas=(d&&d.telas)||[], mapa=(d&&d.rota_da_aba)||ABA_ANTIGA;
   var aba=(location.hash||'').replace('#','');

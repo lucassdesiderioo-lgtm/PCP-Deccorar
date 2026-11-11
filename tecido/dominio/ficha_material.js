@@ -117,8 +117,11 @@ function custo(itens){
   const linhas=[], sem=[]; let total=0;
   for(const i of itens){
     const p=precos?precos[i.componente_pcp_id]:null;
-    const v=(p!=null&&i.quantidade!=null)?Math.round(i.quantidade*p*100):null;
-    if(v==null){ sem.push(i.nome||('material '+i.componente_pcp_id)); }
+    /* ③ REVISAO: a quantidade negativa nao vira dinheiro negativo — o custo
+       dela e indefinido, e a linha e nomeada (regra 4). */
+    const neg=i.quantidade!=null&&i.quantidade<0;
+    const v=(p!=null&&i.quantidade!=null&&!neg)?Math.round(i.quantidade*p*100):null;
+    if(v==null){ sem.push((i.nome||('material '+i.componente_pcp_id))+(neg?' (quantidade negativa)':'')); }
     else total+=v;
     linhas.push({nome:i.nome, quantidade:i.quantidade, unidade:i.unidade, custo_unitario:p, custo_centavos:v});
   }
@@ -247,6 +250,7 @@ const produtosParaPcp=()=>db.prepare(`SELECT m.id, m.nome, m.ativo,
 function naMedida(modelo_id,largura_mm,altura_mm){
   exigir(Number.isInteger(+largura_mm)&&+largura_mm>0&&Number.isInteger(+altura_mm)&&+altura_mm>0,
     'medida_invalida','Digite a largura e a altura.');
+  exigir(!!db.prepare('SELECT 1 FROM sm_modelo WHERE id=?').get(+modelo_id),'produto_nao_existe','Este produto do sob medida não existe.');
   const itens=calcular(+modelo_id,+largura_mm,+altura_mm,()=>true);
   const c=custo(itens);
   c.linhas=c.linhas.map((x,i)=>Object.assign(x,{quando:itens[i].quando, erro:itens[i].erro}));
