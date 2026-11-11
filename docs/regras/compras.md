@@ -95,7 +95,7 @@
 - História:         fase 1.
 
 ### R-CMP-38 · Um sistema de almoxarifado, quantos a empresa quiser
-- Regra:            `almoxarifado` (nome único sem diferença de maiúscula, local, finalidade, ativo), criado, renomeado e desativado pela 501 (aba Almoxarifados), com `almoxarifado.cadastrar`. Com material dentro não se apaga: desativa, e volta pelo "Reativar". Nascem "Comandos e montagem" e "Expedição"; os do tecido vêm na fase 10.
+- Regra:            `almoxarifado` (nome único sem diferença de maiúscula, local, finalidade, ativo), criado, renomeado e desativado pela 1103 Almoxarifados e endereços (até 11/11/2026, aba da 501) (aba Almoxarifados), com `almoxarifado.cadastrar`. Com material dentro não se apaga: desativa, e volta pelo "Reativar". Nascem "Comandos e montagem" e "Expedição"; os do tecido vêm na fase 10.
 - Por quê:          o material fica em vários lugares da fábrica.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_material.js`, `teste_acesso_compras.js`
@@ -227,7 +227,7 @@
 - História:         fase 3.
 
 ### R-CMP-32 · Tolerância em três faixas
-- Regra:            até `tol_aviso_pct` entra normal; até `tol_retem_pct` entra no saldo e vai para ciência; acima — ou contagem **acima** da quantidade declarada — RETÉM: não entra no saldo. **A entrega abaixo do declarado entra** (o pedido fica parcial, o resto a caminho), e a diferença só é cobrada **no fechamento**: o "fechar pedido parcial" põe na aba Recebimento retido uma linha "fechamento" (o que chegou × o declarado), que se decide com aceitar ou aceitar e reclamar e **não mexe no saldo** (decisão do dono, 07/11/2026). Pedido com entrega retida esperando decisão **não fecha** (409): o retido ainda pode entrar. O peso é conferido a cada entrega, e a régua da nota é proporcional: o kg que falta ÷ as unidades declaradas que faltam.
+- Regra:            até `tol_aviso_pct` entra normal; até `tol_retem_pct` entra no saldo e vai para ciência; acima — ou contagem **acima** da quantidade declarada — RETÉM: não entra no saldo. **A entrega abaixo do declarado entra** (o pedido fica parcial, o resto a caminho), e a diferença só é cobrada **no fechamento**: o "fechar pedido parcial" põe na 1201 Recebimento retido (até 11/11/2026, aba da 501) uma linha "fechamento" (o que chegou × o declarado), que se decide com aceitar ou aceitar e reclamar e **não mexe no saldo** (decisão do dono, 07/11/2026). Pedido com entrega retida esperando decisão **não fecha** (409): o retido ainda pode entrar. O peso é conferido a cada entrega, e a régua da nota é proporcional: o kg que falta ÷ as unidades declaradas que faltam.
 - Por quê:          numa compra de R$ 40–50 mil o material pior não pode passar; e a compra por kg chega em partes no caso normal — reter toda parcial era a trava que dispara no caso normal (armadilha #6).
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_recebimento.js` (sem a faixa de aviso, reprova; contagem acima do declarado passando, reprova); `teste_revisao_compras.js` (a parcial retida, a régua dobrada e a diferença sem ir para quem libera, reprovam)
@@ -235,7 +235,7 @@
 - História:         fase 3.
 
 ### R-CMP-33 · O retido sai com um toque, nunca fica preso
-- Regra:            quem tem `recebimento.liberar` (501, aba Recebimento retido) escolhe aceitar, aceitar e reclamar, ou devolver, com motivo; grava quem e quando. Devolver não entra e continua a caminho. O aviso recebe "dar ciência". Retidos e avisos têm linha na central de Pendências.
+- Regra:            quem tem `recebimento.liberar` (1201 Recebimento retido; até 11/11/2026, aba da 501) escolhe aceitar, aceitar e reclamar, ou devolver, com motivo; grava quem e quando. Devolver não entra e continua a caminho. O aviso recebe "dar ciência". Retidos e avisos têm linha na central de Pendências.
 - Por quê:          trava que sabe liberar (armadilha #6).
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_recebimento.js` (retido entrando, reprova 8; sem motivo, 4); `teste_acesso_compras.js`
@@ -351,7 +351,7 @@
 - História:         fase 5.
 
 ### R-CMP-38 (fase 5) · O endereço do almoxarifado
-- Regra:            haste → andar → nível por almoxarifado (`alm_haste`, `alm_andar`, `alm_nivel`), criado pela 501 (aba Almoxarifados) com `almoxarifado.cadastrar`, no desenho do armazém do sob medida. Criar o mesmo endereço de novo não duplica.
+- Regra:            haste → andar → nível por almoxarifado (`alm_haste`, `alm_andar`, `alm_nivel`), criado pela 1103 Almoxarifados e endereços (até 11/11/2026, aba Almoxarifados da 501) com `almoxarifado.cadastrar`, no desenho do armazém do sob medida. Criar o mesmo endereço de novo não duplica.
 - Por quê:          o mesmo desenho que o sob medida já usa, e para onde os endereços dele migram na fase 10.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_almoxarifado.js`
@@ -361,7 +361,7 @@
 ## G. Contagem e consumo (fase 6)
 
 ### R-CMP-42 · Contagem de material: uma pessoa, cega, por almoxarifado
-- Regra:            a 504 (`/contagem-material`) abre a contagem de UM almoxarifado (um por vez) e lista os materiais por quantidade e por volume dele, sem o saldo (nem pelo JSON). Só quem abriu lança e termina. Ao terminar, por material contado: diferença até `tol_aviso_pct` aplica sozinha (motivo `contagem`, com quem contou); acima, vai para quem tem `contagem.aprovar` (aba Contagem da 302 e central de Pendências), que aplica a DIFERENÇA sobre o saldo de agora, com motivo. Quem contou não aprova. O saldo comparado é o da hora em que o material começou a ser contado. `contagem_dias` (30) diz quem está "a contar".
+- Regra:            a 504 (`/contagem-material`) abre a contagem de UM almoxarifado (um por vez) e lista os materiais por quantidade e por volume dele, sem o saldo (nem pelo JSON). Só quem abriu lança e termina. Ao terminar, por material contado: diferença até `tol_aviso_pct` aplica sozinha (motivo `contagem`, com quem contou); acima, vai para quem tem `contagem.aprovar` (a 504, num bloco só para quem tem a chave — até 11/11/2026, na aba Contagem da 302 — e central de Pendências, que leva à 504), que aplica a DIFERENÇA sobre o saldo de agora, com motivo. Quem contou não aprova. O saldo comparado é o da hora em que o material começou a ser contado. `contagem_dias` (30) diz quem está "a contar".
 - Por quê:          a contagem de material ganhou spec própria.
 - Exceções:         material por volume nunca é ajustado aqui: o saldo dele é a soma dos volumes; a diferença vai para ciência, e corrige-se na 503.
 - Teste que trava:  `teste_contagem_material.js` (saldo vazando, reprova 1; aplicando tudo sozinho, reprova; quem contou aprovando, 1; o saldo do "terminei", 2)
@@ -447,7 +447,7 @@
 - História:         fase 9.
 
 ### R-CMP-50 · Um sistema de almoxarifado: o PCP é dono do endereço; o sob medida, do rolo e da sobra
-- Regra:            `node migrar_enderecos_sobmedida.js` (simula nas cópias dos dois bancos; `--aplicar` faz backup dos dois, aplica e confere) leva os armazéns ROLO e SOBRA do sob medida para o PCP como "Tecidos novos" e "Sobras de tecido", com os mesmos nomes de haste, andar e nível e o id antigo guardado (`origem_sm`, `origem_sm_id`). No sob medida, armazem/haste/andar/nivel viram o ESPELHO do PCP (`pcp_almox_id`, `pcp_id`, migração 41): a porta (`tecido/nucleo/enderecos_pcp.js`) copia nome e ativo do PCP a cada leitura da árvore; a bancada que cria o buraco novo o cria NO PCP (R-SME-01 continua, pelo dono); renomear e desativar lá é recusado (é no PCP, 501). O rolo e a sobra guardam o nível do PCP e o nome dele (`nivel_pcp_id`, `nivel_pcp_nome`), mantidos por gatilho quando o `nivel_id` muda — o `nivel_id` de sempre e o corte não mudaram. "Um só por nível" vale entre os dois lados (o volume do PCP não entra onde há rolo, e o rolo não entra onde há volume). O painel do almoxarifado (501) mostra os volumes do PCP e os rolos e sobras do sob medida, por endereço, numa lista só.
+- Regra:            `node migrar_enderecos_sobmedida.js` (simula nas cópias dos dois bancos; `--aplicar` faz backup dos dois, aplica e confere) leva os armazéns ROLO e SOBRA do sob medida para o PCP como "Tecidos novos" e "Sobras de tecido", com os mesmos nomes de haste, andar e nível e o id antigo guardado (`origem_sm`, `origem_sm_id`). No sob medida, armazem/haste/andar/nivel viram o ESPELHO do PCP (`pcp_almox_id`, `pcp_id`, migração 41): a porta (`tecido/nucleo/enderecos_pcp.js`) copia nome e ativo do PCP a cada leitura da árvore; a bancada que cria o buraco novo o cria NO PCP (R-SME-01 continua, pelo dono); renomear e desativar lá é recusado (é no PCP, 1103 Almoxarifados e endereços). O rolo e a sobra guardam o nível do PCP e o nome dele (`nivel_pcp_id`, `nivel_pcp_nome`), mantidos por gatilho quando o `nivel_id` muda — o `nivel_id` de sempre e o corte não mudaram. "Um só por nível" vale entre os dois lados (o volume do PCP não entra onde há rolo, e o rolo não entra onde há volume). O painel do almoxarifado (1103; até 11/11/2026, aba da 501) mostra os volumes do PCP e os rolos e sobras do sob medida, por endereço, numa lista só.
 - Por quê:          o corte grava rolo, sobra e plano numa transação só; separar isso em dois bancos faria um corte pela metade virar tecido sumido.
 - Exceções:         porta caída: o endereço não some (o nome fica gravado no rolo e na sobra), a tela diz "sem atualização", e criar endereço no sob medida recusa (não nasce de um lado só). O PCP lista o que é dele e diz que o sob medida ficou de fora.
 - Teste que trava:  `teste_porta_almox.js` (sem o gatilho do mover, reprova 2; a conferência cega, 1; o rolo sem o nível do PCP, 6; sem ler o PCP, 4; a bancada criando só lá, reprova; o rolo ignorando o volume do PCP, 2; o volume ignorando o rolo, 1; a porta caída calada, 1; renomear lá, 1); `cd tecido && npm test` (o corte igual)
@@ -457,7 +457,7 @@
 ## J. Notas baixadas da Receita (fase 11)
 
 ### R-CMP-51 · O certificado entra pela tela, nunca pelo repositório
-- Regra:            501 → aba **Certificado**, só o Admin Geral (`certificado.gerenciar`, intransferível e sensível): cadastrar o CNPJ e o código da UF da Deccorar, enviar o `.pfx` com a senha, trocar e remover. O Node abre o `.pfx` com a senha (senha errada é recusada na hora) e lê titular, CNPJ e validade; o CNPJ tem que ser o da Deccorar (`config.cnpj`), e sem ele cadastrado o envio é recusado dizendo isso. O arquivo vai para `caminhos.CERTIFICADO` (`PCP_CERTIFICADO_DIR`, padrão `<pasta do PCP>/certificado`, fora de `lotes/` e de `backups/`), com permissão 0600. A senha é cifrada (AES-256-GCM, `v1:`) com uma chave própria do servidor, no arquivo `.chave` da mesma pasta (0600, criado na primeira vez). Trocar apaga o arquivo do anterior. **Não há rota que entregue o arquivo**, e a pasta, `*.pfx` e `*.p12` estão no `.gitignore`.
+- Regra:            **1302 Certificado digital** (até 11/11/2026, aba da 501), só o Admin Geral (`certificado.gerenciar`, intransferível e sensível): cadastrar o CNPJ e o código da UF da Deccorar, enviar o `.pfx` com a senha, trocar e remover. O Node abre o `.pfx` com a senha (senha errada é recusada na hora) e lê titular, CNPJ e validade; o CNPJ tem que ser o da Deccorar (`config.cnpj`), e sem ele cadastrado o envio é recusado dizendo isso. O arquivo vai para `caminhos.CERTIFICADO` (`PCP_CERTIFICADO_DIR`, padrão `<pasta do PCP>/certificado`, fora de `lotes/` e de `backups/`), com permissão 0600. A senha é cifrada (AES-256-GCM, `v1:`) com uma chave própria do servidor, no arquivo `.chave` da mesma pasta (0600, criado na primeira vez). Trocar apaga o arquivo do anterior. **Não há rota que entregue o arquivo**, e a pasta, `*.pfx` e `*.p12` estão no `.gitignore`.
 - Por quê:          o certificado A1 assina pela empresa; vazado, alguém emite e manifesta nota em nome da Deccorar.
 - Exceções:         nenhuma. A senha nunca vai ao JSON, ao log ou ao banco em texto; a decifra só acontece dentro do servidor, na hora da busca.
 - Teste que trava:  `teste_certificado.js` (senha em texto no banco, reprova 1; sem conferir o CNPJ, 1; sem exigir o CNPJ da empresa, 1; o arquivo sem 0600, 1; trocar sem apagar o anterior, 2)
@@ -465,7 +465,7 @@
 - História:         fase 11.
 
 ### R-CMP-52 · A validade à vista
-- Regra:            vencendo em menos de 30 dias: tarja âmbar na aba Certificado e nas **Notas recebidas**, e a linha "Certificado digital vencendo ou vencido" na central de Pendências (quem tem `certificado.gerenciar`). Vencido: a busca para e diz por quê. Certificado já vencido não entra.
+- Regra:            vencendo em menos de 30 dias: tarja âmbar na 1302 Certificado digital e nas **Notas recebidas** (1301), e a linha "Certificado digital vencendo ou vencido" na central de Pendências (quem tem `certificado.gerenciar`). Vencido: a busca para e diz por quê. Certificado já vencido não entra.
 - Por quê:          certificado que vence calado faz a busca parar sem ninguém ver.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_certificado.js` (a régua dos 30 dias trocada, reprova 2)
@@ -473,7 +473,7 @@
 - História:         fase 11.
 
 ### R-CMP-53 · A busca das notas na Receita
-- Regra:            com certificado válido, o servidor consulta a distribuição de DF-e do Ambiente Nacional (`NFeDistribuicaoDFe`, `distNSU`) pelo próprio relógio (`dfe_route.js`, olha a cada 5 min se já passou a `proxima_consulta`; sem cron), guardando o último NSU lido. `cStat 138` com mais a ler (`ultNSU < maxNSU`) volta em 2 min; `138` com tudo lido, `137` (nada novo) e `656` (consumo indevido) esperam **pelo menos uma hora**, seja qual for o `config.dfe_intervalo_min` (padrão 60; valor que não é número vira 60) — e depois de 137/656 o "consultar agora" também espera. Cada documento do lote entra sozinho: o que não abre vira linha "não entrou", com o motivo **e o conteúdo**, e o NSU só anda depois do lote; a linha é tentada de novo nas consultas seguintes (até 10 vezes), conta na central de Pendências e sai com "ciente" e motivo. Cada nota emitida contra o CNPJ aparece em 501 → Notas → **Notas recebidas da Receita**, com emitente, valor e data. O Admin Geral pode "Consultar a Receita agora".
+- Regra:            com certificado válido, o servidor consulta a distribuição de DF-e do Ambiente Nacional (`NFeDistribuicaoDFe`, `distNSU`) pelo próprio relógio (`dfe_route.js`, olha a cada 5 min se já passou a `proxima_consulta`; sem cron), guardando o último NSU lido. `cStat 138` com mais a ler (`ultNSU < maxNSU`) volta em 2 min; `138` com tudo lido, `137` (nada novo) e `656` (consumo indevido) esperam **pelo menos uma hora**, seja qual for o `config.dfe_intervalo_min` (padrão 60; valor que não é número vira 60) — e depois de 137/656 o "consultar agora" também espera. Cada documento do lote entra sozinho: o que não abre vira linha "não entrou", com o motivo **e o conteúdo**, e o NSU só anda depois do lote; a linha é tentada de novo nas consultas seguintes (até 10 vezes), conta na central de Pendências e sai com "ciente" e motivo. Cada nota emitida contra o CNPJ aparece em 1301 Notas fiscais de compra → **Notas recebidas da Receita** (até 11/11/2026, aba Notas da 501), com emitente, valor e data. O Admin Geral pode "Consultar a Receita agora".
 - Por quê:          a nota chega antes da mercadoria, e a Receita bloqueia quem consulta demais.
 - Exceções:         `PCP_DFE_AUTOMATICO=0` desliga o relógio (é o que os testes usam).
 - Teste que trava:  `teste_dfe.js` (o 137 sem esperar a hora, reprova 1; o "consultar agora" depois do 137, 1; o 138 sem mais nada, 1; o documento estragado derrubando o lote, 4)

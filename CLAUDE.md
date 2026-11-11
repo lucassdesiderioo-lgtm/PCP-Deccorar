@@ -1812,7 +1812,7 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 > ⚠️ **A 502 É CONTAGEM CEGA** (R-CMP-29): a fila não traz o pedido, o declarado
 > nem o peso esperado do item por quantidade — e não é esquecimento. O retido
 > (peso acima da tolerância, ou contagem ≠ declarado) **não entra no saldo** até
-> alguém com `recebimento.liberar` decidir, com motivo (501, aba Recebimento retido).
+> alguém com `recebimento.liberar` decidir, com motivo (1201 Recebimento retido; até 11/11/2026, aba da 501).
 >
 > ⚠️ **O CRÉDITO DE IMPOSTO VEM DA TABELA `regra_credito`, NÃO DO CÓDIGO** (R-CMP-25),
 > e cada nota grava o regime da data dela: mudar o regime não dá crédito para trás.
@@ -1841,7 +1841,7 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 > `nivel_id` pelo id do PCP**: o corte grava rolo, sobra e plano numa transação só.
 >
 > ⚠️ **O CERTIFICADO DIGITAL SÓ ENTRA PELA TELA, E NUNCA SAI** (R-CMP-51, fase 11):
-> 501 → aba Certificado, só o Admin Geral. O `.pfx` mora em `caminhos.CERTIFICADO`
+> 1302 Certificado digital (até 11/11/2026, aba da 501), só o Admin Geral. O `.pfx` mora em `caminhos.CERTIFICADO`
 > (0600, no `.gitignore`), a senha fica **cifrada** com a chave do arquivo `.chave` da
 > mesma pasta, e não há rota que entregue o arquivo. **Nunca commite certificado,
 > senha ou essa chave.** Perdida a pasta (servidor novo), o certificado é enviado de
@@ -1861,7 +1861,7 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 >   Acessos — até lá só ele abre a 503, libera retido, lança nota e aprova pedido.
 > - **Compra por kg em partes: a entrega abaixo do declarado ENTRA.** A que passa do
 >   declarado retém na hora; a diferença abaixo é cobrada no "fechar pedido parcial"
->   (uma linha "fechamento" na aba Recebimento retido, que **não mexe no saldo**). A
+>   (uma linha "fechamento" na 1201 Recebimento retido, que **não mexe no saldo**). A
 >   régua do peso da nota é o kg que falta ÷ as unidades declaradas que faltam.
 > - **O tecido com saldo de antes fica "por quantidade"** até alguém com
 >   `contagem.aprovar` etiquetar os rolos na 504; com saldo, o modo do material não
@@ -3463,6 +3463,9 @@ Esperado: telas `302`, API `401`, `/login` `200`.
 `/admin/problemas`, `/admin/pendencias`, `/admin/correcoes`, `/admin/devolucoes`,
 `/admin/estoque`, `/admin/contagem`, `/admin/skus`, `/admin/sku-incompleto`,
 `/admin/ficha`, `/admin/compras`, `/admin/cadastros` e `/admin/teste` — e, desde
+11/11/2026, `/admin/materiais`, `/admin/fornecedores`, `/admin/almoxarifados`,
+`/admin/recebimento-retido`, `/admin/notas` e `/admin/certificado` (ARRUMAR-O-LUGAR
+fase 2) — e, desde
 05/11/2026, a tela 206 `/coleta-horarios` (HORARIOS-DE-COLETA) — e, desde
 08/11/2026, a 905 `/minha-producao` (RELATORIOS-UNIFICADOS).
 
@@ -3922,7 +3925,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). ~~**Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa~~ — **fechado em 08/11/2026**: a 905 Minha produção e a aba Por pessoa da 904 (§21) · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (308), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (108), `teste_custo_historico.js` (15); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (308), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (67), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (109), `teste_501_so_compra.js` (93), `teste_custo_historico.js` (15); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4706,7 +4709,7 @@ abaixo) e o **Alt+0** do "Sair".
 > upload único na 103, 05/11/2026), os dois "Liberar com
 > divergência" da Conferência (202, `saida.liberar`), a decisão da divergência
 > de leitura (204, `sku.cadastrar`), o "pedir" do ajuste (301), o aprovar e
-> rejeitar da contagem de material (302), o cadastro de modelo, cor e tecido
+> rejeitar dos ajustes de peça (302; os de material moram na 504 desde 11/11/2026), o cadastro de modelo, cor e tecido
 > (402), o salvar e excluir da ficha (404) e as listas e o código do kit (902).
 > A regra é: **marca quem tem a ação numa chave diferente da que abre a tela**
 > — quem abriu a tela já tem a chave dela. **Botão novo de ação nasce com
@@ -5025,7 +5028,8 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 >   esperado, e o `teste_menu_unico.js` confere, pessoa a pessoa, que o menu tem
 >   exatamente as telas que o portão de cada operação deixa abrir;
 > - a lista do que está fora do lugar encolheu de 34 para **8** (as seis abas da
->   501, `302/material` e `902/horarios`), e o **Financeiro foi inaugurado** (a 616);
+>   501, `302/material` e `902/horarios`) — e para **1** em 11/11/2026, com a fase 2
+>   da ARRUMAR-O-LUGAR —, e o **Financeiro foi inaugurado** (a 616);
 > - ⚠️ **a tela de Acessos (901) continua agrupando pela centena** (`moduloDe`),
 >   de propósito: mudá-la é na tela de permissão, e ficou para depois.
 >
@@ -5051,8 +5055,8 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 
 > **Fase 2 (10/11/2026), o que veio antes do menu:** Toda
 > tela das duas operações declara `modulo` (o do **assunto**), `bloco` e `liga`
-> no `telas.js` e no `tecido/nucleo/telas.js`; as dez abas da 501 e as "partes"
-> da 302 e da 902 também têm módulo. A lista dos 18 módulos, os blocos, as
+> no `telas.js` e no `tecido/nucleo/telas.js`; as abas da 501 e as "partes"
+> da 902 (e da 302, até 11/11/2026) também têm módulo. A lista dos 18 módulos, os blocos, as
 > faixas, os números antigos e a lista do que está fora do lugar moram **num
 > lugar só**, o `modulos.js`. ✅ No ar desde 10/11/2026 (PR #328): o dono fez o
 > deploy e disse *"deu tudo certo"*. Valem também o 📍 LUGAR (§0) e a seção
@@ -5070,6 +5074,41 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 > do assunto — e desde o menu único os dois são o mesmo, então nenhuma tela está
 > na lista `FORA_DO_LUGAR`. O teste **exige** isso: item arrumado que fica na
 > lista reprova.
+
+> ⚠️ **A 501 FICOU SÓ COM COMPRA, E O FISCAL FOI INAUGURADO** (spec
+> `ARRUMAR-O-LUGAR` fase 2, 11/11/2026, em código, falta subir). Seis abas da 501
+> viraram telas: **1101 Materiais**, **1102 Fornecedores**, **1103 Almoxarifados e
+> endereços** (Cadastros), **1201 Recebimento retido** (Almoxarifado), **1301
+> Notas fiscais de compra** e **1302 Certificado digital** (Fiscal). O que parece
+> bug e não é:
+> - **a tela nova é o mesmo `index.html` do Admin**, servido com a aba de Compras
+>   e o `cmp` dela (`telas.js`, campo `cmp`; `admin_telas.js` o manda no
+>   `TELA_ADMIN`): o `compras_abas.js` desenha só aquela aba, sem a faixa. O
+>   código da aba não mudou, e o registro dela diz a tela (`tela:1101`);
+> - **cada uma abre com a regra que MOSTRAVA a aba na 501** (o `le` do registrar,
+>   quando havia, senão o `perms`), conferido pessoa a pessoa no
+>   `teste_501_so_compra.js`. O ganho é nomeado: a chave que é o trabalho da tela
+>   abre a tela mesmo sem chave da 501 (`recebimento.liberar` a 1201;
+>   `nota.lancar` e `custo.ver` a 1301) — a rota já aceitava a chave;
+> - **a central de Pendências leva cada linha à tela nova** (ou à 504), e os
+>   ajustes antigos são duas linhas: peça (302) e material (504), cada uma
+>   contando o que a tela dela mostra (#12);
+> - **o link antigo** (`/admin/compras#notas`, e a aba lembrada neste computador)
+>   leva à tela nova; a 501 abre só com Lista de compras, Pedidos, Compra rápida
+>   e Compra programada;
+> - **a aprovação da contagem de material e os ajustes antigos de material saíram
+>   da 302 e moram na 504** (decisão do dono "a"), no `public/aprov_material.js`:
+>   a 504 abre também com `contagem.aprovar` e `contagem.ajustar`, o bloco só
+>   aparece a quem tem a chave, e o ajuste antigo de material só se rejeita (o
+>   servidor recusa aprovar, 410). A 302 é de peça;
+> - **a tela de Acessos agrupa as telas novas pelas centenas 1100, 1200 e 1300**
+>   (`telas.js`, `MODULOS`), e a caixinha de cada ação pendura na tela nova; a
+>   chave não mudou (#13);
+> - **a lista do que está fora do lugar ficou só com `902/horarios`** (fase 3).
+>
+> **Rode `node teste_501_so_compra.js` (93) ao mexer no `compras_abas.js`, nas
+> telas 1101–1302, na 504, no `aprov_material.js` ou no destino de uma linha
+> da central de Pendências.**
 
 **A fábrica tem duas operações; a venda tem três canais.**
 
@@ -5093,9 +5132,9 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 | 800 | Mercado Livre (integração) | reservado |
 | 900 | Administração | existe (hoje "Sistema") |
 | 1000 | Comercial | existe em parte (609–611) · consumidor final reservado |
-| 1100 | Cadastros | existe espalhado (402–404, 902, 606/608, abas da 501) |
-| 1200 | Almoxarifado | existe espalhado (502–504, 603–605) |
-| 1300 | Fiscal | reservado · hoje só abas da 501 |
+| 1100 | Cadastros | existe (402–404, 902, 606/608 e, desde 11/11/2026, 1101–1103) |
+| 1200 | Almoxarifado | existe (502–504, 603–605 e, desde 11/11/2026, 1201) |
+| 1300 | Fiscal | existe desde 11/11/2026 (ARRUMAR-O-LUGAR fase 2): a 1301 e a 1302 |
 | 1400 | Financeiro | existe desde o menu único (10/11/2026): a 616 |
 | 1500 | Instalação e entrega | reservado |
 | 1600 | Relatórios e indicadores | existe (904, 905, 607, 615) |
@@ -5140,7 +5179,7 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 `tecido/nucleo/telas.js`.** Nove defeitos foram reintroduzidos um a um, e cada
 um reprova (mais seis na ③ REVISÃO, um a um: o módulo ou o bloco trocado numa
 tela ou numa parte que o inventário não conferia — ele passou de 26 para as 45
-telas e as duas partes): tela sem módulo (2), módulo inventado (3), aba de outro assunto fora
+telas e as duas partes; hoje são 51 telas e uma parte): tela sem módulo (2), módulo inventado (3), aba de outro assunto fora
 da lista (2), aba registrada sem declaração no mapa (1), tela nova na faixa 600
 (3), item arrumado esquecido na lista (2), bloco "Revenda" numa tela de Produção
 (2), a lista de números antigos crescendo (1) e tela nova fora da faixa do módulo (2).
@@ -5151,11 +5190,10 @@ mora" da spec dela — o caso do inventário exige as telas do mapa, todas, e
 reprova a tela nova que não está lá. Não é para mexer no número: é para declarar.
 
 > ⚠️ **O QUE ESTÁ FORA DO LUGAR HOJE, E NÃO É PARA "CONSERTAR" DE PASSAGEM**
-> (R-ORG-14): a 302 na parte de material (o cartão que leva à 504 e os ajustes
-> antigos aguardando aprovação), os horários da 902 (→ Administração) e as seis
-> abas da 501 (Materiais, Fornecedores, Almoxarifados → Cadastros; Recebimento
-> retido → Almoxarifado; Notas e Certificado → Fiscal). ~~103, 402–404, 502–504,
-> 902, 904, 905 e as 16 do sob medida~~ saíram com o menu único. Mover
+> (R-ORG-14): os horários da 902 (→ Administração, fase 3 da ARRUMAR-O-LUGAR).
+> ~~103, 402–404, 502–504, 902, 904, 905 e as 16 do sob medida~~ saíram com o
+> menu único; ~~a 302 na parte de material e as seis abas da 501~~ saíram em
+> 11/11/2026 (ARRUMAR-O-LUGAR fase 2). Mover
 > qualquer uma é das specs seguintes (§8 da spec: `CADASTRO-DE-MATERIAL`,
 > `ALMOXARIFADO-E-FISCAL`, `FICHAS-NO-CADASTRO-UNICO`, `FINANCEIRO`), cada uma com
 > conversa própria no Projeto.
@@ -5179,7 +5217,7 @@ dinheiro, com valores."*
 
 - **Toda tela com dinheiro declara a chave do valor no mapa** (`valor:[…]` no
   `telas.js` e no `tecido/nucleo/telas.js`). Hoje: 301, 302 e 404 → `custo.ver`;
-  501 → `compras.valores`; 252 → `devolucao.valores`; 603, 604, 606 e 607 → a
+  501 e 1301 → `compras.valores`; 252 → `devolucao.valores`; 603, 604, 606 e 607 → a
   `custo.ver` do sob medida; 608–611, 614–616 → `preco.ver`. ⚠️ **Uma chave de
   VER por tela**: `pedido.pagar` (Pix e banco) e `devolucao.dinheiro` (os totais
   e as decisões) são AÇÕES, e na tela de Acessos apareceriam como "Ver valores"
@@ -5238,12 +5276,13 @@ dinheiro, com valores."*
 - **A 904 continua sem valor** nesta fase; o valor dela, pela chave do assunto, é
   da fase 5 da spec.
 
-**Rode `node teste_valor.js` (108, sobe o servidor de verdade numa porta livre —
+**Rode `node teste_valor.js` (109, sobe o servidor de verdade numa porta livre —
 nunca na 3010) e `cd tecido && npm test` (o `valor.test.js`) ao mexer em tela com
 dinheiro, numa rota que leve valor, no `valor.js`, no `custo.js` do sob medida, no
 mapa ou na tela de Acessos.**
 
-> ⚠️ **EM CÓDIGO DESDE 11/11/2026, FALTA SUBIR.** Ainda não provado com dado real:
+> ✅ **NO AR DESDE 11/11/2026** (PR #334): o dono fez o backup, o deploy e
+> disse *"deu tudo certo no deploy"*. ⚠️ Ainda não provado com dado real:
 > a caixinha marcada e desmarcada na tela de Acessos com uma pessoa de verdade, e
 > o vendedor do sob medida sem a `custo.ver`. Prova que não foi feita se escreve
 > como não feita.

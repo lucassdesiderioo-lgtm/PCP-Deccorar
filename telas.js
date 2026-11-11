@@ -45,7 +45,10 @@
  */
 const MODULOS = {
   100:'Produção', 200:'Expedição', 250:'Devoluções', 300:'Estoque', 400:'Planejamento',
-  500:'Compras', 600:'Sob medida', 700:'Frota', 800:'Mercado Livre', 900:'Sistema'
+  500:'Compras', 600:'Sob medida', 700:'Frota', 800:'Mercado Livre', 900:'Sistema',
+  /* ARRUMAR-O-LUGAR fase 2 (11/11/2026): as primeiras telas que nascem nas
+     faixas de 1000 em diante (R-ORG-06). A tela de Acessos agrupa por aqui. */
+  1100:'Cadastros', 1200:'Almoxarifado', 1300:'Fiscal'
 };
 
 const TELAS = [
@@ -95,8 +98,10 @@ const TELAS = [
   { n:302, nome:'Contagem',              rota:'/admin/contagem', nivel:'admin',     onde:'computador',
     perms:['contagem.planejar','contagem.resolver','contagem.relatorio','contagem.ajustar','contagem.aprovar'], aba:'ct',
     valor:['custo.ver'],
-    modulo:'estoque', bloco:'medida_padrao', liga:[303, 301, 504],
-    partes:[{ id:'material', nome:'Material (cartão que leva à 504 e ajustes antigos aguardando aprovação)', modulo:'almoxarifado' }] },
+    modulo:'estoque', bloco:'medida_padrao', liga:[303, 301, 504] },
+    /* a parte de material (a aprovação da contagem por almoxarifado e os ajustes
+       antigos de material) foi para a 504 em 11/11/2026 (ARRUMAR-O-LUGAR fase 2,
+       decisão do dono "a") */
   { n:303, nome:'Inventário',            rota:'/inventario',    nivel:'operacao',   onde:'tablet',     perms:['contagem.contar','contagem.desempatar'], area:'inventario',
     modulo:'estoque', bloco:'medida_padrao', liga:[302, 301] },
   // ── 400 · Planejamento ──
@@ -118,20 +123,23 @@ const TELAS = [
       { id:'lista',        nome:'Lista de compras',   modulo:'compras' },
       { id:'pedidos',      nome:'Pedidos',            modulo:'compras' },
       { id:'rapida',       nome:'Compra rápida',      modulo:'compras' },
-      { id:'programada',   nome:'Compra programada',  modulo:'compras' },
-      { id:'materiais',    nome:'Materiais',          modulo:'cadastros' },
-      { id:'fornecedores', nome:'Fornecedores',       modulo:'cadastros' },
-      { id:'almox',        nome:'Almoxarifados',      modulo:'cadastros' },
-      { id:'retidos',      nome:'Recebimento retido', modulo:'almoxarifado' },
-      { id:'notas',        nome:'Notas',              modulo:'fiscal' },
-      { id:'certificado',  nome:'Certificado',        modulo:'fiscal' }] },
+      { id:'programada',   nome:'Compra programada',  modulo:'compras' }] },
+  /* ⚠️ AS OUTRAS SEIS ABAS DA 501 VIRARAM TELAS (ARRUMAR-O-LUGAR fase 2,
+     11/11/2026): 1101, 1102, 1103, 1201, 1301 e 1302, no fim deste mapa. O
+     perms de cada uma é a regra que MOSTRAVA a aba (o `le`, quando havia, senão
+     o `perms` do registrar do compras_abas.js): ninguém ganha nem perde. */
   { n:502, nome:'Recebimento',           rota:'/recebimento',   nivel:'operacao',   onde:'tablet',     perms:['pedido.receber'],        area:'recebimento',
     modulo:'almoxarifado', bloco:'comum', liga:[501, 503, 'componente'] },
   // COMPRAS-E-RECEBIMENTO fase 5: guardar, mover e abrir volume por bipe (a chave nasce só para o Admin Geral, R-ALC-06)
   { n:503, nome:'Almoxarifado',          rota:'/almoxarifado',  nivel:'operacao',   onde:'tablet',     perms:['volume.movimentar'],  area:'almoxarifado',
     modulo:'almoxarifado', bloco:'comum', liga:[502, 504, 'almoxarifado (endereços)'] },
   // COMPRAS-E-RECEBIMENTO fase 6: a contagem de material por almoxarifado (as chaves de contagem que ja existem)
-  { n:504, nome:'Contagem de material',  rota:'/contagem-material', nivel:'operacao', onde:'tablet',  perms:['contagem.contar'],
+  /* Desde 11/11/2026 (ARRUMAR-O-LUGAR fase 2, decisão do dono "a") a 504 abre
+     também com a chave de APROVAR a contagem de material e a de AJUSTAR (os
+     ajustes antigos de material, que só se rejeitam): a aprovação saiu da 302.
+     O bloco de aprovar só aparece para quem tem a chave — o operador que conta
+     não o vê, e a rota continua recusando. */
+  { n:504, nome:'Contagem de material',  rota:'/contagem-material', nivel:'operacao', onde:'tablet',  perms:['contagem.contar','contagem.aprovar','contagem.ajustar'],
     modulo:'almoxarifado', bloco:'comum', liga:[503, 302, 'componente'] },
   // ── 600 · Sob medida: as telas moram em tecido/nucleo/telas.js (numero e nivel la) ──
   // ── 700 · Frota e 800 · Mercado Livre: reservados para as specs deles ──
@@ -147,7 +155,24 @@ const TELAS = [
     modulo:'relatorios', bloco:'comum', liga:[401, 301, 252, 615, 'pendencias_dia'] },
   // RELATORIOS-UNIFICADOS (08/11/2026): o que a pessoa logada fez. Nível Operação, do tablet ou do computador (D4).
   { n:905, nome:'Minha produção',        rota:'/minha-producao', nivel:'operacao',  onde:'tablet',     perms:['produtividade.propria'],
-    modulo:'relatorios', bloco:'medida_padrao', liga:[101, 102, 201, 202] }
+    modulo:'relatorios', bloco:'medida_padrao', liga:[101, 102, 201, 202] },
+  /* ── ARRUMAR-O-LUGAR fase 2 (11/11/2026): as abas da 501 que não eram compra ──
+     Cada uma é o mesmo index.html do Admin (como as outras /admin/), servido
+     com a aba de Compras e o `cmp` dela: o compras_abas.js desenha só aquela
+     aba, sem a faixa. Abrem com a regra que mostrava a aba na 501. */
+  { n:1101, nome:'Materiais',            rota:'/admin/materiais', nivel:'admin',    onde:'computador', perms:['compras.ver'],           cmp:'materiais',
+    modulo:'cadastros', bloco:'comum', liga:[501, 404, 502, 503, 504, 'componente'] },
+  { n:1102, nome:'Fornecedores',         rota:'/admin/fornecedores', nivel:'admin', onde:'computador', perms:['compras.ver'],           cmp:'fornecedores',
+    modulo:'cadastros', bloco:'comum', liga:[501, 502, 604, 'fornecedor'] },
+  { n:1103, nome:'Almoxarifados e endereços', rota:'/admin/almoxarifados', nivel:'admin', onde:'computador', perms:['almoxarifado.cadastrar','componente.cadastrar','compras.ver'], cmp:'almox',
+    modulo:'cadastros', bloco:'comum', liga:[503, 504, 603, 604, 'almoxarifado'] },
+  { n:1201, nome:'Recebimento retido',   rota:'/admin/recebimento-retido', nivel:'admin', onde:'computador', perms:['recebimento.liberar','compras.ver'], cmp:'retidos',
+    modulo:'almoxarifado', bloco:'comum', liga:[502, 'recebimento'] },
+  { n:1301, nome:'Notas fiscais de compra', rota:'/admin/notas',   nivel:'admin',    onde:'computador', perms:['nota.lancar','custo.ver'], cmp:'notas',
+    valor:['compras.valores'],
+    modulo:'fiscal', bloco:'comum', liga:[501, 502, 'componente (custo médio)'] },
+  { n:1302, nome:'Certificado digital',  rota:'/admin/certificado', nivel:'admin_geral', onde:'computador', perms:['certificado.gerenciar'], cmp:'certificado',
+    modulo:'fiscal', bloco:'comum', liga:[1301] }
 ];
 
 /* A ORDEM DE CHEGADA depois do PIN (destino.js): a primeira tela que a pessoa

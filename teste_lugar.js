@@ -96,7 +96,10 @@ const t501 = M.porNumero(501) || {};
 const abasCodigo = [];
 fs.readFileSync(path.join(__dirname, 'public', 'compras_abas.js'), 'utf8')
   .replace(/registrar\(\s*\{\s*id\s*:\s*'([a-z_]+)'/g, (m, id) => { abasCodigo.push(id); return m; });
-const abasMapa = (t501.abas || []).map(a => a.id);
+/* As abas que viraram telas (ARRUMAR-O-LUGAR fase 2, 11/11/2026) continuam
+   registradas no compras_abas.js, com o `tela:` delas: a declaração é a TELA
+   do mapa que tem aquele `cmp`, e não mais a aba da 501. */
+const abasMapa = (t501.abas || []).map(a => a.id).concat(TODAS.filter(t => t.cmp).map(t => t.cmp));
 const semDecl = abasCodigo.filter(id => abasMapa.indexOf(id) < 0);
 const semCodigo = abasMapa.filter(id => abasCodigo.indexOf(id) < 0);
 ok('as abas da 501 que o compras_abas.js registra são as declaradas no mapa (são ' + abasCodigo.length + ')',
@@ -139,9 +142,12 @@ const INV = {   // as 45 telas do §5 da spec, sem faltar nenhuma (③ REVISÃO:
   601:['administracao','comum'], 602:['producao','sob_medida'], 603:['almoxarifado','sob_medida'], 604:['almoxarifado','sob_medida'],
   605:['almoxarifado','sob_medida'], 606:['cadastros','sob_medida'], 607:['relatorios','sob_medida'], 608:['cadastros','sob_medida'],
   609:['comercial','revenda'], 610:['comercial','revenda'], 611:['comercial','revenda'], 612:['producao','sob_medida'],
-  613:['producao','sob_medida'], 614:['planejamento','sob_medida'], 615:['relatorios','sob_medida'], 616:['financeiro','revenda'] };
+  613:['producao','sob_medida'], 614:['planejamento','sob_medida'], 615:['relatorios','sob_medida'], 616:['financeiro','revenda'],
+  /* ARRUMAR-O-LUGAR fase 2 (11/11/2026): o "Onde mora" da spec */
+  1101:['cadastros','comum'], 1102:['cadastros','comum'], 1103:['cadastros','comum'], 1201:['almoxarifado','comum'],
+  1301:['fiscal','comum'], 1302:['fiscal','comum'] };
 const semInv = TODAS.filter(t => !INV[t.n]).map(t => t.n), semMapa = Object.keys(INV).filter(k => !NUMS.has(+k));
-ok('o inventário tem as telas do mapa, e só elas (as 45 de 10/11/2026)', !semInv.length && !semMapa.length,
+ok('o inventário tem as telas do mapa, e só elas (as 45 de 10/11/2026 e as 6 da fase 2 da ARRUMAR-O-LUGAR)', !semInv.length && !semMapa.length,
   (semInv.length ? 'tela nova fora do inventário: ' + lista(semInv) + ' — declare-a no INV com o módulo e o bloco do "Onde mora" da spec dela. ' : '')
   + (semMapa.length ? 'no inventário e fora do mapa: ' + lista(semMapa) : ''));
 const divergeInv = Object.entries(INV).filter(([num, [mod, bl]]) => {
@@ -152,12 +158,12 @@ const abaEsperada = { lista:'compras', pedidos:'compras', rapida:'compras', prog
   fornecedores:'cadastros', almox:'cadastros', retidos:'almoxarifado', notas:'fiscal', certificado:'fiscal' };
 const abaDiverge = (t501.abas || []).filter(a => abaEsperada[a.id] !== a.modulo).map(a => a.id);
 ok('as abas da 501 batem com o inventário do §5', !abaDiverge.length, lista(abaDiverge));
-const PARTES = { '302/material':'almoxarifado', '902/horarios':'administracao' };
+const PARTES = { '902/horarios':'administracao' };   // a 302/material foi para a 504 (ARRUMAR-O-LUGAR fase 2)
 const partesMapa = {};
 TODAS.forEach(t => (t.partes || []).forEach(p => { partesMapa[t.n + '/' + p.id] = p.modulo; }));
 const parteDiverge = Object.keys(PARTES).filter(k => partesMapa[k] !== PARTES[k])
   .concat(Object.keys(partesMapa).filter(k => !PARTES[k]));
-ok('as partes (302/material e 902/horarios) batem com o inventário do §5, e não há outra', !parteDiverge.length, lista(parteDiverge));
+ok('as partes (902/horarios) batem com o inventário do §5, e não há outra', !parteDiverge.length, lista(parteDiverge));
 
 console.log('\n' + (n - falhas) + ' ok, ' + falhas + ' falha(s)');
 process.exit(falhas ? 1 : 0);

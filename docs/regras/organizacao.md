@@ -29,7 +29,7 @@
 - Regra:            nunca no módulo da spec que a criou.
 - Por quê:          "conforme a gente vai criando as coisas, a gente não está organizando no local correto de cada coisa" (o dono, 10/11/2026).
 - Exceções:         o que já está fora do lugar fica na lista nomeada (R-ORG-14) até a spec que o arruma.
-- Teste que trava:  `teste_lugar.js` (tela sem módulo; o inventário do §5 tela a tela, nas 45 telas e nas duas partes)
+- Teste que trava:  `teste_lugar.js` (tela sem módulo; o inventário do §5 tela a tela, nas 45 telas de 10/11/2026, nas 6 da fase 2 da ARRUMAR-O-LUGAR e na parte que sobrou, a 902/horarios)
 - Status:           no ar desde 10/11/2026 (fase 2, PR #328); desde a fase 3 o ☰ Menu agrupa pelo módulo do assunto.
 - História:         spec §1.
 
@@ -44,7 +44,7 @@
 ### R-ORG-04 · Aba só para o mesmo assunto da tela
 - Regra:            aba de assunto diferente é tela, no módulo dela. "Não criar tela nova" deixa de ser motivo para pendurar aba.
 - Por quê:          a `COMPRAS-E-RECEBIMENTO` pôs material, fornecedor, almoxarifado, retido, nota e certificado como abas da 501.
-- Exceções:         as abas da 501 de hoje, na lista nomeada (R-ORG-14).
+- Exceções:         a parte de outro assunto que ainda não se moveu, na lista nomeada (R-ORG-14) — desde 11/11/2026 só a `902/horarios`; as seis abas da 501 viraram telas (ARRUMAR-O-LUGAR fase 2).
 - Teste que trava:  `teste_lugar.js` (aba **declarada** de outro assunto fora da lista; aba registrada no `compras_abas.js` sem declaração no mapa). ⚠️ **Só as abas da 501 estão declaradas e comparadas com o código** (é o que o §9 da spec pede): uma aba nova numa tela que não declara abas (a 401, a 904, a 252) não é vista pelo teste — ali a regra vale pelo 📍 LUGAR do PLANO
 - Status:           no ar desde 10/11/2026 (fase 2, PR #328); desde a fase 3 o ☰ Menu agrupa pelo módulo do assunto.
 - História:         spec §1 e §5.
@@ -130,7 +130,7 @@
 - Por quê:          lista de exceção que só cresce é onde a bagunça volta a entrar.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_lugar.js` (item arrumado esquecido na lista; fora do lugar sem estar na lista; item sem a spec que o arruma)
-- Status:           em código desde 10/11/2026 (`modulos.js`, `FORA_DO_LUGAR`); com o menu único a lista caiu de 34 para 8 itens (só abas e partes).
+- Status:           em código desde 10/11/2026 (`modulos.js`, `FORA_DO_LUGAR`); com o menu único a lista caiu de 34 para 8 itens (só abas e partes), e com a fase 2 da ARRUMAR-O-LUGAR (11/11/2026) para 1 (`902/horarios`).
 - História:         spec §5.
 
 ### R-ORG-15 · O Decorsoft é referência de organização, não de regra

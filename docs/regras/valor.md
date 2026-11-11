@@ -15,8 +15,8 @@
 - Regra:            a tela que mostra valor em reais (custo, preço, valor, desembolso, saldo em R$, limite, frete, imposto, dado de pagamento) declara no mapa (`telas.js`, `tecido/nucleo/telas.js`) a chave que libera o valor: `valor:[…]`. A primeira chave é a principal. Quantidade não é dinheiro.
 - Por quê:          até 11/11/2026 cada tela decidia sozinha quem via o dinheiro, e em seis lugares ele ia pelo fio para quem não tinha chave nenhuma.
 - Exceções:         nenhuma.
-- Teste que trava:  `teste_valor.js` §1 (o inventário: 252, 301, 302, 404, 501 e 603, 604, 606–611, 614–616 — tela nova com dinheiro entra no mapa E no inventário do teste). **Uma chave de VER por tela**: ação que mexe em dinheiro (`pedido.pagar`, `devolucao.dinheiro`) continua sendo ação. A 602 Corte não tem dinheiro e não declara.
-- Status:           em código desde 11/11/2026 (fase 1, falta subir).
+- Teste que trava:  `teste_valor.js` §1 (o inventário: 252, 301, 302, 404, 501, 1301 e 603, 604, 606–611, 614–616 — tela nova com dinheiro entra no mapa E no inventário do teste). **Uma chave de VER por tela**: ação que mexe em dinheiro (`pedido.pagar`, `devolucao.dinheiro`) continua sendo ação. A 602 Corte não tem dinheiro e não declara.
+- Status:           no ar desde 11/11/2026 (fase 1, PR #334).
 - História:         spec `ARRUMAR-O-LUGAR` §1 e §3.
 
 ### R-VAL-02 · Abrir a tela e ver o valor são duas caixinhas
@@ -24,7 +24,7 @@
 - Por quê:          o dono decide quem vê o dinheiro sem mexer em quem abre a tela.
 - Exceções:         a chave de valor que também é ação da tela aparece uma vez, na linha de valores. Debaixo da caixinha, a tela escreve quem também vê sem ela (os equivalentes da R-VAL-04).
 - Teste que trava:  `teste_valor.js` §4 (o `/api/acesso/registro` traz `valores` em cada tela)
-- Status:           em código desde 11/11/2026.
+- Status:           no ar desde 11/11/2026 (PR #334).
 - História:         spec `ARRUMAR-O-LUGAR` §3.
 
 ### R-VAL-03 · Sem a caixinha, a tela abre sem o dinheiro, e quem tira é o servidor
@@ -32,7 +32,7 @@
 - Por quê:          esconder na tela e mandar pelo fio não protege nada (regra 14 do §13); e "—" sem explicação parece defeito.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_valor.js` §5 (rota a rota) e §4 (`sem_valor`); `tecido/teste/valor.test.js`
-- Status:           em código desde 11/11/2026.
+- Status:           no ar desde 11/11/2026 (PR #334).
 - História:         spec `ARRUMAR-O-LUGAR` §3; os seis vazamentos da varredura de 11/11.
 
 ### R-VAL-04 · Quem lança dinheiro vê o que lança
@@ -40,7 +40,7 @@
 - Por quê:          lançar às cegas seria a armadilha #6.
 - Exceções:         **na 252 o dinheiro é parte do caso, não o caso**: quem lança ou acompanha sem a caixinha continua lançando e acompanhando, mas não digita valor (recusa 403 dizendo a chave), e não marca o "Enviado" do item faltante, que pede o frete.
 - Teste que trava:  `teste_valor.js` §2b e §5c
-- Status:           em código desde 11/11/2026.
+- Status:           no ar desde 11/11/2026 (PR #334).
 - História:         spec `ARRUMAR-O-LUGAR` §3 e §8.
 
 ### R-VAL-05 · No sob medida, preço de venda e custo são duas chaves
@@ -48,7 +48,7 @@
 - Por quê:          o vendedor precisa do preço da persiana, não do valor do estoque.
 - Exceções:         o vendedor nasce com as duas chaves (o pacote e o backfill); o dono tira o custo pela tela de Acessos.
 - Teste que trava:  `tecido/teste/valor.test.js` (as duas podas, o lado de cada rota, os quatro vazamentos)
-- Status:           em código desde 11/11/2026.
+- Status:           no ar desde 11/11/2026 (PR #334).
 - História:         spec `ARRUMAR-O-LUGAR` §3.
 
 ### R-VAL-06 · Toda chave de valor é sensível, e o backfill rodou uma vez só
@@ -56,7 +56,7 @@
 - Por quê:          ninguém perde no deploy o dinheiro que via; rodar de novo devolveria a chave a quem o dono tirou. **E ninguém ganha**: a conta é pessoa a pessoa, e quem tinha a chave de origem revogada por exceção recebe a exceção que revoga a de valor.
 - Exceções:         é a exceção nomeada à R-ALC-06 ("tudo novo nasce só para o Admin Geral").
 - Teste que trava:  `teste_valor.js` §3 (quem ganhou, quem não ganhou, e a chave tirada que não volta)
-- Status:           em código desde 11/11/2026.
+- Status:           no ar desde 11/11/2026 (PR #334).
 - História:         spec `ARRUMAR-O-LUGAR` §8.
 
 ### R-VAL-07 · Tela nova com dinheiro nasce declarando
@@ -64,7 +64,7 @@
 - Por quê:          a regra só vale se a próxima tela não nascer fora dela.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_valor.js` §1 (o mapa e o inventário têm que bater)
-- Status:           em código desde 11/11/2026.
+- Status:           no ar desde 11/11/2026 (PR #334).
 - História:         spec `ARRUMAR-O-LUGAR` §3.
 
 ---

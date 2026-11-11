@@ -30,7 +30,7 @@ const MODULOS = [
   { chave:'almoxarifado',  nome:'Almoxarifado',               faixa:1200, tipo:'producao', situacao:'existe' },
   { chave:'compras',       nome:'Compras',                    faixa:500,  tipo:'demais',   situacao:'existe' },
   { chave:'cadastros',     nome:'Cadastros',                  faixa:1100, tipo:'producao', situacao:'existe' },
-  { chave:'fiscal',        nome:'Fiscal',                     faixa:1300, tipo:'demais',   situacao:'reservado' },
+  { chave:'fiscal',        nome:'Fiscal',                     faixa:1300, tipo:'demais',   situacao:'existe' },       // inaugurado pela 1301 (ARRUMAR-O-LUGAR fase 2, 11/11/2026)
   { chave:'financeiro',    nome:'Financeiro',                 faixa:1400, tipo:'venda',    situacao:'existe' },   // inaugurado pela 616 no menu único (10/11/2026)
   { chave:'relatorios',    nome:'Relatórios e indicadores',   faixa:1600, tipo:'misto',    situacao:'existe' },
   { chave:'administracao', nome:'Administração',              faixa:900,  tipo:'demais',   situacao:'existe' },
@@ -73,14 +73,10 @@ const FORA_DO_LUGAR = [
      agrupa pelo módulo do assunto, e as 26 telas que estavam fora do lugar
      (103, 402–404, 502–504, 902, 904, 905 e as 16 do sob medida) saíram. Ficam
      as abas e as partes de outro assunto, que só se arrumam movendo-as. */
-  { item:'302/material', spec:'ALMOXARIFADO-E-FISCAL' },
-  { item:'902/horarios', spec:'a definir: Parâmetros, em Administração (§4-A da spec)' },
-  { item:'501/materiais',    spec:'CADASTRO-DE-MATERIAL' },
-  { item:'501/fornecedores', spec:'CADASTRO-DE-MATERIAL' },
-  { item:'501/almox',        spec:'CADASTRO-DE-MATERIAL' },
-  { item:'501/retidos',      spec:'ALMOXARIFADO-E-FISCAL' },
-  { item:'501/notas',        spec:'ALMOXARIFADO-E-FISCAL' },
-  { item:'501/certificado',  spec:'ALMOXARIFADO-E-FISCAL' }
+  /* As seis abas da 501 e a parte de material da 302 saíram em 11/11/2026
+     (ARRUMAR-O-LUGAR fase 2): viraram as telas 1101–1103, 1201, 1301 e 1302, e
+     a aprovação de material foi para a 504. */
+  { item:'902/horarios', spec:'ARRUMAR-O-LUGAR fase 3 (906 Parâmetros)' }
 ];
 
 function porChave(k){ return MODULOS.find(m => m.chave === k) || null; }

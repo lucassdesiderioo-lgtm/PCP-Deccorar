@@ -5,8 +5,8 @@ STATUS
 Situação: EM CONSTRUÇÃO · aprovada pelo dono em 11/11/2026
 Criada em: 11/11/2026
 Última atualização: 11/11/2026
-Fase atual: 1 em código (11/11/2026), falta subir
-Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐
+Fase atual: 2 em código (11/11/2026), falta subir · a 1 no ar desde 11/11/2026 (PR #334)
+Fases: 1 ☑  2 ◐  3 ☐  4 ☐  5 ☐
 Risco: 🔴 (cria tela, mexe em permissão e na tela de Acessos; a fase 4 muda regra do sob medida)
 Depende de: ORGANIZACAO-DO-SISTEMA (os 18 módulos, o mapa com módulo e bloco, o menu único)
              ACESSO-POR-TELA-E-NIVEL (o mapa de telas, a tela de Acessos pelo mapa)
@@ -14,6 +14,51 @@ Conferida contra: o `main` de 11/11/2026 (PR #331), varredura das 45 telas no na
 Tipo: REGRA + NOVIDADE
 Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
 ```
+
+### Fase 2 — a 501 fica só com compra (11/11/2026, em código)
+
+- **Seis telas novas**, o mesmo `index.html` do Admin servido com a aba de
+  Compras e o `cmp` dela (o `compras_abas.js` desenha só aquela aba, sem a
+  faixa): 1101 Materiais e 1102 Fornecedores (`compras.ver`), 1103 Almoxarifados
+  e endereços (`almoxarifado.cadastrar`, `componente.cadastrar`, `compras.ver`),
+  1201 Recebimento retido (`recebimento.liberar`, `compras.ver`), 1301 Notas
+  fiscais de compra (`nota.lancar`, `custo.ver`, valor `compras.valores`) e 1302
+  Certificado digital (Admin Geral). **Cada uma abre com a regra que mostrava a
+  aba na 501**, conferido pessoa a pessoa no banco de exemplo.
+- **A 501 ficou com quatro abas** (Lista de compras, Pedidos, Compra rápida,
+  Compra programada). O link antigo (`/admin/compras#notas`) e a aba lembrada
+  neste computador levam à tela nova.
+- **O Fiscal foi inaugurado** (a 1301), e a tela de Acessos ganhou as centenas
+  1100, 1200 e 1300. A caixinha de cada ação pendura na tela nova
+  (`componente.cadastrar` na 1101, `nota.lancar` na 1301…); a chave não mudou.
+- **A parte de material da 302 foi para a 504** (decisão do dono "a"): a
+  aprovação da contagem de material por almoxarifado (`contagem.aprovar`) e os
+  ajustes antigos de material (`contagem.ajustar`), num bloco que só aparece a
+  quem tem a chave (`public/aprov_material.js`). A 504 passou a abrir também
+  com essas duas chaves; quem não conta não vê o "Começar a contagem". Os
+  ajustes antigos de peça ficam na 302.
+- **Divergência D9 — o ganho, e nomeado:** a chave que é o trabalho da tela
+  nova abre a tela mesmo sem nenhuma chave da 501 — `recebimento.liberar` a
+  1201, `nota.lancar` e `custo.ver` ("e as de leitura de hoje", §8) a 1301. A
+  rota de cada uma já aceitava a chave: a pessoa passa a ver na tela o que já
+  lia e fazia pela rota. No banco de exemplo, um caso (Revisão + custo).
+- **③ REVISÃO (11/11/2026), consertado com teste:** a central de Pendências (204)
+  levava à 501 (e à 302) as pendências que mudaram de tela — hoje cada linha leva
+  à tela nova ou à 504, e os ajustes antigos se dividem em duas linhas (peça, na
+  302; material, na 504), cada uma contando o que a tela dela mostra; quem abre a
+  501 só pela chave de uma aba que saiu vê para onde ela foi, e não os cards
+  velhos; e o teste de segurança do CI tranca as seis telas e a 504.
+  O testador de tela achou mais três, também consertados: a 504 pedia os
+  almoxarifados e as contagens abertas a quem só aprova (dois 403), não dizia
+  "Nada esperando aprovação", e o `#notas` ficava no endereço da 501 para quem
+  não abre a 1301. Na rodada 2: o bloco dos ajustes antigos de material diz
+  "nenhum" e "não consegui ler", e o aviso da 501 vazia lista só as telas para
+  onde foram abas. **Fica para o dono:** o ganho da D9 (a 1201 e a 1301 abrindo
+  pela chave do trabalho delas, sem chave da 501).
+- **A lista do que está fora do lugar** ficou só com `902/horarios` (fase 3).
+- `teste_501_so_compra.js` (93), escrito antes; os inventários do
+  `teste_lugar.js`, do `teste_admin_telas.js` e do `teste_valor.js` ganharam as
+  telas novas, sem mudar o esperado do que já existia.
 
 ### Fase 1 — a regra do valor (11/11/2026, em código)
 

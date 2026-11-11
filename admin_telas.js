@@ -74,8 +74,10 @@ module.exports = function(app, db){
       if(!req.usuario) return res.redirect('/login?r=' + encodeURIComponent(t.rota));
       let html;
       try{ html = fs.readFileSync(ARQ, 'utf8'); }catch(e){ return res.status(500).send('tela indisponível'); }
-      const dado = '<script>window.TELA_ADMIN=' + JSON.stringify({ n:t.n, nome:t.nome, aba:t.aba, rota:t.rota })
+      const dado = '<script>window.TELA_ADMIN=' + JSON.stringify({ n:t.n, nome:t.nome, aba:t.aba || (t.cmp ? 'compras' : null), cmp:t.cmp || null, rota:t.rota })
         + ';window.ROTA_DA_ABA=' + JSON.stringify(ROTA_DA_ABA) + ';</script>';
+      /* ARRUMAR-O-LUGAR fase 2: a tela que é uma aba da 501 (1101…1302) abre o
+         painel de Compras com o `cmp` dela, e o compras_abas.js desenha só ela. */
       // antes do primeiro <script> da página: tudo abaixo já sabe qual é a tela
       const i = html.indexOf('<script');
       res.type('html').send(i >= 0 ? html.slice(0, i) + dado + html.slice(i) : html + dado);
