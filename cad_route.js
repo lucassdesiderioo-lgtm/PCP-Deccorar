@@ -83,8 +83,12 @@ module.exports=function(app,db){
         .run(cod,b.motivo,b.obs||null,Math.round(+b.segundos||0),b.modo||null,q.usuario_nome,q.usuario_id).lastInsertRowid;
       let sm=false;
       try{ const m=db.prepare('SELECT COALESCE(m.sob_medida,0) s FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=?').get(cod); sm=!!(m&&m.s); }catch(e){ sm=false; }
-      if(!sm) require('./material_extra_dominio').registrarRevisao(db,{sku:cod, referencia:'rejeicao:'+rid,
-        motivo:b.motivo+(b.obs?' — '+b.obs:''), quem:{id:q.usuario_id, nome:q.usuario_nome}});
+      /* ⚠️ O MATERIAL EXTRA NAO TRAVA A BANCADA (#6): num ponto de salvamento
+         proprio; falhou (banco sem a tabela, ficha que estoura), vai ao log e a
+         peca com problema fica registrada do mesmo jeito. */
+      if(!sm) try{ db.transaction(()=>require('./material_extra_dominio').registrarRevisao(db,{sku:cod, referencia:'rejeicao:'+rid,
+        motivo:b.motivo+(b.obs?' — '+b.obs:''), quem:{id:q.usuario_id, nome:q.usuario_nome}}))(); }
+      catch(e){ console.error('[rejeicao] o material extra de '+cod+' nao gravou (a peca com problema ficou registrada):', e.message); }
     })();
     res.json({ok:true});
   });
