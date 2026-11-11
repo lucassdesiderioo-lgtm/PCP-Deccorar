@@ -1,6 +1,6 @@
 # HORARIOS-E-FERIADOS — o corte da Revisão pela coleta lançada, e uma lista só de feriados
 
-> **STATUS (11/11/2026): RASCUNHO — NÃO APROVADO.** Nada construído. Nasceu dos dois
+> **STATUS (11/11/2026): RASCUNHO COM AS DECISÕES DO DONO — falta o "pode seguir".** Nada construído. Nasceu dos dois
 > "achei no caminho" do AJUSTE D12 da `ARRUMAR-O-LUGAR` (o horário padrão foi para a
 > 206). O dono disse *"devemos arrumar isso"*. As decisões marcadas **D** são dele.
 
@@ -25,47 +25,64 @@ muda, a Revisão continua dizendo o corte velho. A agência já usa o horário l
 Um feriado cadastrado na 906 não aparece na 206. Para que apareça, alguém tem que
 lembrar de marcar o dia também lá.
 
-## 2. O que muda (proposta)
+## 2. O que muda
 
 ### Fase 1 — o corte da Revisão vem da 206 (🟡)
 
-- `GET /api/revisao/status` pergunta ao `coleta_horario.js` (o dono dos horários),
-  e não ao `config`.
-- **Qual corte vale (D1):** o da próxima coleta do dia que ainda tem corte pela
-  frente. Depois do último corte, a tela diz *"Lista fechada às <último corte>"*.
-- **Quando não há coleta lançada, ou ela está em rascunho (D2):** vale o padrão da
-  semana, e a tela diz *"horário padrão — a coleta de hoje não foi lançada"*.
-- **O corte "a conferir" (D2):** aparece em âmbar, com *"a conferir"*.
-- **Dia "sem coleta" (D3):** a tela diz *"Hoje não tem coleta (feriado X)"* e não
-  mostra corte.
+`GET /api/revisao/status` pergunta ao `coleta_horario.js` (o dono dos horários),
+e não ao `config`.
+
+- **Cada coleta tem o seu corte (D1).** A Revisão mostra as coletas lançadas do
+  dia, cada uma com o seu corte. A próxima, que ainda não fechou, aparece em
+  destaque. Depois do último corte aparece *"Lista fechada às <último corte>"*.
+- **O corte que não foi lançado ou não foi confirmado não vira o padrão (D2).** A
+  Revisão diz *"O horário de corte de hoje não foi lançado na 206"*. Isso vale:
+  - para o dia sem coleta lançada;
+  - para o dia que só tem o rascunho da semana copiada;
+  - para a coleta cujo corte está "a conferir". Nesse caso a frase é *"O corte
+    da coleta das HH:MM não foi confirmado"*.
+
+  **O padrão da semana deixa de aparecer na Revisão.** Ele continua valendo para
+  o despacho da agência sem horário lançado, e para a cópia da semana.
+- **Dia "sem coleta" (D3).** A Revisão diz *"Hoje não tem coleta"* e o motivo
+  (*"feriado: <nome>"*, ou o motivo escrito). Nesse dia não aparece corte.
 - A agência e o despacho não mudam.
 
 ### Fase 2 — uma lista de feriados, no PCP (🔴: schema, dois bancos, migração)
 
+- **Um feriado é um dia em que o ML não coleta (D6).** Não há marca por feriado.
 - A lista passa para o `dados.db`: tabela `feriado`, com o dono único
   `feriado_dominio.js`. O que é comum mora no PCP (R-ORG-12).
-- O sob medida passa a ler pela porta, como já faz com os endereços. O prazo do
-  pedido continua dando o mesmo resultado.
-- A `sm_feriado` é copiada **uma vez só**, com uma marca em `config`, e com backup
+- **O sob medida passa a ler pela porta**, como já faz com os endereços. O prazo
+  do pedido dele continua pulando os mesmos dias.
+- **A `sm_feriado` é copiada uma vez só**, com uma marca em `config` e com backup
   dos dois bancos antes.
-- O cadastro continua na 906, no mesmo lugar e com a mesma cara.
-- **A 206 conhece a lista (D4):** ver as opções na seção 3.
-- **O item faltante (D5):** se o feriado passa a contar ou não no "sair até".
-- **Tipo de feriado (D6):** se a lista tem uma marca por feriado. Ver na seção 3.
+- O cadastro continua na 906, no mesmo lugar.
+- **A 206 conhece a lista (D4 (a)).** O feriado cadastrado faz o dia nascer *"sem
+  coleta — feriado: <nome>"* **no rascunho da semana**. Quem confirma a semana pode
+  tirar a marca, se o ML vier mesmo assim. Enquanto a semana não for confirmada,
+  o rascunho não vale (R-HCO-13), como hoje. A Revisão diz então que o horário não
+  foi lançado.
+- **Feriado cadastrado depois de a semana estar confirmada:** a 206 mostra o aviso
+  *"<data> é feriado (<nome>) — marque sem coleta, se o ML não vier"*. O dia
+  confirmado não muda sozinho.
+- **O item faltante (D5) fica de fora** (o dono: *"não sei"*). O "sair até" continua
+  contando o feriado como dia útil, como hoje. Volta numa conversa própria.
 
-## 3. Decisões do dono
+## 3. Decisões do dono (11/11/2026)
 
-| # | Pergunta | Recomendação |
+| # | Pergunta | Resposta do dono |
 |---|---|---|
-| D1 | Com 2 ou 3 coletas no dia, qual corte a Revisão mostra? | o da **próxima** coleta ainda pela frente |
-| D2 | Sem coleta lançada, em rascunho ou com o corte "a conferir": o que a Revisão mostra? | o **padrão**, dizendo que é o padrão; o "a conferir" aparece em âmbar |
-| D3 | Dia marcado "sem coleta": o que a Revisão diz? | *"Hoje não tem coleta"*, com o motivo |
-| D4 | Feriado cadastrado na 906: o que acontece na 206? | **(a)** o dia já nasce "sem coleta — feriado X" no rascunho da semana, e quem confirma a semana pode tirar se o ML vier — **recomendado**; **(b)** só um aviso na 206, e a pessoa marca; **(c)** marca sozinho e vale sem confirmar |
-| D5 | O "sair até" do item faltante passa a pular feriado? | **sim**, o feriado deixa de contar como dia útil |
-| D6 | Feriado da fábrica e "o ML não coleta" são a mesma coisa? | uma lista só, com a marca **"o ML não coleta"** (nasce marcada); a fábrica fechada vale para o prazo |
+| D1 | Com várias coletas, qual corte a Revisão mostra? | *"toda coleta tem um horário de corte"* — o corte de cada uma |
+| D2 | Sem coleta lançada ou sem confirmação? | *"mostrar mensagem dizendo que não foi lançado"* — nunca o padrão |
+| D3 | Dia sem coleta? | *"hoje não tem coleta e mostra o motivo; se tiver feriado é por isso"* |
+| D4 | O feriado na 206? | (a) — nasce marcado no rascunho, e quem confirma pode tirar |
+| D5 | Item faltante pula feriado? | *"não sei"* — fica de fora |
+| D6 | Feriado e "o ML não coleta"? | *"ML não coleta"* — feriado é dia sem coleta |
 
 ## 4. Fica de fora
 
+- O "sair até" do item faltante (D5).
 - O despacho da agência, que já usa o horário lançado.
 - O corte da Etiqueta de Venda, que é contagem do despacho.
 - Feriado puxado sozinho de calendário da internet.
@@ -75,7 +92,7 @@ lembrar de marcar o dia também lá.
 | O quê | Módulo · bloco | Liga-se a |
 |---|---|---|
 | a frase do corte | 101 Revisão · Produção · Medida padrão | 206 (lê o corte lançado) |
-| a lista de feriados | 906 Parâmetros · Administração · Comum | 206, 611/610 (prazo do sob medida), 252 (item faltante) |
+| a lista de feriados | 906 Parâmetros · Administração · Comum | 206, 610/611 (prazo do sob medida) |
 | o dia de feriado na 206 | 206 Horários de coleta · Expedição | 906 |
 
 Nenhuma tela nova, nenhuma aba nova, nenhum módulo novo.
@@ -99,5 +116,4 @@ Nenhuma tela nova, nenhuma aba nova, nenhum módulo novo.
 - **Fase 2:**
   - teste novo `teste_feriado.js`: a migração uma vez só, a porta, e a 206 recebendo
     o feriado;
-  - `cd tecido && npm test`, com o `prazo.test.js` sem mudar o esperado;
-  - `teste_devolucao_casos.js`, por causa do item faltante.
+  - `cd tecido && npm test`, com o `prazo.test.js` sem mudar o esperado.
