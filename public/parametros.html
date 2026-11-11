@@ -117,7 +117,10 @@ function ligarSalvar(c, depois){
     if(i.dataset.tipo==='numero'){
       valor=Number(String(i.value).trim().replace(',','.'));
       if(String(i.value).trim()==='' || !isFinite(valor)){ i.classList.add('erro'); m.className='msg err'; m.textContent='Digite um número, com vírgula ou ponto.'; return; }
-    } else valor=String(i.value).trim();
+    } else {
+      valor=String(i.value).trim();
+      if(valor===''){ i.classList.add('erro'); m.className='msg err'; m.textContent='Não deixe o campo vazio.'; return; }
+    }
     var r=await jsend('/sobmedida/api/parametros/'+encodeURIComponent(k),'PUT',{valor:valor});
     if(r.s===200 && r.j && r.j.ok){ if(depois) await depois(k); else { m.className='msg ok'; m.textContent='Salvo.'; } }
     else { i.classList.add('erro'); m.className='msg err'; m.textContent=erroDe(r); }
@@ -133,10 +136,30 @@ async function partCorte(lista){
 }
 /* Depois de salvar, o card volta com o valor, o extenso e o "alterado em" de
    agora (③ REVISÃO: o "Salvo." aparecia ao lado do extenso de antes). */
+/* O QUE ESTAVA DIGITADO E NÃO SALVO NAS OUTRAS LINHAS VOLTA (③ REVISÃO r2, §12):
+   o redesenho troca o card, e o campo nasce de novo com o valor do servidor —
+   "0,7" no peso da sobra sumia calado quando se salvava a margem. Guarda-se o
+   que difere do valor com que o campo nasceu (`defaultValue`), menos a linha
+   salva, e devolve-se depois. */
+function guardarDigitado(c, salva){
+  var g={}; if(!c) return g;
+  c.querySelectorAll('input').forEach(function(i){
+    var k=i.dataset.chave || i.id; if(!k || k===salva) return;
+    if(i.value!==i.defaultValue) g[k]=i.value; });
+  return g;
+}
+function devolverDigitado(c, g){
+  if(!c) return;
+  Object.keys(g).forEach(function(k){
+    var i=c.querySelector('input[data-chave="'+k+'"]') || c.querySelector('#'+k);
+    if(i) i.value=g[k]; });
+}
 async function redesenharSm(chave){
   var px=await jget('/sobmedida/api/parametros'); if(!(px.j && px.j.ok)) return;
-  var l=px.j.dados||[], prazo=String(chave).indexOf('prazo')===0;
+  var l=px.j.dados||[], prazo=String(chave).indexOf('prazo')===0, id=prazo?'pPrazo':'pCorte';
+  var g=guardarDigitado(document.getElementById(id), chave);
   if(prazo) await partPrazo(l); else await partCorte(l);
+  devolverDigitado(document.getElementById(id), g);
   var m=document.querySelector('[data-msg="'+chave+'"]'); if(m){ m.className='msg ok'; m.textContent='Salvo.'; }
 }
 async function partPrazo(lista){
