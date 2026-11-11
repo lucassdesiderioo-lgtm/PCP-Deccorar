@@ -5,8 +5,8 @@ STATUS
 Situação: EM CONSTRUÇÃO · aprovada pelo dono em 11/11/2026
 Criada em: 11/11/2026
 Última atualização: 11/11/2026
-Fase atual: 3 em código, falta subir (11/11/2026) · a 2 no ar desde 11/11/2026 (PR #336) · a 1 no ar desde 11/11/2026 (PR #334) · ⚠️ ainda não provado com dado real: a 1201 e a 1301 abertas por alguém sem chave da 501, a aprovação de material feita na 504, e a 906 usada por alguém do setor "Sob medida / Cadastros" · próxima: fase 4
-Fases: 1 ☑  2 ☑  3 ◐  4 ☐  5 ☐
+Fase atual: 3 no ar desde 11/11/2026 (PR #340; o dono fez o deploy e disse "deu tudo certo no deploy"), e o AJUSTE D12 (os horários na 206) construído, falta subir · a 2 no ar desde 11/11/2026 (PR #336) · a 1 no ar desde 11/11/2026 (PR #334) · ⚠️ ainda não provado com dado real: a 1201 e a 1301 abertas por alguém sem chave da 501, a aprovação de material feita na 504, e a 906 usada por alguém do setor "Sob medida / Cadastros" · próxima: fase 4
+Fases: 1 ☑  2 ☑  3 ☑  4 ☐  5 ☐
 Risco: 🔴 (cria tela, mexe em permissão e na tela de Acessos; a fase 4 muda regra do sob medida)
 Depende de: ORGANIZACAO-DO-SISTEMA (os 18 módulos, o mapa com módulo e bloco, o menu único)
              ACESSO-POR-TELA-E-NIVEL (o mapa de telas, a tela de Acessos pelo mapa)
@@ -15,12 +15,12 @@ Tipo: REGRA + NOVIDADE
 Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
 ```
 
-### Fase 3 — Parâmetros (11/11/2026, em código, falta subir)
+### Fase 3 — Parâmetros (11/11/2026, no ar, PR #340)
 
 - **A tela 906 Parâmetros** (`/parametros`, Administração · Comum), página
   própria como a 206, com quatro partes, cada uma pela rota de sempre e só para
   quem tem a chave dela: horários de corte e despacho (`horarios.editar`; a rota
-  existia sem tela, dívida 18), o segundo bipe na Conferência (era da 902; nível
+  existia sem tela, dívida 18 — **no mesmo dia foram para a 206, D12** abaixo), o segundo bipe na Conferência (era da 902; nível
   Admin), os parâmetros do plano de corte do sob medida (era a aba Parâmetros da
   606) e os números do prazo e os feriados (eram o card da 610).
 - **Divergência D10 — o nível da 906:** o §8 dizia Admin; **o dono decidiu
@@ -38,6 +38,14 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
   /api/config/horarios` deixou de ser descartado calado — 400 dizendo o dia e o
   campo, e nada grava.
 - **A lista do que está fora do lugar está vazia.**
+- **Divergência D12 — os horários de corte e despacho moram na 206, e não na
+  906** (AJUSTE de 11/11/2026, decisão do dono, linha em `docs/DECISOES.md`): é
+  o mesmo assunto das coletas lançadas (horário de saída). Viraram o bloco
+  "Horário padrão da semana" da 206, que abre também com `horarios.editar` e,
+  só para ler, a todo nível Admin (decisão do dono na ③ REVISÃO: era quem lia o
+  padrão na 906, e ninguém perde a leitura); a 906
+  ficou com o segundo bipe e o sob medida, e aponta o caminho. A regra não mudou.
+  Ficou de fora, e é REGRA: a Revisão ler o corte da coleta lançada na 206.
 - **③ REVISÃO (três rodadas, `revisor-fabrica` e `testador-tela`), consertado
   com o teste antes:** a 610 continua mostrando, só leitura, os números do prazo
   e os feriados (o vendedor os lia ali e não abre a 906); o dia que não vem como
@@ -48,7 +56,7 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
   horário recusado não ficava marcado; e o último número de pedido do Decorsoft,
   agora mandado como texto, aceitava letra — o `config.js` do sob medida passou
   a gravá-lo só inteiro, ou vazio ("ainda não lançado", §4.18).
-- `teste_parametros.js` (63), escrito antes; o `teste_lugar.js` e o
+- `teste_parametros.js` (113; 63 na entrega, 50 no AJUSTE da D12), escrito antes; o `teste_lugar.js` e o
   `teste_501_so_compra.js` passaram a esperar a lista vazia e a 906 no inventário.
 
 ### Fase 2 — a 501 fica só com compra (11/11/2026, no ar, PR #336)
@@ -263,7 +271,7 @@ acesso. O endereço antigo (`/admin/compras#notas`, por exemplo) leva à tela no
 | 501 Compras | aba Notas, com "Regime e tabela de crédito" | **1301 Notas fiscais de compra** |
 | 501 Compras | aba Certificado | **1302 Certificado digital** |
 | 902 · 606 · 610 | Segundo bipe na Conferência · Parâmetros do sob medida · Calendário e feriados | **906 Parâmetros** |
-| (nenhuma tela) | os horários de corte e despacho por dia da semana (`/api/config/horarios`, `horarios.editar`) | **906 Parâmetros** — a regra existe e não tinha tela (dívida 18) |
+| (nenhuma tela) | os horários de corte e despacho por dia da semana (`/api/config/horarios`, `horarios.editar`) | ~~**906 Parâmetros**~~ **206 Horários de coleta**, "Horário padrão da semana" (D12, 11/11/2026) — a regra existe e não tinha tela (dívida 18) |
 | 252 · 607 · 615 · 104 · 301 | relatório do mês e desempenho · Painel do tecido · Indicadores · peças com problema · gráfico entrou × saiu | abas da **904**; a 607, a 615 e a 104 saem do menu |
 | 604 Rolos | aba "Entrada de rolo" (só um aviso mandando à 502) | sai |
 | 606 Cadastros | aba "Quem entra" (só leitura) | sai — a grade telas × setores da 901 já mostra |

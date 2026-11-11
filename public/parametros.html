@@ -52,34 +52,6 @@ function erroDe(x){ return (x.j && (x.j.erro || x.j.mensagem)) || ('não deu par
 function card(id){ var d=document.getElementById(id); if(d){ d.innerHTML=''; return d; }
   d=document.createElement('div'); d.className='card'; d.id=id; document.getElementById('corpo').appendChild(d); return d; }
 
-/* ── Horários de corte e despacho (medida padrão) ─────────────────────────── */
-var DIAS=[['seg','Segunda'],['ter','Terça'],['qua','Quarta'],['qui','Quinta'],['sex','Sexta'],['sab','Sábado'],['dom','Domingo']];
-async function partHorarios(){
-  var c=card('pHor'), pode=tem('horarios.editar');
-  var x=await jget('/api/config/horarios');
-  if(x.s!==200 || !x.j){ c.innerHTML='<h2>Horários de corte e despacho</h2><div class="msg err">'+esc(erroDe(x))+'</div>'; return; }
-  var h='<h2>Horários de corte e despacho</h2><p class="ajuda">O <b>corte</b> é o horário até o qual a venda sai no mesmo dia (a Revisão o mostra). O <b>despacho</b> é o limite para levar os volumes à agência — vale quando o dia não tem horário de agência lançado na 206 Horários de coleta.</p>';
-  h+='<div class="rola"><table><tr><th>Dia</th><th>Corte</th><th>Despacho</th></tr>';
-  DIAS.forEach(function(d){ var v=x.j[d[0]]||{};
-    h+='<tr><td>'+d[1]+'</td><td><input type="time" data-dia="'+d[0]+'" data-campo="corte" value="'+esc(v.corte)+'"'+(pode?'':' disabled')+'></td>'
-      +'<td><input type="time" data-dia="'+d[0]+'" data-campo="despacho" value="'+esc(v.despacho)+'"'+(pode?'':' disabled')+'></td></tr>'; });
-  h+='</table></div>';
-  h+= pode ? '<div class="linha"><button class="p" id="horSalvar" type="button">Salvar horários</button></div><div class="msg" id="horMsg"></div>'
-           : '<p class="nota">Mudar os horários é de quem tem a permissão de editar horários.</p>';
-  c.innerHTML=h;
-  if(!pode) return;
-  document.getElementById('horSalvar').onclick=async function(){
-    var corpo={}; c.querySelectorAll('input[data-dia]').forEach(function(i){ i.classList.remove('erro');
-      (corpo[i.dataset.dia]=corpo[i.dataset.dia]||{})[i.dataset.campo]=i.value; });
-    var m=document.getElementById('horMsg'), r=await jsend('/api/config/horarios','POST',corpo);
-    if(r.s===200 && r.j && r.j.ok){ m.className='msg ok'; m.textContent='Horários salvos.'; }
-    else { m.className='msg err'; m.textContent=erroDe(r);
-      /* o campo recusado fica marcado: o que não é HH:MM (vazio, fora da hora) */
-      c.querySelectorAll('input[data-dia]').forEach(function(i){
-        var x=/^(\d{2}):(\d{2})$/.exec(i.value); if(!x || +x[1]>23 || +x[2]>59) i.classList.add('erro'); }); }
-  };
-}
-
 /* ── Segundo bipe na Conferência (medida padrão; muda quem é nível Admin) ─── */
 async function partBipe(){
   var c=card('pBipe'), pode=EU.admin;
@@ -212,7 +184,11 @@ async function iniciar(){
   if(x.j){ EU.perms=x.j.perms||[]; EU.ag=!!x.j.admin_geral; EU.admin=!!x.j.nivel_admin; }
   document.getElementById('corpo').innerHTML='';
   var algum=false;
-  if(EU.admin || tem('horarios.editar')){ algum=true; await partHorarios(); }
+  /* Os horários de corte e despacho moram na 206 desde 11/11/2026 (AJUSTE): é o
+     assunto dela. Aqui fica só o caminho, para quem os procurar. */
+  if(EU.admin || tem('horarios.editar')){
+    var nh=card('pHor'); nh.innerHTML='<h2>Horários de corte e despacho</h2><p class="ajuda">Moram na tela <b>206 Horários de coleta</b>, no bloco "Horário padrão da semana", ao lado das coletas lançadas. <a href="/coleta-horarios" style="color:var(--amb)">Abrir a 206 →</a></p>';
+  }
   if(EU.admin){ await partBipe(); }
   if(tem('sobmedida.parametro.ler') || tem('sobmedida.parametro.editar')){
     algum=true;
