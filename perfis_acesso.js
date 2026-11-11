@@ -129,14 +129,18 @@ const NASCERAM_DEPOIS = ['coleta.horario',   // HORARIOS-DE-COLETA, 05/11/2026
      Admin Geral (R-ALC-06); o dono a da aos Supervisores pela tela de Acessos.
      Sai da comparacao pelo nome; que so o Admin Geral a recebe e travado no
      teste_fichas_material.js. */
-  'material.extra'];
+  'material.extra',
+  /* O MODO TESTE FOI APOSENTADO (11/11/2026): a chave saiu do registro e a 903
+     do mapa. Sai da comparacao pelo nome (como a 203); que ninguem mais liga o
+     modo e travado no teste_tarja_modo_teste.js e no teste_regras_estoque.js. */
+  'teste.operar'];
 function comparar(antes, agora){
   if(!antes) return 'sem retrato de antes';
   /* A 203 Subir PDF SAIU em 05/11/2026 (decisão do dono, D2): o endereço
      `/expedicao` só redireciona para a 103, e abre a qualquer pessoa logada —
      quem julga é o portão da 103. Ele sai da comparação pelo NOME; a outra
      ponta (quem abria a 203 abre a 103) é conferida no teste_mapa, seção 6. */
-  const tira = l => (l || []).filter(r => r !== '/devolucoes' && r !== '/expedicao');
+  const tira = l => (l || []).filter(r => r !== '/devolucoes' && r !== '/expedicao' && r !== '/admin/teste');   // a 903 saiu (11/11/2026)
   const dif = [];
   if(JSON.stringify(tira(antes.abre)) !== JSON.stringify(tira(agora.abre))) dif.push('telas ' + JSON.stringify(tira(antes.abre)) + ' → ' + JSON.stringify(tira(agora.abre)));
   const semNovas = l => (l || []).filter(c => NASCERAM_DEPOIS.indexOf(c) < 0);

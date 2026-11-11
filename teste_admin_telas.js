@@ -44,7 +44,7 @@ function abrir(rota, u){
 const ADMIN = M.TELAS.filter(t => t.rota.indexOf('/admin/') === 0);
 
 console.log('\n── 1. cada aba é uma tela com endereço próprio ──');
-eq('são 13 telas novas em /admin/ (Planejamento, Relatórios e Acessos já tinham endereço)', ADMIN.filter(t => t.aba).length, 13);
+eq('são 12 telas novas em /admin/ (Planejamento, Relatórios e Acessos já tinham endereço; a 903 saiu em 11/11/2026)', ADMIN.filter(t => t.aba).length, 12);
 /* ARRUMAR-O-LUGAR fase 2 (11/11/2026): seis abas da 501 viraram telas /admin/
    com o `cmp` delas — o mesmo index.html, abrindo o painel de Compras só com a
    aba (teste_501_so_compra.js). */
