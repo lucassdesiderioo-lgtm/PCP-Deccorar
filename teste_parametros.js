@@ -72,13 +72,18 @@ console.log('\n── 3. a caixinha de cada ação na tela de Acessos ──');
 const info = {}; PERMISSOES.forEach(p => info[p.chave] = p);
 ok('horarios.editar aparece pendurada na 206 (o horário padrão mora lá)', info['horarios.editar'] && info['horarios.editar'].tela === 206, JSON.stringify(info['horarios.editar'] && info['horarios.editar'].tela));
 const t206 = M.porNumero(206);
-ok('a 206 abre também com horarios.editar (e continua com coleta.horario)', JSON.stringify(t206.perms.slice().sort()) === JSON.stringify(['coleta.horario','horarios.editar']), JSON.stringify(t206.perms));
+/* Decisão do dono (③ REVISÃO): todo nível Admin lia o padrão na 906; a 206 abre
+   a ele também, só para ler — ninguém perde a leitura. */
+ok('a 206 abre com coleta.horario, horarios.editar ou o nível Admin (que lia o padrão na 906)', JSON.stringify(t206.perms.slice().sort()) === JSON.stringify(['@admin','coleta.horario','horarios.editar']), JSON.stringify(t206.perms));
 ok('a 206 diz que se liga à 101 (o corte da Revisão) além de 103, 201 e 202', [101, 103, 201, 202].every(x => t206.liga.indexOf(x) >= 0), JSON.stringify(t206.liga));
 const COL = ler('public/coleta-horarios.html');
 ok('a 206 tem o bloco "Horário padrão da semana", pela rota de sempre', /Horário padrão da semana/.test(COL) && /\/api\/config\/horarios/.test(COL));
 ok('   só quem tem horarios.editar muda o padrão; quem só tem coleta.horario vê', /horarios\.editar/.test(COL) && /disabled/.test(COL));
 ok('   quem não tem coleta.horario não pede as semanas (as rotas delas são de coleta.horario)', /coleta\.horario/.test(COL) && /\/api\/telas\/minhas/.test(COL));
 ok('   o horário recusado fica marcado no campo', /padrao[\s\S]*classList\.add\('erro'\)/.test(COL));
+ok('③ REVISÃO: a leitura do padrão que falha diz que falhou (não mostra campos vazios calada)', /padraoErro|Não deu para ler o horário padrão/.test(COL));
+ok('③ REVISÃO: sem resposta do /api/telas/minhas, a 206 tenta as semanas (não diz à pessoa que ela não tem acesso)', /semPerms|eu\s*===\s*null|minhasFalhou/.test(COL));
+ok('③ REVISÃO: quem não vê as semanas não lê a instrução de lançar a semana nem o "acima"', /ajudaSemana/.test(COL) && /acimaTxt|semAcima/.test(COL));
 ok('sobmedida.parametro.editar aparece pendurada na 906', info['sobmedida.parametro.editar'] && info['sobmedida.parametro.editar'].tela === 906,
   JSON.stringify(info['sobmedida.parametro.editar'] && info['sobmedida.parametro.editar'].tela));
 ok('sobmedida.parametro.ler aparece na 602 Corte (é o Corte e as Sobras que leem os parâmetros)', info['sobmedida.parametro.ler'] && info['sobmedida.parametro.ler'].tela === 602,
@@ -158,7 +163,11 @@ function pessoas(){
       const ganho206 = abre206 && !antes206 && ps.has('horarios.editar');
       const perda906 = !abre906 && antes906 && ps.has('horarios.editar') && abre206;
       ok(p.nome + ': a 906 abre onde abria (ou a pessoa foi para a 206 pelos horários)', antes906 === abre906 || perda906, JSON.stringify({ antes906, abre906, nv }));
-      ok(p.nome + ': a 206 abre onde abria (ou ganhou pela horarios.editar)', antes206 === abre206 || ganho206, JSON.stringify({ antes206, abre206, nv }));
+      /* quem via o padrão na 906 (todo nível Admin, ou horarios.editar) abre a 206 */
+      const viaPadrao = antes906 && (admin || ps.has('horarios.editar'));
+      const ganhoAdmin = abre206 && !antes206 && admin;
+      ok(p.nome + ': a 206 abre onde abria (ou ganhou pela horarios.editar ou pelo nível Admin)', antes206 === abre206 || ganho206 || ganhoAdmin, JSON.stringify({ antes206, abre206, nv }));
+      ok(p.nome + ': quem lia o horário padrão na 906 continua lendo (abre a 206)', !viaPadrao || abre206, JSON.stringify({ viaPadrao, abre206 }));
     }
   }finally{ B.fechar(); }
   fim();

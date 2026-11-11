@@ -83,8 +83,10 @@ const TELAS = [
   /* A 206 abre também com horarios.editar desde 11/11/2026 (AJUSTE, decisão do
      dono): o "Horário padrão da semana" (corte e despacho por dia da semana,
      o que vale quando o dia não tem horário lançado) mora aqui, ao lado das
-     semanas. Quem só tem horarios.editar vê o padrão, e não as semanas. */
-  { n:206, nome:'Horários de coleta',    rota:'/coleta-horarios', nivel:'supervisor', onde:'computador', perms:['coleta.horario','horarios.editar'],
+     semanas. Quem só tem horarios.editar vê o padrão, e não as semanas. E todo
+     nível Admin a abre para LER o padrão (decisão do dono, ③ REVISÃO): era o
+     que ele lia na 906, e ninguém perde a leitura. */
+  { n:206, nome:'Horários de coleta',    rota:'/coleta-horarios', nivel:'supervisor', onde:'computador', perms:['coleta.horario','horarios.editar','@admin'],
     modulo:'expedicao', bloco:'comum', liga:[101, 103, 201, 202] },   // Operação não edita horário (05/11/2026)
   // ── 250 · Devoluções (bloco dentro da Expedição; a porta é /devolucoes) ──
   { n:251, nome:'Devoluções — receber',  rota:'/devolucao',     nivel:'operacao',   onde:'tablet',     perms:['devolucao.registrar'],   area:'devolucao',
