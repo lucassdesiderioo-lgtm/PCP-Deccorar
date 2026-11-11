@@ -106,11 +106,14 @@ try{
       /* ANTES: a pessoa abria a 501 e a aba aparecia para ela. */
       const via = pode(u, '/admin/compras') && (!r.perms || perm(u, r.perms)) && (!r.le || perm(u, r.le));
       const abre = pode(u, e.rota);
-      /* O ÚNICO GANHO ACEITO, e nomeado: a 1301 abre com custo.ver ("e as de
-         leitura de hoje", spec §8), e quem tem custo.ver sem nenhuma chave da
-         501 passa a ver na tela as notas que já lia pela rota (/api/notas
-         aceita custo.ver). Nada que ele não lesse antes. */
-      const aceito = e.n === 1301 && abre && !via && B.AC.permissoesDe(u.id).has('custo.ver') && pode(u, '/api/notas');
+      /* O GANHO ACEITO, e nomeado (③ REVISÃO): a chave que é o trabalho da tela
+         nova abre a tela, mesmo sem nenhuma chave da 501 — `recebimento.liberar`
+         a 1201, `nota.lancar` e `custo.ver` ("e as de leitura de hoje", §8) a
+         1301. A rota da tela já aceitava a chave: a pessoa passa a ver na tela
+         o que já lia e fazia pela rota. */
+      const GANHO = { 1201:['recebimento.liberar','/api/recebimento/retidos'], 1301:['nota.lancar','/api/notas'], '1301c':['custo.ver','/api/notas'] };
+      const ps = B.AC.permissoesDe(u.id);
+      const aceito = abre && !via && [GANHO[e.n], e.n === 1301 ? GANHO['1301c'] : null].some(g => g && ps.has(g[0]) && pode(u, g[1]));
       if(via !== abre && !aceito) difs.push(e.n + (abre ? ' ganhou' : ' perdeu'));
     }
     ok(p.nome + ': abre as telas novas exatamente onde via as abas', !difs.length, difs.join(' · '));
@@ -131,6 +134,39 @@ ok('…e os ajustes antigos de material, que só se rejeitam (contagem.ajustar)'
 ok('a 302 não desenha mais a aprovação de material nem o cartão "Material"', !/cmAprov/.test(INDEX) && !/contagemAprov/.test(INDEX) && !/>Material<\/div>/.test(INDEX));
 ok('os ajustes antigos que ficam na 302 são só os de peça', /ctPendentes[\s\S]{0,600}tipo\s*!==\s*['"]componente['"]/.test(INDEX));
 ok('o compras_abas.js não tem mais a aprovação da contagem (mudou de casa)', !/contagemAprov/.test(ABAS_JS));
+
+console.log('\n── 7. a central de Pendências leva à tela nova (③ REVISÃO) ──');
+const PD = ler('pendencias_dominio.js');
+const ONDE = { material_sem_almox:'/admin/materiais', recebimento_retido:'/admin/recebimento-retido', recebimento_aviso:'/admin/recebimento-retido',
+  certificado:'/admin/certificado', nota_sem_pedido:'/admin/notas', contagem_material:'/contagem-material', contagem_material_antiga:'/contagem-material' };
+for(const [ch, url] of Object.entries(ONDE)){
+  const m = PD.match(new RegExp("chave:'" + ch + "'[^\\n]*onde:\\{\\s*url:'([^']+)'"));
+  ok('a linha "' + ch + '" da central leva a ' + url, !!m && m[1] === url, m ? m[1] : 'sem url');
+}
+{
+  const os = require('os'), Database = require('better-sqlite3');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pend501-'));
+  const db = new Database(path.join(dir, 'p.db'));
+  try{
+    db.exec(`CREATE TABLE contagem_pendente (id INTEGER PRIMARY KEY, sessao TEXT, codigo TEXT, contado REAL, sistema_era REAL, operacao TEXT,
+        contado_por TEXT, criado_em TEXT, tipo TEXT, componente_id INTEGER, aprovado INTEGER DEFAULT 0);
+      CREATE TABLE skus (codigo TEXT, estoque INTEGER, cor TEXT); CREATE TABLE componente (id INTEGER, estoque REAL, unidade TEXT);
+      INSERT INTO contagem_pendente (codigo,contado,operacao,criado_em,tipo) VALUES ('BK1',3,'substituir','2026-11-01','sku'),
+        ('Tubo',5,'substituir','2026-11-02','componente'),('Base',2,'substituir','2026-11-03','componente');`);
+    const PDM = require('./pendencias_dominio');
+    const fontes = PDM.LINHAS || [];
+    const f = ch => fontes.find(x => x.chave === ch);
+    const peca = f('contagem'), mat = f('contagem_material_antiga');
+    ok('a linha "Contagem" da central conta só os ajustes antigos de PEÇA (o que a 302 mostra)', !!peca && peca.contar(db).n === 1, peca ? JSON.stringify(peca.contar(db)) : 'sem a linha');
+    ok('e os de material têm linha própria, que leva à 504', !!mat && mat.contar(db).n === 2, mat ? JSON.stringify(mat.contar(db)) : 'sem a linha');
+  }finally{ db.close(); fs.rmSync(dir, { recursive:true, force:true }); }
+}
+
+console.log('\n── 8. a 501 sem aba nenhuma aponta as telas novas, e o CI tranca as seis ──');
+ok('quem abre a 501 sem aba de compra vê para onde foram as dele (e não os cards velhos)', /vis\.length[\s\S]{0,400}velho\(\[\]\)[\s\S]{0,600}mudaram de tela/.test(ABAS_JS));
+const CI = ler('.github/workflows/testes.yml');
+ok('o teste de segurança do CI confere as seis telas novas sem login', NOVAS.every(e => CI.indexOf(e.rota) >= 0), NOVAS.filter(e => CI.indexOf(e.rota) < 0).map(e => e.rota).join(' '));
+ok('…e a 504', CI.indexOf('/contagem-material') >= 0);
 
 console.log('\n' + (falhas ? falhas + ' FALHA(S) em ' : 'todos os ') + n + ' casos' + (falhas ? '' : ' passaram'));
 process.exit(falhas ? 1 : 0);

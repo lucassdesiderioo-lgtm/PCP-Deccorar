@@ -93,7 +93,19 @@
       }
     }
     var vis = ABAS.filter(function(a){ return (SOLO ? a.id === SOLO : !(a.tela && a.tela !== 501)) && (!a.perms || pode.apply(null, a.perms)) && (!a.le || pode.apply(null, a.le)); });
-    if(!vis.length) return;
+    if(!vis.length){
+      /* Quem abre a 501 só pela chave de uma aba que virou tela (o almoxarifado,
+         o material): nada de compra aqui. Some os cards velhos e diz para onde
+         foi o trabalho dele (③ REVISÃO, fase 2). */
+      if(!SOLO){
+        velho([]);
+        var minhas = TELAS.filter(function(t){ return t.n >= 1100; });
+        cab.innerHTML = ESTILO + '<div class="card"><div class="cmpAvi">As abas do seu acesso mudaram de tela em 11/11/2026: '
+          + (minhas.length ? minhas.map(function(t){ return '<a href="' + esc(t.rota) + '">' + t.n + ' ' + esc(t.nome) + '</a>'; }).join(' · ') : 'nenhuma tela de compra para o seu acesso') + '.</div></div>';
+        $('#cmpCorpo').innerHTML = '';
+      }
+      return;
+    }
     if(!SOLO){ try{ if(!id) id = localStorage.getItem('cmpAba'); }catch(e){} }
     var a = vis.find(function(x){ return x.id === id; }) || vis[0];
     ATUAL = a.id; if(!SOLO){ try{ localStorage.setItem('cmpAba', a.id); }catch(e){} }

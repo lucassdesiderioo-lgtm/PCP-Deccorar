@@ -198,6 +198,8 @@ jobs:
                       /admin/producao /admin/problemas /admin/pendencias /admin/correcoes \
                       /admin/devolucoes /admin/estoque /admin/contagem /admin/skus \
                       /admin/sku-incompleto /admin/ficha /admin/compras /admin/cadastros /admin/teste \
+                      /admin/materiais /admin/fornecedores /admin/almoxarifados \
+                      /admin/recebimento-retido /admin/notas /admin/certificado /contagem-material \
                       /coleta-horarios /minha-producao /relatorios \
                       /sobmedida /sobmedida/corte /sobmedida/cadastros \
                       /sobmedida/telas/corte.html; do

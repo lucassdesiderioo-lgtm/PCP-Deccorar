@@ -37,12 +37,19 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
   quem tem a chave (`public/aprov_material.js`). A 504 passou a abrir também
   com essas duas chaves; quem não conta não vê o "Começar a contagem". Os
   ajustes antigos de peça ficam na 302.
-- **Divergência D9 — o único ganho, e nomeado:** a 1301 abre com `custo.ver`
-  ("e as de leitura de hoje", §8), e quem tem `custo.ver` sem nenhuma chave da
-  501 passa a ver na tela as notas que já lia pela rota (`/api/notas` aceita
-  `custo.ver`). No banco de exemplo, um caso (Revisão + custo).
+- **Divergência D9 — o ganho, e nomeado:** a chave que é o trabalho da tela
+  nova abre a tela mesmo sem nenhuma chave da 501 — `recebimento.liberar` a
+  1201, `nota.lancar` e `custo.ver` ("e as de leitura de hoje", §8) a 1301. A
+  rota de cada uma já aceitava a chave: a pessoa passa a ver na tela o que já
+  lia e fazia pela rota. No banco de exemplo, um caso (Revisão + custo).
+- **③ REVISÃO (11/11/2026), consertado com teste:** a central de Pendências (204)
+  levava à 501 (e à 302) as pendências que mudaram de tela — hoje cada linha leva
+  à tela nova ou à 504, e os ajustes antigos se dividem em duas linhas (peça, na
+  302; material, na 504), cada uma contando o que a tela dela mostra; quem abre a
+  501 só pela chave de uma aba que saiu vê para onde ela foi, e não os cards
+  velhos; e o teste de segurança do CI tranca as seis telas e a 504.
 - **A lista do que está fora do lugar** ficou só com `902/horarios` (fase 3).
-- `teste_501_so_compra.js` (75), escrito antes; os inventários do
+- `teste_501_so_compra.js` (87), escrito antes; os inventários do
   `teste_lugar.js`, do `teste_admin_telas.js` e do `teste_valor.js` ganharam as
   telas novas, sem mudar o esperado do que já existia.
 
