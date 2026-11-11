@@ -239,7 +239,7 @@ module.exports = [
   { chave:'compras.valores',      grupo:'Compras', tela:501, nivel:'supervisor',
     rotulo:'Ver valores das compras', desc:'Preço, desembolso, custo médio, pedido mínimo, frete e o valor dos pedidos',
     sensivel:true },
-  { chave:'fornecedor.cadastrar', grupo:'Compras', tela:501, nivel:'admin',
+  { chave:'fornecedor.cadastrar', grupo:'Compras', tela:1102, nivel:'admin',
     rotulo:'Cadastrar fornecedor', desc:'Criar e editar fornecedores' },
   { chave:'preco.lancar',         grupo:'Compras', tela:501, nivel:'admin',
     rotulo:'Lançar preço',        desc:'Cadastrar e atualizar preço de fornecedor' },
@@ -252,7 +252,7 @@ module.exports = [
     rotulo:'Registrar recebimento', desc:'Conferir a entrega e dar entrada no estoque' },
   /* COMPRAS-E-RECEBIMENTO R-CMP-33: decidir o retido (aceitar, aceitar e
      reclamar, devolver) e dar ciencia do aviso. Backfill: quem tem pedido.criar. */
-  { chave:'recebimento.liberar',  grupo:'Compras', tela:501, nivel:'admin',
+  { chave:'recebimento.liberar',  grupo:'Compras', tela:1201, nivel:'admin',
     rotulo:'Liberar recebimento retido', desc:'Aceitar, aceitar e reclamar ou devolver a entrega retida; dar ciência do aviso de peso',
     sensivel:true },
   /* COMPRAS-E-RECEBIMENTO §7: guardar, mover e abrir volume na 503, por bipe.
@@ -270,11 +270,11 @@ module.exports = [
   { chave:'pedido.aprovar',       grupo:'Compras', tela:501, nivel:'admin',
     rotulo:'Aprovar pedido acima da alçada', desc:'Passar para comprado o pedido de quem tem você como aprovador',
     sensivel:true },
-  { chave:'nota.lancar',          grupo:'Compras', tela:501, nivel:'admin',
+  { chave:'nota.lancar',          grupo:'Compras', tela:1301, nivel:'admin',
     rotulo:'Lançar nota fiscal de compra', desc:'Nota, itens, impostos e custo pago/líquido' },
   /* fase 11 (R-CMP-51): enviar, trocar e remover o certificado digital. Nunca
      baixar. So o Admin Geral. */
-  { chave:'certificado.gerenciar', grupo:'Compras', tela:501, nivel:'admin_geral',
+  { chave:'certificado.gerenciar', grupo:'Compras', tela:1302, nivel:'admin_geral',
     rotulo:'Gerenciar o certificado digital', desc:'Enviar, trocar e remover o .pfx que baixa as notas da Receita (nunca baixar)',
     sensivel:true, intransferivel:true },
   { chave:'alcada.definir',       grupo:'Compras', tela:501, nivel:'admin_geral',
@@ -285,10 +285,10 @@ module.exports = [
   { chave:'custo.ver',            grupo:'Compras', tela:404, nivel:'admin',
     rotulo:'Ver custo do produto', desc:'Custo por SKU e evolução',
     sensivel:true },
-  { chave:'componente.cadastrar', grupo:'Compras', tela:501, nivel:'admin',
+  { chave:'componente.cadastrar', grupo:'Compras', tela:1101, nivel:'admin',
     rotulo:'Cadastrar material', desc:'Tudo que a empresa compra: matéria-prima, tecido, embalagem, limpeza, copa…' },
   /* COMPRAS-E-RECEBIMENTO §7. Backfill: quem tem `componente.cadastrar`. */
-  { chave:'almoxarifado.cadastrar', grupo:'Compras', tela:501, nivel:'admin',
+  { chave:'almoxarifado.cadastrar', grupo:'Compras', tela:1103, nivel:'admin',
     rotulo:'Cadastrar almoxarifado', desc:'Criar, renomear e desativar almoxarifado e os endereços dele' },
   /* `minimo.definir` SAIU em 26/10/2026 (fase 3 da ACESSOS-UNIFICADOS,
      divida 19): nenhuma rota a lia. Quem manda no mínimo e no ideal do card

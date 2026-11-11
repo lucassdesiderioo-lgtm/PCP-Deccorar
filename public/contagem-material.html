@@ -31,6 +31,7 @@ input,select{font-family:inherit;font-size:18px;padding:12px;border:1px solid va
   <div class="sub">Conte o que está no almoxarifado. Você não vê o saldo do sistema — conte o que vê. Zero vale.</div></div></header>
 <div class="wrap"><div id="app">carregando…</div></div>
 <script src="/nav.js"></script>
+<script src="/aprov_material.js"></script>
 <script>
 var $=function(s){return document.querySelector(s);};
 function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
@@ -39,18 +40,23 @@ function numero(v){ var t=String(v==null?'':v).trim().replace(',','.'); return t
 async function api(m,u,b){ try{ var r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined}); var j=await r.json(); if(!r.ok && !j.erro) j.erro='recusado'; return j; }catch(e){ return {erro:'SEM CONEXÃO — confira o Wi-Fi e tente de novo'}; } }
 var CID=null;
 async function inicio(){
+  /* A 504 abre também para quem APROVA a contagem de material ou rejeita os
+     ajustes antigos (ARRUMAR-O-LUGAR fase 2, 11/11/2026: a aprovação saiu da
+     302). Quem não conta não vê o "Começar a contagem" — a rota o recusaria. */
+  var mi=await api('GET','/api/telas/minhas');
+  var conta=mi && (mi.admin_geral || (mi.perms||[]).indexOf('contagem.contar')>=0);
   var al=await api('GET','/api/almoxarifados'); if(!Array.isArray(al)) al=[];
   var ab=await api('GET','/api/contagem-material/abertas'); if(!Array.isArray(ab)) ab=[];
-  $('#app').innerHTML='<div class="card"><div class="nome">Em qual almoxarifado você vai contar?</div>'
+  $('#app').innerHTML='<div id="aprovMat"></div>'+(!conta?'':'<div class="card"><div class="nome">Em qual almoxarifado você vai contar?</div>'
     +'<div class="lin"><select id="alm">'+al.filter(function(a){return a.ativo;}).map(function(a){return '<option value="'+a.id+'">'+esc(a.nome)+'</option>';}).join('')+'</select>'
     +'<button class="b pri" id="abrir">Começar a contagem</button></div><div id="msg"></div></div>'
-    +(ab.length?'<div class="card"><div class="nome">Contagens abertas</div>'+ab.map(function(c){return '<div class="lin"><span>'+esc(c.almoxarifado)+' · '+esc(c.usuario_nome||'')+'</span><button class="b" data-cont="'+c.id+'">Continuar</button></div>';}).join('')+'</div>':'');
+    +(ab.length?'<div class="card"><div class="nome">Contagens abertas</div>'+ab.map(function(c){return '<div class="lin"><span>'+esc(c.almoxarifado)+' · '+esc(c.usuario_nome||'')+'</span><button class="b" data-cont="'+c.id+'">Continuar</button></div>';}).join('')+'</div>':''));
+  if(window.APROV_MATERIAL) window.APROV_MATERIAL.desenhar($('#aprovMat'), mi);
   /* O TECIDO DE ANTES (decisao do dono, 07/11/2026): ficou "por quantidade" ate
      cada rolo ser registrado aqui com a metragem da etiqueta. So aparece a quem
      aprova a contagem (a rota recusa os outros), e sem o saldo. */
   /* so quem aprova a contagem pergunta (sem isso, o 403 no console de todo
      contador — rodada 2 da revisao) */
-  var mi=await api('GET','/api/telas/minhas');
   var aprova=mi && (mi.admin_geral || (mi.perms||[]).indexOf('contagem.aprovar')>=0);
   var et=aprova ? await api('GET','/api/contagem-material/a-etiquetar') : null;
   if(Array.isArray(et) && et.length){

@@ -44,7 +44,8 @@ console.log('\n── 1. o mapa: toda tela com dinheiro declara a chave do valor
 /* O INVENTÁRIO DE 11/11/2026 (as duas varreduras da fase 1). Tela nova com
    dinheiro entra AQUI e no mapa — o caso 1.3 reprova a que entrar só num. */
 const PCP_VALOR = { 301:['custo.ver'], 302:['custo.ver'], 404:['custo.ver'],
-  501:['compras.valores'], 252:['devolucao.valores'] };
+  501:['compras.valores'], 252:['devolucao.valores'],
+  1301:['compras.valores'] };   // as notas saíram da 501 e levaram o dinheiro delas (ARRUMAR-O-LUGAR fase 2)
 /* ⚠️ UMA CHAVE DE VALOR POR TELA (③ REVISÃO): `pedido.pagar` e `devolucao.dinheiro`
    são AÇÕES (pagar, dar baixa no reembolso) e não podem aparecer na tela de
    Acessos como "Ver valores". */

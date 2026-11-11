@@ -38,13 +38,22 @@
     else{ el.style.color = 'var(--green)'; el.textContent = okTxt || 'salvo'; setTimeout(function(){ if(el.textContent === (okTxt || 'salvo')) el.textContent = ''; }, 3000); }
   }
   /* As permissoes da propria pessoa vem do /api/telas/minhas (nav.js). */
-  var PERMS = null, AG = false;
+  var PERMS = null, AG = false, TELAS = [];
   async function perms(){
     if(PERMS) return PERMS;
     var r = await api('GET', '/api/telas/minhas');
-    PERMS = (r && r.perms) || []; AG = !!(r && r.admin_geral);
+    PERMS = (r && r.perms) || []; AG = !!(r && r.admin_geral); TELAS = (r && r.telas) || [];
     return PERMS;
   }
+  /* ⚠️ SEIS ABAS DESTE ARQUIVO VIRARAM TELAS (ARRUMAR-O-LUGAR fase 2,
+     11/11/2026): Materiais (1101), Fornecedores (1102), Almoxarifados (1103),
+     Recebimento retido (1201), Notas (1301) e Certificado (1302) — o `tela:` do
+     registrar diz qual. Na tela nova (`TELA_ADMIN.cmp`) a aba é desenhada
+     SOZINHA, sem a faixa; na 501 ela não aparece, e o link antigo (o #notas, ou
+     a aba lembrada neste computador) leva à tela nova. O código da aba não
+     mudou: só o lugar. */
+  var SOLO = (window.TELA_ADMIN && window.TELA_ADMIN.cmp) || null;
+  function rotaDaTela(n){ var t = TELAS.find(function(x){ return x.n === n; }); return t ? t.rota : null; }
   function pode(){ if(AG) return true; for(var i = 0; i < arguments.length; i++) if((PERMS || []).indexOf(arguments[i]) >= 0) return true; return false; }
 
   var ESTILO = '<style>'
@@ -70,12 +79,25 @@
   async function abrir(id){
     await perms();
     var cab = $('#cmpAbas'); if(!cab) return;
-    var vis = ABAS.filter(function(a){ return (!a.perms || pode.apply(null, a.perms)) && (!a.le || pode.apply(null, a.le)); });
+    if(SOLO) id = SOLO;
+    else{
+      /* o link antigo numa aba que saiu: o #hash do endereço, ou a aba lembrada */
+      var pedido = id || (location.hash || '').replace('#', '');
+      if(!pedido){ try{ pedido = localStorage.getItem('cmpAba'); }catch(e){} }
+      var saiu = ABAS.find(function(x){ return x.id === pedido && x.tela && x.tela !== 501; });
+      if(saiu){
+        try{ localStorage.removeItem('cmpAba'); }catch(e){}
+        var destino = rotaDaTela(saiu.tela);
+        if(destino){ location.replace(destino); return; }
+        id = null;
+      }
+    }
+    var vis = ABAS.filter(function(a){ return (SOLO ? a.id === SOLO : !(a.tela && a.tela !== 501)) && (!a.perms || pode.apply(null, a.perms)) && (!a.le || pode.apply(null, a.le)); });
     if(!vis.length) return;
-    try{ if(!id) id = localStorage.getItem('cmpAba'); }catch(e){}
+    if(!SOLO){ try{ if(!id) id = localStorage.getItem('cmpAba'); }catch(e){} }
     var a = vis.find(function(x){ return x.id === id; }) || vis[0];
-    ATUAL = a.id; try{ localStorage.setItem('cmpAba', a.id); }catch(e){}
-    cab.innerHTML = ESTILO + '<div class="cab">' + vis.map(function(x){ return '<div data-cmp-aba="' + x.id + '" class="' + (x.id === a.id ? 'on' : '') + '">' + esc(x.nome) + '</div>'; }).join('') + '</div>';
+    ATUAL = a.id; if(!SOLO){ try{ localStorage.setItem('cmpAba', a.id); }catch(e){} }
+    cab.innerHTML = ESTILO + (SOLO ? '' : '<div class="cab">' + vis.map(function(x){ return '<div data-cmp-aba="' + x.id + '" class="' + (x.id === a.id ? 'on' : '') + '">' + esc(x.nome) + '</div>'; }).join('') + '</div>');
     velho(a.velho || []);
     var corpo = $('#cmpCorpo'); corpo.innerHTML = '';
     if(a.desenhar) await a.desenhar(corpo);
@@ -93,7 +115,7 @@
 
   /* ── MATERIAIS (fase 1, R-CMP-01 a 10) ───────────────────────────────── */
   var OPC = null, ALM = [];
-  registrar({ id:'materiais', nome:'Materiais', perms:['compras.ver','componente.cadastrar'], le:['compras.ver'], velho:['cmpVelhoMateriais'],
+  registrar({ id:'materiais', tela:1101, nome:'Materiais', perms:['compras.ver','componente.cadastrar'], le:['compras.ver'], velho:['cmpVelhoMateriais'],
     desenhar: async function(box){
       OPC = await api('GET', '/api/componentes/opcoes');
       ALM = await api('GET', '/api/almoxarifados'); if(!Array.isArray(ALM)) ALM = [];
@@ -177,7 +199,7 @@
   }
 
   /* ── ALMOXARIFADOS (fase 1, R-CMP-38) ───────────────────────────────── */
-  registrar({ id:'almox', nome:'Almoxarifados', perms:['almoxarifado.cadastrar','componente.cadastrar','compras.ver'],
+  registrar({ id:'almox', tela:1103, nome:'Almoxarifados', perms:['almoxarifado.cadastrar','componente.cadastrar','compras.ver'],
     desenhar: async function(box){
       var l = await api('GET', '/api/almoxarifados'); if(!Array.isArray(l)) return falhou(box, l);
       box.innerHTML = '<div class="card"><div style="font-weight:700">Almoxarifados</div>'
@@ -217,7 +239,7 @@
   /* ── FORNECEDORES (fase 2, R-CMP-11 e 12) ──────────────────────────── */
   var OPCC = null;
   async function opcoes(){ if(!OPCC) OPCC = await api('GET', '/api/compras/opcoes'); return OPCC; }
-  registrar({ id:'fornecedores', nome:'Fornecedores', perms:['compras.ver','fornecedor.cadastrar'], le:['compras.ver'],
+  registrar({ id:'fornecedores', tela:1102, nome:'Fornecedores', perms:['compras.ver','fornecedor.cadastrar'], le:['compras.ver'],
     desenhar: async function(box){
       var o = await opcoes();
       var l = await api('GET', '/api/fornecedores'); if(!Array.isArray(l)) return falhou(box, l);
@@ -380,7 +402,7 @@
   }
 
   /* ── RECEBIMENTO RETIDO E AVISOS (fase 3, R-CMP-32/33) ─────────────── */
-  registrar({ id:'retidos', nome:'Recebimento retido', perms:['recebimento.liberar','compras.ver'],
+  registrar({ id:'retidos', tela:1201, nome:'Recebimento retido', perms:['recebimento.liberar','compras.ver'],
     desenhar: async function(box){
       var r = await api('GET', '/api/recebimento/retidos'); var it = (r && r.itens) || [], av = (r && r.avisos) || [];
       var decide = pode('recebimento.liberar');
@@ -410,7 +432,7 @@
 
   /* ── NOTAS (fase 4, R-CMP-22 a 27) ───────────────────────────────────── */
   var CAMPOS_NOTA = [['quantidade','Qtd'],['valor_produto','Produto'],['desconto','Desconto'],['frete','Frete'],['seguro','Seguro'],['outras','Outras'],['ipi','IPI'],['icms','ICMS'],['icms_st','ICMS-ST']];
-  registrar({ id:'notas', nome:'Notas', perms:['nota.lancar','custo.ver'],
+  registrar({ id:'notas', tela:1301, nome:'Notas', perms:['nota.lancar','custo.ver'],
     desenhar: async function(box){
       var reg = await api('GET', '/api/notas/regime');
       var notas = await api('GET', '/api/notas'); if(!Array.isArray(notas)) return falhou(box, notas);
@@ -523,27 +545,9 @@
     };
   };
 
-  /* ── A CONTAGEM DE MATERIAL QUE PASSOU DA TOLERANCIA (fase 6, R-CMP-42) ──
-     Desenhada na 302 (aba Contagem), para quem tem contagem.aprovar. */
-  window.CMP.contagemAprov = async function(box){
-    if(!box) return;
-    await perms(); if(!pode('contagem.aprovar')) return;
-    var l = await api('GET', '/api/contagem-material/pendentes'); if(!Array.isArray(l)) return;
-    box.style.display = '';
-    box.innerHTML = '<div style="font-weight:700">Contagem de material por almoxarifado — esperando aprovação</div>'
-      + '<div class="sub" style="margin:4px 0 10px">A diferença passou da tolerância do material. Aprovar aplica a DIFERENÇA sobre o saldo de agora. Quem contou não aprova.'
-      + ' Material por volume não se ajusta aqui: o saldo dele é a soma dos volumes (corrige-se abrindo/encerrando o volume na 503).</div>'
-      + (l.length ? '<table class="cmpTab"><thead><tr><th>Material</th><th>Almox.</th><th>Contado</th><th>Sistema</th><th>Diferença</th><th>Contou</th><th></th></tr></thead><tbody>'
-        + l.map(function(i){ return '<tr><td>' + esc(i.nome) + '</td><td>' + esc(i.almoxarifado || '') + '</td><td>' + n3(i.contado) + ' ' + esc(i.unidade || '') + '</td><td>' + n3(i.sistema) + '</td>'
-          + '<td>' + n3(i.diferenca) + ' (' + n3(i.diferenca_pct) + '%)</td><td>' + esc(i.contado_por || '') + '</td>'
-          + '<td><input data-cm-mot="' + i.id + '" placeholder="motivo"> <button class="primary" data-cm="' + i.id + '" data-a="aprovar">Aprovar</button> <button class="ghost" data-cm="' + i.id + '" data-a="rejeitar">Rejeitar</button> <span class="msg" data-cm-msg="' + i.id + '"></span></td></tr>'; }).join('')
-        + '</tbody></table>' : '<div class="sub">Nada esperando.</div>');
-    box.onclick = async function(ev){
-      var b = ev.target.closest('[data-cm]'); if(!b) return; var id = b.getAttribute('data-cm');
-      var r = await api('POST', '/api/contagem-material/itens/' + id + '/' + b.getAttribute('data-a'), { motivo:$('[data-cm-mot="' + id + '"]').value });
-      if(r.erro) return msg($('[data-cm-msg="' + id + '"]'), r); window.CMP.contagemAprov(box);
-    };
-  };
+  /* A aprovação da contagem de material que passou da tolerância (fase 6,
+     R-CMP-42) mudou de casa em 11/11/2026: mora na 504, no aprov_material.js
+     (ARRUMAR-O-LUGAR fase 2). */
 
   /* ── COMPRA PROGRAMADA (fase 7, R-CMP-46 a 48) ──────────────────────── */
   registrar({ id:'programada', nome:'Compra programada', perms:['compras.ver','pedido.criar'],
@@ -617,7 +621,7 @@
 
   /* ── CERTIFICADO (fase 11, R-CMP-51 a 56) — só o Admin Geral ──────────
      Enviar, trocar e remover. NUNCA baixar: não há botão nem rota. */
-  registrar({ id:'certificado', nome:'Certificado', perms:['certificado.gerenciar'],
+  registrar({ id:'certificado', tela:1302, nome:'Certificado', perms:['certificado.gerenciar'],
     desenhar: async function(box){
       var e = await api('GET', '/api/certificado');
       box.innerHTML = '<div class="card"><div style="font-weight:700">Certificado digital (A1) — notas baixadas da Receita</div>'

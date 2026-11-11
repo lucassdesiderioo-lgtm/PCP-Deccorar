@@ -254,7 +254,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
     </div>
   </div>
 
-  <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="sub" id="dvUltima" style="margin:0 0 10px 4px"></div><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide"><div class="card" id="cmAprov" style="display:none"></div>
+  <div id="v-cd" class="hide"><div id="cdBox"></div></div><div id="v-dv" class="hide"><div class="sub" id="dvUltima" style="margin:0 0 10px 4px"></div><div class="card" id="dvAdmLista"></div></div><div id="v-pb" class="hide"><div class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><span class="sub">De</span><input type="date" id="pbDe" onchange="carregarProb()"><span class="sub">ate</span><input type="date" id="pbAte" onchange="carregarProb()"></div><div id="pbResumo"></div></div><div class="card" id="pbLista"></div></div><div id="v-ct" class="hide">
   <!-- A CONFERENCIA DE PECA (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA, 26/09/2026).
        Contar e no tablet, as cegas, em /inventario; aqui fica o que e de quem
        planeja e de quem aprova. A contagem de MATERIAL continua logo abaixo,
@@ -262,10 +262,10 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   <div class="card" id="invAprov" style="display:none"></div>
   <div class="card" id="invConf" style="display:none"></div>
   <div class="card" id="invRel" style="display:none"></div>
-  <!-- A contagem antiga de MATERIAL saiu (revisão do PR #305, 07/11/2026):
-       material se conta só na 504, por almoxarifado e às cegas. -->
-  <div class="card"><div style="font-weight:700;margin-bottom:4px">Material</div>
-    <div class="sub">Material se conta na tela <a href="/contagem-material" style="color:#4493f8">504 Contagem de material</a>, por almoxarifado e às cegas. A aprovação dela fica no alto desta tela.</div></div>
+  <!-- A parte de MATERIAL desta tela (o cartão que levava à 504, a aprovação da
+       contagem por almoxarifado e os ajustes antigos de material) mora na 504
+       desde 11/11/2026 (ARRUMAR-O-LUGAR fase 2, decisão do dono "a"). A 302 é
+       de peça. -->
   <div class="card" id="ctAlertas"></div>
   <div class="card" id="ctPend" style="display:none"></div>
 </div>
@@ -521,7 +521,11 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   var vfx=$("#v-ficha"); if(vfx) vfx.classList.toggle("hide",t.dataset.t!=="ficha");
   if(t.dataset.t==="ficha") carregarFicha();
   var vcp=$("#v-compras"); if(vcp) vcp.classList.toggle("hide",t.dataset.t!=="compras");
-  if(t.dataset.t==="compras"){ carregarCompras(); carregarListaCompras(); if(window.CMP) window.CMP.abrir(); }
+  /* As telas 1101…1302 são abas da 501 que viraram telas (ARRUMAR-O-LUGAR fase
+     2): abrem o painel de Compras só com a aba delas (o `cmp`), sem a carga da
+     lista de compras. A 1101 traz junto o card de mínimo e ideal. */
+  if(t.dataset.t==="compras" && TELA && TELA.cmp){ if(TELA.cmp==="materiais") verMinimos(); if(window.CMP) window.CMP.abrir(TELA.cmp); }
+  else if(t.dataset.t==="compras"){ carregarCompras(); carregarListaCompras(); if(window.CMP) window.CMP.abrir(); }
   if(t.dataset.t==="ct"){ ctLista(); ctPendentes(); invCarregar(); }
   /* O iframe de Planejamento, Relatórios e Acessos SAIU (fase 5 da
      ACESSO-POR-TELA-E-NIVEL): cada um é a tela dele, e o clique acima já
@@ -3074,7 +3078,6 @@ async function ctAjustar(){
 // nunca muda por UPDATE, passa pelo dono unico (regra 10).
 function ctItem(l){ return {tipo:l.tipo||'sku', codigo:l.codigo, componente_id:l.componente_id||null}; }
 document.addEventListener('DOMContentLoaded',function(){
-  if(naTela('ct') && window.CMP && window.CMP.contagemAprov) window.CMP.contagemAprov(document.getElementById('cmAprov'));
   var b=document.getElementById('ctBipe');
   if(!b) return;
   b.addEventListener('keydown',function(e){
@@ -3603,6 +3606,9 @@ async function ctPendentes(){
   var d={linhas:[]};
   try{ var resp=await fetch("/api/contagem/pendentes"); if(resp.status!==200){ box.style.display="none"; return; } d=await resp.json(); }
   catch(e){ box.style.display="none"; return; }
+  /* os ajustes antigos de MATERIAL moram na 504 desde 11/11/2026 (ARRUMAR-O-LUGAR
+     fase 2): aqui ficam só os de peça */
+  d.linhas=(d.linhas||[]).filter(function(l){ return l.tipo !== 'componente'; });
   if(!d.linhas.length){ box.style.display="none"; return; }
   box.style.display="block";
   var h='<div style="font-weight:700;margin-bottom:8px">Ajustes aguardando aprovacao ('+d.linhas.length+')</div>';

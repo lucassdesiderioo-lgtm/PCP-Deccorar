@@ -95,7 +95,7 @@
 - História:         fase 1.
 
 ### R-CMP-38 · Um sistema de almoxarifado, quantos a empresa quiser
-- Regra:            `almoxarifado` (nome único sem diferença de maiúscula, local, finalidade, ativo), criado, renomeado e desativado pela 501 (aba Almoxarifados), com `almoxarifado.cadastrar`. Com material dentro não se apaga: desativa, e volta pelo "Reativar". Nascem "Comandos e montagem" e "Expedição"; os do tecido vêm na fase 10.
+- Regra:            `almoxarifado` (nome único sem diferença de maiúscula, local, finalidade, ativo), criado, renomeado e desativado pela 1103 Almoxarifados e endereços (até 11/11/2026, aba da 501) (aba Almoxarifados), com `almoxarifado.cadastrar`. Com material dentro não se apaga: desativa, e volta pelo "Reativar". Nascem "Comandos e montagem" e "Expedição"; os do tecido vêm na fase 10.
 - Por quê:          o material fica em vários lugares da fábrica.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_material.js`, `teste_acesso_compras.js`
@@ -235,7 +235,7 @@
 - História:         fase 3.
 
 ### R-CMP-33 · O retido sai com um toque, nunca fica preso
-- Regra:            quem tem `recebimento.liberar` (501, aba Recebimento retido) escolhe aceitar, aceitar e reclamar, ou devolver, com motivo; grava quem e quando. Devolver não entra e continua a caminho. O aviso recebe "dar ciência". Retidos e avisos têm linha na central de Pendências.
+- Regra:            quem tem `recebimento.liberar` (1201 Recebimento retido; até 11/11/2026, aba da 501) escolhe aceitar, aceitar e reclamar, ou devolver, com motivo; grava quem e quando. Devolver não entra e continua a caminho. O aviso recebe "dar ciência". Retidos e avisos têm linha na central de Pendências.
 - Por quê:          trava que sabe liberar (armadilha #6).
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_recebimento.js` (retido entrando, reprova 8; sem motivo, 4); `teste_acesso_compras.js`
@@ -351,7 +351,7 @@
 - História:         fase 5.
 
 ### R-CMP-38 (fase 5) · O endereço do almoxarifado
-- Regra:            haste → andar → nível por almoxarifado (`alm_haste`, `alm_andar`, `alm_nivel`), criado pela 501 (aba Almoxarifados) com `almoxarifado.cadastrar`, no desenho do armazém do sob medida. Criar o mesmo endereço de novo não duplica.
+- Regra:            haste → andar → nível por almoxarifado (`alm_haste`, `alm_andar`, `alm_nivel`), criado pela 1103 Almoxarifados e endereços (até 11/11/2026, aba Almoxarifados da 501) com `almoxarifado.cadastrar`, no desenho do armazém do sob medida. Criar o mesmo endereço de novo não duplica.
 - Por quê:          o mesmo desenho que o sob medida já usa, e para onde os endereços dele migram na fase 10.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_almoxarifado.js`
@@ -457,7 +457,7 @@
 ## J. Notas baixadas da Receita (fase 11)
 
 ### R-CMP-51 · O certificado entra pela tela, nunca pelo repositório
-- Regra:            501 → aba **Certificado**, só o Admin Geral (`certificado.gerenciar`, intransferível e sensível): cadastrar o CNPJ e o código da UF da Deccorar, enviar o `.pfx` com a senha, trocar e remover. O Node abre o `.pfx` com a senha (senha errada é recusada na hora) e lê titular, CNPJ e validade; o CNPJ tem que ser o da Deccorar (`config.cnpj`), e sem ele cadastrado o envio é recusado dizendo isso. O arquivo vai para `caminhos.CERTIFICADO` (`PCP_CERTIFICADO_DIR`, padrão `<pasta do PCP>/certificado`, fora de `lotes/` e de `backups/`), com permissão 0600. A senha é cifrada (AES-256-GCM, `v1:`) com uma chave própria do servidor, no arquivo `.chave` da mesma pasta (0600, criado na primeira vez). Trocar apaga o arquivo do anterior. **Não há rota que entregue o arquivo**, e a pasta, `*.pfx` e `*.p12` estão no `.gitignore`.
+- Regra:            **1302 Certificado digital** (até 11/11/2026, aba da 501), só o Admin Geral (`certificado.gerenciar`, intransferível e sensível): cadastrar o CNPJ e o código da UF da Deccorar, enviar o `.pfx` com a senha, trocar e remover. O Node abre o `.pfx` com a senha (senha errada é recusada na hora) e lê titular, CNPJ e validade; o CNPJ tem que ser o da Deccorar (`config.cnpj`), e sem ele cadastrado o envio é recusado dizendo isso. O arquivo vai para `caminhos.CERTIFICADO` (`PCP_CERTIFICADO_DIR`, padrão `<pasta do PCP>/certificado`, fora de `lotes/` e de `backups/`), com permissão 0600. A senha é cifrada (AES-256-GCM, `v1:`) com uma chave própria do servidor, no arquivo `.chave` da mesma pasta (0600, criado na primeira vez). Trocar apaga o arquivo do anterior. **Não há rota que entregue o arquivo**, e a pasta, `*.pfx` e `*.p12` estão no `.gitignore`.
 - Por quê:          o certificado A1 assina pela empresa; vazado, alguém emite e manifesta nota em nome da Deccorar.
 - Exceções:         nenhuma. A senha nunca vai ao JSON, ao log ou ao banco em texto; a decifra só acontece dentro do servidor, na hora da busca.
 - Teste que trava:  `teste_certificado.js` (senha em texto no banco, reprova 1; sem conferir o CNPJ, 1; sem exigir o CNPJ da empresa, 1; o arquivo sem 0600, 1; trocar sem apagar o anterior, 2)
@@ -465,7 +465,7 @@
 - História:         fase 11.
 
 ### R-CMP-52 · A validade à vista
-- Regra:            vencendo em menos de 30 dias: tarja âmbar na aba Certificado e nas **Notas recebidas**, e a linha "Certificado digital vencendo ou vencido" na central de Pendências (quem tem `certificado.gerenciar`). Vencido: a busca para e diz por quê. Certificado já vencido não entra.
+- Regra:            vencendo em menos de 30 dias: tarja âmbar na 1302 Certificado digital e nas **Notas recebidas** (1301), e a linha "Certificado digital vencendo ou vencido" na central de Pendências (quem tem `certificado.gerenciar`). Vencido: a busca para e diz por quê. Certificado já vencido não entra.
 - Por quê:          certificado que vence calado faz a busca parar sem ninguém ver.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_certificado.js` (a régua dos 30 dias trocada, reprova 2)

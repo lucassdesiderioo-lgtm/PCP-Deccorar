@@ -44,13 +44,19 @@ function abrir(rota, u){
 const ADMIN = M.TELAS.filter(t => t.rota.indexOf('/admin/') === 0);
 
 console.log('\n── 1. cada aba é uma tela com endereço próprio ──');
-eq('são 13 telas novas em /admin/ (Planejamento, Relatórios e Acessos já tinham endereço)', ADMIN.length, 13);
+eq('são 13 telas novas em /admin/ (Planejamento, Relatórios e Acessos já tinham endereço)', ADMIN.filter(t => t.aba).length, 13);
+/* ARRUMAR-O-LUGAR fase 2 (11/11/2026): seis abas da 501 viraram telas /admin/
+   com o `cmp` delas — o mesmo index.html, abrindo o painel de Compras só com a
+   aba (teste_501_so_compra.js). */
+eq('e mais 6 que eram abas da 501 (1101, 1102, 1103, 1201, 1301 e 1302)', ADMIN.filter(t => t.cmp).map(t => t.n).join(','), '1101,1102,1103,1201,1301,1302');
 ok('o módulo admin_telas.js existe', typeof ADM === 'function');
 for(const t of ADMIN){
   const d = B.AC.permDaRota(t.rota, 'GET'), arr = Array.isArray(d) ? d : [d];
   ok(t.n + ' ' + t.rota + ' abre com as permissões da linha do mapa', JSON.stringify(arr) === JSON.stringify(t.perms), JSON.stringify(d));
   const r = abrir(t.rota, sessao('Lucas'));
-  ok('   e responde com a tela dela (TELA_ADMIN = ' + t.aba + ')', !!r && r.body.indexOf('"aba":"' + t.aba + '"') >= 0 && r.body.indexOf('<div class="tabs"') >= 0);
+  const aba = t.aba || 'compras';
+  ok('   e responde com a tela dela (TELA_ADMIN = ' + aba + (t.cmp ? ' · ' + t.cmp : '') + ')', !!r && r.body.indexOf('"aba":"' + aba + '"') >= 0
+    && (!t.cmp || r.body.indexOf('"cmp":"' + t.cmp + '"') >= 0) && r.body.indexOf('<div class="tabs"') >= 0);
 }
 const html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
 ok('saiu o iframe (Planejamento, Relatórios e Acessos abrem a tela deles)', html.indexOf('<iframe') < 0);
