@@ -3210,7 +3210,11 @@ var CDTIPOS=[
   {t:'rejeicao',n:'Motivos de peça com problema (revisão)'},
   {t:'motivo_devolucao',n:'Motivos de devolução (a baixa e as devoluções em andamento usam a mesma lista)'},
   {t:'doc_devolucao',n:'Documentos exigidos na coleta de devolução (antes de "Documentos ao ML")'},
-  {t:'motivo_estoque',n:'Motivos da conferência de estoque (quem aprova a diferença escolhe um)'}
+  {t:'motivo_estoque',n:'Motivos da conferência de estoque (quem aprova a diferença escolhe um)'},
+  /* AS CATEGORIAS DE MATERIAL (AJUSTE de 11/11/2026, o dono: "deveríamos ter um
+     campo para cadastrar novas categorias"). A lista já existia (R-CMP-04) e não
+     tinha tela. Ela só filtra e agrupa a compra programada — não decide regra. */
+  {t:'categoria_material',n:'Categorias de material (a 501 Compras → Materiais usa ao cadastrar)'}
 ];
 async function carregarCad(){
   var el=document.getElementById('cdBox');
