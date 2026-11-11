@@ -22,6 +22,21 @@ module.exports = function(app, db){
 
   const txt = v => { const t=String(v==null?'':v).trim(); return t===''?null:t; };
 
+  /* O HISTÓRICO DE CUSTO NÃO DESFAZ O SALVAR (CONSERTO de 11/11/2026). A linha
+     da ficha já está gravada quando o histórico roda; se ele estourar, responder
+     erro faz a 404 dizer "não salvou" sobre o que salvou (foi o que aconteceu de
+     07 a 11/11, com o histórico recusando o custo indefinido). O mesmo cuidado
+     que a troca de preço já tinha (compras_route): o erro vai para o log. */
+  function historico(modelo, motivo, req){
+    try{ CUSTO.porModelo(db, modelo, motivo, {usuario_nome:QUEM.nomeDe(req), usuario_id:QUEM.idDe(req)}); }
+    catch(e){
+      /* E NA AUDITORIA (③ REVISÃO): só o log faria o histórico parar de novo
+         sem sinal nenhum — o defeito de 07/11 só apareceu porque a 404 dava 500. */
+      console.log('[ficha] histórico de custo do modelo '+modelo+' falhou ('+motivo+'): '+e.message);
+      QUEM.auditar(app, req, 'compras', 'historico_custo_falhou', 'modelo '+modelo, motivo+': '+e.message);
+    }
+  }
+
   /* ── AS MEDIDAS DE TESTE VEM DO CATALOGO, NAO DE UMA LISTA FIXA ───────────
      O `formula.js` trazia 1,00×1,00 / 1,80×1,50 / 3,00×2,50 escritas no codigo.
      A ultima nao existe: a persiana mais larga do catalogo tem 1,80 e a bobina
@@ -194,14 +209,14 @@ module.exports = function(app, db){
       /* O recalculo de custo continua sendo disparado pela linha inteira, e nao
          so pela `expressao`: mexer no corte nao muda centavo, mas o carimbo de
          "quando esta ficha foi tocada" tem que valer para a linha toda. */
-      CUSTO.porModelo(db, modelo, 'fórmula alterada', {usuario_nome:QUEM.nomeDe(req), usuario_id:QUEM.idDe(req)});
+      historico(modelo, 'fórmula alterada', req);
       return res.json({ok:true,id:+b.id,testes:v.testes});
     }
     const r=db.prepare(`INSERT INTO ficha_formula (modelo_id,componente_id,familia,expressao,observacao,ordem,
         corte_largura,corte_altura,corte_unidade,planejamento)
       VALUES (@modelo_id,@componente_id,@familia,@expressao,@observacao,@ordem,
         @corte_largura,@corte_altura,@corte_unidade,@planejamento)`).run(Object.assign({planejamento: plan||0}, campos));
-    CUSTO.porModelo(db, modelo, 'linha acrescentada à ficha', {usuario_nome:QUEM.nomeDe(req), usuario_id:QUEM.idDe(req)});
+    historico(modelo, 'linha acrescentada à ficha', req);
     res.json({ok:true,id:r.lastInsertRowid,testes:v.testes});
   });
 
@@ -220,7 +235,7 @@ module.exports = function(app, db){
   app.delete('/api/formulas/:id',(req,res)=>{
     const f=db.prepare('SELECT modelo_id FROM ficha_formula WHERE id=?').get(req.params.id);
     db.prepare('DELETE FROM ficha_formula WHERE id=?').run(req.params.id);
-    if(f) CUSTO.porModelo(db, f.modelo_id, 'linha removida da ficha', {usuario_nome:QUEM.nomeDe(req), usuario_id:QUEM.idDe(req)});
+    if(f) historico(f.modelo_id, 'linha removida da ficha', req);
     res.json({ok:true});
   });
 
