@@ -19,7 +19,15 @@ const LER='pedido.ler', LANCAR='pedido.lancar', APROVAR='pedido.aprovar',
    (preco|valor|custo|...), e e por isso que os campos daqui se chamam
    `valor_total_centavos` e `preco_unitario_centavos` — um `total_centavos`
    viajaria pelo fio para quem nao tem `custo.ver` (CLAUDE.md §19). */
-const podar=(usuario,dados)=>custo.podarVenda(usuario,dados);
+/* ⚠️ O MARCO "enviado" ESCREVE O TOTAL NO DETALHE ("pedido 5001 · 1.234,56 ·
+   pronto ..."), sem "R$" e num campo de nome que a regra nao pega (③ REVISAO).
+   Para quem nao ve o preco de venda, o detalhe desse marco sai; o marco fica. */
+function semTotalNoMarco(d){
+  if(Array.isArray(d)) return d.map(semTotalNoMarco);
+  if(!d||typeof d!=='object'||!Array.isArray(d.marcos)) return d;
+  return {...d, marcos:d.marcos.map(m=>m&&m.marco==='enviado'?{...m,detalhe:null}:m)};
+}
+const podar=(usuario,dados)=>custo.vePreco(usuario)?dados:semTotalNoMarco(custo.podarVenda(usuario,dados));
 
 module.exports={rotas:[
 

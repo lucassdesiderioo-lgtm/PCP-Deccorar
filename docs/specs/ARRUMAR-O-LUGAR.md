@@ -44,7 +44,24 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
 - **Achado no caminho, consertado junto por ser defeito da fase 3 da
   `ORGANIZACAO-DO-SISTEMA` (também minha):** o `admin_telas.js` lia o nome da
   pessoa direto da sessão, e o `teste_quem.js` reprovava.
-- `teste_valor.js` (74) e `tecido/teste/valor.test.js` (8), escritos antes do
+- **③ REVISÃO (três revisores, dois verificadores e o testador de tela):** 14
+  achados confirmados, consertados com teste antes — o backfill dando a chave
+  a quem a tinha revogada (agora pessoa a pessoa); `pedido.pagar` e
+  `devolucao.dinheiro` aparecendo como "Ver valores" (a chave de valor é uma
+  só por tela); a 602 Corte declarada sem ter dinheiro; o total do pedido no
+  marco "enviado", os avisos do comparar e o orçamento e o comprovante do
+  pedido levando R$; a resposta da revisão do frete gravando valor sem a
+  caixinha; a 404 ainda vazia (a leitura das fórmulas passou às chaves da
+  tela); a 611 quebrando sem o preço; a frase falsa da alçada; o botão da
+  folha e o do WhatsApp aparecendo sem poder; a chave repetida ao salvar o
+  setor; e o "·" da 610. **Divergência D8 — a R-VAL-04 no sob medida:** a §3
+  diz "lançar nota, boleto, parcela ou preço já traz ver aquele valor", e por
+  ela quem lança preço no Catálogo, boleto ou limite de crédito vê o preço de
+  venda; quem só monta pedido não (o preço é calculado). Um verificador leu
+  isso como mudança de regra; vale o texto aprovado do §3, e fica no FECHAMENTO.
+  **Fica para o dono (P5):** sem a caixinha, o "Enviado" do item faltante não
+  se marca nem para corrigir só o rastreio.
+- `teste_valor.js` (104) e `tecido/teste/valor.test.js` (12), escritos antes do
   conserto. Mudaram as pessoas de mentira de quatro testes (as de depois do
   backfill), sem mudar o esperado de nenhum: `teste_devolucao_casos.js` (1104),
   `teste_devolucao_casos_tela.js` (247), `teste_revisao_compras.js` (46) e

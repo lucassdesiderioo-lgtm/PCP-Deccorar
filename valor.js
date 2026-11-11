@@ -20,7 +20,10 @@
 const QUEM_LANCA = {
   'compras.valores':     ['pedido.criar','pedido.aprovar','pedido.pagar','nota.lancar','preco.lancar','custo.ver'],
   'devolucao.valores':   ['devolucao.dinheiro'],
-  'sobmedida.custo.ver': ['sobmedida.rolo.nota']
+  'sobmedida.custo.ver': ['sobmedida.rolo.nota'],
+  /* o preço por m² e o do componente, o boleto e o limite de crédito — quem
+     SÓ MONTA PEDIDO não entra: ali o preço é calculado, e não lançado. */
+  'sobmedida.preco.ver': ['sobmedida.catalogo.editar','sobmedida.boleto.editar','sobmedida.credito.editar']
 };
 
 /* `tem(chave)` é a pergunta de permissão de quem chama (o podePermissao do

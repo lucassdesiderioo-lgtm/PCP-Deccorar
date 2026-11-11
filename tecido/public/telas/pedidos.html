@@ -255,6 +255,11 @@ function desenharAberto(){
      outra afirmacao. Zero se le como "de graca", e e a regra 4 do COMPRAS.md
      ("zero e um custo valido e mentiroso") na tela: enquanto nao ha peca, o
      lugar do numero fica com um traco. */
+  /* ⚠️ SEM O PRECO DE VENDA O OBJETO `preco` NEM VEM (R-VAL: a poda de venda o
+     tira). A tela escreve "—" e segue: sem esta guarda o `pr.valor_total`
+     estourava no meio, e sumiam o Historico e o botao de Enviar (③ REVISAO). */
+  if(!pr) linhaTot('Total Deccorar','—');
+  else {
   const vivas=p.itens.filter(i=>!i.cancelado_em).length;
   linhaTot('Total Deccorar', !vivas?'—':
     (pr.valor_total==null?('≥ '+reais(pr.valor_piso)):reais(pr.valor_total)));
@@ -268,6 +273,7 @@ function desenharAberto(){
   if(pr.mudou_depois_do_envio)
     tot.appendChild(el('div',{class:'aviso'},[
       'O envio prometia '+reais(pr.valor_enviado)+' — peça(s) cancelada(s) depois disso.']));
+  }
   c.appendChild(tot);
 
   c.appendChild(acoes(p));
@@ -543,7 +549,9 @@ function acoes(p){
       await api('/api/pedidos/'+p.id+'/prazo',{metodo:'POST',corpo:{para,motivo}});
       await carregar(); abrir(p.id);
     },'data'));
-  if(p.congelado)
+  /* A folha tem os R$: o botao so aparece quando o servidor deixou o preco
+     passar (R-VAL; a rota recusa do mesmo jeito). */
+  if(p.congelado&&'valor_total_centavos' in p)
     bt('Abrir a folha (PDF)',null,()=>window.open(NAV_BASE+'/api/pedidos/'+p.id+'/pdf','_blank'));
   if(p.marco!=='cancelado'&&posso('pedido.cancelar'))
     bt('Cancelar o pedido',null,()=>comMotivo('Por que o pedido foi cancelado?',async motivo=>{

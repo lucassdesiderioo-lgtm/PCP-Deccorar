@@ -193,7 +193,7 @@ function desRevendas(){
     tr.appendChild(el('td',{class:'n'},[
       ('valor_limite_credito_centavos' in r)
         ? (reais(r.valor_limite_credito_centavos)||'—')
-        : '·']));
+        : '—']));
     tr.appendChild(el('td',{},[r.limite_revisado_em
       ? el('span',{class:r.limite_vencido?'falta':''},[r.limite_revisado_em+(r.limite_vencido?' (vencida)':'')])
       : '—']));

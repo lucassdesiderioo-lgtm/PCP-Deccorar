@@ -15,20 +15,20 @@
 - Regra:            a tela que mostra valor em reais (custo, preço, valor, desembolso, saldo em R$, limite, frete, imposto, dado de pagamento) declara no mapa (`telas.js`, `tecido/nucleo/telas.js`) a chave que libera o valor: `valor:[…]`. A primeira chave é a principal. Quantidade não é dinheiro.
 - Por quê:          até 11/11/2026 cada tela decidia sozinha quem via o dinheiro, e em seis lugares ele ia pelo fio para quem não tinha chave nenhuma.
 - Exceções:         nenhuma.
-- Teste que trava:  `teste_valor.js` §1 (o inventário: 252, 301, 302, 404, 501 e 602–604, 606–611, 614–616 — tela nova com dinheiro entra no mapa E no inventário do teste)
+- Teste que trava:  `teste_valor.js` §1 (o inventário: 252, 301, 302, 404, 501 e 603, 604, 606–611, 614–616 — tela nova com dinheiro entra no mapa E no inventário do teste). **Uma chave de VER por tela**: ação que mexe em dinheiro (`pedido.pagar`, `devolucao.dinheiro`) continua sendo ação. A 602 Corte não tem dinheiro e não declara.
 - Status:           em código desde 11/11/2026 (fase 1, falta subir).
 - História:         spec `ARRUMAR-O-LUGAR` §1 e §3.
 
 ### R-VAL-02 · Abrir a tela e ver o valor são duas caixinhas
 - Regra:            na tela de Acessos, debaixo de cada tela com dinheiro, aparece a linha **"R$ Ver valores (R$) desta tela"**, que se marca ou não, por setor ou por pessoa. A mesma chave em duas telas (a `custo.ver` na 301, na 302 e na 404) é uma permissão só, e as caixinhas andam juntas.
 - Por quê:          o dono decide quem vê o dinheiro sem mexer em quem abre a tela.
-- Exceções:         a chave de valor que também é ação da tela aparece uma vez, na linha de valores.
+- Exceções:         a chave de valor que também é ação da tela aparece uma vez, na linha de valores. Debaixo da caixinha, a tela escreve quem também vê sem ela (os equivalentes da R-VAL-04).
 - Teste que trava:  `teste_valor.js` §4 (o `/api/acesso/registro` traz `valores` em cada tela)
 - Status:           em código desde 11/11/2026.
 - História:         spec `ARRUMAR-O-LUGAR` §3.
 
 ### R-VAL-03 · Sem a caixinha, a tela abre sem o dinheiro, e quem tira é o servidor
-- Regra:            os campos de dinheiro não viajam (a chave nem existe no JSON); a tela escreve "—", nunca zero; e a barra diz, uma vez, *"Os valores em R$ desta tela não aparecem para o seu acesso."* (`sem_valor` do `/api/telas/minhas`, desenhado pelo `public/menu_telas.js`).
+- Regra:            os campos de dinheiro não viajam (a chave nem existe no JSON), e o dinheiro ESCRITO também não (texto com "R$", o total no detalhe do marco "enviado" do pedido do sob medida, o orçamento e o comprovante anexados ao pedido de compra); a tela escreve "—" (ou tira o quadro do valor), nunca zero; e a barra diz, uma vez, *"Os valores em R$ desta tela não aparecem para o seu acesso."* (`sem_valor` do `/api/telas/minhas`, desenhado pelo `public/menu_telas.js`).
 - Por quê:          esconder na tela e mandar pelo fio não protege nada (regra 14 do §13); e "—" sem explicação parece defeito.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_valor.js` §5 (rota a rota) e §4 (`sem_valor`); `tecido/teste/valor.test.js`
@@ -36,7 +36,7 @@
 - História:         spec `ARRUMAR-O-LUGAR` §3; os seis vazamentos da varredura de 11/11.
 
 ### R-VAL-04 · Quem lança dinheiro vê o que lança
-- Regra:            a chave de valor tem EQUIVALENTES — as ações que lançam aquele dinheiro. `compras.valores` ← pedido.criar, pedido.aprovar, pedido.pagar, nota.lancar, preco.lancar, custo.ver; `devolucao.valores` ← devolucao.dinheiro; `sobmedida.custo.ver` ← sobmedida.rolo.nota. A lista mora no `valor.js` (dono único), e as rotas e a barra perguntam a ele.
+- Regra:            a chave de valor tem EQUIVALENTES — as ações que lançam aquele dinheiro. `compras.valores` ← pedido.criar, pedido.aprovar, pedido.pagar, nota.lancar, preco.lancar, custo.ver; `devolucao.valores` ← devolucao.dinheiro; `sobmedida.custo.ver` ← sobmedida.rolo.nota; `sobmedida.preco.ver` ← sobmedida.catalogo.editar, sobmedida.boleto.editar, sobmedida.credito.editar (quem só monta pedido, não: ali o preço é calculado). A lista mora no `valor.js` (dono único), e as rotas e a barra perguntam a ele.
 - Por quê:          lançar às cegas seria a armadilha #6.
 - Exceções:         **na 252 o dinheiro é parte do caso, não o caso**: quem lança ou acompanha sem a caixinha continua lançando e acompanhando, mas não digita valor (recusa 403 dizendo a chave), e não marca o "Enviado" do item faltante, que pede o frete.
 - Teste que trava:  `teste_valor.js` §2b e §5c
@@ -53,7 +53,7 @@
 
 ### R-VAL-06 · Toda chave de valor é sensível, e o backfill rodou uma vez só
 - Regra:            a chave de valor é `sensivel`. As três novas (`devolucao.valores`, `compras.valores`, `sobmedida.preco.ver`) foram dadas, uma vez só (`config.seed_valor_1`), a quem já via aquele valor: quem lançava ou acompanhava devolução, quem tinha `compras.ver`, quem tinha a `sobmedida.custo.ver`. Daí em diante, quem decide é a tela de Acessos.
-- Por quê:          ninguém perde no deploy o dinheiro que via; rodar de novo devolveria a chave a quem o dono tirou.
+- Por quê:          ninguém perde no deploy o dinheiro que via; rodar de novo devolveria a chave a quem o dono tirou. **E ninguém ganha**: a conta é pessoa a pessoa, e quem tinha a chave de origem revogada por exceção recebe a exceção que revoga a de valor.
 - Exceções:         é a exceção nomeada à R-ALC-06 ("tudo novo nasce só para o Admin Geral").
 - Teste que trava:  `teste_valor.js` §3 (quem ganhou, quem não ganhou, e a chave tirada que não volta)
 - Status:           em código desde 11/11/2026.

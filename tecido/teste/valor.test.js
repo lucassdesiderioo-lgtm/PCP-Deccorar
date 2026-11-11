@@ -102,6 +102,38 @@ module.exports=[
   igual(/vePreco\(usuario\)/.test(ler('pedido.js')),true,'a rota do PDF confere a preco.ver (custo.vePreco)');
 }},
 
+{nome:'③ REVISAO S1: o total do pedido escrito no marco "enviado" nao viaja a quem nao ve o preco', executar({igual}){
+  const pedido=require('../dominio/pedido');
+  const p0=pedido.porId;
+  pedido.porId=()=>({id:1,numero:5001,valor_total_centavos:123456,
+    marcos:[{marco:'enviado',detalhe:'pedido 5001 · 1.234,56 · pronto 20/11'},{marco:'aprovado',detalhe:'aprovado por Lucas'}]});
+  try{
+    const r=rota('pedido.js','GET','/api/pedidos/:id');
+    const so=r.manipulador({usuario:SO_CUSTO,params:{id:1},query:{},corpo:{}});
+    igual(/1\.234,56/.test(JSON.stringify(so)),false,'o total nao sobra no historico');
+    igual(so.marcos.length,2,'mas o marco continua la');
+    igual(so.marcos[1].detalhe,'aprovado por Lucas','e o detalhe que nao e dinheiro fica');
+    const com=r.manipulador({usuario:SO_PRECO,params:{id:1},query:{},corpo:{}});
+    igual(com.marcos[0].detalhe,'pedido 5001 · 1.234,56 · pronto 20/11','quem ve o preco le o historico inteiro');
+  } finally { pedido.porId=p0; }
+}},
+
+{nome:'③ REVISAO S3: quem lanca preco, boleto ou limite ve o preco de venda (R-VAL-04)', executar({igual}){
+  for(const c of ['catalogo.editar','boleto.editar','credito.editar'])
+    igual('preco_m2_centavos' in custo.podarVenda({permissoes:['modulo.entrar',c]},{preco_m2_centavos:1}),true,c+' ve o que lanca');
+  igual(custo.vePreco({permissoes:['modulo.entrar','pedido.lancar']}),false,'quem so monta pedido nao (o preco e calculado, nao lancado)');
+}},
+
+{nome:'③ REVISAO S4: o botao da folha do pedido so aparece quando o preco veio', executar({igual}){
+  const html=fs.readFileSync(path.join(__dirname,'..','public','telas','pedidos.html'),'utf8');
+  igual(/'valor_total_centavos' in p\)?\s*\n?\s*bt\('Abrir a folha/.test(html)||/p\.congelado&&'valor_total_centavos' in p/.test(html),true,'o botao olha o campo que o servidor deixou passar');
+}},
+
+{nome:'③ REVISAO T1: a 611 nao quebra quando o preco nao vem (o objeto preco some na poda)', executar({igual}){
+  const html=fs.readFileSync(path.join(__dirname,'..','public','telas','pedidos.html'),'utf8');
+  igual(/if\(!pr\) linhaTot\('Total Deccorar','—'\)/.test(html),true,'sem preco, o total e "—" e a tela segue (o Enviar e o Historico continuam)');
+}},
+
 {nome:'⚠️ VAZAMENTO 4: o pedido sai sem o preco escrito na conta (base) para quem nao ve o preco', executar({igual}){
   // A poda e a podarVenda (caso 2); aqui so a garantia de que o pedido passa por ela.
   igual(/podar=\(u,d\)=>custo\.podarVenda\(u,d\)|podarVenda/.test(ler('pedido.js')),true,'a rota do pedido usa a poda de venda');

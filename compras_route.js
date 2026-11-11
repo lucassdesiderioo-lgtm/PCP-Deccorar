@@ -54,11 +54,15 @@ module.exports = function(app, db){
      leituras o `total` é contagem de linhas. Só a lista de compras corta o
      `total` (o previsto, e o de cada fornecedor), pelo `extra` dela. */
   const DINHEIRO_CMP=/^(preco|custo|valor|desembolso|frete|desconto|pedido_minimo|aviso_minimo)/;
+  /* ⚠️ O DINHEIRO TAMBÉM VEM ESCRITO (③ REVISÃO): os avisos do comparar dizem
+     "o desembolso de B é R$ 60.00 menor". Texto com "R$" sai junto — a frase
+     na lista, o campo no objeto. */
+  const comRS=v=>typeof v==='string'&&/R\$/.test(v);
   function semDinheiro(o, extra){
-    if(Array.isArray(o)) return o.map(x=>semDinheiro(x,extra));
+    if(Array.isArray(o)) return o.filter(x=>!comRS(x)).map(x=>semDinheiro(x,extra));
     if(!o||typeof o!=='object') return o;
     const n={};
-    for(const k of Object.keys(o)) if(!DINHEIRO_CMP.test(k) && !(extra && extra.test(k))) n[k]=semDinheiro(o[k],extra);
+    for(const k of Object.keys(o)) if(!DINHEIRO_CMP.test(k) && !(extra && extra.test(k)) && !comRS(o[k])) n[k]=semDinheiro(o[k],extra);
     return n;
   }
   const VA=require('./valor');

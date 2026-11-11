@@ -643,7 +643,12 @@ module.exports = function(app, db){
            (custo.ver na 301, na 302 e na 404) — a tela de Acessos as mantém
            marcadas juntas, porque é uma permissão só. */
         valores: (t.valor || []).map(c => PERMISSOES.find(p => p.chave === c)).filter(Boolean)
-          .map(p => ({ chave:p.chave, rotulo:p.rotulo, desc:p.desc || '', nivel:p.nivel, sensivel:!!p.sensivel })) });
+          .map(p => ({ chave:p.chave, rotulo:p.rotulo, desc:p.desc || '', nivel:p.nivel, sensivel:!!p.sensivel,
+            /* QUEM TAMBÉM VÊ SEM A CAIXINHA (R-VAL-04, valor.js): quem lança aquele
+               dinheiro. A tela diz, para a caixinha desmarcada não parecer tirar
+               o que não tira (③ REVISÃO). */
+            tambem: (require('./valor').QUEM_LANCA[p.chave] || []).map(c => PERMISSOES.find(x => x.chave === c)).filter(Boolean)
+              .map(x => ({ chave:x.chave, rotulo:x.rotulo })) })) });
     });
     return Object.keys(mods).map(Number).sort((a, b) => a - b).map(k => { mods[k].telas.sort((a, b) => a.n - b.n); return mods[k]; });
   }
@@ -1088,6 +1093,10 @@ module.exports = function(app, db){
        12(c) do §14 nao existir — registro em que rota sem permissao NASCE
        negada — cada rota nova precisa vir com a sua linha aqui, e e por isso
        que esta usa prefixo: a proxima leitura de formula ja nasce coberta. */
+    /* A LEITURA DA FICHA É DA 404 (R-VAL, ③ REVISÃO): com a ficha aberta sem o
+       custo, quem abre a tela com modelo.cadastrar levava 403 nas fórmulas e
+       via a tabela vazia. A fórmula não tem dinheiro. */
+    if(M === 'GET' && pre('/api/formulas')) return ['modelo.cadastrar','custo.ver','compras.ver'];
     if(pre('/api/formulas')) return 'compras.ver';
     if(M !== 'GET' && pre('/api/fornecedores')) return 'fornecedor.cadastrar';
     /* COMPRAS-E-RECEBIMENTO fase 11: o certificado (so o Admin Geral) e as notas
@@ -1592,17 +1601,35 @@ module.exports = function(app, db){
        sobmedida.custo.ver                     → sobmedida.preco.ver
      UMA VEZ SÓ (marca em `config`): rodar de novo devolveria a chave a quem o
      dono tirou. Fica DEPOIS do 3-F e do f6, pela mesma razão do f6. */
+  /* ⚠️ A EXCEÇÃO QUE REVOGAVA A ORIGEM VALE (③ REVISÃO): o setor ganha a chave
+     de valor, e a pessoa que tinha a chave de origem TIRADA por exceção
+     (concede=0) herdaria a de valor pelo setor — passaria a ver o que não via.
+     Por isso a conta é pessoa a pessoa: quem não tinha a origem EFETIVA antes
+     do seed (setor + exceção, pelo permissoesDe) e passou a ter a de valor
+     ganha a exceção que a revoga. A 252 tem DUAS origens: quem perdeu o lançar
+     mas acompanha continua com a caixinha. */
   try{
     if(!db.prepare("SELECT 1 FROM config WHERE chave='seed_valor_1'").get()){
+      const PARES = [['devolucao.lancar','devolucao.valores'], ['devolucao.acompanhar','devolucao.valores'],
+                     ['compras.ver','compras.valores'], ['sobmedida.custo.ver','sobmedida.preco.ver']];
+      const DESTINOS = Array.from(new Set(PARES.map(p => p[1])));
+      const origensDe = d => PARES.filter(p => p[1] === d).map(p => p[0]);
       db.transaction(() => {
-        for(const [de, para] of [['devolucao.lancar','devolucao.valores'], ['devolucao.acompanhar','devolucao.valores'],
-                                 ['compras.ver','compras.valores'], ['sobmedida.custo.ver','sobmedida.preco.ver']]){
+        const pessoas = db.prepare('SELECT id FROM usuarios').all().map(r => r.id);
+        const tinha = {};
+        pessoas.forEach(id => { const p = permissoesDe(id); tinha[id] = new Set(DESTINOS.filter(d => p.has(d) || origensDe(d).some(o => p.has(o)))); });
+        for(const [de, para] of PARES){
           db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
             SELECT setor_id, ? FROM setor_permissao WHERE chave=?`).run(para, de);
           db.prepare(`INSERT OR IGNORE INTO usuario_excecao (usuario_id,chave,concede)
             SELECT usuario_id, ?, 1 FROM usuario_excecao e WHERE chave=? AND concede=1
               AND NOT EXISTS (SELECT 1 FROM usuario_excecao x WHERE x.usuario_id=e.usuario_id AND x.chave=?)`).run(para, de, para);
         }
+        pessoas.forEach(id => {
+          const p = permissoesDe(id);
+          DESTINOS.forEach(d => { if(p.has(d) && !tinha[id].has(d))
+            db.prepare('INSERT OR REPLACE INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,?,0)').run(id, d); });
+        });
         db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('seed_valor_1','1')").run();
       })();
     }

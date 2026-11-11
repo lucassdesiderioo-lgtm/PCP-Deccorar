@@ -221,6 +221,8 @@ module.exports = function(app, db){
   post('/api/devolucao-casos/:id/revisao-frete-resposta', (req,res) => {
     if(!pode(req).acompanhar) return semAcompanhar(res);
     const b = req.body || {};
+    // o frete devolvido é valor em R$ (③ REVISÃO): sem a caixinha, recusa
+    if(trazValor(b) && !podeValores(req)) return semValores(req, res);
     responder(res, () => {
       const r = D.respostaRevisaoFrete(db, req.params.id, b, QUEM.pessoa(req));
       if(r.valorMudou && r.valorMudou.length) auditar(req, 'valor', req.params.id, 'lançou '+r.valorMudou.join(', ')+': '+JSON.stringify({ valor_revisao: b.valor_revisao }));

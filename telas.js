@@ -27,6 +27,10 @@
  *           e quem tira o dinheiro é o servidor. A tela de Acessos desenha a
  *           caixinha debaixo da tela, e o `teste_valor.js` reprova tela com
  *           dinheiro sem esta linha (o inventário mora lá).
+ *           ⚠️ É A CHAVE DE VER, e uma só por tela. Ação que mexe em dinheiro
+ *           (pagar o pedido, dar baixa no reembolso) continua sendo AÇÃO da
+ *           tela: na tela de Acessos ela apareceria como "Ver valores" e daria
+ *           muito mais que ver (③ REVISÃO da fase 1).
  *
  * ⚠️ TELA NOVA NASCE SÓ PARA O ADMIN GERAL (R-TEL-03, R-ALC-06): a linha entra
  * aqui com uma permissão nova, que nenhum setor tem; o Admin Geral passa por
@@ -80,7 +84,7 @@ const TELAS = [
     modulo:'posvenda', bloco:'mercado_livre', liga:[252, 253, 102] },
   { n:252, nome:'Devoluções — em andamento', rota:'/devolucao-casos', nivel:'supervisor', onde:'computador',
     perms:['devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro'], area:'devolucao_casos',
-    valor:['devolucao.valores','devolucao.dinheiro'],
+    valor:['devolucao.valores'],
     modulo:'posvenda', bloco:'mercado_livre', liga:[251, 253, 'lote'] },
   { n:253, nome:'Devoluções — baixa',    rota:'/admin/devolucoes', nivel:'admin',   onde:'computador', perms:['devolucao.baixar'],      aba:'dv',
     modulo:'posvenda', bloco:'mercado_livre', liga:[251, 252] },
@@ -108,7 +112,7 @@ const TELAS = [
   // ── 500 · Compras ──
   { n:501, nome:'Compras',               rota:'/admin/compras', nivel:'admin',      onde:'computador',
     perms:['compras.ver','fornecedor.cadastrar','preco.lancar','pedido.criar','pedido.pagar','componente.cadastrar','almoxarifado.cadastrar','certificado.gerenciar'], aba:'compras',
-    valor:['compras.valores','pedido.pagar'],
+    valor:['compras.valores'],
     modulo:'compras', bloco:'comum', liga:[404, 502, 'componente', 'fornecedor'],
     abas:[
       { id:'lista',        nome:'Lista de compras',   modulo:'compras' },

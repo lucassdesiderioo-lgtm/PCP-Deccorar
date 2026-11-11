@@ -378,7 +378,12 @@ function listaDaTela(t){
     .concat(vs.map(function(pm){return {pm:pm,valor:true};}));
 }
 function rotuloDe(it){
-  return it.valor ? '<span class="valorpill">R$</span> Ver valores (R$) desta tela — '+it.pm.rotulo : it.pm.rotulo;
+  if(!it.valor) return it.pm.rotulo;
+  /* quem lança aquele dinheiro vê sem a caixinha (R-VAL-04): dito aqui, para a
+     caixinha desmarcada não parecer tirar o que não tira */
+  var tb=(it.pm.tambem||[]).map(function(x){return x.rotulo;});
+  return '<span class="valorpill">R$</span> Ver valores (R$) desta tela — '+it.pm.rotulo
+    +(tb.length?'<small>também vê sem esta caixinha quem tem: '+tb.join(' · ')+'</small>':'');
 }
 document.addEventListener('change',function(e){
   var c=e.target.closest('.spermchk'); if(!c) return;
@@ -439,7 +444,8 @@ function renderSetorPerms(){
 }
 document.addEventListener('change',function(e){ if(e.target.id==='sNivel') renderSetorPerms(); });
 async function salvarSetor(){
-  var perms=[].slice.call(document.querySelectorAll('.spermchk:checked')).map(function(x){return x.getAttribute('data-c');});
+  /* a mesma chave aparece em várias telas (as de valor): vai uma vez só */
+  var perms=Array.from(new Set([].slice.call(document.querySelectorAll('.spermchk:checked')).map(function(x){return x.getAttribute('data-c');})));
   /* `todas`: a lista vai INTEIRA, inclusive o que esta acima do nivel. Sem a
      marca o servidor trata o corpo como o da tela antiga e nao apaga nada. */
   var body={nome:$('#sNome').value.trim(),nivel:$('#sNivel').value,permissoes:perms,todas:true};

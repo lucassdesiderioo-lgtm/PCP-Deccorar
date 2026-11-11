@@ -44,20 +44,24 @@ console.log('\n── 1. o mapa: toda tela com dinheiro declara a chave do valor
 /* O INVENTÁRIO DE 11/11/2026 (as duas varreduras da fase 1). Tela nova com
    dinheiro entra AQUI e no mapa — o caso 1.3 reprova a que entrar só num. */
 const PCP_VALOR = { 301:['custo.ver'], 302:['custo.ver'], 404:['custo.ver'],
-  501:['compras.valores','pedido.pagar'], 252:['devolucao.valores','devolucao.dinheiro'] };
-const SM_CUSTO = [602, 603, 604, 606, 607], SM_VENDA = [608, 609, 610, 611, 614, 615, 616];
+  501:['compras.valores'], 252:['devolucao.valores'] };
+/* ⚠️ UMA CHAVE DE VALOR POR TELA (③ REVISÃO): `pedido.pagar` e `devolucao.dinheiro`
+   são AÇÕES (pagar, dar baixa no reembolso) e não podem aparecer na tela de
+   Acessos como "Ver valores". */
+const SM_CUSTO = [603, 604, 606, 607], SM_VENDA = [608, 609, 610, 611, 614, 615, 616];
 const valorDe = t => Array.isArray(t.valor) ? t.valor : (t.valor ? [t.valor] : []);
 for(const [nn, chaves] of Object.entries(PCP_VALOR)){
   const t = M.porNumero(+nn);
   ok(nn + ' declara o valor ' + chaves.join(' + '), t && JSON.stringify(valorDe(t)) === JSON.stringify(chaves), t && JSON.stringify(t.valor));
 }
 const smPorN = {}; Object.values(SMT).forEach(t => { if(!t.apelido) smPorN[t.numero] = t; });
-ok('602, 603, 604, 606 e 607 (sob medida) declaram o valor "custo.ver" (ver custo e valor do estoque)',
+ok('603, 604, 606 e 607 (sob medida) declaram o valor "custo.ver" (ver custo e valor do estoque)',
   SM_CUSTO.every(x => JSON.stringify(valorDe(smPorN[x])) === '["custo.ver"]'), SM_CUSTO.map(x => x + ':' + JSON.stringify(smPorN[x].valor)).join(' '));
 ok('608, 609, 610, 611, 614, 615 e 616 (sob medida) declaram o valor "preco.ver" (ver preço de venda)',
   SM_VENDA.every(x => JSON.stringify(valorDe(smPorN[x])) === '["preco.ver"]'), SM_VENDA.map(x => x + ':' + JSON.stringify(smPorN[x].valor)).join(' '));
 const comValor = M.TELAS.filter(t => valorDe(t).length).map(t => t.n).concat(Object.values(smPorN).filter(t => valorDe(t).length).map(t => t.numero)).sort();
 const esperado = Object.keys(PCP_VALOR).map(Number).concat(SM_CUSTO, SM_VENDA).sort();
+ok('a 602 Corte não declara valor: a tela e as rotas do corte não têm dinheiro (o aviso acenderia todo dia para o cortador)', !valorDe(smPorN[602]).length);
 ok('as telas com `valor` são exatamente as do inventário (tela nova com dinheiro entra nos dois)',
   JSON.stringify(comValor) === JSON.stringify(esperado), 'mapa: ' + comValor.join(',') + ' · inventário: ' + esperado.join(','));
 const chaveDoMapa = [];
@@ -90,6 +94,11 @@ console.log('\n── 2b. o valor.js: quem lança vê o que lança, e a régua b
   const custoSm = fs.readFileSync(path.join(__dirname, 'tecido', 'dominio', 'custo.js'), 'utf8');
   ok('a equivalência do custo do sob medida (rolo.nota) é a mesma nos dois lados',
     JSON.stringify(VA.QUEM_LANCA['sobmedida.custo.ver']) === '["sobmedida.rolo.nota"]' && /veComercial=u=>pode\(u,'custo\.ver'\)\|\|pode\(u,'rolo\.nota'\)/.test(custoSm));
+  ok('no sob medida, quem lança preço (catálogo), boleto ou limite de crédito vê o preço de venda; quem só monta pedido, não',
+    ['sobmedida.catalogo.editar','sobmedida.boleto.editar','sobmedida.credito.editar'].every(c => VA.ve([c], 'sobmedida.preco.ver')) && !VA.ve(['sobmedida.pedido.lancar'], 'sobmedida.preco.ver'));
+  const SMC = require('./tecido/dominio/custo');
+  ok('a régua do sob medida (custo.vePreco) diz o mesmo que o valor.js',
+    ['catalogo.editar','boleto.editar','credito.editar'].every(c => SMC.vePreco({ permissoes:[c] })) && !SMC.vePreco({ permissoes:['pedido.lancar'] }));
   ok('o semValor olha a PRIMEIRA chave da tela, e o Admin Geral nunca', VA.semValor({ valor:['compras.valores','pedido.pagar'] }, ['pedido.pagar'], false) === false
     && VA.semValor({ valor:['custo.ver'] }, [], true) === false && VA.semValor({ valor:[] }, [], false) === false);
 }
@@ -115,6 +124,14 @@ console.log('\n── 3. o backfill: quem via o valor continua vendo, uma vez s�
   const pDev = pessoa('Rê', ['devolucao.lancar']);
   const pSm = pessoa('Vê', ['sobmedida.custo.ver']);
   const pNada = pessoa('Zé', ['devolucao.baixar']);
+  /* as revogações: a exceção concede=0 tirava a chave de origem da pessoa */
+  const naSetor = (u, sid) => db.prepare('INSERT INTO usuario_setor (usuario_id,setor_id) VALUES (?,?)').run(u, sid);
+  const revoga = (u, c) => db.prepare('INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,?,0)').run(u, c);
+  const pRev = pessoa('Revogada SM', []); naSetor(pRev, sSm); revoga(pRev, 'sobmedida.custo.ver');
+  const pRevCmp = pessoa('Revogada CMP', []); naSetor(pRevCmp, sCmp); revoga(pRevCmp, 'compras.ver');
+  const sDuas = setor('Lança e acompanha', 'admin', ['devolucao.lancar','devolucao.acompanhar']);
+  const pDuas = pessoa('Duas origens', []); naSetor(pDuas, sDuas); revoga(pDuas, 'devolucao.lancar');
+  [pRev, pRevCmp, pDuas].forEach(u => db.prepare("UPDATE usuarios SET nivel='admin' WHERE id=?").run(u));
   db.prepare("DELETE FROM config WHERE chave='seed_valor_1'").run();
   require('./acesso')(appFalso(), db);
   const tem = (s, c) => !!db.prepare('SELECT 1 FROM setor_permissao WHERE setor_id=? AND chave=?').get(s, c);
@@ -125,6 +142,11 @@ console.log('\n── 3. o backfill: quem via o valor continua vendo, uma vez s�
   ok('quem tem compras.ver ganhou compras.valores', tem(sCmp, 'compras.valores'));
   ok('quem tem a custo.ver do sob medida ganhou a preco.ver (setor)', tem(sSm, 'sobmedida.preco.ver'));
   ok('a exceção da custo.ver do sob medida ganhou a preco.ver', exc(pSm, 'sobmedida.preco.ver'));
+  const AC0 = (() => { const a = appFalso(); require('./acesso')(a, db); return a.locals.acesso; })();
+  ok('quem teve a custo.ver do sob medida REVOGADA por exceção não ganhou a preco.ver pelo setor',
+    !AC0.permissoesDe(pRev).has('sobmedida.preco.ver'), JSON.stringify(Array.from(AC0.permissoesDe(pRev))));
+  ok('quem teve a compras.ver revogada não ganhou compras.valores', !AC0.permissoesDe(pRevCmp).has('compras.valores'));
+  ok('quem teve só o lançar revogado, mas acompanha pelo setor, continua com devolucao.valores', AC0.permissoesDe(pDuas).has('devolucao.valores'));
   ok('o setor sem nenhuma chave de origem não ganhou nada',
     !['devolucao.valores','compras.valores','sobmedida.preco.ver'].some(c => tem(sNada, c)));
   ok('a exceção sem chave de origem (só a baixa) não ganhou nada', !exc(pNada, 'devolucao.valores'));
@@ -218,6 +240,14 @@ function temCampo(o, nome){
   ok('a 609 (sob medida) mostra a sobmedida.preco.ver e a 607 a sobmedida.custo.ver',
     chavesValor(tReg(609)).indexOf('sobmedida.preco.ver') >= 0 && chavesValor(tReg(607)).indexOf('sobmedida.custo.ver') >= 0, JSON.stringify(tReg(609).valores));
   ok('tela sem dinheiro não ganha a linha de valores (101)', !chavesValor(tReg(101)).length);
+  ok('pagar pedido continua AÇÃO da 501, e não "Ver valores"', chavesValor(tReg(501)).indexOf('pedido.pagar') < 0 && (tReg(501).acoes || []).some(a => a.chave === 'pedido.pagar'));
+  ok('o dinheiro das devoluções continua AÇÃO da 252, e não "Ver valores"', chavesValor(tReg(252)).indexOf('devolucao.dinheiro') < 0 && (tReg(252).acoes || []).some(a => a.chave === 'devolucao.dinheiro'));
+  const v501 = (tReg(501).valores || [])[0] || {};
+  ok('a linha de valor diz quem também vê sem a caixinha (quem lança aquele dinheiro, R-VAL-04)',
+    Array.isArray(v501.tambem) && v501.tambem.some(t => t.chave === 'pedido.criar' && t.rotulo), JSON.stringify(v501));
+  const acsHtml = fs.readFileSync(path.join(__dirname, 'views', 'acessos.html'), 'utf8');
+  ok('a tela de Acessos escreve quem também vê', /tambem/.test(acsHtml));
+  ok('salvar o setor não manda a mesma chave repetida (ela aparece em várias telas)', /new Set\(/.test(acsHtml.slice(acsHtml.indexOf('async function salvarSetor('), acsHtml.indexOf('async function salvarSetor(') + 600)));
   const v = (tReg(301).valores || [])[0] || {};
   ok('a linha de valor diz o rótulo da chave e que é sensível', !!v.rotulo && v.sensivel === true, JSON.stringify(v));
   const minhas = await get('AdmSem', '/api/telas/minhas');
@@ -299,6 +329,53 @@ function temCampo(o, nome){
   const eSemC = await get('AdmSem', '/api/estoque/painel'), eLu = await get('Lucas', '/api/estoque/painel');
   ok('o Admin sem custo.ver abre o estoque sem valor', eSemC.st === 200 && !temCampo(eSemC.d, 'valor_estoque'), eSemC.st + ' ' + JSON.stringify(eSemC.d).slice(0, 200));
   ok('com custo.ver (Admin Geral), o valor vem', eLu.st === 200 && temCampo(eLu.d, 'valor_estoque'));
+
+  console.log('\n── 5f. o que a ③ REVISÃO achou (cada caso reprovava antes do conserto) ──');
+  /* P1: a resposta da revisão do frete também é valor digitado */
+  db.prepare("UPDATE devolucao_caso SET chegou_em=datetime('now','localtime'), revisao_pedida_em=datetime('now','localtime') WHERE id=?").run(caso);
+  const rf = await post('DevSem', '/api/devolucao-casos/' + caso + '/revisao-frete-resposta', { resultado:'devolveu', valor_revisao: 77.5 });
+  ok('a resposta da revisão do frete com valor é recusada sem a caixinha (403)', rf.st === 403 && rf.d.chave === 'devolucao.valores', JSON.stringify(rf));
+  ok('…e nada foi gravado', db.prepare('SELECT valor_revisao FROM devolucao_caso WHERE id=?').get(caso).valor_revisao == null);
+  /* as outras escritas com valor, uma a uma */
+  for(const [rota, corpo] of [['/coleta', { transportadora_id: 1, custo: 50 }], ['/coleta-agenda', { custo: 50 }],
+                              ['/coleta-resultado', { resultado:'coletou', custo: 50 }], ['/enviar', { rastreio:'BR1', custo_envio: 30 }]]){
+    const r = await post('DevSem', '/api/devolucao-casos/' + caso + rota, corpo);
+    ok(rota + ' com valor é recusada sem a caixinha (403)', r.st === 403 && r.d.chave === 'devolucao.valores', JSON.stringify(r));
+  }
+  /* P2: o aviso do comparar escreve R$ em texto */
+  const comp2 = db.prepare("INSERT INTO componente (nome,unidade,custo_medio) VALUES ('Parafuso teste','un',0.1)").run().lastInsertRowid;
+  const fA = db.prepare("INSERT INTO fornecedor (nome) VALUES ('Barato com frete')").run().lastInsertRowid;
+  const fB = db.prepare("INSERT INTO fornecedor (nome) VALUES ('Caro sem frete')").run().lastInsertRowid;
+  db.prepare("INSERT INTO oferta (fornecedor_id,componente_id,embalagem,fator,preco,frete) VALUES (?,?,'un',1,10,100)").run(fA, comp2);
+  db.prepare("INSERT INTO oferta (fornecedor_id,componente_id,embalagem,fator,preco,frete) VALUES (?,?,'un',1,12,0)").run(fB, comp2);
+  const cmpSem = await get('CmpSem', '/api/comparar?componente_id=' + comp2 + '&necessidade=7'), cmpCom = await get('CmpCom', '/api/comparar?componente_id=' + comp2 + '&necessidade=7');
+  ok('o comparar com a caixinha traz o aviso com R$ (o caso é de verdade)', cmpCom.st === 200 && /R\$/.test(JSON.stringify(cmpCom.d)), JSON.stringify(cmpCom.d).slice(0, 300));
+  ok('sem a caixinha, nenhum "R$" sobra no comparar — nem no texto do aviso', cmpSem.st === 200 && !/R\$/.test(JSON.stringify(cmpSem.d)), JSON.stringify(cmpSem.d).slice(0, 300));
+  /* P6: a lista de compras (o previsto) e as rotas podadas, no código */
+  db.prepare("UPDATE componente SET estoque_minimo=10, estoque_ideal=20 WHERE id=?").run(comp2);
+  const lcSem = await get('CmpSem', '/api/compras/lista'), lcCom = await get('CmpCom', '/api/compras/lista');
+  ok('a lista de compras com a caixinha traz o desembolso e o total', lcCom.st === 200 && temCampo(lcCom.d, 'desembolso') && 'total' in lcCom.d, JSON.stringify(lcCom.d).slice(0, 200));
+  ok('sem a caixinha, a lista sai sem desembolso e sem o total previsto', lcSem.st === 200 && !temCampo(lcSem.d, 'desembolso') && !('total' in lcSem.d), JSON.stringify(lcSem.d).slice(0, 200));
+  ok('…mas a quantidade da origem (subtotal) continua', lcSem.st === 200 && temCampo(lcSem.d, 'subtotal') === temCampo(lcCom.d, 'subtotal'));
+  const fonteCmp = fs.readFileSync(path.join(__dirname, 'compras_route.js'), 'utf8');
+  ok('as leituras do Compras com dinheiro passam todas pela poda (comparar, lista, necessidade, histórico de preço)',
+    ['/api/comparar','/api/compras/lista','/api/compras/necessidade','/api/precos/historico'].every(r => fonteCmp.indexOf("'" + r + "'") >= 0 && new RegExp("\\['" + r.replace(/\//g, '\\/') + "'").test(fonteCmp)));
+  /* P3: a 404 desenha a ficha para quem só cadastra modelo */
+  const fm = await get('FichaSem', '/api/formulas?modelo_id=1');
+  ok('quem abre a 404 com modelo.cadastrar lê as fórmulas da ficha (sem isso a tela fica vazia)', fm.st === 200 && Array.isArray(fm.d), JSON.stringify(fm).slice(0, 160));
+  const idx = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+  ok('a ficha na tela não quebra se a leitura de fórmulas falhar (FXLINHAS só vale como lista)', /FXLINHAS=Array\.isArray\(/.test(idx));
+  /* P4: sem a caixinha, a tela não escreve "sem limite" */
+  const abas = fs.readFileSync(path.join(__dirname, 'public', 'compras_abas.js'), 'utf8');
+  ok('a alçada do pedido só é escrita quando veio (podada não vira "sem limite")', /'alcada' in p/.test(abas));
+  /* P7: o orçamento e o comprovante do pedido são arquivos com R$ */
+  const anx = await post('CmpCria', '/api/compras/anexos', { pedido_id: ped, tipo:'orcamento', nome:'orc.txt', base64: Buffer.from('R$ 999,00').toString('base64') });
+  ok('quem cria pedido anexa o orçamento', anx.st === 200 && anx.d.id, JSON.stringify(anx));
+  const baixaSem = await get('CmpSem', '/api/compras/anexos/' + anx.d.id), baixaCom = await get('CmpCom', '/api/compras/anexos/' + anx.d.id);
+  ok('sem a caixinha, o orçamento do pedido não se baixa (403)', baixaSem.st === 403, baixaSem.st + ' ' + JSON.stringify(baixaSem.d).slice(0, 120));
+  ok('com a caixinha, baixa', baixaCom.st === 200);
+  const listaSem = await get('CmpSem', '/api/compras/anexos?pedido_id=' + ped);
+  ok('…e a lista de anexos não o oferece a quem não pode abrir', listaSem.st === 200 && Array.isArray(listaSem.d) && !listaSem.d.some(a => a.id === anx.d.id));
 
   db.close();
   console.log('\n' + (n - falhas) + ' ok, ' + falhas + ' falha(s)');

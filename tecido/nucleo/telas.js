@@ -23,7 +23,7 @@ const TELAS={
      em branco nao se parece nem de longe com "mexeram na permissao". */
   '/':          {numero:601, nome:'Início', nivel:'operacao', arquivo:'telas/inicio.html',    permissao:'modulo.entrar',     contexto:'operacao', modulo:'administracao', bloco:'comum', liga:[602, 612, 613]},
   '/inicio':    {numero:601, nome:'Início', nivel:'operacao', apelido:true, arquivo:'telas/inicio.html',    permissao:'modulo.entrar',     contexto:'operacao', modulo:'administracao', bloco:'comum', liga:[602, 612, 613]},
-  '/corte':     {numero:602, nome:'Corte', nivel:'operacao', arquivo:'telas/corte.html',     permissao:'plano.calcular',    contexto:'operacao', valor:['custo.ver'], modulo:'producao', bloco:'sob_medida', liga:[604, 603, 605, 612]},
+  '/corte':     {numero:602, nome:'Corte', nivel:'operacao', arquivo:'telas/corte.html',     permissao:'plano.calcular',    contexto:'operacao', modulo:'producao', bloco:'sob_medida', liga:[604, 603, 605, 612]},
   '/sobras':    {numero:603, nome:'Sobras', nivel:'operacao', arquivo:'telas/sobras.html',    permissao:'sobra.ler',         contexto:'operacao', valor:['custo.ver'], modulo:'almoxarifado', bloco:'sob_medida', liga:[602, 605]},
   '/rolos':     {numero:604, nome:'Rolos', nivel:'operacao', arquivo:'telas/rolos.html',     permissao:'rolo.ler',          contexto:'operacao', valor:['custo.ver'], modulo:'almoxarifado', bloco:'sob_medida', liga:[502, 602]},
   '/etiquetas': {numero:605, nome:'Etiquetas', nivel:'operacao', arquivo:'telas/etiquetas.html', permissao:'etiqueta.imprimir', contexto:'operacao', modulo:'almoxarifado', bloco:'sob_medida', liga:[603, 604]},
@@ -99,7 +99,9 @@ const TELAS={
    valores (R$)" da tela. Duas, e nunca misturadas: `preco.ver` e o PRECO DE
    VENDA (o que a revenda paga: catalogo, simulador, pedido, quadro,
    indicadores, revenda e financeiro); `custo.ver` e o CUSTO (o que o rolo
-   custou, o dinheiro parado: corte, sobras, rolos, cadastros, painel). A
+   custou, o dinheiro parado: sobras, rolos, cadastros, painel). A 602 Corte
+   NAO tem `valor`: a tela e as rotas do corte nao mostram dinheiro, e a linha
+   "os valores nao aparecem" acenderia todo dia para o cortador. A
    poda de cada lado e do `dominio/custo.js` (podarVenda, podarCusto).
 
    TELA_DA_CHAVE diz em que tela cada permissao do modulo e usada (R-ALC-03):

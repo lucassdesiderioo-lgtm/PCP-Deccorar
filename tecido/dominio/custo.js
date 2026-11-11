@@ -215,7 +215,12 @@ const veComercial=u=>pode(u,'custo.ver')||pode(u,'rolo.nota');
    A regra de NOME continua uma so (ECONOMICO): o nome do campo nao diz o lado,
    quem diz e a ROTA. Nenhuma rota mistura os dois (a varredura de 11/11). Cada
    arquivo de rotas chama a do seu lado, e o teste/valor.test.js confere. */
-const vePreco=u=>pode(u,'preco.ver');
+/* QUEM LANCA O PRECO DE VENDA VE O QUE LANCA (R-VAL-04): o preco por m² e
+   o do componente (catalogo.editar), o boleto (boleto.editar) e o limite de
+   credito (credito.editar). Quem so monta pedido nao entra: ali o preco e
+   CALCULADO pelo sistema, e nao lancado. A mesma lista esta no valor.js da
+   raiz (o aviso da barra), e o teste_valor.js confere que as duas batem. */
+const vePreco=u=>pode(u,'preco.ver')||pode(u,'catalogo.editar')||pode(u,'boleto.editar')||pode(u,'credito.editar');
 const podarCusto=(usuario,dados)=>veComercial(usuario)?dados:semPreco(dados);
 /* O preco tambem vem ESCRITO: a linha da conta da persiana traz
    `base: "1,2 m² × R$ 110,00/m²"`, e o nome `base` nao bate com a regra. Na

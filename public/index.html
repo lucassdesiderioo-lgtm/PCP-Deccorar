@@ -856,7 +856,8 @@ async function trocarModelo(){
 async function recarregar(){
   const mid=$('#fxModelo').value;
   FXLINHAS=[]; FXFICHA=null;
-  if(mid){ try{ FXLINHAS=await (await fetch('/api/formulas?modelo_id='+mid)).json(); }catch(e){} }
+  /* só vale como LISTA: a recusa (403) é um objeto, e o render estourava nele */
+  if(mid){ try{ const fl=await (await fetch('/api/formulas?modelo_id='+mid)).json(); FXLINHAS=Array.isArray(fl)?fl:[]; }catch(e){} }
   const sku=$('#fxSku')&&$('#fxSku').value;
   if(sku){ try{ FXFICHA=await (await fetch('/api/ficha/'+encodeURIComponent(sku))).json(); }catch(e){} }
   render();

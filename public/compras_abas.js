@@ -289,7 +289,7 @@
           var comp = i.unidade_compra ? n3(i.qtd_compra) + ' ' + esc(i.unidade_compra) + ' × ' + brl(i.preco_unid_compra) : n3(i.qtd_embalagem) + ' × ' + esc(i.embalagem || '') + ' × ' + brl(i.preco_unit);
           return '<tr><td>' + esc(i.item) + '</td><td>' + comp + '</td><td>' + (i.qtd_declarada != null ? n3(i.qtd_declarada) + ' ' + esc(i.unidade || '') : '—') + '</td><td>' + n3(i.qtd_recebida) + '</td><td>' + brl(i.desembolso) + '</td></tr>';
         }).join('') + '</tbody></table></div>';
-    h += '<div class="sub" style="margin-top:6px">Total ' + brl(p.valor_previsto) + (p.alcada ? ' · alçada de quem criou: ' + brl(p.alcada.limite) : ' · quem criou não tem alçada (sem limite)') + '</div>';
+    h += '<div class="sub" style="margin-top:6px">Total ' + brl(p.valor_previsto) + (!('alcada' in p) ? '' : p.alcada ? ' · alçada de quem criou: ' + brl(p.alcada.limite) : ' · quem criou não tem alçada (sem limite)') + '</div>';
     if(p.comprado_em) h += '<div class="sub">Comprado em ' + data(p.comprado_em) + ' · ' + esc(nomeCanal(o, p.canal)) + (p.loja ? ' · loja ' + esc(p.loja) : '') + ' · nº ' + esc(p.numero_externo || '—') + ' · por ' + esc(p.comprado_por || '—') + '</div>';
     if(p.aprovado_em) h += '<div class="sub">Aprovado por ' + esc(p.aprovado_por) + ' em ' + data(p.aprovado_em) + ' — "' + esc(p.motivo_aprovacao) + '"</div>';
     if(p.status === 'rascunho'){
@@ -306,7 +306,7 @@
         + '<button class="primary" data-perm="pedido.aprovar" id="paAprovar">Aprovar e passar para comprado</button> <span class="msg" id="paMsg"></span>';
     }
     if(['rascunho','aguardando_aprovacao','comprado','parcial'].indexOf(p.status) >= 0)
-      h += ' <button class="ghost" data-perm="pedido.criar" id="pcCancelar">Cancelar pedido</button> <button class="ghost" id="pcWa">Texto de WhatsApp</button>';
+      h += ' <button class="ghost" data-perm="pedido.criar" id="pcCancelar">Cancelar pedido</button> <button class="ghost" id="pcWa" data-perm="compras.valores pedido.criar pedido.aprovar pedido.pagar nota.lancar preco.lancar custo.ver">Texto de WhatsApp</button>';
     h += '<div id="pcWaTxt"></div>';
     /* PARCELAS: so chegam a quem pode ver (a poda e no servidor). */
     if(Array.isArray(p.parcelas)){
@@ -333,7 +333,9 @@
         if(r.erro) return msg($('#paMsg'), r); return abrir('pedidos').then(function(){ detalhe(id); }); }
       if(t.id === 'pcCancelar'){ var m = prompt('Por que está cancelando? (vai para a auditoria)'); if(!m) return;
         r = await api('POST', '/api/pedidos/' + id + '/cancelar', { motivo:m }); if(r.erro) return alert(r.erro); return abrir('pedidos'); }
-      if(t.id === 'pcWa'){ r = await api('GET', '/api/pedidos/' + id + '/whatsapp'); $('#pcWaTxt').innerHTML = '<textarea style="width:100%;min-height:140px;margin-top:8px">' + esc(r.texto || r.erro) + '</textarea>'; return; }
+      if(t.id === 'pcWa'){ r = await api('GET', '/api/pedidos/' + id + '/whatsapp');
+        /* a recusa NÃO vai para a caixa do texto a mandar (③ REVISÃO): ali ela seria copiada como a mensagem */
+        $('#pcWaTxt').innerHTML = r.erro ? '<div class="cmpAvi">' + esc(r.erro) + '</div>' : '<textarea style="width:100%;min-height:140px;margin-top:8px">' + esc(r.texto) + '</textarea>'; return; }
       if(t.matches('[data-pg]')){ r = await api('POST', '/api/parcelas/' + t.getAttribute('data-pg') + '/pagar', {}); if(r.erro) return alert(r.erro); return detalhe(id); }
       if(t.matches('[data-pgdel]')){ r = await api('DELETE', '/api/parcelas/' + t.getAttribute('data-pgdel')); if(r.erro) return alert(r.erro); return detalhe(id); }
       if(t.id === 'ppAdd'){
