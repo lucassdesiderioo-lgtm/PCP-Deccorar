@@ -73,6 +73,16 @@ entra no custo, não entra na compra e não sai do saldo.
    junto com o preço e as escolhas. Na medida padrão, a ficha é a 404.
 10. **O código de cadastro é `MAT-0001`**, e o "Código (opcional)" de hoje fica
     como código de barras ou do fornecedor.
+11. **Catálogo e ficha técnica são a mesma coisa para o dono** (11/11/2026):
+    *"ainda achando que os dois é a mesma coisa; porém o catálogo da rolo do
+    Mercado Livre chamaria Rolo medida padrão ML"*. Ou seja: um lugar só com os
+    produtos das duas operações, cada um com a sua ficha. Ver §3-F.
+12. **As duas operações dão saída no fim, quando a peça é EMBALADA** — a medida
+    padrão na embalagem (o +1), o sob medida no bipe da embalagem.
+13. **A peça refeita não baixa sozinha**: *"às vezes estamos apenas refazendo e
+    não teve que trocar material"*.
+14. **A peça com problema fica assinalada para o Supervisor**, que no fim do dia
+    diz se teve ou não que usar outro material — e só aí baixa. Ver §3-G.
 
 ## 3. O que a spec decide
 
@@ -142,8 +152,39 @@ entra no custo, não entra na compra e não sai do saldo.
 - **Medida padrão: o momento é a EMBALAGEM** (o +1 do estoque, §2). ⚠️ **A
   devolução reembalada não baixa material** (`fila.modo='devolucao'`): a peça já
   existia. Embalagem em modo teste também não baixa de verdade.
-- **Sob medida: o momento é a persiana PRONTA** (`pronto_em`), e só depois da
-  fase 2 (sem lista de material não há o que baixar).
+- **Sob medida: o momento é o bipe da EMBALAGEM** (resposta 12), e só depois da
+  fase 2 (sem lista de material não há o que baixar). Uma vez por unidade: a
+  persiana embalada de novo depois de uma recusa **não** baixa outra vez.
+
+### F. Um catálogo só, com os produtos das duas operações (fase 5)
+
+- Para o dono, catálogo e ficha técnica são a mesma coisa (resposta 11). Hoje são
+  duas telas: a **404 Ficha técnica** (modelo da medida padrão) e o **608
+  Catálogo** (produto do sob medida, com preço e escolhas).
+- A proposta: **um Catálogo só**, listando os produtos das duas operações, cada
+  um marcado (*Medida padrão* · *Sob medida*). O modelo da medida padrão aparece
+  com o nome de produto — **"Rolo medida padrão ML"** —, e abrir um produto leva
+  à ficha dele.
+- **A conta continua diferente em cada operação** (R-ORG-11): fórmula por modelo
+  na medida padrão; escada, gomos e folhas no sob medida, com preço de venda. O
+  que se junta é **o lugar**, e não a conta.
+- É mudança de tela e de lugar (R-ORG), e mexe em duas telas que estão no ar e
+  funcionando. **Fica para depois das fases 1 a 4**, que são o que o dono pediu
+  primeiro (o material conectado e a baixa).
+
+### G. O material extra fica para o Supervisor decidir (fase 4)
+
+- **Peça com problema na revisão** (medida padrão, `rejeicao`) e **peça recusada
+  e refeita** (sob medida, `sm_recusa`) **não baixam material sozinhas**.
+- Cada uma vira uma linha **"material extra a decidir"**, com a peça, o SKU ou o
+  pedido, quem registrou o problema e quando.
+- **O Supervisor, no fim do dia, decide cada linha**: *"não precisou de material"*
+  (fecha sem baixar) ou *"usou material"* — escolhe os materiais da ficha daquela
+  peça e a quantidade (já vem preenchida com a da ficha, editável), e aí baixa,
+  pelo `componente_dominio`, com o motivo `refeito` e quem decidiu.
+- Linha não decidida **não some**: aparece na central de Pendências (204) com há
+  quantos dias espera, como as outras.
+- Material que ainda sai pela contagem não baixa aqui: a linha só fica registrada.
 
 ## 4. A passagem
 
@@ -188,9 +229,12 @@ Na 1101, o consumido no período por operação, calculado pelas duas fichas e p
 que cada operação produziu, escrito como estimativa.
 
 ### Fase 4 — A saída pelo que foi produzido 🔴 (REGRA)
-Ver §3-E. **Na medida padrão pode vir logo depois da fase 1** (a ficha da 404 já
+Ver §3-E e §3-G. **Na medida padrão pode vir logo depois da fase 1** (a ficha da 404 já
 existe e o ROLO BK ML está lançado); no sob medida, depois da fase 2. Não depende
 mais da `PRODUCAO-MONTAGEM`: o evento é a embalagem (proposta, pergunta 6).
+
+### Fase 5 — Um catálogo só 🟡
+Ver §3-F. Depois das fases 1 a 4.
 
 ## 8. Testes (todos rodados pelo Claude Code)
 
@@ -210,12 +254,17 @@ Respondidas em 11/11/2026: onde se monta a lista do sob medida (no Catálogo, 60
 o formato do código (`MAT-0001`), o kit (não há receita: parafuso e bucha são
 linhas da ficha da medida padrão) e a contagem (ficha baixa, contagem corrige).
 
+Respondidas também: o momento da baixa (a embalagem, nas duas), a peça refeita
+(não baixa sozinha) e a peça com problema (o Supervisor decide no fim do dia).
+
 Abertas:
 
-5. **A peça refeita no sob medida** (recusada e feita de novo) gasta material
-   outra vez. Baixa de novo pela ficha? Recomendação: sim — o material foi gasto.
-6. **O momento da baixa na medida padrão é a embalagem?** Recomendação: sim, é
-   onde a peça vira estoque. A revisão não mexe em estoque (R-EST-01).
-7. **A peça com problema na revisão** (volta para a produção) gastou material e
-   não foi embalada: fica como perda, que a contagem mostra. Recomendação: sim —
-   não baixar nada na revisão.
+8. **Onde o Supervisor decide o material extra?** A 104 Problemas é do mesmo
+   assunto (peças com problema), mas é de nível Admin, e o Supervisor não a
+   abre. Opções: (a) uma tela nova no módulo Produção, nível Supervisor, bloco
+   Comum, ligada à 101 Revisão, à 613 Bancada e à 1101 Materiais (número na
+   faixa 100); (b) a 104 passa a ser de nível Supervisor. Recomendação: (a) — a
+   104 mostra outras coisas que hoje só o Admin vê.
+9. **A ação nova** "Decidir material extra" (`material.extra`, nível Supervisor,
+   sensível porque mexe em saldo) nasce só para o Admin Geral, e o dono a dá aos
+   Supervisores pela tela de Acessos (R-ALC-06). Confirma?
