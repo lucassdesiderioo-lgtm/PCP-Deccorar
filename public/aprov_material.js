@@ -31,7 +31,8 @@
     if(tem('contagem.aprovar')){
       var l = await api('GET', '/api/contagem-material/pendentes');
       if(!Array.isArray(l)) h += '<div class="card"><div class="nome">Contagem de material esperando aprovação</div><div class="sub">Não consegui ler esta lista: ' + esc((l && l.erro) || 'sem resposta') + '.</div></div>';
-      else if(l.length){
+      else if(!l.length) h += '<div class="card"><div class="nome">Contagem de material esperando aprovação</div><div class="sub">Nada esperando aprovação.</div></div>';
+      else{
         h += '<div class="card"><div class="nome">Contagem de material esperando aprovação (' + l.length + ')</div>'
           + '<div class="sub">A diferença passou da tolerância do material. Aprovar aplica a DIFERENÇA sobre o saldo de agora. Quem contou não aprova. '
           + 'Material por volume não se ajusta aqui: o saldo dele é a soma dos volumes (corrige-se abrindo ou encerrando o volume na 503).</div>'

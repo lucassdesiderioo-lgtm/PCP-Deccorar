@@ -89,6 +89,8 @@
         try{ localStorage.removeItem('cmpAba'); }catch(e){}
         var destino = rotaDaTela(saiu.tela);
         if(destino){ location.replace(destino); return; }
+        /* sem acesso à tela nova: fica na 501, e o #hash da aba que saiu sai do endereço */
+        if(location.hash){ try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){} }
         id = null;
       }
     }

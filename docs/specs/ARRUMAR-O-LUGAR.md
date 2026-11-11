@@ -48,8 +48,12 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
   302; material, na 504), cada uma contando o que a tela dela mostra; quem abre a
   501 só pela chave de uma aba que saiu vê para onde ela foi, e não os cards
   velhos; e o teste de segurança do CI tranca as seis telas e a 504.
+  O testador de tela achou mais três, também consertados: a 504 pedia os
+  almoxarifados e as contagens abertas a quem só aprova (dois 403), não dizia
+  "Nada esperando aprovação", e o `#notas` ficava no endereço da 501 para quem
+  não abre a 1301.
 - **A lista do que está fora do lugar** ficou só com `902/horarios` (fase 3).
-- `teste_501_so_compra.js` (87), escrito antes; os inventários do
+- `teste_501_so_compra.js` (90), escrito antes; os inventários do
   `teste_lugar.js`, do `teste_admin_telas.js` e do `teste_valor.js` ganharam as
   telas novas, sem mudar o esperado do que já existia.
 

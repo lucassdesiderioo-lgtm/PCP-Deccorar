@@ -168,5 +168,11 @@ const CI = ler('.github/workflows/testes.yml');
 ok('o teste de segurança do CI confere as seis telas novas sem login', NOVAS.every(e => CI.indexOf(e.rota) >= 0), NOVAS.filter(e => CI.indexOf(e.rota) < 0).map(e => e.rota).join(' '));
 ok('…e a 504', CI.indexOf('/contagem-material') >= 0);
 
+console.log('\n── 9. o que o testador de tela achou (③ REVISÃO) ──');
+ok('a 504 só pede os almoxarifados e as contagens abertas a quem conta (sem 403 para quem só aprova)',
+  /conta\s*\?\s*await api\('GET','\/api\/almoxarifados'\)/.test(C504) && /conta\s*\?\s*await api\('GET','\/api\/contagem-material\/abertas'\)/.test(C504));
+ok('quem aprova vê "Nada esperando aprovação" quando a lista está vazia', /Nada esperando aprova/.test(APR));
+ok('na 501, o #hash de uma aba que saiu é tirado do endereço quando a pessoa não abre a tela nova', /history\.replaceState/.test(ABAS_JS));
+
 console.log('\n' + (falhas ? falhas + ' FALHA(S) em ' : 'todos os ') + n + ' casos' + (falhas ? '' : ' passaram'));
 process.exit(falhas ? 1 : 0);

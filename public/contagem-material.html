@@ -45,8 +45,8 @@ async function inicio(){
      302). Quem não conta não vê o "Começar a contagem" — a rota o recusaria. */
   var mi=await api('GET','/api/telas/minhas');
   var conta=mi && (mi.admin_geral || (mi.perms||[]).indexOf('contagem.contar')>=0);
-  var al=await api('GET','/api/almoxarifados'); if(!Array.isArray(al)) al=[];
-  var ab=await api('GET','/api/contagem-material/abertas'); if(!Array.isArray(ab)) ab=[];
+  var al=conta ? await api('GET','/api/almoxarifados') : []; if(!Array.isArray(al)) al=[];
+  var ab=conta ? await api('GET','/api/contagem-material/abertas') : []; if(!Array.isArray(ab)) ab=[];
   $('#app').innerHTML='<div id="aprovMat"></div>'+(!conta?'':'<div class="card"><div class="nome">Em qual almoxarifado você vai contar?</div>'
     +'<div class="lin"><select id="alm">'+al.filter(function(a){return a.ativo;}).map(function(a){return '<option value="'+a.id+'">'+esc(a.nome)+'</option>';}).join('')+'</select>'
     +'<button class="b pri" id="abrir">Começar a contagem</button></div><div id="msg"></div></div>'
