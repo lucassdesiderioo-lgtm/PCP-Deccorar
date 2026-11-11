@@ -174,5 +174,10 @@ ok('a 504 só pede os almoxarifados e as contagens abertas a quem conta (sem 403
 ok('quem aprova vê "Nada esperando aprovação" quando a lista está vazia', /Nada esperando aprova/.test(APR));
 ok('na 501, o #hash de uma aba que saiu é tirado do endereço quando a pessoa não abre a tela nova', /history\.replaceState/.test(ABAS_JS));
 
+console.log('\n── 10. rodada 2 da revisão ──');
+ok('o bloco dos ajustes antigos diz quando não há nada, e quando não conseguiu ler', /Nenhum ajuste antigo de material/.test(APR) && /Não consegui ler os ajustes antigos/.test(APR));
+ok('o aviso da 501 vazia lista só as telas para onde foram abas (o tela: do registrar), e não qualquer número ≥ 1100',
+  !/t\.n >= 1100/.test(ABAS_JS) && /ABAS[\s\S]{0,200}\.tela/.test(ABAS_JS.slice(ABAS_JS.indexOf('mudaram de tela') - 600, ABAS_JS.indexOf('mudaram de tela'))));
+
 console.log('\n' + (falhas ? falhas + ' FALHA(S) em ' : 'todos os ') + n + ' casos' + (falhas ? '' : ' passaram'));
 process.exit(falhas ? 1 : 0);

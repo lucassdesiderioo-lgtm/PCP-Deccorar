@@ -101,7 +101,8 @@
          foi o trabalho dele (③ REVISÃO, fase 2). */
       if(!SOLO){
         velho([]);
-        var minhas = TELAS.filter(function(t){ return t.n >= 1100; });
+        var foram = ABAS.filter(function(x){ return x.tela && x.tela !== 501; }).map(function(x){ return x.tela; });
+        var minhas = TELAS.filter(function(t){ return foram.indexOf(t.n) >= 0; });
         cab.innerHTML = ESTILO + '<div class="card"><div class="cmpAvi">As abas do seu acesso mudaram de tela em 11/11/2026: '
           + (minhas.length ? minhas.map(function(t){ return '<a href="' + esc(t.rota) + '">' + t.n + ' ' + esc(t.nome) + '</a>'; }).join(' · ') : 'nenhuma tela de compra para o seu acesso') + '.</div></div>';
         $('#cmpCorpo').innerHTML = '';

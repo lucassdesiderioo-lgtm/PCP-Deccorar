@@ -47,8 +47,11 @@
     }
     if(tem('contagem.ajustar')){
       var d = await api('GET', '/api/contagem/pendentes');
-      var antigos = d && Array.isArray(d.linhas) ? d.linhas.filter(function(x){ return x.tipo === 'componente'; }) : [];
-      if(antigos.length){
+      var antigos = d && Array.isArray(d.linhas) ? d.linhas.filter(function(x){ return x.tipo === 'componente'; }) : null;
+      /* leitura que falhou não vira lista vazia (a regra do PR #305) */
+      if(!antigos) h += '<div class="card"><div class="nome">Ajustes antigos de material</div><div class="sub">Não consegui ler os ajustes antigos: ' + esc((d && d.erro) || 'sem resposta') + '.</div></div>';
+      else if(!antigos.length) h += '<div class="card"><div class="nome">Ajustes antigos de material</div><div class="sub">Nenhum ajuste antigo de material esperando.</div></div>';
+      else{
         h += '<div class="card"><div class="nome">Ajustes antigos de material (' + antigos.length + ')</div>'
           + '<div class="sub">São da contagem de material antiga, que saiu em 07/11/2026. Não se aprovam mais: rejeite e conte de novo aqui, por almoxarifado.</div>'
           + antigos.map(function(x){
