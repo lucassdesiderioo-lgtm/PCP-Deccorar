@@ -32,7 +32,11 @@ function ok(desc, cond, detalhe){
 const ler = f => fs.readFileSync(path.join(__dirname, f), 'utf8');
 const existe = f => fs.existsSync(path.join(__dirname, f));
 
-const ABRE = ['horarios.editar','sobmedida.parametro.ler','sobmedida.parametro.editar','@admin'];
+/* AJUSTE de 11/11/2026 (decisão do dono): os horários de corte e despacho
+   saíram da 906 e moram na 206 Horários de coleta, como "Horário padrão da
+   semana" — mesmo assunto (horário de saída). A 906 fica com o segundo bipe e o
+   sob medida. */
+const ABRE = ['sobmedida.parametro.ler','sobmedida.parametro.editar','@admin'];
 
 console.log('\n── 1. a 906 no mapa ──');
 const t = M.porNumero(906);
@@ -40,9 +44,9 @@ ok('a 906 existe, em /parametros', !!t && t.rota === '/parametros', JSON.stringi
 if(t){
   ok('   Administração · Comum, nível Supervisor', t.modulo === 'administracao' && t.bloco === 'comum' && t.nivel === 'supervisor',
     JSON.stringify({ modulo:t.modulo, bloco:t.bloco, nivel:t.nivel }));
-  ok('   abre com as chaves de cada parte (horários, parâmetros do sob medida, nível Admin para o segundo bipe)',
+  ok('   abre com as chaves de cada parte (parâmetros do sob medida, nível Admin para o segundo bipe) — não mais com horarios.editar',
     JSON.stringify(t.perms.slice().sort()) === JSON.stringify(ABRE.slice().sort()), JSON.stringify(t.perms));
-  ok('   diz a que se liga (202, 201/206, 602, 609–611)', Array.isArray(t.liga) && [202, 206, 602, 610].every(x => t.liga.indexOf(x) >= 0), JSON.stringify(t.liga));
+  ok('   diz a que se liga (202, 602, 609–611)', Array.isArray(t.liga) && [202, 602, 610].every(x => t.liga.indexOf(x) >= 0) && t.liga.indexOf(206) < 0, JSON.stringify(t.liga));
   ok('   sem dinheiro, sem `valor`', !t.valor);
   ok('   o número cai na faixa do módulo', MO.moduloDaFaixa(906) === 'administracao');
 }
@@ -66,7 +70,15 @@ ok('a 610 diz onde se mudam (a 906) só a quem tem a parametro.editar', /posso\(
 
 console.log('\n── 3. a caixinha de cada ação na tela de Acessos ──');
 const info = {}; PERMISSOES.forEach(p => info[p.chave] = p);
-ok('horarios.editar aparece pendurada na 906', info['horarios.editar'] && info['horarios.editar'].tela === 906, JSON.stringify(info['horarios.editar'] && info['horarios.editar'].tela));
+ok('horarios.editar aparece pendurada na 206 (o horário padrão mora lá)', info['horarios.editar'] && info['horarios.editar'].tela === 206, JSON.stringify(info['horarios.editar'] && info['horarios.editar'].tela));
+const t206 = M.porNumero(206);
+ok('a 206 abre também com horarios.editar (e continua com coleta.horario)', JSON.stringify(t206.perms.slice().sort()) === JSON.stringify(['coleta.horario','horarios.editar']), JSON.stringify(t206.perms));
+ok('a 206 diz que se liga à 101 (o corte da Revisão) além de 103, 201 e 202', [101, 103, 201, 202].every(x => t206.liga.indexOf(x) >= 0), JSON.stringify(t206.liga));
+const COL = ler('public/coleta-horarios.html');
+ok('a 206 tem o bloco "Horário padrão da semana", pela rota de sempre', /Horário padrão da semana/.test(COL) && /\/api\/config\/horarios/.test(COL));
+ok('   só quem tem horarios.editar muda o padrão; quem só tem coleta.horario vê', /horarios\.editar/.test(COL) && /disabled/.test(COL));
+ok('   quem não tem coleta.horario não pede as semanas (as rotas delas são de coleta.horario)', /coleta\.horario/.test(COL) && /\/api\/telas\/minhas/.test(COL));
+ok('   o horário recusado fica marcado no campo', /padrao[\s\S]*classList\.add\('erro'\)/.test(COL));
 ok('sobmedida.parametro.editar aparece pendurada na 906', info['sobmedida.parametro.editar'] && info['sobmedida.parametro.editar'].tela === 906,
   JSON.stringify(info['sobmedida.parametro.editar'] && info['sobmedida.parametro.editar'].tela));
 ok('sobmedida.parametro.ler aparece na 602 Corte (é o Corte e as Sobras que leem os parâmetros)', info['sobmedida.parametro.ler'] && info['sobmedida.parametro.ler'].tela === 602,
@@ -80,13 +92,12 @@ const PAG = existe('public/parametros.html') ? ler('public/parametros.html') : '
 ok('carrega o nav.js da medida padrão (barra de sessão e ☰ Menu)', /<script src="\/nav\.js"/.test(PAG));
 ok('o servidor serve /parametros', /app\.get\('\/parametros'/.test(ler('server.js')));
 ok('o auth.js protege /parametros e /parametros.html (tela fora do /admin/, #3)', /'\/parametros':/.test(ler('auth.js')) && /'\/parametros\.html':/.test(ler('auth.js')));
-ok('horários: lê e grava pela rota de sempre', /\/api\/config\/horarios/.test(PAG) && /horarios\.editar/.test(PAG));
+ok('a 906 não tem mais os horários de corte e despacho (moram na 206)', !/\/api\/config\/horarios/.test(PAG) && /206/.test(PAG));
 ok('segundo bipe: lê e grava pela rota de sempre, e só nível Admin muda', /\/api\/config\/conferencia/.test(PAG) && /nivel_admin/.test(PAG));
 ok('parâmetros do corte e o prazo: pela rota do sob medida, sem conta própria', /\/sobmedida\/api\/parametros/.test(PAG) && /\/sobmedida\/api\/prazo/.test(PAG));
 ok('feriados: pela rota do sob medida (listar, cadastrar, apagar)', /\/sobmedida\/api\/feriados/.test(PAG) && /DELETE/.test(PAG));
 ok('cada parte só aparece para quem tem a chave dela', /sobmedida\.parametro\.ler/.test(PAG) && /sobmedida\.parametro\.editar/.test(PAG));
 ok('③ REVISÃO: o parâmetro de tipo texto (a hora do corte do prazo) vai como TEXTO, e quem recusa é o servidor', /tipo\s*===\s*'numero'/.test(PAG) && /data-tipo/.test(PAG));
-ok('③ REVISÃO: o horário recusado fica marcado no campo, e não só na mensagem', /partHorarios[\s\S]*classList\.add\('erro'\)[\s\S]*function partBipe/.test(PAG));
 ok('③ REVISÃO: o card do sob medida não se chama "plano de corte" (ele lista etiqueta, rolo, crédito…)', !/parâmetros do plano de corte<\/h2>/.test(PAG));
 ok('③ REVISÃO r2: o redesenho depois de salvar devolve o que estava digitado e não salvo nas outras linhas (§12)', /function guardarDigitado/.test(PAG) && /function devolverDigitado/.test(PAG) && /redesenharSm[\s\S]{0,400}guardarDigitado[\s\S]{0,400}devolverDigitado/.test(PAG));
 ok('③ REVISÃO r3: o campo devolvido volta marcado como não salvo', /Não salvo — clique em Salvar/.test(PAG));
@@ -126,7 +137,7 @@ console.log('\n── 5. o horário impossível é recusado, e nada grava ──
 }
 
 function pessoas(){
-  console.log('\n── 6. pessoa a pessoa: quem via ou mudava uma parte abre a 906 ──');
+  console.log('\n── 6. pessoa a pessoa: a 906 e a 206 ──');
   const B = P.montar();
   try{
     for(const p of B.pessoas){
@@ -134,19 +145,20 @@ function pessoas(){
       const ps = B.AC.permissoesDe(u.id);
       const ag = B.AC.ehAdminGeral(u.id);
       const admin = ag || B.AC.ehNivelAdmin(u.id);
-      /* ANTES: o segundo bipe — quem abria a 902 via o card, e só quem é nível
-         Admin mudava (POST '@admin'); os horários — horarios.editar, pela rota;
-         os parâmetros do sob medida — quem abria a 606; o calendário — quem
-         abria a 610 e tinha a parametro.editar. */
-      const antes = B.AC.decidir(u, '/admin/cadastros', 'GET').ok || admin || ps.has('horarios.editar')
-        || ps.has('sobmedida.parametro.editar') || ps.has('sobmedida.parametro.ler') && ps.has('sobmedida.cadastro.editar');
-      const abre = B.AC.decidir(u, '/parametros', 'GET').ok;
-      /* O GANHO ACEITO, e nomeado: quem é nível Supervisor ou acima e tem a
-         `sobmedida.parametro.ler` abre a 906 só para ler — os parâmetros que a
-         rota já lhe entregava. */
+      /* ANTES deste AJUSTE (a fase 3 no ar): a 906 abria com horarios.editar,
+         as chaves do sob medida ou o nível Admin; a 206, com coleta.horario. */
       const nv = B.AC.nivelDaPessoa ? B.AC.nivelDaPessoa(u.id) : null;
-      const ganho = abre && !antes && ps.has('sobmedida.parametro.ler');
-      ok(p.nome + ': abre a 906 onde via ou mudava uma parte', antes === abre || ganho, JSON.stringify({ antes, abre, nv }));
+      const sup = ag || ['supervisor','admin','admin_geral'].indexOf(nv) >= 0;
+      const antes906 = sup && (admin || ps.has('horarios.editar') || ps.has('sobmedida.parametro.editar') || ps.has('sobmedida.parametro.ler'));
+      const antes206 = sup && ps.has('coleta.horario') || ag;
+      const abre906 = B.AC.decidir(u, '/parametros', 'GET').ok;
+      const abre206 = B.AC.decidir(u, '/coleta-horarios', 'GET').ok;
+      /* O QUE MUDA, e nomeado: quem tem horarios.editar passa a abrir a 206 (o
+         padrão mora lá); quem perdesse a 906 por isso abre a 206 no lugar. */
+      const ganho206 = abre206 && !antes206 && ps.has('horarios.editar');
+      const perda906 = !abre906 && antes906 && ps.has('horarios.editar') && abre206;
+      ok(p.nome + ': a 906 abre onde abria (ou a pessoa foi para a 206 pelos horários)', antes906 === abre906 || perda906, JSON.stringify({ antes906, abre906, nv }));
+      ok(p.nome + ': a 206 abre onde abria (ou ganhou pela horarios.editar)', antes206 === abre206 || ganho206, JSON.stringify({ antes206, abre206, nv }));
     }
   }finally{ B.fechar(); }
   fim();

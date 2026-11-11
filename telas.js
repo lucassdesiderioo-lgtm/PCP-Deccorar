@@ -80,8 +80,12 @@ const TELAS = [
     modulo:'expedicao', bloco:'comum', liga:[103, 205, 253, 301, 302] },
   { n:205, nome:'Correções',             rota:'/admin/correcoes', nivel:'admin',    onde:'computador', perms:['correcao.executar'],     aba:'cor',
     modulo:'expedicao', bloco:'comum', liga:[201, 202, 204] },
-  { n:206, nome:'Horários de coleta',    rota:'/coleta-horarios', nivel:'supervisor', onde:'computador', perms:['coleta.horario'],
-    modulo:'expedicao', bloco:'comum', liga:[103, 201, 202] },   // Operação não edita horário (05/11/2026)
+  /* A 206 abre também com horarios.editar desde 11/11/2026 (AJUSTE, decisão do
+     dono): o "Horário padrão da semana" (corte e despacho por dia da semana,
+     o que vale quando o dia não tem horário lançado) mora aqui, ao lado das
+     semanas. Quem só tem horarios.editar vê o padrão, e não as semanas. */
+  { n:206, nome:'Horários de coleta',    rota:'/coleta-horarios', nivel:'supervisor', onde:'computador', perms:['coleta.horario','horarios.editar'],
+    modulo:'expedicao', bloco:'comum', liga:[101, 103, 201, 202] },   // Operação não edita horário (05/11/2026)
   // ── 250 · Devoluções (bloco dentro da Expedição; a porta é /devolucoes) ──
   { n:251, nome:'Devoluções — receber',  rota:'/devolucao',     nivel:'operacao',   onde:'tablet',     perms:['devolucao.registrar'],   area:'devolucao',
     modulo:'posvenda', bloco:'mercado_livre', liga:[252, 253, 102] },
@@ -153,9 +157,11 @@ const TELAS = [
      (a rota existia sem tela), e os parâmetros do corte, os números do prazo e
      os feriados do sob medida (eram da 606 e da 610). Nível Supervisor (decisão
      do dono): as chaves do sob medida são de Supervisor (R-SMA-02). Cada parte
-     aparece para quem tem a chave dela; o segundo bipe muda quem é nível Admin. */
-  { n:906, nome:'Parâmetros',            rota:'/parametros',    nivel:'supervisor', onde:'computador', perms:['horarios.editar','sobmedida.parametro.ler','sobmedida.parametro.editar','@admin'],
-    modulo:'administracao', bloco:'comum', liga:[202, 201, 206, 602, 609, 610, 611] },
+     aparece para quem tem a chave dela; o segundo bipe muda quem é nível Admin.
+     Os horários de corte e despacho saíram daqui em 11/11/2026 (AJUSTE): moram
+     na 206, que é o assunto deles. */
+  { n:906, nome:'Parâmetros',            rota:'/parametros',    nivel:'supervisor', onde:'computador', perms:['sobmedida.parametro.ler','sobmedida.parametro.editar','@admin'],
+    modulo:'administracao', bloco:'comum', liga:[202, 602, 609, 610, 611] },
   { n:903, nome:'Modo teste',            rota:'/admin/teste',   nivel:'admin',      onde:'computador', perms:['teste.operar'],          aba:'tst',
     modulo:'administracao', bloco:'comum', liga:['todas as tabelas do modo teste'] },
   { n:904, nome:'Relatórios',            rota:'/relatorios',    nivel:'supervisor', onde:'computador', perms:['relatorios.ver'],        area:'relatorios', aba:'rel',

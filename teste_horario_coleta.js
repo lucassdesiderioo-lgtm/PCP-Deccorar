@@ -270,7 +270,8 @@ async function main(){
     const M = require('./telas');
     const t = M.porNumero(206);
     ok('a tela 206 está no mapa, de nível Supervisor (Operação não edita horário)', !!t && t.rota === '/coleta-horarios' && t.nivel === 'supervisor');
-    eq('e abre com coleta.horario', t && t.perms, ['coleta.horario']);
+    // desde 11/11/2026 também com horarios.editar: o "Horário padrão da semana" mora na 206 (AJUSTE, teste_parametros.js)
+    eq('e abre com coleta.horario (e com horarios.editar, pelo horário padrão)', t && t.perms, ['coleta.horario','horarios.editar']);
     const P = require('./permissoes');
     const lista = P.PERMISSOES || P.permissoes || P;
     const pc = (Array.isArray(lista) ? lista : []).find(p => p.chave === 'coleta.horario');
