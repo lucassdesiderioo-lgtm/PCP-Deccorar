@@ -22,6 +22,12 @@
   .grid-med{display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:10px;align-items:end;margin-top:12px}
   .mcrow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
   .mcrow .code{min-width:96px}
+  /* O nome e o que se edita aqui: ele ocupa o que sobra da linha, e nunca e
+     espremido pelas caixinhas — no modelo elas vao numa segunda linha. */
+  .mcrow .mcNome{flex:1 1 0;min-width:0;width:auto}
+  .mcrow.mcMod{flex-wrap:wrap}
+  .mcrow.mcMod .mcFlags{flex:1 1 100%;display:flex;gap:18px;padding-left:104px}
+  .mcrow .mcOk{font-size:12px;white-space:nowrap}
   @media(max-width:700px){.grid,.grid-med{grid-template-columns:1fr}}
   button{cursor:pointer;border:0;border-radius:9px;font-weight:600;font-size:14px;padding:11px 16px}
   .primary{background:var(--amber);color:#1a1300}.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
@@ -445,7 +451,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
 
     <div class="card"><div style="font-weight:700;margin-bottom:4px">Modelos, cores e tecidos</div>
       <div class="sub" style="margin-bottom:14px"><b>Modelo</b> é o mecanismo — Rolô, Romana, Acessório. <b>Tecido</b> é o material — Blackout, Screen. São coisas diferentes: um rolô de blackout e um rolô de screen têm o mesmo modelo e tecidos distintos. Desmarque <b>tem medida</b> num modelo como Acessório, e os produtos dele param de ser cobrados por largura e altura. Desativar não apaga: SKU que já aponta continua apontando.</div>
-      <div id="mcBox" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px"></div></div>
+      <div id="mcBox" style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:22px"></div></div>
 
     <div class="card"><table><thead><tr><th>Código</th><th>Descrição</th><th>Medida</th><th>Modelo</th><th>Tecido</th><th>Cor</th><th></th></tr></thead><tbody id="lista"></tbody></table></div>
   </div>
@@ -593,9 +599,28 @@ document.addEventListener('input',function(e){ if(e.target&&e.target.id==='codig
 document.addEventListener('change',async function(e){
   const n=e.target.closest&&e.target.closest('.mcNome');
   if(n){
-    await fetch(rotaLista(n.dataset.tipo),{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({codigo:n.dataset.cod,nome:n.value.trim()})});
-    carregarListas(); return;
+    /* Diz se gravou. Antes a tela redesenhava calada: recusado ou nao, o
+       nome voltava e ninguem sabia se tinha salvo. */
+    const linha=n.closest('.mcrow'), ok=linha&&linha.querySelector('.mcOk');
+    if(!n.value.trim()){
+      /* Vazio a rota ignora e mantem o nome de antes: dizer "salvo" seria mentir. */
+      if(ok){ ok.textContent='o nome não pode ficar vazio'; ok.style.color='var(--red)'; }
+      return;
+    }
+    let r=null;
+    try{ r=await fetch(rotaLista(n.dataset.tipo),{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({codigo:n.dataset.cod,nome:n.value.trim()})}); }catch(_){}
+    if(!r||!r.ok){
+      let msg='não salvou';
+      try{ const j=await r.json(); if(j&&j.erro) msg=j.erro; }catch(_){}
+      if(ok){ ok.textContent=msg; ok.style.color='var(--red)'; }
+      return;   // o digitado fica no campo, para corrigir
+    }
+    await carregarListas();
+    const nova=document.querySelector('.mcrow [data-tipo="'+n.dataset.tipo+'"][data-cod="'+n.dataset.cod+'"]');
+    const o2=nova&&nova.closest('.mcrow').querySelector('.mcOk');
+    if(o2){ o2.textContent='salvo ✓'; o2.style.color='var(--green)'; setTimeout(()=>{ o2.textContent=''; },2500); }
+    return;
   }
   /* "tem medida": o que tira Acessorio da cobranca de largura e altura. */
   const md=e.target.closest&&e.target.closest('.mcMedida');
@@ -649,21 +674,22 @@ function renderMC(){
   const el=$('#mcBox'); if(!el) return;
   let h='<div><div class="sub" style="margin-bottom:8px">MODELOS (mecanismo)</div>';
   for(const m of MODELOS)
-    h+='<div class="mcrow"'+(m.ativo?'':' style="opacity:.45"')+'><span class="code">'+esc(m.codigo)+'</span>'
-      +'<input class="mcNome" data-tipo="modelo" data-cod="'+esc(m.codigo)+'" value="'+esc(m.nome)+'" placeholder="nome do modelo">'
-      +'<label style="display:flex;align-items:center;gap:5px;text-transform:none;letter-spacing:0;white-space:nowrap;margin:0">'
+    h+='<div class="mcrow mcMod"'+(m.ativo?'':' style="opacity:.45"')+'><span class="code">'+esc(m.codigo)+'</span>'
+      +'<input class="mcNome" data-tipo="modelo" data-cod="'+esc(m.codigo)+'" value="'+esc(m.nome)+'" placeholder="nome do modelo (ex.: Rolo BK ML)" title="O nome aparece na ficha técnica, na lista de SKUs e nos relatórios. O código ('+esc(m.codigo)+') não muda: é ele que liga os SKUs e a ficha.">'
+      +'<span class="mcOk"></span>'
+      +(m.ativo?'<button class="ghost small mcOff" data-perm="modelo.cadastrar" data-tipo="modelo" data-id="'+m.id+'">desativar</button>'
+               :'<span class="sub">inativo</span>')
+      +'<div class="mcFlags"><label style="display:flex;align-items:center;gap:5px;text-transform:none;letter-spacing:0;white-space:nowrap;margin:0">'
       +'<input type="checkbox" class="mcMedida" data-cod="'+esc(m.codigo)+'" style="width:auto"'+(m.exige_medida?' checked':'')+'> tem medida</label>'
       +'<label title="Peça feita contra o pedido: não tem estoque pra consultar" style="display:flex;align-items:center;gap:5px;text-transform:none;letter-spacing:0;white-space:nowrap;margin:0">'
-      +'<input type="checkbox" class="mcSob" data-cod="'+esc(m.codigo)+'" style="width:auto"'+(m.sob_medida?' checked':'')+'> sob medida</label>'
-      +(m.ativo?'<button class="ghost small mcOff" data-perm="modelo.cadastrar" data-tipo="modelo" data-id="'+m.id+'">desativar</button>'
-               :'<span class="sub">inativo</span>')+'</div>';
+      +'<input type="checkbox" class="mcSob" data-cod="'+esc(m.codigo)+'" style="width:auto"'+(m.sob_medida?' checked':'')+'> sob medida</label></div></div>';
   h+='<div class="mcrow"><input id="mcModCod" placeholder="código (ex.: ROLO)"><input id="mcModNome" placeholder="nome">'
     +'<button class="primary small mcAdd" data-perm="modelo.cadastrar" data-tipo="modelo">Adicionar</button></div></div>';
 
   h+='<div><div class="sub" style="margin-bottom:8px">TECIDOS (material)</div>';
   for(const t of TECIDOS)
     h+='<div class="mcrow"'+(t.ativo?'':' style="opacity:.45"')+'><span class="code">'+esc(t.codigo)+'</span>'
-      +'<input class="mcNome" data-tipo="tecido" data-cod="'+esc(t.codigo)+'" value="'+esc(t.nome)+'" placeholder="nome do tecido">'
+      +'<input class="mcNome" data-tipo="tecido" data-cod="'+esc(t.codigo)+'" value="'+esc(t.nome)+'" placeholder="nome do tecido">'+'<span class="mcOk"></span>'
       +(t.ativo?'<button class="ghost small mcOff" data-perm="sku.cadastrar" data-tipo="tecido" data-id="'+esc(t.codigo)+'">desativar</button>'
                :'<span class="sub">inativo</span>')+'</div>';
   h+='<div class="mcrow"><input id="mcTecCod" placeholder="código (ex.: BLACKOUT)"><input id="mcTecNome" placeholder="nome">'
@@ -672,7 +698,7 @@ function renderMC(){
   h+='<div><div class="sub" style="margin-bottom:8px">CORES</div>';
   for(const c of CORES)
     h+='<div class="mcrow"'+(c.ativa?'':' style="opacity:.45"')+'><span class="code">'+esc(c.codigo)+'</span>'
-      +'<input class="mcNome" data-tipo="cor" data-cod="'+esc(c.codigo)+'" value="'+esc(c.nome)+'" placeholder="nome da cor">'
+      +'<input class="mcNome" data-tipo="cor" data-cod="'+esc(c.codigo)+'" value="'+esc(c.nome)+'" placeholder="nome da cor">'+'<span class="mcOk"></span>'
       +(c.ativa?'<button class="ghost small mcOff" data-perm="sku.cadastrar" data-tipo="cor" data-id="'+esc(c.codigo)+'">desativar</button>'
                :'<span class="sub">inativa</span>')+'</div>';
   h+='<div class="mcrow"><input id="mcCorCod" placeholder="código (ex.: BEGE)"><input id="mcCorNome" placeholder="nome">'
