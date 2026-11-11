@@ -304,11 +304,12 @@ module.exports=function(app,db){
            a falha vira "material extra a decidir" para o Supervisor. */
         if(!sobMedida && modo!=='devolucao'){
           const BM=require('./baixa_material_dominio');
-          let ficha={itens:[]};
+          let ficha={itens:[]}, baixou=false;
           try{
             ficha=BM.daFichaPadrao(db,cod);
             db.transaction(()=>BM.baixar(db,{itens:ficha.itens, operacao:'padrao', motivo:'ficha',
               referencia:'montagem:'+mid, usuario_id:q.usuario_id, usuario_nome:q.usuario_nome, teste:emTeste}))();
+            baixou=true;
             /* O material PELA FICHA cuja quantidade nao saiu (a formula que nao
                avalia neste SKU, o SKU sem medida) nao some calado (③ REVISAO):
                vira "material extra a decidir", com o motivo. */
@@ -325,9 +326,13 @@ module.exports=function(app,db){
             console.error('[montagem] a baixa de material de '+cod+' falhou (a embalagem seguiu):', e.message);
             /* O registro da falha tambem nao trava: sem a tabela (banco velho,
                teste antigo), a falha fica so no log, e a peca embala. */
+            /* ⚠️ Se a BAIXA ja andou e o que estourou foi a linha "sem
+               quantidade" (③ rodada 3), a sugestao NAO e a ficha: ela ja saiu,
+               e o "baixar" sem mexer tiraria tudo duas vezes. */
             try{ require('./material_extra_dominio').registrar(db,{origem:'falha_baixa', operacao:'padrao',
-              referencia:'montagem:'+mid, descricao:cod, motivo:'a baixa pela ficha falhou: '+e.message,
-              sugestao:ficha.itens, registrado_por:q.usuario_nome, registrado_por_id:null}); }
+              referencia:'montagem:'+mid, descricao:cod,
+              motivo:baixou?'a baixa pela ficha andou, mas o aviso do material sem quantidade falhou: '+e.message:'a baixa pela ficha falhou: '+e.message,
+              sugestao:baixou?[]:ficha.itens, registrado_por:q.usuario_nome, registrado_por_id:null}); }
             catch(e2){ console.error('[montagem] e o material extra da falha tambem nao gravou:', e2.message); }
           }
         }

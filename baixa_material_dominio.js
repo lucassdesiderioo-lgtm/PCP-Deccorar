@@ -63,7 +63,7 @@ function daFichaPadrao(db, sku){
   const F = require('./ficha_dominio').calcularFicha(db, sku);
   const itens = [], faltam = [], semQuantidade = [];
   const doModelo = () => { try{
-    return db.prepare(`SELECT f.componente_id FROM ficha_formula f JOIN skus s ON s.modelo_id=f.modelo_id
+    return db.prepare(`SELECT DISTINCT f.componente_id FROM ficha_formula f JOIN skus s ON s.modelo_id=f.modelo_id
       WHERE s.codigo=? AND f.ativo=1 AND f.componente_id IS NOT NULL`).all(sku).map(r => r.componente_id);
   }catch(e){ return []; } };
   if(!F || F.erro || F.pendencia || !F.linhas){

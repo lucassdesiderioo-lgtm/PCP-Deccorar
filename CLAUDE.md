@@ -5360,7 +5360,14 @@ O que parece bug e não é:
   0,001 por peça fica de fora (dita), em vez de desfazer a baixa do SKU inteiro;
   na 106, número escrito pela metade ("3abc") é recusado. **A linha de ficha que
   não deu quantidade** (fórmula que não avalia na medida, SKU sem medida) de um
-  material pela ficha **vira "material extra a decidir"**, nas duas operações.
+  material pela ficha **vira "material extra a decidir"**, nas duas operações —
+  e ⚠️ **a sugestão dessa linha é SÓ o material que faltou, sem quantidade**: o
+  resto da ficha já baixou, e sugeri-lo faria o "baixar" sem mexer tirar duas
+  vezes. O Supervisor digita a quantidade; vazio é recusado.
+- ⚠️ **A BAIXA QUE ESPEROU SAI EM NOME DE QUEM EMBALOU** (`sm_pedido_material.
+  embalado_por`, `_id`, `_em`), e o `baixado_em` é a data da embalagem. A linha do
+  livro de material nasce com a hora em que a baixa andou (o saldo anda quando
+  anda), mas com quem embalou.
 - ⚠️ **O CONSUMIDO POR OPERAÇÃO CONTA A PEÇA EMBALADA MESMO QUANDO A BAIXA
   FALHOU**: ele mede o que a peça gastou fisicamente (embalagens × ficha), e não
   o que o livro baixou — por isso é "estimado" para quem sai pela contagem.
