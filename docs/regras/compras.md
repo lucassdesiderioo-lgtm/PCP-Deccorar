@@ -39,7 +39,7 @@
 - História:         fase 1.
 
 ### R-CMP-04 · Categoria é lista editável, e não decide regra
-- Regra:            `listas` tipo `categoria_material`, semeada uma vez com Matéria-prima · Tecido · Embalagem · Ferramenta · Limpeza · Copa · Escritório · Manutenção. **Desde 11/11/2026 (AJUSTE) se edita na 902 Cadastros**, no quadro "Categorias de material", com `listas.editar` — a mesma rota e chave dos motivos. Remover desativa: o material que já a usa guarda o texto.
+- Regra:            `listas` tipo `categoria_material`, semeada uma vez com Matéria-prima · Tecido · Embalagem · Ferramenta · Limpeza · Copa · Escritório · Manutenção. **Desde 11/11/2026 (AJUSTE) se edita na 902 Cadastros**, no quadro "Categorias de material", com `listas.editar` — a mesma rota e chave dos motivos. Remover desativa: o material que já a usa guarda o texto. No ar desde 11/11/2026 (PR #333).
 - Por quê:          filtrar e montar a compra programada.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_material.js`

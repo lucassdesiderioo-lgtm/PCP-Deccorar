@@ -666,10 +666,13 @@ Spec `docs/specs/PLANEJAMENTO-VENDAS-FUTURAS.md` (as quatro fases), as linhas de
   que o trouxeram), não a da falta.
   ✅ **NO AR DESDE 10/11/2026** (PR #326): o dono fez o deploy e abriu a aba —
   "0 persianas", a tarja de nenhuma linha marcada e 25 SKUs em "ficou fora",
-  cada um com o motivo, como devia antes da ficha ser preenchida. **FALTA:**
-  lançar na 404 as medidas de corte e marcar as linhas. **AINDA NÃO PROVADO COM
-  DADO REAL:** a lista batendo com o que a bancada corta. Prova que não foi
-  feita se escreve como não feita.
+  cada um com o motivo, como devia antes da ficha ser preenchida.
+  ✅ **PROVADO COM DADO REAL EM 11/11/2026, NO ROLO BK ML:** o dono lançou na
+  404 as medidas de corte e as caixinhas (tubo e base `largura - 3`, corrente
+  `2 * altura - 20`, tecido `largura - 3` × `altura + 15 - 5 * piso(largura /
+  180)`, comando sem corte) e conferiu a aba com o que a bancada corta — *"ficha
+  técnica ficou perfeita"*, *"validado"*. ⚠️ **Os outros modelos (Screen, sob
+  medida, acessório) ainda não têm ficha lançada**, e continuam em "ficou fora".
   **Rode `node teste_corte_separacao.js` (32) e `node teste_ficha.js` ao mexer no
   `corte_dominio.js`, na caixinha da ficha ou na aba.** ⚠️ Três coisas que parecem
   bug e não são: o tecido sem preço e sem medida de corte sai **"—"** (indefinido,
@@ -1688,7 +1691,13 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
   salvar**: vai para o log e para a auditoria (`historico_custo_falhou`,
   `ficha_route.js`). ⚠️ **A migração que falhar não derruba o servidor**: ela
   roda no `require('./db')`; a transação desfaz, o log diz que NÃO migrou, e o
-  boot segue. `node teste_custo_historico.js` (15).
+  boot segue. `node teste_custo_historico.js` (15). ✅ **No ar desde 11/11/2026**
+  (PR #335): o dono fez o backup e o deploy, e a 404 voltou a salvar sem o "não
+  salvou" — *"agora sim deu certo"*. ⚠️ **O que se perdeu de 07/11 até o deploy
+  não volta**: o SKU que ficou indefinido só ganha a linha no próximo salvar ou
+  troca de preço, com a data desse dia. E o lançamento de nota de compra
+  (`receb_route.js`) ainda engole o erro do histórico num `catch` vazio — fora
+  deste conserto.
 - **Não há coluna `tipo` na `ficha_formula`, e é de propósito.** A tela oferece
   tipos de linha (quantidade fixa, pela largura, pela altura, pelo tecido) que
   **geram** a expressão; o que se grava continua sendo a expressão, e a tela
@@ -1707,6 +1716,8 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
   em cada bobina), e o âmbar das pendências junta o que o `/api/ficha/:sku` de
   **cada** SKU do modelo diz — uma chamada por SKU, sem conta própria na tela.
   O "Gravar na ficha da montagem" continua sendo por SKU: sem medida, ele avisa.
+  ✅ **No ar desde 11/11/2026** (PR #333): o dono fez o deploy e lançou a ficha
+  do ROLO BK ML pela tela.
 - **A tabela da ficha é só leitura, e editar abre UM material de cada vez.**
   A primeira versão punha dez campos em duas linhas de tabela por material:
   dava para editar e não dava para ler — não se enxergava onde um material
@@ -1763,7 +1774,7 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 | `componente` é **provisória** | O dono é `PRODUCAO-MONTAGEM.md` §6, não implementado. O que faltar entra por `ALTER`, nunca recriando |
 | Não segue a forma do `ARQUITETURA-ALVO.md` | O `COMPRAS.md` §11 manda `dominio/ dados/ rotas/`. Foi construído no padrão atual do projeto — o documento não estava no repositório (hoje está em `docs/specs/ARQUITETURA-ALVO.md`) |
 | Fórmula do tecido | ~~As oito medidas da planilha fecham em 6 de 8~~ — a fórmula passou a usar `largura_bobina` em 04/09/2026 (armadilha #19). O que sobra: **quando** o corte é encaixado e quando é sozinho ainda é decisão de quem produz, e a ficha guarda uma das duas |
-| Medida de corte sem valor lançado | A `ficha_formula` já tem `corte_largura`/`corte_altura` (armadilha #18), mas as folgas reais — tubo, base redonda, tecido — ainda não foram preenchidas. Enquanto forem vazias a coluna "corta a" mostra traço, que é resposta e não erro. **Desde 10/11/2026 o dono deu as medidas** (tecido largura − 3 × altura + 15, e + 10 na 1,80; tubo e base largura − 3; corrente altura − 10) **e elas são lançadas pela 404**, junto com a caixinha "vai para o planejamento da produção" — enquanto não forem, a aba Corte e separação da 401 lista os SKUs em "ficou fora" |
+| Medida de corte sem valor lançado | A `ficha_formula` já tem `corte_largura`/`corte_altura` (armadilha #18), mas as folgas reais — tubo, base redonda, tecido — ainda não foram preenchidas. Enquanto forem vazias a coluna "corta a" mostra traço, que é resposta e não erro. **Desde 10/11/2026 o dono deu as medidas** (tecido largura − 3 × altura + 15, e + 10 na 1,80; tubo e base largura − 3; corrente altura − 10) **e elas são lançadas pela 404**, junto com a caixinha "vai para o planejamento da produção" — enquanto não forem, a aba Corte e separação da 401 lista os SKUs em "ficou fora". **Lançadas no ROLO BK ML em 11/11/2026**, e conferidas pelo dono; faltam os outros modelos |
 | Mínimos são placeholder | Foram semeados com um valor padrão ("depois eu edito"). Enquanto forem, o gatilho 1 vence quase sempre e a demanda quase não aparece na lista — não é bug da fase 6, é dado a revisar |
 | Modelo ACESSORIO sem ficha | Os dois kits têm venda e nenhuma linha de ficha. Ou lançam ficha, ou viram `tem_ficha=0` (revenda) com custo direto |
 
