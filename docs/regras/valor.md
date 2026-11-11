@@ -15,7 +15,7 @@
 - Regra:            a tela que mostra valor em reais (custo, preço, valor, desembolso, saldo em R$, limite, frete, imposto, dado de pagamento) declara no mapa (`telas.js`, `tecido/nucleo/telas.js`) a chave que libera o valor: `valor:[…]`. A primeira chave é a principal. Quantidade não é dinheiro.
 - Por quê:          até 11/11/2026 cada tela decidia sozinha quem via o dinheiro, e em seis lugares ele ia pelo fio para quem não tinha chave nenhuma.
 - Exceções:         nenhuma.
-- Teste que trava:  `teste_valor.js` §1 (o inventário: 252, 301, 302, 404, 501 e 603, 604, 606–611, 614–616 — tela nova com dinheiro entra no mapa E no inventário do teste). **Uma chave de VER por tela**: ação que mexe em dinheiro (`pedido.pagar`, `devolucao.dinheiro`) continua sendo ação. A 602 Corte não tem dinheiro e não declara.
+- Teste que trava:  `teste_valor.js` §1 (o inventário: 252, 301, 302, 404, 501, 1301 e 603, 604, 606–611, 614–616 — tela nova com dinheiro entra no mapa E no inventário do teste). **Uma chave de VER por tela**: ação que mexe em dinheiro (`pedido.pagar`, `devolucao.dinheiro`) continua sendo ação. A 602 Corte não tem dinheiro e não declara.
 - Status:           no ar desde 11/11/2026 (fase 1, PR #334).
 - História:         spec `ARRUMAR-O-LUGAR` §1 e §3.
 

@@ -168,7 +168,7 @@ module.exports = [
     rotulo:'Fazer a 3ª contagem', desc:'Contar às cegas o SKU em que as duas primeiras contagens não bateram (nunca o que a própria pessoa contou)' },
   { chave:'contagem.planejar',    grupo:'Estoque',    tela:302, nivel:'admin',
     rotulo:'Planejar conferência', desc:'Abrir a contagem geral, antecipar a quinzenal e tirar ou pôr pessoas no rodízio da contagem' },
-  { chave:'contagem.aprovar',     grupo:'Estoque',    tela:302, nivel:'admin',
+  { chave:'contagem.aprovar',     grupo:'Estoque',    tela:504, nivel:'admin',
     rotulo:'Aprovar conferência (antiga)', desc:'Sem uso desde 04/11/2026: duas contagens que batem aplicam sozinhas, e o resto é de quem resolve',
     sensivel:true },
   { chave:'contagem.resolver',    grupo:'Estoque',    tela:302, nivel:'admin',

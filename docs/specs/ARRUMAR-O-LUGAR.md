@@ -56,7 +56,7 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
   onde foram abas. **Fica para o dono:** o ganho da D9 (a 1201 e a 1301 abrindo
   pela chave do trabalho delas, sem chave da 501).
 - **A lista do que está fora do lugar** ficou só com `902/horarios` (fase 3).
-- `teste_501_so_compra.js` (92), escrito antes; os inventários do
+- `teste_501_so_compra.js` (93), escrito antes; os inventários do
   `teste_lugar.js`, do `teste_admin_telas.js` e do `teste_valor.js` ganharam as
   telas novas, sem mudar o esperado do que já existia.
 

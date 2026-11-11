@@ -89,7 +89,8 @@ ok('nenhum número novo fora da faixa do módulo', NOVAS.every(e => MO.moduloDaF
 console.log('\n── 4. a caixinha de cada ação na tela nova (tela de Acessos) ──');
 const infoPerm = {}; PERMISSOES.forEach(p => infoPerm[p.chave] = p);
 const TELA_DA_ACAO = { 'componente.cadastrar':1101, 'fornecedor.cadastrar':1102, 'almoxarifado.cadastrar':1103,
-  'recebimento.liberar':1201, 'nota.lancar':1301, 'certificado.gerenciar':1302 };
+  'recebimento.liberar':1201, 'nota.lancar':1301, 'certificado.gerenciar':1302,
+  'contagem.aprovar':504 };   // a aprovação de material mora na 504 (decisão "a")
 for(const [c, t] of Object.entries(TELA_DA_ACAO))
   ok(c + ' aparece pendurada na ' + t, infoPerm[c] && infoPerm[c].tela === t, JSON.stringify(infoPerm[c] && infoPerm[c].tela));
 
