@@ -31,6 +31,11 @@ Tipo: NOVIDADE (+ REGRA na fase 4)
   outro banco), uma vez por peça; a falha vira "material extra a decidir".
 - **A lista de material do sob medida é uma aba do Catálogo (608)**, mesma
   ficha do produto, ao lado das peças.
+- **③ REVISÃO:** com o modo teste do PCP ligado, a baixa do sob medida espera
+  (lá não há modo teste); a quantidade tem três casas; a linha que não dá
+  quantidade vira material extra; **o custo da lista saiu do simulador** (o
+  vendedor tem a `custo.ver` de lá) — onde mostrar o custo da persiana sob
+  medida é pergunta ao dono.
 - **A fase 5 juntou o LUGAR**: a 404 se chama "Catálogo e ficha técnica" e lista
   os produtos do sob medida com o caminho para a 608; as duas telas continuam,
   porque a conta é diferente em cada operação.
