@@ -16,6 +16,7 @@
  */
 const D = require('./devcaso_dominio');
 const QUEM = require('./quem');
+const VA = require('./valor');
 const CAMINHOS = require('./caminhos');
 
 module.exports = function(app, db){
@@ -40,9 +41,20 @@ module.exports = function(app, db){
   }
   const podeDinheiro = (req) => podeChave(req, 'devolucao.dinheiro');
   /* Os VALORES do caso (valor do ML, custos, etiqueta, limite do frete, frete
-     devolvido) são de quem lança e de quem acompanha — e de quem tem o
-     dinheiro, que decide sobre eles. */
-  const podeValores = (req) => podeChave(req, 'devolucao.lancar') || podeChave(req, 'devolucao.acompanhar') || podeDinheiro(req);
+     devolvido) são de quem tem a caixinha "Ver valores das devoluções" — e de
+     quem tem o dinheiro, que decide sobre eles.
+     ⚠️ ATÉ 11/11/2026 ERAM DE QUEM LANÇA OU ACOMPANHA, sem caixinha nenhuma
+     (decisão de 03/11/2026). A regra do valor (R-VAL, spec ARRUMAR-O-LUGAR)
+     pôs a caixinha: o backfill `seed_valor_1` a deu a quem lançava ou
+     acompanhava, e o dono pode tirá-la. Quem decide é o valor.js. */
+  const podeValores = (req) => VA.ve(c => podeChave(req, c), 'devolucao.valores');
+  /* O CAMPO DE VALOR NAS ESCRITAS: quem não tem a caixinha lança e acompanha o
+     caso, mas não digita valor — nem no lançamento, nem no "Salvar alterações",
+     nem na coleta (o custo). Vazio não conta: o campo que não veio não é valor. */
+  const CAMPOS_VALOR = ['valor_ml','valor_devolvido','valor_perdido','custo_etiqueta','valor_revisao','limite_frete','custo_envio','custo'];
+  const cheioV = v => v !== undefined && v !== null && String(v).trim() !== '';
+  const trazValor = b => !!b && (CAMPOS_VALOR.some(k => cheioV(b[k])) || (b.coleta && cheioV(b.coleta.custo)));
+  const semValores = (req, res) => res.status(403).json({ erro:'Os valores em R$ das devoluções não estão no seu acesso. Lance sem eles, ou peça a caixinha "Ver valores das devoluções".', chave:'devolucao.valores' });
   function auditar(req, acao, alvo, detalhe){
     try{ app.locals.acesso.auditar(req, 'devolucao', acao, String(alvo), detalhe || ''); }catch(e){}
   }
@@ -152,6 +164,7 @@ module.exports = function(app, db){
   /* ── lançar e editar (devolucao.lancar) ── */
   post('/api/devolucao-casos', (req,res) => {
     const b = Object.assign({}, req.body || {});
+    if(trazValor(b) && !podeValores(req)) return semValores(req, res);
     // Os campos internos do script dos casos iniciais não entram pela rota.
     delete b._valor_ml; delete b._valor_ml_situacao;
     /* Os valores no lançamento são de quem lança (AJUSTE de 03/11/2026). */
@@ -168,10 +181,13 @@ module.exports = function(app, db){
       return r.aviso ? { ok:true, id:r.caso.id, aviso:r.aviso } : { ok:true, id:r.caso.id };
     });
   });
-  post('/api/devolucao-casos/:id/editar', (req,res) => responder(res, () => {
-    D.editar(db, req.params.id, req.body, QUEM.pessoa(req), { temChave: temChaveResp });
-    return { ok:true };
-  }));
+  post('/api/devolucao-casos/:id/editar', (req,res) => {
+    if(trazValor(req.body) && !podeValores(req)) return semValores(req, res);
+    responder(res, () => {
+      D.editar(db, req.params.id, req.body, QUEM.pessoa(req), { temChave: temChaveResp });
+      return { ok:true };
+    });
+  });
 
   /* ── acompanhar (devolucao.acompanhar) ── */
   post('/api/devolucao-casos/:id/etapa', (req,res) => responder(res, () => {
@@ -242,18 +258,27 @@ module.exports = function(app, db){
   }));
 
   /* As tentativas de coleta (fase 3, R8). */
-  post('/api/devolucao-casos/:id/coleta', (req,res) => responder(res, () => {
-    D.pedirColeta(db, req.params.id, req.body, QUEM.pessoa(req));
-    return { ok:true };
-  }));
-  post('/api/devolucao-casos/:id/coleta-agenda', (req,res) => responder(res, () => {
-    D.agendarColeta(db, req.params.id, req.body, QUEM.pessoa(req));
-    return { ok:true };
-  }));
-  post('/api/devolucao-casos/:id/coleta-resultado', (req,res) => responder(res, () => {
-    D.resultadoColeta(db, req.params.id, req.body, QUEM.pessoa(req));
-    return { ok:true };
-  }));
+  post('/api/devolucao-casos/:id/coleta', (req,res) => {
+    if(trazValor(req.body) && !podeValores(req)) return semValores(req, res);
+    responder(res, () => {
+      D.pedirColeta(db, req.params.id, req.body, QUEM.pessoa(req));
+      return { ok:true };
+    });
+  });
+  post('/api/devolucao-casos/:id/coleta-agenda', (req,res) => {
+    if(trazValor(req.body) && !podeValores(req)) return semValores(req, res);
+    responder(res, () => {
+      D.agendarColeta(db, req.params.id, req.body, QUEM.pessoa(req));
+      return { ok:true };
+    });
+  });
+  post('/api/devolucao-casos/:id/coleta-resultado', (req,res) => {
+    if(trazValor(req.body) && !podeValores(req)) return semValores(req, res);
+    responder(res, () => {
+      D.resultadoColeta(db, req.params.id, req.body, QUEM.pessoa(req));
+      return { ok:true };
+    });
+  });
 
   /* Os anexos (fase 4, R11, R21). */
   post('/api/devolucao-casos/:id/anexo', (req,res) => responder(res, () =>
@@ -269,7 +294,7 @@ module.exports = function(app, db){
      devolvido ao comprador acompanham as DECISÕES, e ficam com o dinheiro. */
   post('/api/devolucao-casos/:id/valor', (req,res) => {
     const b = req.body || {};
-    if(!podeValores(req)) return res.status(403).json({ erro:'Os valores do caso são de quem lança ou acompanha as devoluções.', chave:'devolucao.acompanhar' });
+    if(!podeValores(req)) return semValores(req, res);
     if(('valor_perdido' in b || 'valor_devolvido' in b) && !podeDinheiro(req)) return semDinheiro(req, res);
     responder(res, () => {
       const mud = D.lancarValor(db, req.params.id, req.body, QUEM.pessoa(req));
@@ -281,7 +306,7 @@ module.exports = function(app, db){
      O frete é um valor do caso: de quem lança ou acompanha (R-ENV-10). O
      número vai à auditoria; a história do caso diz só "frete lançado". */
   post('/api/devolucao-casos/:id/enviar', (req,res) => {
-    if(!podeValores(req)) return res.status(403).json({ erro:'Enviar (com o frete) é de quem lança ou acompanha as devoluções.', chave:'devolucao.acompanhar' });
+    if(!podeValores(req)) return res.status(403).json({ erro:'Marcar o envio pede o frete, que é um valor em R$: está com quem tem a caixinha "Ver valores das devoluções".', chave:'devolucao.valores' });
     responder(res, () => {
       const r = D.enviar(db, req.params.id, req.body, QUEM.pessoa(req));
       if(r.valorMudou.length) auditar(req, 'valor', req.params.id, 'lançou o frete do envio: '+JSON.stringify({ custo_envio:(req.body||{}).custo_envio }));

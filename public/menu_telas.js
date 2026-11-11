@@ -42,5 +42,24 @@
     if(!saida.length) return '<div class="mnVazio">Seu acesso não alcança nenhuma tela.</div>';
     return saida.join('');
   }
-  raiz.MENU_TELAS = { html:html };
+  /* A LINHA DOS VALORES (R-VAL, spec ARRUMAR-O-LUGAR): na tela com dinheiro em
+     que a pessoa não vê o valor (`sem_valor`, que o servidor decide pelo
+     valor.js), uma linha só, no topo: os "—" da tela não são defeito. Quem
+     TIRA o dinheiro é o servidor; esta linha só explica. Devolve a frase, ou
+     '' quando a tela aberta não tem nada a dizer. */
+  var FRASE_SEM_VALOR = 'Os valores em R$ desta tela não aparecem para o seu acesso.';
+  function avisoValor(d, atual){
+    var t = ((d && d.telas) || []).filter(function(x){ return x.rota === atual; })[0];
+    return t && t.sem_valor ? FRASE_SEM_VALOR : '';
+  }
+  function marcarSemValor(d, atual, antes){
+    if(typeof document === 'undefined' || document.getElementById('semValor')) return;
+    var f = avisoValor(d, atual); if(!f || !antes) return;
+    var el = document.createElement('div'); el.id = 'semValor'; el.setAttribute('role', 'note');
+    el.style.cssText = 'margin:8px 16px;padding:8px 12px;border:1px solid #d29922;border-radius:8px;color:#d29922;font-size:13px;background:transparent';
+    el.textContent = f;
+    // só depois do menu: antes dele a barra ainda não existe, e a linha iria parar acima dela
+    if(antes && antes.parentNode) antes.parentNode.insertBefore(el, antes.nextSibling);
+  }
+  raiz.MENU_TELAS = { html:html, avisoValor:avisoValor, marcarSemValor:marcarSemValor, FRASE_SEM_VALOR:FRASE_SEM_VALOR };
 })(typeof window !== 'undefined' ? window : this);

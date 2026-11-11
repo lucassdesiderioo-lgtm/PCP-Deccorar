@@ -254,7 +254,7 @@ function credito(r){
     if(!c) return alvo.appendChild(el('span',{class:'nota'},['—']));
     const linhas=[];
     if(!('valor_em_aberto_centavos' in c)){
-      /* Sem `custo.ver` o campo nem vem (a poda) — o que sobra é a marca. */
+      /* Sem `preco.ver` o campo nem vem (a poda) — o que sobra é a marca. */
       linhas.push(c.estourado
         ? el('b',{class:'falta'},['limite estourado'])
         : el('span',{class:'nota'},['dentro do limite']));

@@ -20,6 +20,13 @@
  *           hoje das abas que todo Admin vê: Estoque, Pendências, Problemas).
  *   area    a área-sombra que leva a pessoa até aqui depois do PIN (destino.js)
  *   aba     a aba do Admin antigo (`/admin#<aba>`) que esta tela substitui
+ *   valor   AS CHAVES QUE LIBERAM O DINHEIRO DA TELA (R-VAL, spec
+ *           ARRUMAR-O-LUGAR, 11/11/2026). Toda tela que mostra valor em reais
+ *           declara aqui a chave da caixinha "Ver valores (R$)" — abrir a tela
+ *           e ver o valor são duas caixinhas. Sem a chave, a tela abre com "—"
+ *           e quem tira o dinheiro é o servidor. A tela de Acessos desenha a
+ *           caixinha debaixo da tela, e o `teste_valor.js` reprova tela com
+ *           dinheiro sem esta linha (o inventário mora lá).
  *
  * ⚠️ TELA NOVA NASCE SÓ PARA O ADMIN GERAL (R-TEL-03, R-ALC-06): a linha entra
  * aqui com uma permissão nova, que nenhum setor tem; o Admin Geral passa por
@@ -73,14 +80,17 @@ const TELAS = [
     modulo:'posvenda', bloco:'mercado_livre', liga:[252, 253, 102] },
   { n:252, nome:'Devoluções — em andamento', rota:'/devolucao-casos', nivel:'supervisor', onde:'computador',
     perms:['devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro'], area:'devolucao_casos',
+    valor:['devolucao.valores','devolucao.dinheiro'],
     modulo:'posvenda', bloco:'mercado_livre', liga:[251, 253, 'lote'] },
   { n:253, nome:'Devoluções — baixa',    rota:'/admin/devolucoes', nivel:'admin',   onde:'computador', perms:['devolucao.baixar'],      aba:'dv',
     modulo:'posvenda', bloco:'mercado_livre', liga:[251, 252] },
   // ── 300 · Estoque ──
   { n:301, nome:'Estoque',               rota:'/admin/estoque', nivel:'admin',      onde:'computador', perms:['@admin'],                aba:'est',
+    valor:['custo.ver'],
     modulo:'estoque', bloco:'medida_padrao', liga:[102, 202, 302, 'skus'] },
   { n:302, nome:'Contagem',              rota:'/admin/contagem', nivel:'admin',     onde:'computador',
     perms:['contagem.planejar','contagem.resolver','contagem.relatorio','contagem.ajustar','contagem.aprovar'], aba:'ct',
+    valor:['custo.ver'],
     modulo:'estoque', bloco:'medida_padrao', liga:[303, 301, 504],
     partes:[{ id:'material', nome:'Material (cartão que leva à 504 e ajustes antigos aguardando aprovação)', modulo:'almoxarifado' }] },
   { n:303, nome:'Inventário',            rota:'/inventario',    nivel:'operacao',   onde:'tablet',     perms:['contagem.contar','contagem.desempatar'], area:'inventario',
@@ -93,10 +103,12 @@ const TELAS = [
   { n:403, nome:'SKU incompleto',        rota:'/admin/sku-incompleto', nivel:'admin', onde:'computador', perms:['sku.cadastrar'],      aba:'pend',
     modulo:'cadastros', bloco:'medida_padrao', liga:[402] },
   { n:404, nome:'Ficha técnica',         rota:'/admin/ficha',   nivel:'admin',      onde:'computador', perms:['modelo.cadastrar','custo.ver','compras.ver'], aba:'ficha',
+    valor:['custo.ver'],
     modulo:'cadastros', bloco:'medida_padrao', liga:[402, 401, 501, 'componente'] },
   // ── 500 · Compras ──
   { n:501, nome:'Compras',               rota:'/admin/compras', nivel:'admin',      onde:'computador',
     perms:['compras.ver','fornecedor.cadastrar','preco.lancar','pedido.criar','pedido.pagar','componente.cadastrar','almoxarifado.cadastrar','certificado.gerenciar'], aba:'compras',
+    valor:['compras.valores','pedido.pagar'],
     modulo:'compras', bloco:'comum', liga:[404, 502, 'componente', 'fornecedor'],
     abas:[
       { id:'lista',        nome:'Lista de compras',   modulo:'compras' },
@@ -168,7 +180,9 @@ function telasSobMedida(){
   for(const [rota, t] of Object.entries(T)){
     if(t.apelido) continue;
     out.push({ n:t.numero, nome:t.nome, rota:'/sobmedida' + (rota === '/' ? '' : rota), nivel:t.nivel, modulo:t.modulo, bloco:t.bloco,
-      onde:t.contexto === 'operacao' ? 'tablet' : 'computador', perms:['sobmedida.' + t.permissao], sobmedida:true });
+      onde:t.contexto === 'operacao' ? 'tablet' : 'computador', perms:['sobmedida.' + t.permissao], sobmedida:true,
+      // a chave do valor, com o prefixo da lista do PCP (R-VAL)
+      valor:(Array.isArray(t.valor) ? t.valor : (t.valor ? [t.valor] : [])).map(c => 'sobmedida.' + c) });
   }
   return out.sort((a, b) => a.n - b.n);
 }

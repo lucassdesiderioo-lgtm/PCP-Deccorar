@@ -118,19 +118,19 @@ module.exports={rotas:[
    detalhe:(req)=>req.body.nome!==undefined?('renomeou para '+req.body.nome):null},
 
   {metodo:'GET', caminho:'/api/tecidos', permissao:LER,
-   manipulador:({usuario})=>custo.podar(usuario,tecido.listarTecidos())},
+   manipulador:({usuario})=>custo.podarCusto(usuario,tecido.listarTecidos())},
   {metodo:'POST', caminho:'/api/tecidos', permissao:EDITAR,
-   manipulador:({corpo,usuario})=>custo.podar(usuario,tecido.criarTecido(corpo)),
+   manipulador:({corpo,usuario})=>custo.podarCusto(usuario,tecido.criarTecido(corpo)),
    detalhe:(req,d)=>'tecido '+(d&&d.codigo)},
   {metodo:'PUT', caminho:'/api/tecidos/:id', permissao:EDITAR,
-   manipulador:({params,corpo,usuario})=>custo.podar(usuario,tecido.atualizarTecido(params.id,corpo))},
+   manipulador:({params,corpo,usuario})=>custo.podarCusto(usuario,tecido.atualizarTecido(params.id,corpo))},
 
   /* O PRECO DO M² DO TECIDO — o numero que responde "quanto temos em reais de
      sobra". Porta propria, com historico: mudar isto muda o valor de todas
      as sobras do tecido de uma vez. A tela so mostra o botao a quem ve custo;
      a chave e a de editar cadastro, porque e cadastro. */
   {metodo:'PUT', caminho:'/api/tecidos/:id/preco', permissao:EDITAR,
-   manipulador:({params,corpo,usuario})=>custo.podar(usuario,tecido.definirPreco(params.id,corpo.preco_m2,usuario.nome)),
+   manipulador:({params,corpo,usuario})=>custo.podarCusto(usuario,tecido.definirPreco(params.id,corpo.preco_m2,usuario.nome)),
    detalhe:(req,d)=>d?'preco do m² de '+d.codigo+': '+
      (d.mudou?(d.preco_anterior==null?'sem preco':'R$ '+d.preco_anterior)+' → R$ '+d.preco_m2:'sem mudanca'):null},
   {metodo:'GET', caminho:'/api/tecidos/:id/preco/historico', permissao:'custo.ver',

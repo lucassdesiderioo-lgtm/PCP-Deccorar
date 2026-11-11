@@ -498,7 +498,7 @@ module.exports=[
   const c=bol('credito',r.id);
   /* A poda pergunta pelo PAPEL (nucleo/permissoes.js → pode), e nao por uma
      lista de chaves: quem monta o usuario e o portao do modulo. */
-  const podado=custo.podar({papel:'producao'},c);
+  const podado=custo.podarVenda({papel:'producao'},c);
   /* A poda corta por PADRAO DE NOME (§19) — e por isso TODO campo de
      dinheiro daqui comeca com `valor_`. Um `em_aberto_centavos` nao casaria
      com o padrao e viajaria pelo fio em silencio, que foi como o
@@ -507,7 +507,7 @@ module.exports=[
   igual(podado.valor_disponivel_centavos,undefined,'nem o disponivel');
   igual(podado.valor_limite_credito_centavos,undefined,'nem o limite');
   igual(podado.estourado,c.estourado,'mas a MARCA fica: ela nao e dinheiro');
-  igual(custo.podar({papel:'vendedor'},c).valor_disponivel_centavos,
+  igual(custo.podarVenda({papel:'vendedor'},c).valor_disponivel_centavos,
     c.valor_disponivel_centavos,'e quem tem a chave recebe tudo');
  }},
 
@@ -823,7 +823,7 @@ module.exports=[
   const p=aprovado(r.id);
   const v=valorDo(p);
   lancar(r.id,{pedido_ids:[p.id], valor_centavos:v*10});
-  const l=custo.podar({papel:'producao'},bol('listar',{revenda_id:r.id}))[0];
+  const l=custo.podarVenda({papel:'producao'},bol('listar',{revenda_id:r.id}))[0];
   /* `valor_pedidos_centavos` comeca com `valor_` e por isso a poda o corta;
      `excede_pedidos` NAO e dinheiro, e e ela que acende o aviso para quem so
      ve a cor — a mesma regra do `estourado`. */
@@ -979,7 +979,7 @@ module.exports=[
   const r=revendaCom({limite:5000000, forma:'Boleto'});
   const p=aprovado(r.id);
   lancar(r.id,{pedido_ids:[p.id], valor_centavos:Math.round(valorDo(p)*0.3)});
-  const c=custo.podar({papel:'producao'},bol('credito',r.id));
+  const c=custo.podarVenda({papel:'producao'},bol('credito',r.id));
   igual(c.valor_falta_titular_centavos,undefined,'o valor foi podado');
   igual(c.parcialmente_titulados,1,'a contagem sobreviveu');
  }}

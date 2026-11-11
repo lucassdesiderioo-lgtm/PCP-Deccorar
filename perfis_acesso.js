@@ -117,7 +117,14 @@ const NASCERAM_DEPOIS = ['coleta.horario',   // HORARIOS-DE-COLETA, 05/11/2026
      §7). Saem da comparacao pelo nome; que ninguem mais as recebe e travado no
      teste_acesso_compras.js. */
   'almoxarifado.cadastrar','pedido.aprovar','nota.lancar','recebimento.liberar','volume.movimentar',
-  'alcada.definir','certificado.gerenciar'];
+  'alcada.definir','certificado.gerenciar',
+  /* A REGRA DO VALOR (R-VAL, spec ARRUMAR-O-LUGAR, 11/11/2026): as três chaves
+     de "ver valores" NÃO nascem só para o Admin Geral — o backfill de uma vez
+     só (`seed_valor_1`) as dá a quem já via o valor (lança ou acompanha
+     devolução, vê compras, tem a custo.ver do sob medida). Saem da comparação
+     pelo nome; a outra ponta (quem as ganhou tinha a chave de origem, e mais
+     ninguém) é travada no teste_valor.js, seção 3. */
+  'devolucao.valores','compras.valores','sobmedida.preco.ver'];
 function comparar(antes, agora){
   if(!antes) return 'sem retrato de antes';
   /* A 203 Subir PDF SAIU em 05/11/2026 (decisão do dono, D2): o endereço

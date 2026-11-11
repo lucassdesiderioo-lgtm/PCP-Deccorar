@@ -73,7 +73,14 @@ let QUEM = 1;
 const app = express();
 app.use(express.json({ limit:'25mb' }));
 app.locals.acesso = {
-  podePermissao(u, chave){ return !!(u && PERMS[u.id] && PERMS[u.id].has(chave)); },
+  /* R-VAL (spec ARRUMAR-O-LUGAR, 11/11/2026): o backfill deu `devolucao.valores`
+     a quem lançava ou acompanhava; a régua de mentira faz o mesmo (as pessoas
+     de depois do deploy). Tirar a caixinha é conferido no teste_valor.js. */
+  podePermissao(u, chave){
+    const p = u && PERMS[u.id]; if(!p) return false;
+    if(chave === 'devolucao.valores' && (p.has('devolucao.lancar') || p.has('devolucao.acompanhar'))) return true;
+    return p.has(chave);
+  },
   auditar(){}
 };
 app.use((req, res, next) => { req.usuario = QUEM === 1 ? { id:1, nome:'Lucas Tela' } : QUEM === 2 ? { id:2, nome:'Renato Tela' } : { id:3, nome:'Edvaldo Tela' }; next(); });

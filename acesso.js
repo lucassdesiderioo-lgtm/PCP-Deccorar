@@ -637,7 +637,13 @@ module.exports = function(app, db){
       const m = mods[t.modulo] = mods[t.modulo] || { modulo:t.modulo, nome:MP.MODULOS[t.modulo] || String(t.modulo), telas:[] };
       m.telas.push({ n:t.n, nome:t.nome, rota:t.rota, nivel:t.nivel, onde:t.onde || '', abrem:t.perms.slice(),
         acoes: PERMISSOES.filter(p => +p.tela === t.n).map(p => ({ chave:p.chave, rotulo:p.rotulo, desc:p.desc || '', nivel:p.nivel,
-          sensivel:!!p.sensivel, intransferivel:!!p.intransferivel })) });
+          sensivel:!!p.sensivel, intransferivel:!!p.intransferivel })),
+        /* R-VAL (spec ARRUMAR-O-LUGAR): a caixinha "Ver valores (R$)" de cada
+           tela com dinheiro. A MESMA chave aparece em toda tela onde vale
+           (custo.ver na 301, na 302 e na 404) — a tela de Acessos as mantém
+           marcadas juntas, porque é uma permissão só. */
+        valores: (t.valor || []).map(c => PERMISSOES.find(p => p.chave === c)).filter(Boolean)
+          .map(p => ({ chave:p.chave, rotulo:p.rotulo, desc:p.desc || '', nivel:p.nivel, sensivel:!!p.sensivel })) });
     });
     return Object.keys(mods).map(Number).sort((a, b) => a - b).map(k => { mods[k].telas.sort((a, b) => a.n - b.n); return mods[k]; });
   }
@@ -1067,7 +1073,12 @@ module.exports = function(app, db){
     // custo.ver e sensivel: custo do produto e a informacao mais estrategica do
     // sistema. Quem opera nao enxerga, e todo acesso passa pela auditoria.
     if(eq('/api/skus/custo')) return 'custo.ver';
-    // A ficha mostra consumo E custo por componente — mesma sensibilidade.
+    /* A FICHA ABRE COM AS CHAVES DA 404, E O CUSTO É A CAIXINHA DE VALOR (R-VAL,
+       spec ARRUMAR-O-LUGAR, 11/11/2026). Até aqui a LEITURA pedia custo.ver, e
+       quem abria a 404 com modelo.cadastrar ou compras.ver levava 403 na ficha
+       inteira — via a tela e não via a ficha. Agora a leitura sai sem o custo
+       (a poda é do ficha_route.js), e gravar a ficha continua pedindo custo.ver. */
+    if(M === 'GET' && /^\/api\/ficha\/[^/]+$/.test(p)) return ['modelo.cadastrar','custo.ver','compras.ver'];
     if(pre('/api/ficha')) return 'custo.ver';
     // Quem mexe numa formula mexe no consumo de material de toda a linha.
     if(M !== 'GET' && pre('/api/formulas')) return 'modelo.cadastrar';
@@ -1571,6 +1582,31 @@ module.exports = function(app, db){
       })();
     }
   }catch(e){ console.log('[acesso] seed da aprovacao em duas pessoas falhou: ' + e.message); }
+
+  /* A REGRA DO VALOR (spec ARRUMAR-O-LUGAR, fase 1, R-VAL, 11/11/2026). Três
+     chaves novas de "ver valores", e ninguém perde no deploy o dinheiro que
+     já via: quem tinha a chave de origem ganha a de valor, no setor e na
+     exceção. Daí em diante é a caixinha da tela de Acessos que decide.
+       devolucao.lancar / devolucao.acompanhar → devolucao.valores
+       compras.ver                             → compras.valores
+       sobmedida.custo.ver                     → sobmedida.preco.ver
+     UMA VEZ SÓ (marca em `config`): rodar de novo devolveria a chave a quem o
+     dono tirou. Fica DEPOIS do 3-F e do f6, pela mesma razão do f6. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='seed_valor_1'").get()){
+      db.transaction(() => {
+        for(const [de, para] of [['devolucao.lancar','devolucao.valores'], ['devolucao.acompanhar','devolucao.valores'],
+                                 ['compras.ver','compras.valores'], ['sobmedida.custo.ver','sobmedida.preco.ver']]){
+          db.prepare(`INSERT OR IGNORE INTO setor_permissao (setor_id,chave)
+            SELECT setor_id, ? FROM setor_permissao WHERE chave=?`).run(para, de);
+          db.prepare(`INSERT OR IGNORE INTO usuario_excecao (usuario_id,chave,concede)
+            SELECT usuario_id, ?, 1 FROM usuario_excecao e WHERE chave=? AND concede=1
+              AND NOT EXISTS (SELECT 1 FROM usuario_excecao x WHERE x.usuario_id=e.usuario_id AND x.chave=?)`).run(para, de, para);
+        }
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('seed_valor_1','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[acesso] seed das chaves de valor falhou: ' + e.message); }
 
   // pergunta pontual (usada por outras rotas, ex.: contagem em dois passos):
   // o usuario tem esta permissao? Admin Geral tem todas. Migra na primeira vez.

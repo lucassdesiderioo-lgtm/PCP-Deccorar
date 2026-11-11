@@ -38,7 +38,7 @@ module.exports={rotas:[
      const f={linha:query.linha,abertura:query.abertura,cor:query.cor,largura:query.largura};
      const chave=[query.dias,f.linha,f.abertura,f.cor,f.largura].join('|');
      const d=comCache(chave,()=>gerencial.painel(query.dias,f));
-     return pode(usuario,'custo.ver')?d:custo.semPreco(d);
+     return custo.podarCusto(usuario,d);
    }},
 
   /* O GIRO: o que sai, quanto por dia, e quanto tempo o estoque aguenta.
@@ -47,7 +47,7 @@ module.exports={rotas:[
   {metodo:'GET', caminho:'/api/painel/giro', permissao:'painel.ler',
    manipulador:({query,usuario})=>{
      const d=giro.painel(query.dias);
-     return pode(usuario,'custo.ver')?d:custo.semPreco(d);
+     return custo.podarCusto(usuario,d);
    }},
 
   {metodo:'GET', caminho:'/api/painel/estoque',  permissao:'painel.ler', manipulador:()=>painel.estoque()},

@@ -279,7 +279,7 @@ function desenhar(r){
   grade.appendChild(esq);
 
   // ── Quanto custa ─────────────────────────────────────────────────────────
-  /* O preco so existe para quem tem `custo.ver`: o servidor PODA o JSON, e a
+  /* O preco so existe para quem tem `preco.ver`: o servidor PODA o JSON, e a
      tela nao tem o que esconder porque o campo nao chegou. */
   if(r.preco){
     const dir=el('div',{class:'cartao'},[el('h2',{},['Preço Deccorar'])]);

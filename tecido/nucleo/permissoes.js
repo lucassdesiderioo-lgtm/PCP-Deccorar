@@ -53,7 +53,14 @@ const CHAVES=[
      sai sem eles. Nao adianta esconder na tela e mandar pelo fio (regra 14 do
      CLAUDE.md §13). A bancada precisa saber onde o rolo esta e quanto ele
      tem; quanto ele custou e outra conversa. */
-  {chave:'custo.ver',         nome:'Ver preço e valor do estoque'},
+  {chave:'custo.ver',         nome:'Ver custo e valor do estoque'},
+  /* O PRECO DE VENDA E OUTRA CHAVE (R-VAL, spec ARRUMAR-O-LUGAR, 11/11/2026).
+     Ate aqui a `custo.ver` liberava os dois: o vendedor, que precisa do preco
+     da persiana, via tambem o valor do estoque. A chave `custo.ver` NAO mudou
+     de nome (trocar tiraria a permissao de quem a tem, #13): so o rotulo. O
+     backfill de uma vez so (acesso.js, `seed_valor_1`) da esta a quem tinha
+     a `custo.ver` — ninguem perde nada no deploy. */
+  {chave:'preco.ver',         nome:'Ver preço de venda e valores da revenda (pedido, crédito, boleto)'},
   {chave:'rolo.nota',         nome:'Lançar NF, fornecedor e preço do rolo'},
   {chave:'rolo.ler',          nome:'Ver rolos'},
   {chave:'rolo.entrada',      nome:'Entrada de rolo'},
@@ -207,7 +214,7 @@ const SUPERVISOR=new Set([
   'boleto.aprovar_baixa','sobra.aprovar_descarte'
 ]);
 const SENSIVEL=new Set([
-  'sobra.descartar','sobra.corrigir','rolo.ajustar','rolo.encerrar','rolo.nota','custo.ver',
+  'sobra.descartar','sobra.corrigir','rolo.ajustar','rolo.encerrar','rolo.nota','custo.ver','preco.ver',
   'parametro.editar','catalogo.editar','revenda.editar','credito.editar','boleto.editar',
   'pedido.aprovar_qualquer','pedido.cancelar','corte.aprovar_correcao','producao.pendencia',
   'boleto.aprovar_baixa','sobra.aprovar_descarte'
@@ -261,12 +268,16 @@ const PAPEIS={
      CHEFIA: catalogo, tecido, parametros e descarte de sobra, tudo junto.
      Estava escrito como divida aberta no STATUS da fase 1, e fecha aqui.
 
-     ⚠️ `custo.ver` ESTA NA LISTA, e tem que estar. A poda do custo.js corta
-     todo campo de dinheiro de quem nao a tem — e o vendedor sem ela abriria
-     o simulador e veria a persiana inteira SEM o preco, que e justamente o
-     numero que ele foi buscar. O que ela abre alem disso (o painel, o valor
-     do estoque) continua fechado por outra chave: `painel.ler` e
-     `cadastro.ler` nao estao aqui. */
+     ⚠️ `preco.ver` ESTA NA LISTA, e tem que estar. A poda de venda do custo.js
+     (podarVenda) corta o preco de quem nao a tem — e o vendedor sem ela
+     abriria o simulador e veria a persiana inteira SEM o preco, que e
+     justamente o numero que ele foi buscar.
+     ⚠️ E A `custo.ver` TAMBEM, POR ENQUANTO (R-VAL, 11/11/2026). Ate aqui ela
+     era a chave do preco de venda; o pacote nasce com as duas para o setor
+     novo ficar igual ao de producao depois do backfill, e o dono decide na
+     tela de Acessos se tira o custo do vendedor. O que ela abre alem disso
+     (o painel, o valor do estoque) continua fechado por outra chave:
+     `painel.ler` e `cadastro.ler` nao estao aqui. */
   /* ── A BANCADA DA PRODUCAO (fase 5-A) ──────────────────────────────────
      Quem so tem area de setor. Ele entra, ve a fila dele e bipa. Nao corta
      tecido, nao mexe em rolo, nao abre catalogo, nao ve preco e nao imprime
@@ -282,7 +293,7 @@ const PAPEIS={
 
   vendedor:[
     'modulo.entrar',
-    'catalogo.ler','custo.ver',
+    'catalogo.ler','custo.ver','preco.ver',
     'revenda.ler',
     /* O pedido e o trabalho dele: lanca, envia, aprova a propria carteira e
        negocia prazo. Nao aprova a carteira do colega e nao cancela. */

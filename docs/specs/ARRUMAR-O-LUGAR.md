@@ -2,11 +2,11 @@
 
 ```
 STATUS
-Situação: APROVADA pelo dono em 11/11/2026 · planejado
+Situação: EM CONSTRUÇÃO · aprovada pelo dono em 11/11/2026
 Criada em: 11/11/2026
 Última atualização: 11/11/2026
-Fase atual: 1 (PLANO a apresentar)
-Fases: 1 ☐  2 ☐  3 ☐  4 ☐  5 ☐
+Fase atual: 1 em código (11/11/2026), falta subir
+Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐
 Risco: 🔴 (cria tela, mexe em permissão e na tela de Acessos; a fase 4 muda regra do sob medida)
 Depende de: ORGANIZACAO-DO-SISTEMA (os 18 módulos, o mapa com módulo e bloco, o menu único)
              ACESSO-POR-TELA-E-NIVEL (o mapa de telas, a tela de Acessos pelo mapa)
@@ -14,6 +14,42 @@ Conferida contra: o `main` de 11/11/2026 (PR #331), varredura das 45 telas no na
 Tipo: REGRA + NOVIDADE
 Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
 ```
+
+### Fase 1 — a regra do valor (11/11/2026, em código)
+
+- **O mapa:** `valor:` em 17 telas (301, 302, 404, 501, 252 e 602–604, 606–611,
+  614–616). **`valor.js`** (novo) é o dono único de "esta pessoa vê este
+  dinheiro?", com a lista de quem lança vê o que lança.
+- **As chaves:** `devolucao.valores` e `compras.valores` (Supervisor, sensíveis) e
+  a `preco.ver` do sob medida (Operação, sensível); a `custo.ver` do sob medida
+  mudou só o rótulo. Backfill de uma vez só (`seed_valor_1`).
+- **A tela de Acessos** mostra "R$ Ver valores (R$) desta tela" em cada tela com
+  dinheiro, e a mesma chave em duas telas anda junta; a barra das duas operações
+  diz uma vez quando os valores não aparecem.
+- **A poda:** o `custo_direto` do `/api/skus`; a 252 pela `devolucao.valores`
+  (lançar, editar, coleta e valor recusam valor digitado sem ela); a 501 pela
+  `compras.valores` (lista, comparar, materiais, fornecedores, ofertas, histórico
+  de preço, pedidos); a 404 abre a ficha sem o custo; no sob medida, `podarVenda`
+  e `podarCusto`, e os quatro vazamentos de lá.
+- **Divergência D6 — a 252 e o R-VAL-04.** O §3 diz "quem lança dinheiro vê o
+  que lança", e na 252 o dono respondeu que os valores podem ser tirados de quem
+  lança. Vale a resposta do dono: na 252 o dinheiro é parte do caso, e quem lança
+  sem a caixinha lança o caso sem valor (e não marca o "Enviado", que pede o
+  frete). O R-VAL-04 vale onde o dinheiro é o próprio trabalho (nota, pedido,
+  parcela, preço, nota do rolo).
+- **Divergência D7 — a fase 1 trocou mais do que o §3 listou:** o histórico de
+  preço das coleções, dos componentes e das tabelas do sob medida passou a pedir
+  `preco.ver` (era `custo.ver`), e o painel 607 passou a aceitar quem lança nota
+  do rolo, como as outras telas de custo.
+- **Achado no caminho, consertado junto por ser defeito da fase 3 da
+  `ORGANIZACAO-DO-SISTEMA` (também minha):** o `admin_telas.js` lia o nome da
+  pessoa direto da sessão, e o `teste_quem.js` reprovava.
+- `teste_valor.js` (74) e `tecido/teste/valor.test.js` (8), escritos antes do
+  conserto. Mudaram as pessoas de mentira de quatro testes (as de depois do
+  backfill), sem mudar o esperado de nenhum: `teste_devolucao_casos.js` (1104),
+  `teste_devolucao_casos_tela.js` (247), `teste_revisao_compras.js` (46) e
+  `teste_acessos_f2.js` (89, com o caso novo da `preco.ver`); dois testes do
+  sob medida trocaram a poda única pela de venda.
 
 ## Onde mora
 

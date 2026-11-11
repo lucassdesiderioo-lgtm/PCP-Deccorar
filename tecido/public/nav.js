@@ -43,6 +43,9 @@ var MENU={telas:null, painel:null};
 function desenharMenu(){
   if(MENU.painel && MENU.telas && typeof MENU_TELAS!=='undefined')
     MENU.painel.innerHTML=MENU_TELAS.html(MENU.telas, aqui);
+  // R-VAL: a tela com dinheiro que a pessoa não vê diz isso uma vez, debaixo do menu
+  if(MENU.painel && MENU.telas && typeof MENU_TELAS!=='undefined' && MENU_TELAS.marcarSemValor)
+    MENU_TELAS.marcarSemValor(MENU.telas, aqui, MENU.painel);
 }
 function carregarMenu(){
   if(typeof MENU_TELAS==='undefined'){

@@ -13,7 +13,7 @@ const custo=require('../dominio/custo');
    mesma regra (custo.js, regra 4): quem nao tem custo.ver recebe o JSON SEM
    preco_m2 e valor. A bancada precisa saber o que a sobra e e onde esta;
    quanto ela vale e outra conversa. */
-const podar=custo.podar;
+const podar=custo.podarCusto;
 
 module.exports={rotas:[
   {metodo:'GET', caminho:'/api/sobras', permissao:'sobra.ler',
@@ -79,9 +79,12 @@ module.exports={rotas:[
   {metodo:'POST', caminho:'/api/sobras/:id/descartar', permissao:'sobra.descartar',
    manipulador:({params,corpo,usuario})=>aprovacao.pedirDescarte(params.id,corpo.motivo,usuario),
    detalhe:(req)=>'pediu o descarte da sobra '+req.params.id+': '+(req.body.motivo||'')},
+  /* ⚠️ A SOBRA DO PEDIDO DE DESCARTE PASSA PELA PODA (R-VAL, 11/11/2026): a
+     rota e da bancada (`sobra.ler`), e ate aqui levava o preco e o valor da
+     sobra a quem nao ve custo. */
   {metodo:'GET', caminho:'/api/sobras/descartes', permissao:'sobra.ler',
-   manipulador:()=>aprovacao.pendentes('descarte_sobra').map(a=>({...a,
-     sobra:sobra.porId(a.alvo_id)}))},
+   manipulador:({usuario})=>aprovacao.pendentes('descarte_sobra').map(a=>({...a,
+     sobra:podar(usuario,sobra.porId(a.alvo_id))}))},
   {metodo:'POST', caminho:'/api/sobras/descartes/:aid/aprovar', permissao:'sobra.aprovar_descarte',
    manipulador:({params,usuario})=>aprovacao.aprovar(params.aid,usuario),
    detalhe:(req,d)=>'aprovou o descarte da sobra '+(d&&d.alvo_id)+' pedido por '+(d&&d.pedido_por)},

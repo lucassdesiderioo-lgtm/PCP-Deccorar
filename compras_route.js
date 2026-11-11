@@ -43,6 +43,32 @@ module.exports = function(app, db){
      `pedido.pagar` (COMPRAS-E-RECEBIMENTO R-CMP-12): a poda e no JSON. */
   const podeP=(req,chave)=>{ try{ return !!app.locals.acesso.podePermissao(req.usuario,chave); }catch(e){ return false; } };
   const PAGAMENTO=['pix','banco','agencia','conta'];
+  /* ⚠️ O DINHEIRO DAS COMPRAS SÓ COM A CAIXINHA (R-VAL, spec ARRUMAR-O-LUGAR,
+     11/11/2026). Abrir a 501 (compras.ver) e ver os preços (compras.valores)
+     são duas caixinhas. Quem LANÇA dinheiro de compra (pedido, nota, parcela,
+     preço) vê o que lança — quem decide é o valor.js. Sem ela, estas leituras
+     saem sem os campos de dinheiro (a chave nem viaja), e a tela escreve "—".
+     Fica ANTES dos handlers: o Express roda na ordem em que registra. */
+  /* ⚠️ `subtotal` E `total` NÃO ESTÃO NA REGRA: na lista de compras o
+     `subtotal` da origem é QUANTIDADE (peças × consumo por peça), e em outras
+     leituras o `total` é contagem de linhas. Só a lista de compras corta o
+     `total` (o previsto, e o de cada fornecedor), pelo `extra` dela. */
+  const DINHEIRO_CMP=/^(preco|custo|valor|desembolso|frete|desconto|pedido_minimo|aviso_minimo)/;
+  function semDinheiro(o, extra){
+    if(Array.isArray(o)) return o.map(x=>semDinheiro(x,extra));
+    if(!o||typeof o!=='object') return o;
+    const n={};
+    for(const k of Object.keys(o)) if(!DINHEIRO_CMP.test(k) && !(extra && extra.test(k))) n[k]=semDinheiro(o[k],extra);
+    return n;
+  }
+  const VA=require('./valor');
+  const veValorCompras=req=>VA.ve(c=>podeP(req,c),'compras.valores');
+  for(const [caminho, extra] of [['/api/fornecedores'],['/api/componentes'],['/api/ofertas'],['/api/comparar'],
+                        ['/api/compras/lista',/^total$/],['/api/compras/necessidade'],['/api/precos/historico']])
+    app.get(caminho,(req,res,next)=>{
+      if(veValorCompras(req)) return next();
+      const j=res.json.bind(res); res.json=c=>j(semDinheiro(c, extra)); next();
+    });
   app.get('/api/fornecedores',(req,res)=>{
     const l=db.prepare('SELECT * FROM fornecedor ORDER BY ativo DESC, nome').all();
     if(!podeP(req,'pedido.pagar')) l.forEach(f=>PAGAMENTO.forEach(k=>delete f[k]));

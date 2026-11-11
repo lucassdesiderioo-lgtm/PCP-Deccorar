@@ -30,6 +30,7 @@
   .chk .lb{flex:1}.chk .lb small{display:block;color:var(--muted);font-size:11px;font-weight:400}
   .orig{font-size:11px;padding:2px 8px;border-radius:20px;white-space:nowrap}
   .orig.setor{background:#0f2233;color:#7cc0ff}.orig.exc{background:#231d06;color:var(--amber)}.orig.no{color:var(--muted)}
+  .valorpill{font-size:10px;font-weight:800;color:#0b2a17;background:#3fb950;border-radius:5px;padding:1px 6px;margin-right:4px}
   .sens{font-size:10px;font-weight:800;color:#ffb4ae;background:#3a1513;border-radius:5px;padding:1px 6px;margin-left:6px}
   .intr{font-size:10px;font-weight:800;color:#8b97a5;border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-left:6px}
   .grp{font-size:13px;font-weight:800;color:var(--amber);margin:14px 0 4px;letter-spacing:.03em}
@@ -312,9 +313,11 @@ function renderDetalhe(){
   (REG.mapa||[]).forEach(function(m){
     var bloco='';
     m.telas.forEach(function(t){
-      if(!t.acoes.length) return;
+      var lista=listaDaTela(t);
+      if(!lista.length) return;
       bloco+='<div class="tela">'+t.n+' · '+t.nome+' <span class="nivelpill">'+NOMEN[t.nivel]+'</span></div>';
-      t.acoes.forEach(function(pm){
+      lista.forEach(function(it){
+        var pm=it.pm;
         var temSetor=viaSetor.has(pm.chave);
         var tem=isAG||perms.has(pm.chave);
         var acima=!isAG && NIVEIS[pm.nivel]>NIVEIS[nvPessoa];
@@ -332,7 +335,7 @@ function renderDetalhe(){
           +(trancada?' title="Intransferível: só o Admin Geral tem, por nível"':'')
           +'><input type="checkbox" class="permchk" data-c="'+pm.chave+'" data-setor="'+(temSetor?1:0)+'"'
           +(tem?' checked':'')+((isAG||trava)?' disabled':'')+'>'
-          +'<span class="lb">'+pm.rotulo+(pm.sensivel?' <span class="sens">SENSÍVEL</span>':'')+(pm.intransferivel?' <span class="intr">intransferível</span>':'')
+          +'<span class="lb">'+rotuloDe(it)+(pm.sensivel?' <span class="sens">SENSÍVEL</span>':'')+(pm.intransferivel?' <span class="intr">intransferível</span>':'')
           +'<small>'+(pm.desc||'')+(acima?' — <b>exige nível '+NOMEN[pm.nivel]+'</b> (a pessoa é '+NOMEN[nvPessoa]+')':'')+'</small></span>'+origem+'</label>';
       });
     });
@@ -361,6 +364,25 @@ document.addEventListener('change',async function(e){
   var r=await jpost('/api/acesso/usuario/'+SEL+'/excecao',body);
   if(r.erro){ alert(r.erro); renderDetalhe(); return; }
   EST.permissoes=r.permissoes; renderDetalhe();
+});
+
+/* A LINHA DE VALORES (R-VAL, spec ARRUMAR-O-LUGAR): debaixo de cada tela com
+   dinheiro, a caixinha "Ver valores (R$) desta tela". Abrir a tela e ver o
+   valor são duas caixinhas. A chave de valor que também é ação desta tela
+   aparece UMA vez, na linha de valores; a mesma chave em outra tela (a
+   custo.ver na 301, na 302 e na 404) é a mesma permissão, e as caixinhas
+   andam juntas. */
+function listaDaTela(t){
+  var vs=t.valores||[], vk=vs.map(function(v){return v.chave;});
+  return (t.acoes||[]).filter(function(pm){return vk.indexOf(pm.chave)<0;}).map(function(pm){return {pm:pm,valor:false};})
+    .concat(vs.map(function(pm){return {pm:pm,valor:true};}));
+}
+function rotuloDe(it){
+  return it.valor ? '<span class="valorpill">R$</span> Ver valores (R$) desta tela — '+it.pm.rotulo : it.pm.rotulo;
+}
+document.addEventListener('change',function(e){
+  var c=e.target.closest('.spermchk'); if(!c) return;
+  document.querySelectorAll('.spermchk[data-c="'+c.getAttribute('data-c')+'"]').forEach(function(x){ x.checked=c.checked; });
 });
 
 /* ---------- SETORES ---------- */
@@ -394,16 +416,18 @@ function renderSetorPerms(){
   (REG.mapa||[]).forEach(function(m){
     var bloco='';
     m.telas.forEach(function(t){
-      if(!t.acoes.length) return;
+      var lista=listaDaTela(t);
+      if(!lista.length) return;
       bloco+='<div class="tela">'+t.n+' · '+t.nome+' <span class="nivelpill">'+NOMEN[t.nivel]+'</span></div>';
-      t.acoes.forEach(function(pm){
+      lista.forEach(function(it){
+        var pm=it.pm;
         var acima=NIVEIS[pm.nivel]>NIVEIS[nivel];
         var trava=!!pm.intransferivel;
         var jaTem=marc.indexOf(pm.chave)>=0 && !trava;
         var cinza=trava||(acima&&!jaTem);
         bloco+='<label class="chk'+(cinza?' acima':'')+'"><input type="checkbox" class="spermchk" data-c="'+pm.chave+'"'
           +(jaTem?' checked':'')+(cinza?' disabled':'')+'>'
-          +'<span class="lb">'+pm.rotulo+(pm.sensivel?' <span class="sens">SENSÍVEL</span>':'')
+          +'<span class="lb">'+rotuloDe(it)+(pm.sensivel?' <span class="sens">SENSÍVEL</span>':'')
           +'<small>'+NOMEN[pm.nivel]+(trava?' — só o setor Admin Geral'
             :(acima&&jaTem?' — <b style="color:#d29922">acima do nível do setor: fica até alguém desmarcar</b>'
             :(acima?' — <b>exige nível '+NOMEN[pm.nivel]+'</b> (o setor é '+NOMEN[nivel]+')':'')))+'</small></span></label>';

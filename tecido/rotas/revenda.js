@@ -21,27 +21,27 @@ module.exports={rotas:[
      carteira. E o tipo de defeito que so aparece depois de a tela estar
      pronta, e que se explica mal. */
   {metodo:'GET', caminho:'/api/revendas/carteiras', permissao:LER,
-   manipulador:({usuario})=>custo.podar(usuario,revenda.carteiras())},
+   manipulador:({usuario})=>custo.podarVenda(usuario,revenda.carteiras())},
   {metodo:'GET', caminho:'/api/revendas/limites-vencidos', permissao:LER,
-   manipulador:({usuario})=>custo.podar(usuario,revenda.limitesVencidos())},
+   manipulador:({usuario})=>custo.podarVenda(usuario,revenda.limitesVencidos())},
 
   {metodo:'GET', caminho:'/api/revendas', permissao:LER,
-   manipulador:({query,usuario})=>custo.podar(usuario,revenda.listar(
+   manipulador:({query,usuario})=>custo.podarVenda(usuario,revenda.listar(
      query.ativo===undefined?{}:{ativo:query.ativo==='1'}))},
   {metodo:'GET', caminho:'/api/revendas/:id', permissao:LER,
-   manipulador:({params,usuario})=>custo.podar(usuario,revenda.porId(params.id))},
+   manipulador:({params,usuario})=>custo.podarVenda(usuario,revenda.porId(params.id))},
 
   {metodo:'POST', caminho:'/api/revendas', permissao:EDITAR,
-   manipulador:({corpo,usuario})=>custo.podar(usuario,revenda.criar(corpo,usuario)),
+   manipulador:({corpo,usuario})=>custo.podarVenda(usuario,revenda.criar(corpo,usuario)),
    detalhe:(req)=>'revenda '+req.body.nome_fantasia},
   {metodo:'PUT', caminho:'/api/revendas/:id', permissao:EDITAR,
-   manipulador:({params,corpo,usuario})=>custo.podar(usuario,revenda.editar(params.id,corpo,usuario)),
+   manipulador:({params,corpo,usuario})=>custo.podarVenda(usuario,revenda.editar(params.id,corpo,usuario)),
    detalhe:(req,d)=>d?'revenda '+d.nome_fantasia:null},
 
   /* O VENDEDOR TEM PORTA PROPRIA, e nao e capricho: trocar quem cuida de uma
      revenda e decisao, e o nome do anterior fica gravado como historia. */
   {metodo:'PUT', caminho:'/api/revendas/:id/vendedor', permissao:EDITAR,
-   manipulador:({params,corpo,usuario})=>custo.podar(usuario,
+   manipulador:({params,corpo,usuario})=>custo.podarVenda(usuario,
      revenda.definirVendedor(params.id,corpo.vendedor_usuario_id,usuario)),
    detalhe:(req,d)=>d?('vendedor de '+d.nome_fantasia+': '+(d.vendedor_nome||'— nenhum —')):null},
 
@@ -50,13 +50,13 @@ module.exports={rotas:[
      quanto a revenda paga, a outra quanto ela pode dever. E as duas escritas
      gravam historico. */
   {metodo:'PUT', caminho:'/api/revendas/:id/limite', permissao:CREDITO,
-   manipulador:({params,corpo,usuario})=>custo.podar(usuario,
+   manipulador:({params,corpo,usuario})=>custo.podarVenda(usuario,
      revenda.definirLimite(params.id,corpo.valor_limite_credito_centavos,usuario)),
    detalhe:(req,d)=>d&&d.mudou?('limite de '+d.nome_fantasia+': '+
      (d.limite_anterior==null?'sem limite':d.limite_anterior)+' → '+
      d.valor_limite_credito_centavos+' centavos'):null},
   {metodo:'POST', caminho:'/api/revendas/:id/limite/revisar', permissao:CREDITO,
-   manipulador:({params,usuario})=>custo.podar(usuario,revenda.revisarLimite(params.id,usuario)),
+   manipulador:({params,usuario})=>custo.podarVenda(usuario,revenda.revisarLimite(params.id,usuario)),
    detalhe:(req,d)=>d?('revisou o limite de '+d.nome_fantasia):null},
   {metodo:'GET', caminho:'/api/revendas/:id/limite/historico', permissao:CREDITO,
    manipulador:({params})=>revenda.historicoLimite(params.id)},
@@ -96,7 +96,7 @@ module.exports={rotas:[
    detalhe:(req,d)=>d&&d.mudou?('tabela '+d.nome+': '+
      (d.desconto_anterior==null?'sem percentual':d.desconto_anterior)+' → '+
      d.desconto_centesimos+' centesimos de %'):null},
-  {metodo:'GET', caminho:'/api/tabelas/:id/historico', permissao:'custo.ver',
+  {metodo:'GET', caminho:'/api/tabelas/:id/historico', permissao:'preco.ver',
    manipulador:({params})=>revenda.historicoTabela(params.id)},
 
   {metodo:'GET', caminho:'/api/formas-pagamento', permissao:LER,

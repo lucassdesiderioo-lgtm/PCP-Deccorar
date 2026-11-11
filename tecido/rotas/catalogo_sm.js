@@ -4,7 +4,7 @@
 const catalogo=require('../dominio/catalogo_sm');
 const persiana=require('../dominio/persiana');
 /* ⚠️ A PODA DE DINHEIRO E A MESMA DO RESTO DO MODULO, e nao uma nova.
-   `custo.podar` corta por PADRAO DE NOME (custo.eDinheiro), porque a defesa
+   `custo.podarVenda` corta por PADRAO DE NOME (custo.eDinheiro), porque a defesa
    anterior era uma lista literal e ela envelheceu em uma semana — o painel
    gerencial nasceu com `resumo.valor_parado` fora dela e o numero passou a
    viajar pelo fio ate a bancada.
@@ -24,10 +24,10 @@ module.exports={rotas:[
      conferir; o vendedor que lanca pedido nao o ve na lista, e o detalhe dele
      e recusado com o mesmo motivo do calculo. */
   {metodo:'GET', caminho:'/api/sm/modelos', permissao:LER,
-   manipulador:({usuario})=>custo.podar(usuario,
+   manipulador:({usuario})=>custo.podarVenda(usuario,
      catalogo.listarModelos({inativos:pode(usuario,EDITAR)}))},
   {metodo:'GET', caminho:'/api/sm/modelos/:id', permissao:LER,
-   manipulador:({params,usuario})=>custo.podar(usuario,
+   manipulador:({params,usuario})=>custo.podarVenda(usuario,
      catalogo.modeloParaVer(params.id,pode(usuario,EDITAR)))},
   {metodo:'POST', caminho:'/api/sm/modelos', permissao:EDITAR,
    manipulador:({corpo,usuario})=>catalogo.criarModelo(corpo,usuario),
@@ -54,22 +54,22 @@ module.exports={rotas:[
 
   // ── Colecoes de venda ───────────────────────────────────────────────────
   {metodo:'POST', caminho:'/api/sm/modelos/:id/colecoes', permissao:EDITAR,
-   manipulador:({params,corpo,usuario})=>custo.podar(usuario,
+   manipulador:({params,corpo,usuario})=>custo.podarVenda(usuario,
      catalogo.ligarColecao(Object.assign({},corpo,{modelo_id:params.id}),usuario)),
    detalhe:(req,d)=>'ligou a colecao '+(d&&d.colecao_nome)},
   {metodo:'PUT', caminho:'/api/sm/colecoes/:id', permissao:EDITAR,
-   manipulador:({params,corpo,usuario})=>custo.podar(usuario,catalogo.editarColecao(params.id,corpo)),
+   manipulador:({params,corpo,usuario})=>custo.podarVenda(usuario,catalogo.editarColecao(params.id,corpo)),
    detalhe:(req,d)=>'colecao '+(d&&d.colecao_nome)},
   /* O PRECO TEM PORTA PROPRIA, com historico de quem mudou e de quanto para
      quanto — o `editarColecao` recusa o campo de proposito. Duas portas de
      escrita no mesmo numero e a armadilha #12. */
   {metodo:'PUT', caminho:'/api/sm/colecoes/:id/preco', permissao:EDITAR,
-   manipulador:({params,corpo,usuario})=>custo.podar(usuario,
+   manipulador:({params,corpo,usuario})=>custo.podarVenda(usuario,
      catalogo.definirPrecoColecao(params.id,corpo.preco_m2_centavos,usuario)),
    detalhe:(req,d)=>d?('preco do m² de '+d.colecao_nome+': '+
      (d.mudou?((d.preco_anterior==null?'sem preco':d.preco_anterior)+' → '+d.preco_m2_centavos+' centavos')
              :'sem mudanca')):null},
-  {metodo:'GET', caminho:'/api/sm/colecoes/:id/preco/historico', permissao:'custo.ver',
+  {metodo:'GET', caminho:'/api/sm/colecoes/:id/preco/historico', permissao:'preco.ver',
    manipulador:({params})=>catalogo.historicoPreco('colecao',params.id)},
 
   {metodo:'POST', caminho:'/api/sm/modelos/:id/cores', permissao:EDITAR,
@@ -79,17 +79,17 @@ module.exports={rotas:[
 
   // ── Componentes ─────────────────────────────────────────────────────────
   {metodo:'GET', caminho:'/api/sm/componentes', permissao:LER,
-   manipulador:({usuario})=>custo.podar(usuario,catalogo.listarComponentes())},
+   manipulador:({usuario})=>custo.podarVenda(usuario,catalogo.listarComponentes())},
   {metodo:'POST', caminho:'/api/sm/componentes', permissao:EDITAR,
-   manipulador:({corpo,usuario})=>custo.podar(usuario,catalogo.criarComponente(corpo||{},usuario)),
+   manipulador:({corpo,usuario})=>custo.podarVenda(usuario,catalogo.criarComponente(corpo||{},usuario)),
    detalhe:(req,d)=>d?('componente '+d.chave+' · '+d.nome):null},
   {metodo:'PUT', caminho:'/api/sm/componentes/:id/preco', permissao:EDITAR,
-   manipulador:({params,corpo,usuario})=>custo.podar(usuario,
+   manipulador:({params,corpo,usuario})=>custo.podarVenda(usuario,
      catalogo.definirPrecoComponente(params.id,corpo.preco_centavos,usuario)),
    detalhe:(req,d)=>d?('preco de '+d.nome+': '+(d.mudou?
      ((d.preco_anterior==null?'sem preco':d.preco_anterior)+' → '+d.preco_centavos+' centavos')
      :'sem mudanca')):null},
-  {metodo:'GET', caminho:'/api/sm/componentes/:id/preco/historico', permissao:'custo.ver',
+  {metodo:'GET', caminho:'/api/sm/componentes/:id/preco/historico', permissao:'preco.ver',
    manipulador:({params})=>catalogo.historicoPreco('componente',params.id)},
 
   // ── Escada de tubos ─────────────────────────────────────────────────────
@@ -150,7 +150,7 @@ module.exports={rotas:[
      o mesmo caminho que a fase 3 vai usar para montar o item do pedido.
      Ele NAO grava nada: simular e perguntar. */
   {metodo:'POST', caminho:'/api/sm/simular', permissao:LER,
-   manipulador:({corpo,usuario})=>custo.podar(usuario,
+   manipulador:({corpo,usuario})=>custo.podarVenda(usuario,
      persiana.calcular(corpo,{aceitaInativo:pode(usuario,EDITAR)}))},
 
   /* ⚠️ AS CORES DE UMA COLECAO TEM PORTA PROPRIA, e nao e duplicacao do
@@ -166,5 +166,5 @@ module.exports={rotas:[
      aqui poria no pedido uma escolha que a bancada nao consegue cumprir, e a
      descoberta seria na hora de cortar. */
   {metodo:'GET', caminho:'/api/sm/colecoes/:id/cores', permissao:LER,
-   manipulador:({params,usuario})=>custo.podar(usuario,catalogo.coresDaColecao(params.id))}
+   manipulador:({params,usuario})=>custo.podarVenda(usuario,catalogo.coresDaColecao(params.id))}
 ]};

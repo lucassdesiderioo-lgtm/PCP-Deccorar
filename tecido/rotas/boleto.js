@@ -16,7 +16,7 @@ const custo=require('../dominio/custo');
 const aprovacao=require('../dominio/aprovacao');
 
 const LER='boleto.ler', EDITAR='boleto.editar';
-const podar=(usuario,dados)=>custo.podar(usuario,dados);
+const podar=(usuario,dados)=>custo.podarVenda(usuario,dados);
 
 module.exports={rotas:[
 

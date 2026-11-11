@@ -73,7 +73,16 @@ const AUDIT = [];
 const rotas = {};
 const app = {
   locals:{ acesso:{
-    podePermissao(u, chave){ return !!(u && PERMS[u.id] && PERMS[u.id].has(chave)); },
+    /* A REGRA DO VALOR (R-VAL, spec ARRUMAR-O-LUGAR, 11/11/2026): os valores do
+       caso passaram a ser a caixinha `devolucao.valores`, e o backfill de uma
+       vez só (`seed_valor_1`) a deu a quem lançava ou acompanhava. A régua de
+       mentira faz o mesmo, para estas pessoas serem as de depois do deploy.
+       Tirar a caixinha (e o valor sumir) é conferido no teste_valor.js. */
+    podePermissao(u, chave){
+      const p = u && PERMS[u.id]; if(!p) return false;
+      if(chave === 'devolucao.valores' && (p.has('devolucao.lancar') || p.has('devolucao.acompanhar'))) return true;
+      return p.has(chave);
+    },
     auditar(req, cat, acao, alvo, detalhe){ AUDIT.push({uid:(req.usuario||{}).id, cat, acao, alvo, detalhe}); }
   }},
   get(p,h){ rotas['GET '+p]=h; }, post(p,h){ rotas['POST '+p]=h; }, delete(p,h){ rotas['DELETE '+p]=h; }
