@@ -4675,7 +4675,7 @@ de material do PCP (marca e modelo): `node teste_componentes.js`. Todos os
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 885 casos
+cd tecido && npm test          # 886 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
@@ -5366,7 +5366,8 @@ O que parece bug e não é:
   e ⚠️ **a sugestão dessa linha é SÓ o material que faltou, sem quantidade**: o
   resto da ficha já baixou, e sugeri-lo faria o "baixar" sem mexer tirar duas
   vezes. O Supervisor digita a quantidade; vazio é recusado. **A fórmula que dá
-  negativo** também vira essa linha. **O SKU de revenda** (custo pendente) não:
+  negativo** também vira essa linha — nas duas operações, inclusive o negativo
+  minúsculo (−0,0004), que o cálculo do sob medida não arredonda a zero. **O SKU de revenda** (custo pendente) não:
   só a medida pendente conta a ficha do modelo.
 - ⚠️ **A BAIXA QUE ESPEROU SAI EM NOME DE QUEM EMBALOU** (`sm_pedido_material.
   embalado_por`, `_id`, `_em`), e o `baixado_em` é a data da embalagem. A linha do

@@ -39,7 +39,8 @@ Tipo: NOVIDADE (+ REGRA na fase 4)
 - **③ REVISÃO, rodadas 2 e 3:** a linha "a ficha não deu a quantidade" sugere
   só o material que faltou, sem quantidade (o resto já baixou); a baixa que
   esperou sai em nome de quem embalou (`sm_pedido_material.embalado_por/_id/_em`);
-  a fórmula negativa vira essa linha; o SKU de revenda não gera linha; a 106
+  a fórmula negativa vira essa linha (no sob medida, também a de −0,0004, que
+  o cálculo não arredonda mais a zero — pedido do dono, 11/11/2026); o SKU de revenda não gera linha; a 106
   guarda a unidade e o digitado entre abas; a linha de falha não sugere a ficha
   que já baixou; o mesmo material em duas fórmulas sai uma vez.
 - **A fase 5 juntou o LUGAR**: a 404 se chama "Catálogo e ficha técnica" e lista

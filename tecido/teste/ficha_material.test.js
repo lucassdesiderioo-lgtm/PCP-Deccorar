@@ -180,6 +180,16 @@ module.exports=[
   FM.congelar(905,[{componente_pcp_id:12,nome:'Corrente',unidade:'m',quantidade:-3}]);
   igual(/sem quantidade/.test(db.prepare('SELECT baixa_resultado r FROM sm_pedido_material WHERE item_id=905').get().r),true,'marcada sem quantidade');
  }},
+{nome:'o negativo MINUSCULO (-0,0004) da formula tambem nao some: o calculo nao o arredonda a zero',
+ executar({igual,db}){
+  const m=produto();
+  FM.criar({modelo_id:m.id, componente_pcp_id:12, expressao:'(largura - 150.04) / 100', quando:'sempre'});
+  const c=FM.calcular(m.id,1500,2000,q=>q==='sempre').find(x=>x.componente_pcp_id===12&&/150.04/.test(x.expressao));
+  igual(c.quantidade<0,true,'continua negativo');
+  FM.congelar(905,[c]);
+  const l=db.prepare('SELECT baixa_resultado r FROM sm_pedido_material WHERE item_id=905').get();
+  igual(!!l&&/negativo/.test(l.r),true,'congela como sem quantidade');
+ }},
 {nome:'③ o catalogo unico da 404 nao mostra produto inativo (R-SMN-01)',
  executar({igual}){
   produto();

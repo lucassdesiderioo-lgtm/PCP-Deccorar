@@ -100,7 +100,9 @@ function calcular(modelo_id,largura_mm,altura_mm,entra){
     if(!l.ativo) continue;
     if(entra&&!entra(l.quando)) continue;
     let q=null, erro=null;
-    try{ q=Math.round(F.avaliar(l.expressao,vars)*1000)/1000; }catch(e){ erro=e.message; }
+    /* O negativo NAO se arredonda (-0,0004 viraria -0 e sumiria no congelar):
+       ele fica negativo e vira "sem quantidade", como na medida padrao. */
+    try{ const v=F.avaliar(l.expressao,vars); q=v<0?v:Math.round(v*1000)/1000; }catch(e){ erro=e.message; }
     out.push({componente_pcp_id:l.componente_pcp_id, nome:l.nome, unidade:l.unidade, expressao:l.expressao,
       quando:l.quando, quantidade:q, erro});
   }
