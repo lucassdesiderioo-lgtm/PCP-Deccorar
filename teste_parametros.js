@@ -85,6 +85,9 @@ ok('segundo bipe: lê e grava pela rota de sempre, e só nível Admin muda', /\/
 ok('parâmetros do corte e o prazo: pela rota do sob medida, sem conta própria', /\/sobmedida\/api\/parametros/.test(PAG) && /\/sobmedida\/api\/prazo/.test(PAG));
 ok('feriados: pela rota do sob medida (listar, cadastrar, apagar)', /\/sobmedida\/api\/feriados/.test(PAG) && /DELETE/.test(PAG));
 ok('cada parte só aparece para quem tem a chave dela', /sobmedida\.parametro\.ler/.test(PAG) && /sobmedida\.parametro\.editar/.test(PAG));
+ok('③ REVISÃO: o parâmetro de tipo texto (a hora do corte do prazo) vai como TEXTO, e quem recusa é o servidor', /tipo\s*===\s*'numero'/.test(PAG) && /data-tipo/.test(PAG));
+ok('③ REVISÃO: o horário recusado fica marcado no campo, e não só na mensagem', /partHorarios[\s\S]*classList\.add\('erro'\)[\s\S]*function partBipe/.test(PAG));
+ok('③ REVISÃO: o card do sob medida não se chama "plano de corte" (ele lista etiqueta, rolo, crédito…)', !/parâmetros do plano de corte<\/h2>/.test(PAG));
 ok('o /api/telas/minhas diz se a pessoa é de nível Admin (o segundo bipe)', /nivel_admin/.test(ler('admin_telas.js')));
 ok('nenhum texto proibido (chefia, dono…)', !/\b(chefia|chefe|patr[aã]o|gest[aã]o)\b/i.test(PAG.replace(/<!--[\s\S]*?-->/g,'').replace(/\/\*[\s\S]*?\*\//g,'')));
 

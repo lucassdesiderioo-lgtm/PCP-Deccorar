@@ -73,7 +73,10 @@ async function partHorarios(){
       (corpo[i.dataset.dia]=corpo[i.dataset.dia]||{})[i.dataset.campo]=i.value; });
     var m=document.getElementById('horMsg'), r=await jsend('/api/config/horarios','POST',corpo);
     if(r.s===200 && r.j && r.j.ok){ m.className='msg ok'; m.textContent='Horários salvos.'; }
-    else { m.className='msg err'; m.textContent=erroDe(r); }
+    else { m.className='msg err'; m.textContent=erroDe(r);
+      /* o campo recusado fica marcado: o que não é HH:MM (vazio, fora da hora) */
+      c.querySelectorAll('input[data-dia]').forEach(function(i){
+        var x=/^(\d{2}):(\d{2})$/.exec(i.value); if(!x || +x[1]>23 || +x[2]>59) i.classList.add('erro'); }); }
   };
 }
 
@@ -95,7 +98,9 @@ async function partBipe(){
 /* ── Os parâmetros do sob medida: o corte e o prazo (rota de lá) ─────────── */
 function linhaParam(p, pode, extenso){
   return '<tr><td><b>'+esc(p.rotulo||p.chave)+'</b>'+(p.unidade?' <span class="nota">('+esc(p.unidade)+')</span>':'')+'<br><span class="nota">'+esc(p.ajuda||'')+'</span></td>'
-    +'<td><input class="num" inputmode="decimal" data-chave="'+esc(p.chave)+'" value="'+esc(String(p.valor).replace('.',','))+'"'+(pode?'':' disabled')+'>'
+    +'<td>'+(p.tipo==='numero'
+      ? '<input class="num" inputmode="decimal" data-tipo="numero" data-chave="'+esc(p.chave)+'" value="'+esc(String(p.valor).replace('.',','))+'"'
+      : '<input data-tipo="texto" data-chave="'+esc(p.chave)+'" value="'+esc(p.valor)+'"')+(pode?'':' disabled')+'>'
     +(extenso?' <span class="nota">'+esc(extenso)+'</span>':'')
     +(pode?' <button class="g" type="button" data-salvar="'+esc(p.chave)+'">Salvar</button>':'')
     +'<div class="msg" data-msg="'+esc(p.chave)+'"></div>'
@@ -104,10 +109,16 @@ function linhaParam(p, pode, extenso){
 function ligarSalvar(c, depois){
   c.querySelectorAll('button[data-salvar]').forEach(function(b){ b.onclick=async function(){
     var k=b.dataset.salvar, i=c.querySelector('input[data-chave="'+k+'"]'), m=c.querySelector('[data-msg="'+k+'"]');
-    var n=Number(String(i.value).trim().replace(',','.'));
+    /* O parâmetro de tipo texto (a hora do corte do prazo, o endereço do PCP) vai
+       como TEXTO: quem diz se ele vale é o servidor (③ REVISÃO — a hora "17:00"
+       virava NaN, e não havia mais tela que a mudasse). */
+    var valor;
     i.classList.remove('erro');
-    if(String(i.value).trim()==='' || !isFinite(n)){ i.classList.add('erro'); m.className='msg err'; m.textContent='Digite um número, com vírgula ou ponto.'; return; }
-    var r=await jsend('/sobmedida/api/parametros/'+encodeURIComponent(k),'PUT',{valor:n});
+    if(i.dataset.tipo==='numero'){
+      valor=Number(String(i.value).trim().replace(',','.'));
+      if(String(i.value).trim()==='' || !isFinite(valor)){ i.classList.add('erro'); m.className='msg err'; m.textContent='Digite um número, com vírgula ou ponto.'; return; }
+    } else valor=String(i.value).trim();
+    var r=await jsend('/sobmedida/api/parametros/'+encodeURIComponent(k),'PUT',{valor:valor});
     if(r.s===200 && r.j && r.j.ok){ if(depois) await depois(k); else { m.className='msg ok'; m.textContent='Salvo.'; } }
     else { i.classList.add('erro'); m.className='msg err'; m.textContent=erroDe(r); }
   }; });
@@ -115,7 +126,7 @@ function ligarSalvar(c, depois){
 async function partCorte(lista){
   var c=card('pCorte'), pode=tem('sobmedida.parametro.editar');
   var corte=lista.filter(function(p){ return String(p.chave).indexOf('prazo')!==0; });
-  var h='<h2>Sob medida — parâmetros do plano de corte</h2><p class="ajuda">Os números que governam o cálculo do corte. Mudar é um campo, não um deploy — e muda a bobina que o sistema escolhe para a fábrica inteira.</p>';
+  var h='<h2>Sob medida — parâmetros</h2><p class="ajuda">Os números do sob medida: o cálculo do corte (mudar muda a bobina que o sistema escolhe para a fábrica inteira), a etiqueta, o rolo, o estoque mínimo, o crédito e o bipe da bancada. Mudar é um campo, não um deploy.</p>';
   h+= corte.length ? '<div class="rola"><table>'+corte.map(function(p){ return linhaParam(p,pode); }).join('')+'</table></div>' : '<div class="vazio">Nenhum parâmetro.</div>';
   if(!pode) h+='<p class="nota">Mudar é de quem tem a permissão de editar os parâmetros do cálculo.</p>';
   c.innerHTML=h; if(pode) ligarSalvar(c, redesenharSm);
