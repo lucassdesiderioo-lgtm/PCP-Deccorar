@@ -195,9 +195,14 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
         <div style="min-width:220px"><label>Modelo</label><select id="fxModelo"></select></div>
         <!-- A MEDIDA. A tela mostrava `1,80 × 1,50` fixo: a persiana crítica é a
              1,80 e a mais vendida é a 1,60 — mostrava uma e escondia a outra. -->
-        <div style="min-width:260px"><label>Na medida</label><select id="fxSku"></select></div>
+        <!-- A FICHA É DO MODELO, E A MEDIDA SÓ CONFERE (AJUSTE de 11/11/2026, o
+             dono: "parece que eu estou editando uma medida específica"). A tela
+             abre SEM medida, mostrando as fórmulas; escolher uma medida só mostra
+             os números dela, e não muda nada do que se grava. -->
+        <div style="min-width:300px"><label>Conferir numa medida (opcional — não muda a ficha)</label><select id="fxSku"></select></div>
         <div style="flex:1;min-width:120px"><span class="sub" id="fxAviso"></span></div>
       </div>
+      <div id="fxEscopo" style="margin-top:12px"></div>
     </div>
 
     <div class="card">
@@ -871,12 +876,34 @@ async function trocarModelo(){
     const lista=SKUS.filter(x=>x.modelo_id===mid && x.tem_ficha!==0)
       .sort((a,b)=>(a.largura_cm||0)-(b.largura_cm||0)||(a.altura_cm||0)-(b.altura_cm||0)
                  ||String(a.codigo).localeCompare(String(b.codigo)));
-    s.innerHTML=lista.map(x=>'<option value="'+esc(x.codigo)+'">'
-      +(x.largura_cm&&x.altura_cm?med(x.largura_cm,x.altura_cm)+' · ':'')+esc(x.codigo)+'</option>').join('')
-      || '<option value="">— este modelo não tem SKU com ficha —</option>';
+    /* A PRIMEIRA OPÇÃO É "NENHUMA", E A TELA ABRE NELA: a ficha é do modelo, e
+       abrir já numa medida fazia parecer que se editava a ficha daquela medida. */
+    s.innerHTML='<option value="">— nenhuma: mostrar as fórmulas —</option>'
+      +lista.map(x=>'<option value="'+esc(x.codigo)+'">'
+      +(x.largura_cm&&x.altura_cm?med(x.largura_cm,x.altura_cm)+' · ':'')+esc(x.codigo)+'</option>').join('');
+    escopoFicha(lista);
   }
   FXEDIT=null;
   await recarregar();
+}
+
+/* A FAIXA DO ESCOPO: diz, antes de tudo, que a ficha é do MODELO e vale para
+   todos os SKUs dele — cada um calculado pela sua própria medida. */
+function escopoFicha(lista){
+  const el=$('#fxEscopo'); if(!el) return;
+  const m=MODELOS.find(x=>x.id===+$('#fxModelo').value);
+  if(!m){ el.innerHTML=''; return; }
+  const n=lista.length;
+  el.innerHTML='<div style="padding:10px 12px;border:1px solid var(--blue,#4493f8);border-radius:8px">'
+    +'<b>Ficha técnica do modelo '+esc(m.nome||m.codigo||'')+'</b> — '
+    +(n ? 'vale para '+(n===1?'o SKU':'os <b>'+n+'</b> SKUs')+' deste modelo, cada um pela sua medida. '
+          +'Mudar uma linha aqui muda todos de uma vez.'
+        : 'nenhum SKU aponta para este modelo ainda.')
+    +(n ? '<details style="margin-top:6px"><summary class="sub" style="cursor:pointer">ver os SKUs</summary>'
+          +'<div class="sub" style="margin-top:4px;line-height:1.7">'
+          +lista.map(x=>esc(x.codigo)+(x.largura_cm&&x.altura_cm?' ('+med(x.largura_cm,x.altura_cm)+')':'')).join(' · ')
+          +'</div></details>' : '')
+    +'</div>';
 }
 
 async function recarregar(){
@@ -905,7 +932,9 @@ function render(){
   const porId={};
   if(f&&f.linhas) f.linhas.forEach(l=>{ porId[l.formula_id]=l; });
 
-  let h='<table><thead><tr><th>Material</th><th class="n">Consome</th>'
+  let h=(f?'':'<div class="sub" style="margin-bottom:8px">Mostrando as <b>fórmulas</b>, que valem para todas as medidas. '
+      +'Para ver os números e o custo de uma medida, escolha-a em "Conferir numa medida".</div>')
+    +'<table><thead><tr><th>Material</th><th class="n">Consome</th>'
     +'<th class="n">Corta a</th><th class="n">R$</th><th></th></tr></thead><tbody>';
 
   for(const l of FXLINHAS){
@@ -925,11 +954,18 @@ function render(){
         +(l.observacao?'<div class="sub">'+esc(l.observacao)+'</div>':'')
         +(l.planejamento?'<div class="sub" style="color:var(--blue,#4493f8)">📋 vai para o planejamento da produção</div>':'')
         +(cego?'<div class="sub" style="color:var(--amber)">⚠ não olha a bobina</div>':'')+'</td>'
-      +'<td class="n">'+(r.erro?'<span style="color:var(--amber)">⚠</span>':qtd(r.quantidade))
+      +(f ? ('<td class="n">'+(r.erro?'<span style="color:var(--amber)">⚠</span>':qtd(r.quantidade))
         +(r.unidade&&!r.erro?' <span class="sub">'+esc(r.unidade)+'</span>':'')
         +(r.motivo?'<div class="sub">'+esc(r.motivo)+'</div>':'')+'</td>'
       +'<td class="n">'+(r.corte&&r.corte.texto?esc(r.corte.texto):'<span class="sub">—</span>')+'</td>'
-      +'<td class="n">'+brl(r.custo)+'</td>'
+      +'<td class="n">'+brl(r.custo)+'</td>')
+        /* SEM MEDIDA ESCOLHIDA, A REGRA: a fórmula como está gravada. O R$ fica
+           em branco, porque o preço depende da medida. */
+        : ('<td class="n"><code>'+esc(l.expressao||'')+'</code></td>'
+          +'<td class="n">'+([l.corte_largura,l.corte_altura].filter(x=>x!=null&&String(x).trim()!=='').length
+              ? '<code>'+[l.corte_largura,l.corte_altura].filter(x=>x!=null&&String(x).trim()!=='').map(esc).join(' × ')+'</code>'
+              : '<span class="sub">—</span>')+'</td>'
+          +'<td class="n"><span class="sub">—</span></td>'))
       +'<td class="n"><span class="sub">editar</span></td></tr>';
     if(r.erro) h+='<tr><td colspan="5" class="sub" style="color:var(--amber);padding-top:0">⚠ '+esc(r.erro)+'</td></tr>';
   }
@@ -1075,7 +1111,6 @@ async function previewEditor(){
   catch(e){ return; }
 
   if(!r.ok){ el.innerHTML='<span style="color:var(--red)">✗ '+esc(r.erro||'')+'</span>'; return; }
-  const t=r.testes[0];
   /* A unidade vem do cadastro do componente, não do resultado: "consome 1,6" e
      "consome 1,6 m" são frases diferentes, e é a segunda que se confere. */
   const uni=fam?'m linear':(function(){
@@ -1083,21 +1118,38 @@ async function previewEditor(){
              : (FXLINHAS.find(x=>x.id==FXEDIT)||{}).componente_id;
     const c=COMPS.find(x=>x.id===id); return c&&c.unidade?c.unidade:'';
   })();
-  let h='<span style="color:var(--green)">✓</span> nesta medida consome <b style="color:var(--amber)">'
-    +qtd(t.resultado)+(uni?' '+esc(uni):'')+'</b>';
-  if(r.corte){
+  /* O corte de uma medida: acha pelo par largura × altura, e não pela posição —
+     a lista do corte pode ter ignorado uma medida que a do consumo não ignorou. */
+  const corteDe=t=>{
+    if(!r.corte) return '';
     const p=[];
     for(const k of ['largura','altura']){
       const c=r.corte[k]; if(!c) continue;
-      p.push(c.ok?(cmN(c.testes[0].resultado)+' cm')
-                 :('<span style="color:var(--red)">'+esc(c.erro||'')+'</span>'));
+      if(!c.ok){ p.push('<span style="color:var(--red)">'+esc(c.erro||'')+'</span>'); continue; }
+      const x=(c.testes||[]).find(y=>y.largura===t.largura&&y.altura===t.altura);
+      p.push(x?cmN(x.resultado)+' cm':'—');
     }
-    if(p.length) h+=' · corta a <b>'+p.join(' × ')+'</b>';
+    return p.length?' · corta a <b>'+p.join(' × ')+'</b>':'';
+  };
+  const umaMedida=!!(s&&s.largura_cm&&s.altura_cm);
+  let h;
+  if(umaMedida){
+    const t=r.testes[0];
+    h='<span style="color:var(--green)">✓</span> na medida '+med(t.largura,t.altura)
+      +' consome <b style="color:var(--amber)">'+qtd(t.resultado)+(uni?' '+esc(uni):'')+'</b>'+corteDe(t);
+  }else{
+    /* SEM MEDIDA ESCOLHIDA: a mesma regra nas medidas de teste do catálogo, lado
+       a lado — é isto que mostra que a linha vale para TODAS as medidas. */
+    h='<span style="color:var(--green)">✓</span> a mesma fórmula em cada medida:'
+      +r.testes.map(t=>'<div style="margin-left:18px">'+med(t.largura,t.altura)
+        +' → consome <b style="color:var(--amber)">'+qtd(t.resultado)+(uni?' '+esc(uni):'')+'</b>'
+        +corteDe(t)+'</div>').join('');
   }
   if(r.bobinas&&r.bobinas.length>1){
     h+='<div style="margin-top:4px">'+r.bobinas.map(b=>{
       const x=b.ok&&b.testes&&b.testes[0];
-      return '<span class="sub" style="margin-right:16px">bobina '+bob(b.cm)+' m: <b>'
+      return '<span class="sub" style="margin-right:16px">bobina '+bob(b.cm)+' m'
+        +(x&&!umaMedida?' ('+med(x.largura,x.altura)+')':'')+': <b>'
         +(x?qtd(x.resultado):(b.ok?'—':'não cabe'))+'</b></span>';
     }).join('')+'</div>';
     const vistos=new Set(r.bobinas.filter(b=>b.ok&&b.testes&&b.testes[0])
@@ -1165,6 +1217,8 @@ document.addEventListener('click',async function(e){
   }
   if(alvo.id==='fxNovo'){ FXEDIT='novo'; render(); return; }
   if(alvo.id==='fxMat'){
+    /* Gravar na ficha da montagem é por SKU: sem medida escolhida, diz o que falta. */
+    if(!$('#fxSku').value){ aviso('#fxMatMsg','Escolha uma medida em "Conferir numa medida" para gravar na ficha da montagem','var(--amber)'); return; }
     const r=await fetch('/api/ficha/'+encodeURIComponent($('#fxSku').value)+'/materializar',{method:'POST'});
     const j=await r.json();
     aviso('#fxMatMsg', r.ok?(j.linhas+' linhas gravadas'):(j.pendencia||j.erro||'não deu'),
