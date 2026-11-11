@@ -5118,7 +5118,8 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 > da central de Pendências.**
 
 > ⚠️ **OS AJUSTES DA FÁBRICA MORAM NA 906 PARÂMETROS, E O FORA DO LUGAR ZEROU**
-> (spec `ARRUMAR-O-LUGAR` fase 3, 11/11/2026, em código, falta subir; duas
+> (spec `ARRUMAR-O-LUGAR` fase 3, 11/11/2026, no ar desde 11/11/2026, PR #340 — o
+> dono fez o deploy e disse *"deu tudo certo no deploy"*; duas
 > linhas em `docs/DECISOES.md`). A tela `/parametros` (Administração · Comum)
 > junta quatro partes, cada uma pela rota de sempre e só para quem tem a chave
 > dela:

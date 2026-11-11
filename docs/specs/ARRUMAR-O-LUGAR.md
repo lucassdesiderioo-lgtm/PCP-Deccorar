@@ -5,8 +5,8 @@ STATUS
 Situação: EM CONSTRUÇÃO · aprovada pelo dono em 11/11/2026
 Criada em: 11/11/2026
 Última atualização: 11/11/2026
-Fase atual: 3 em código, falta subir (11/11/2026) · a 2 no ar desde 11/11/2026 (PR #336) · a 1 no ar desde 11/11/2026 (PR #334) · ⚠️ ainda não provado com dado real: a 1201 e a 1301 abertas por alguém sem chave da 501, a aprovação de material feita na 504, e a 906 usada por alguém do setor "Sob medida / Cadastros" · próxima: fase 4
-Fases: 1 ☑  2 ☑  3 ◐  4 ☐  5 ☐
+Fase atual: 3 no ar desde 11/11/2026 (PR #340; o dono fez o deploy e disse "deu tudo certo no deploy") · a 2 no ar desde 11/11/2026 (PR #336) · a 1 no ar desde 11/11/2026 (PR #334) · ⚠️ ainda não provado com dado real: a 1201 e a 1301 abertas por alguém sem chave da 501, a aprovação de material feita na 504, e a 906 usada por alguém do setor "Sob medida / Cadastros" · próxima: fase 4
+Fases: 1 ☑  2 ☑  3 ☑  4 ☐  5 ☐
 Risco: 🔴 (cria tela, mexe em permissão e na tela de Acessos; a fase 4 muda regra do sob medida)
 Depende de: ORGANIZACAO-DO-SISTEMA (os 18 módulos, o mapa com módulo e bloco, o menu único)
              ACESSO-POR-TELA-E-NIVEL (o mapa de telas, a tela de Acessos pelo mapa)
@@ -15,7 +15,7 @@ Tipo: REGRA + NOVIDADE
 Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
 ```
 
-### Fase 3 — Parâmetros (11/11/2026, em código, falta subir)
+### Fase 3 — Parâmetros (11/11/2026, no ar, PR #340)
 
 - **A tela 906 Parâmetros** (`/parametros`, Administração · Comum), página
   própria como a 206, com quatro partes, cada uma pela rota de sempre e só para
