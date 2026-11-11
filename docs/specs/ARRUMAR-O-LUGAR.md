@@ -53,8 +53,9 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
   "Nada esperando aprovação", e o `#notas` ficava no endereço da 501 para quem
   não abre a 1301. Na rodada 2: o bloco dos ajustes antigos de material diz
   "nenhum" e "não consegui ler", e o aviso da 501 vazia lista só as telas para
-  onde foram abas. **Fica para o dono:** o ganho da D9 (a 1201 e a 1301 abrindo
-  pela chave do trabalho delas, sem chave da 501).
+  onde foram abas. ~~**Fica para o dono:** o ganho da D9~~ — **decidido pelo dono em
+  11/11/2026: fica** (a 1201 e a 1301 abrem pela chave do trabalho delas, sem
+  chave da 501; linha em `docs/DECISOES.md`).
 - **A lista do que está fora do lugar** ficou só com `902/horarios` (fase 3).
 - `teste_501_so_compra.js` (93), escrito antes; os inventários do
   `teste_lugar.js`, do `teste_admin_telas.js` e do `teste_valor.js` ganharam as
