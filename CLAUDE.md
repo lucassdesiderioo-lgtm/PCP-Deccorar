@@ -5100,7 +5100,9 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 >   quando havia, senão o `perms`), conferido pessoa a pessoa no
 >   `teste_501_so_compra.js`. O ganho é nomeado: a chave que é o trabalho da tela
 >   abre a tela mesmo sem chave da 501 (`recebimento.liberar` a 1201;
->   `nota.lancar` e `custo.ver` a 1301) — a rota já aceitava a chave;
+>   `nota.lancar` e `custo.ver` a 1301) — a rota já aceitava a chave. **Decisão do
+  dono (11/11/2026, linha em `docs/DECISOES.md`)**: fica assim, para quem lança
+  nota ou libera retido não precisar ganhar a área de compras inteira;
 > - **a central de Pendências leva cada linha à tela nova** (ou à 504), e os
 >   ajustes antigos são duas linhas: peça (302) e material (504), cada uma
 >   contando o que a tela dela mostra (#12);
