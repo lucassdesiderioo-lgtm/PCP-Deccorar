@@ -155,8 +155,9 @@ module.exports=[
   const l=db.prepare('SELECT baixado_em, baixa_resultado r FROM sm_pedido_material WHERE item_id=903').get();
   igual(l.baixado_em,null,'nao marcada como baixada'); igual(/esperando/.test(l.r),true,'diz que esta esperando');
   igual(chamadas.length,0,'nada baixou');
-  FM.baixarDaEmbalagem(904,{id:300,nome:'Bia'});
+  FM.baixarDaEmbalagem(904,{id:777,nome:'Bruno'});
   igual(chamadas.length,2,'a proxima embalagem baixa a dela e a que esperava');
+  igual(chamadas[1].usuario_id,300,'a que esperava baixa em nome de quem a EMBALOU, e nao de quem embalou a seguinte');
   igual(db.prepare('SELECT COUNT(*) n FROM sm_pedido_material WHERE item_id IN (903,904) AND baixado_em IS NULL').get().n,0,'as duas baixadas');
  }},
 {nome:'③ a linha da lista que nao deu quantidade nao some: vira material extra na embalagem',
@@ -170,6 +171,14 @@ module.exports=[
   FM.baixarDaEmbalagem(905,{id:300,nome:'Bia'});
   igual(extras.length,1,'virou material extra'); igual(/Corrente/.test(extras[0].motivo)&&/divisão por zero/.test(extras[0].motivo),true,'diz qual e por que');
   igual(chamadas.length,1,'o parafuso baixou'); igual(chamadas[0].itens.length,1,'so o parafuso foi a baixa');
+  igual(extras[0].sugestao.length,1,'a sugestao e so a Corrente'); igual(extras[0].sugestao[0].componente_id,12,'a que faltou');
+  igual(extras[0].sugestao[0].quantidade,null,'sem quantidade sugerida');
+ }},
+{nome:'③ a quantidade NEGATIVA da formula nao some: congela como sem quantidade',
+ executar({igual,db}){
+  produto();
+  FM.congelar(905,[{componente_pcp_id:12,nome:'Corrente',unidade:'m',quantidade:-3}]);
+  igual(/sem quantidade/.test(db.prepare('SELECT baixa_resultado r FROM sm_pedido_material WHERE item_id=905').get().r),true,'marcada sem quantidade');
  }},
 {nome:'③ o catalogo unico da 404 nao mostra produto inativo (R-SMN-01)',
  executar({igual}){

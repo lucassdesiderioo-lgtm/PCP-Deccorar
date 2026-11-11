@@ -2160,7 +2160,10 @@ CREATE TABLE sm_pedido_material (
   componente_pcp_id INTEGER NOT NULL,
   nome TEXT, unidade TEXT,
   quantidade REAL NOT NULL,
-  baixado_em TEXT, baixa_resultado TEXT
+  baixado_em TEXT, baixa_resultado TEXT,
+  -- quem embalou e quando: a baixa que esperou (modo teste do PCP) sai em nome
+  -- de quem embalou, na data da embalagem, e nao de quem embalou a seguinte
+  embalado_por TEXT, embalado_por_id INTEGER, embalado_em TEXT
 );
 CREATE INDEX idx_sm_pedido_material ON sm_pedido_material(item_id);
 `});

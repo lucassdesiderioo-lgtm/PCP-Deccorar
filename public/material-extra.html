@@ -50,8 +50,9 @@ var aba = 'pendentes', MATS = [], EU = null;
 /* O DIGITADO SOBREVIVE AO REDESENHO (③ REVISAO, §12 e §9-B: nada digitado some
    calado). Decidir uma linha redesenha a lista; o que estava preparado nas
    outras e guardado antes e devolvido depois, cartao a cartao. */
+var GUARDADO = {};   // o digitado de cada cartao, que sobrevive tambem a troca de aba
 function guardar(){
-  var g = {};
+  var g = GUARDADO;
   [].forEach.call(document.querySelectorAll('[data-id]'), function(card){
     g[card.getAttribute('data-id')] = { obs:card.querySelector('.obs') ? card.querySelector('.obs').value : '',
       linhas:[].map.call(card.querySelectorAll('tbody tr'), function(tr){ return { m:tr.querySelector('.mat').value, q:tr.querySelector('.q').value }; }) };
@@ -62,7 +63,11 @@ function devolver(g){
   Object.keys(g || {}).forEach(function(id){
     var card = document.querySelector('[data-id="' + id + '"]'); if(!card) return;
     var tb = card.querySelector('tbody'); tb.innerHTML = '';
-    g[id].linhas.forEach(function(l, i){ tb.insertAdjacentHTML('beforeend', linhaItem({ componente_id:l.m }, i)); var tr = tb.lastElementChild; tr.querySelector('.q').value = l.q; });
+    g[id].linhas.forEach(function(l, i){
+      var m = MATS.find(function(x){ return String(x.id) === String(l.m); }) || {};
+      tb.insertAdjacentHTML('beforeend', linhaItem({ componente_id:l.m, unidade:m.unidade }, i));
+      tb.lastElementChild.querySelector('.q').value = l.q;
+    });
     if(card.querySelector('.obs')) card.querySelector('.obs').value = g[id].obs;
   });
 }
@@ -111,6 +116,11 @@ async function carregar(){
 }
 $('#abaP').onclick = function(){ aba = 'pendentes'; $('#abaP').className = 'on'; $('#abaD').className = ''; carregar(); };
 $('#abaD').onclick = function(){ aba = 'decididas'; $('#abaD').className = 'on'; $('#abaP').className = ''; carregar(); };
+$('#lista').onchange = function(ev){
+  if(!ev.target.classList.contains('mat')) return;
+  var m = MATS.find(function(x){ return String(x.id) === ev.target.value; }) || {};
+  var u = ev.target.closest('tr').querySelector('.uni'); if(u) u.textContent = m.unidade || '';
+};
 $('#lista').onclick = async function(ev){
   var card = ev.target.closest('[data-id]'); if(!card) return;
   var msg = card.querySelector('.msg'), tb = card.querySelector('tbody');
@@ -126,6 +136,8 @@ $('#lista').onclick = async function(ev){
   var r = await api('POST', '/api/material-extra/' + card.getAttribute('data-id') + '/decidir', corpo);
   ev.target.disabled = false;
   if(r.erro){ msg.className = 'msg err'; msg.textContent = r.erro; return; }
+  delete GUARDADO[card.getAttribute('data-id')];
+  card.remove();   // a decidida sai antes do guardar, e nao volta com o digitado
   carregar();
 };
 carregar();

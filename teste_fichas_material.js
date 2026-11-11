@@ -197,5 +197,25 @@ const MAT = require('./material_dominio');
   ok('o SKU sem medida, com material pela ficha no modelo, tambem vira linha', r.status === 200 &&
     db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n === n5 + 1);
 
+  secao('③ rodada 2 · a sugestao e so o que faltou, e o negativo nao some');
+  ok('a sugestao da linha "nao deu a quantidade" e SO o material que faltou, sem quantidade (nunca o que ja baixou)', (() => {
+    const sg = JSON.parse(fx.sugestao); return sg.length === 1 && sg[0].componente_id === cola && sg[0].quantidade == null; })(), () => fx.sugestao);
+  db.prepare('UPDATE ficha_formula SET ativo=0 WHERE componente_id=?').run(cola);
+  fins(cola, 'altura - 200');
+  const n6 = db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n;
+  r = await post('/api/montagem', { codigo:'RT160', kit_ok:1 }, OPE);
+  ok('a formula que da NEGATIVO num material pela ficha vira linha, e nao some', r.status === 200 &&
+    db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n === n6 + 1);
+  db.prepare('UPDATE ficha_formula SET ativo=0 WHERE componente_id=?').run(cola);
+  db.pragma('foreign_keys = OFF');
+  db.exec("INSERT INTO skus (codigo,descricao,estoque,modelo_id,tem_ficha) VALUES ('REV1','revenda',5,50,0)");
+  db.pragma('foreign_keys = ON');
+  fins(cola, '1');
+  const n7 = db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n;
+  r = await post('/api/montagem', { codigo:'REV1', kit_ok:1 }, OPE);
+  ok('o SKU de revenda (sem ficha) nao gera linha sobre a ficha do modelo', r.status === 200 &&
+    db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n === n7);
+  db.prepare('UPDATE ficha_formula SET ativo=0 WHERE componente_id=?').run(cola);
+
   fim();
 })();

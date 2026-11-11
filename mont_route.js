@@ -316,7 +316,11 @@ module.exports=function(app,db){
             if(semQ.length) require('./material_extra_dominio').registrar(db,{origem:'falha_baixa', operacao:'padrao',
               referencia:'montagem:'+mid, descricao:cod,
               motivo:'a ficha não deu a quantidade de: '+semQ.map(x=>{ const c=db.prepare('SELECT nome FROM componente WHERE id=?').get(x.componente_id); return (c?c.nome:'#'+x.componente_id)+' ('+x.motivo+')'; }).join(' · '),
-              sugestao:ficha.itens, registrado_por:q.usuario_nome, registrado_por_id:null});
+              /* ⚠️ A SUGESTAO E SO O QUE FALTOU, SEM QUANTIDADE (③ rodada 2): o
+                 resto da ficha ja baixou, e sugeri-lo faria o "baixar" sem mexer
+                 tirar o tubo duas vezes. */
+              sugestao:semQ.map(x=>{ const c=db.prepare('SELECT nome,unidade FROM componente WHERE id=?').get(x.componente_id)||{}; return {componente_id:x.componente_id, nome:c.nome, unidade:c.unidade, quantidade:null}; }),
+              registrado_por:q.usuario_nome, registrado_por_id:null});
           }catch(e){
             console.error('[montagem] a baixa de material de '+cod+' falhou (a embalagem seguiu):', e.message);
             /* O registro da falha tambem nao trava: sem a tabela (banco velho,

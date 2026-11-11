@@ -68,11 +68,15 @@ function daFichaPadrao(db, sku){
   }catch(e){ return []; } };
   if(!F || F.erro || F.pendencia || !F.linhas){
     const m = F && (F.erro || F.pendencia) || 'sem ficha';
-    return { itens, faltam:[m], semQuantidade:doModelo().map(id => ({ componente_id:id, motivo:m })) };
+    /* So a MEDIDA pendente conta a ficha do modelo (③ rodada 2): o SKU de
+       revenda (custo pendente) nao usa a ficha do modelo, e nao vira linha. */
+    return { itens, faltam:[m], semQuantidade:(F && F.pendencia === 'medida pendente' ? doModelo() : []).map(id => ({ componente_id:id, motivo:m })) };
   }
   for(const l of F.linhas){
     if(l.componente_id && Number.isFinite(+l.quantidade) && +l.quantidade > 0)
       itens.push({ componente_id:l.componente_id, nome:l.componente_nome, unidade:l.unidade, quantidade:+l.quantidade });
+    else if(l.componente_id && Number.isFinite(+l.quantidade) && +l.quantidade < 0)
+      semQuantidade.push({ componente_id:l.componente_id, motivo:'a fórmula deu número negativo (' + l.quantidade + ')' });
     else if(l.erro && !/sem preço/.test(l.erro)){
       faltam.push(l.erro);
       let cid = l.componente_id || null;

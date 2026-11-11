@@ -136,6 +136,7 @@ function congelar(item_id,itens){
   for(const i of itens){
     if(i.quantidade!=null&&i.quantidade>0) ins.run(item_id,i.componente_pcp_id,i.nome,i.unidade,i.quantidade,null);
     else if(i.quantidade==null) ins.run(item_id,i.componente_pcp_id,i.nome,i.unidade,0,SEM_Q+(i.erro||'a fórmula não avaliou'));
+    else if(i.quantidade<0) ins.run(item_id,i.componente_pcp_id,i.nome,i.unidade,0,SEM_Q+'a fórmula deu número negativo ('+i.quantidade+')');
   }
 }
 
@@ -149,14 +150,19 @@ const ESPERANDO='esperando: ';
    ligado — ③ REVISAO): tentadas de novo a cada embalagem, ate 20 por vez. */
 function baixarEsperando(usuario){
   const ids=db.prepare("SELECT DISTINCT item_id FROM sm_pedido_material WHERE baixado_em IS NULL AND baixa_resultado LIKE '"+ESPERANDO+"%' LIMIT 20").all().map(r=>r.item_id);
-  for(const id of ids) baixarUma(id,usuario);
+  /* ⚠️ Em nome de QUEM EMBALOU e na data da embalagem (③ rodada 2): quem
+     embalou a peca seguinte nao fez esta (#10). */
+  for(const id of ids){
+    const e=db.prepare('SELECT embalado_por, embalado_por_id, embalado_em FROM sm_pedido_material WHERE item_id=? AND embalado_em IS NOT NULL LIMIT 1').get(id);
+    baixarUma(id,e?{id:e.embalado_por_id,nome:e.embalado_por}:usuario,e&&e.embalado_em);
+  }
 }
 function baixarDaEmbalagem(item_id,usuario){
   const r=baixarUma(item_id,usuario);
   if(!r.adiado) try{ baixarEsperando(usuario); }catch(e){ console.error('[ficha_material] baixa das que esperavam:',e.message); }
   return r;
 }
-function baixarUma(item_id,usuario){
+function baixarUma(item_id,usuario,quando){
   const todas=db.prepare('SELECT * FROM sm_pedido_material WHERE item_id=? AND baixado_em IS NULL').all(item_id);
   if(!todas.length) return {baixados:[], ignorados:[], nada:true};
   const semQ=todas.filter(x=>String(x.baixa_resultado||'').indexOf(SEM_Q)===0);
@@ -174,17 +180,20 @@ function baixarUma(item_id,usuario){
     if(!falha&&r&&r.adiado){
       db.prepare('UPDATE sm_pedido_material SET baixa_resultado=? WHERE item_id=? AND baixado_em IS NULL AND (baixa_resultado IS NULL OR baixa_resultado LIKE ?)')
         .run(ESPERANDO+(r.motivo||'adiada'),item_id,ESPERANDO+'%');
+      db.prepare('UPDATE sm_pedido_material SET embalado_por=?, embalado_por_id=?, embalado_em=? WHERE item_id=? AND baixado_em IS NULL AND embalado_em IS NULL')
+        .run(usuario&&usuario.nome||null,usuario&&usuario.id||null,dia.agora(),item_id);
       return {adiado:true};
     }
   }
   const res=falha?('falhou: '+falha):('baixou '+r.baixados.length+', pela contagem '+r.ignorados.length);
-  const agora=dia.agora();
+  const agora=quando||dia.agora();
   for(const x of pend) db.prepare('UPDATE sm_pedido_material SET baixado_em=?, baixa_resultado=? WHERE id=?').run(agora,res,x.id);
   for(const x of semQ) db.prepare('UPDATE sm_pedido_material SET baixado_em=? WHERE id=?').run(agora,x.id);
   if(semQ.length){
     try{ PCP.extra({origem:'falha_baixa', referencia:ref, descricao:desc,
       motivo:'a ficha não deu a quantidade de: '+semQ.map(x=>x.nome+' ('+String(x.baixa_resultado).slice(SEM_Q.length)+')').join(' · '),
-      sugestao:pend.map(x=>({componente_id:x.componente_pcp_id, nome:x.nome, unidade:x.unidade, quantidade:x.quantidade})),
+      /* SO o que faltou, sem quantidade (③ rodada 2): o resto ja baixou. */
+      sugestao:semQ.map(x=>({componente_id:x.componente_pcp_id, nome:x.nome, unidade:x.unidade, quantidade:null})),
       registrado_por:usuario&&usuario.nome, registrado_por_id:null}); }catch(e){ console.error('[ficha_material] material extra da linha sem quantidade:',e.message); }
   }
   if(falha){
