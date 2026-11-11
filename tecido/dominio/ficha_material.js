@@ -240,5 +240,17 @@ const produtosParaPcp=()=>db.prepare(`SELECT m.id, m.nome, m.ativo,
   (SELECT COUNT(*) FROM sm_ficha_material f WHERE f.modelo_id=m.id AND f.ativo=1) materiais
   FROM sm_modelo m WHERE m.ativo=1 ORDER BY m.nome`).all();
 
-module.exports={produtosParaPcp,QUANDOS,listar,criar,editar,calcular,custo,congelar,baixarDaEmbalagem,registrarRecusa,
+/* A lista de um produto numa medida, com o custo (item 1, 11/11/2026): para a
+   404 do PCP conferir. TODA linha ativa entra, com o `quando` dela — a 404
+   separa o que entra sempre do que depende de escolha. O custo e o da conta
+   da 404 (a porta); quem poda e a rota do PCP. */
+function naMedida(modelo_id,largura_mm,altura_mm){
+  exigir(Number.isInteger(+largura_mm)&&+largura_mm>0&&Number.isInteger(+altura_mm)&&+altura_mm>0,
+    'medida_invalida','Digite a largura e a altura.');
+  const itens=calcular(+modelo_id,+largura_mm,+altura_mm,()=>true);
+  const c=custo(itens);
+  c.linhas=c.linhas.map((x,i)=>Object.assign(x,{quando:itens[i].quando, erro:itens[i].erro}));
+  return c;
+}
+module.exports={naMedida,produtosParaPcp,QUANDOS,listar,criar,editar,calcular,custo,congelar,baixarDaEmbalagem,registrarRecusa,
   linhasParaPcp,embaladoNoPeriodo};

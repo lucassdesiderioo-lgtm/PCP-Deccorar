@@ -190,6 +190,15 @@ module.exports=[
   const l=db.prepare('SELECT baixa_resultado r FROM sm_pedido_material WHERE item_id=905').get();
   igual(!!l&&/negativo/.test(l.r),true,'congela como sem quantidade');
  }},
+{nome:'naMedida (a 404): toda linha ativa entra, com o quando, e a medida impossivel e recusada',
+ executar({igual}){
+  const m=produto();
+  const r=FM.naMedida(m.id,1500,2000);
+  igual(r.linhas.some(x=>x.quando==='com_comando'),true,'a linha de escolha vem, marcada');
+  igual(r.linhas.every(x=>'quando' in x),true,'toda linha diz quando entra');
+  let recusou=false; try{ FM.naMedida(m.id,0,2000); }catch(e){ recusou=true; }
+  igual(recusou,true,'largura zero e recusada');
+ }},
 {nome:'③ o catalogo unico da 404 nao mostra produto inativo (R-SMN-01)',
  executar({igual}){
   produto();

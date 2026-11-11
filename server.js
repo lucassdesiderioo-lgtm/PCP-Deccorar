@@ -240,7 +240,7 @@ try{
                  ocupado: id => require('./almox_dominio').ocupadoPorVolume(db, id) }
   });
   require('./sobmedida_material').ligar(sm && sm.consumoDeMaterial);
-  require('./sobmedida_material').ligarFicha(sm && { linhas:sm.fichaMaterial, embalado:sm.materialEmbalado, produtos:sm.produtosParaPcp });
+  require('./sobmedida_material').ligarFicha(sm && { linhas:sm.fichaMaterial, embalado:sm.materialEmbalado, produtos:sm.produtosParaPcp, naMedida:sm.materialNaMedida });
   /* A PORTA DO ROLO (COMPRAS-E-RECEBIMENTO fase 9): o recebimento do tecido do
      sob medida cria o rolo la, e o cadastro de material do PCP aponta o tecido. */
   require('./sobmedida_rolo').ligar(sm && { criarRolos:sm.criarRolosDoRecebimento, tecidos:sm.tecidosParaCompras });

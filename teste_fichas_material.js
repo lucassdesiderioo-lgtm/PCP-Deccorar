@@ -137,6 +137,28 @@ const MAT = require('./material_dominio');
   require('./sobmedida_material').ligarFicha({ linhas:() => [], embalado:() => [], produtos:() => [{ id:3, nome:'Romana', ativo:1, materiais:2, preco_m2_centavos:99 }] });
   r = await get('/api/catalogo/sobmedida', ADM);
   ok('com a porta: nome, ativo e quantos materiais — e nada de preco', r.corpo.produtos.length === 1 && r.corpo.produtos[0].nome === 'Romana' && !('preco_m2_centavos' in r.corpo.produtos[0]));
+  secao('item 1 · o custo da persiana sob medida numa medida, na 404');
+  const CAD = { id:21, nome:'Cad', permissoes:['modelo.cadastrar'] };
+  const CUS = { id:22, nome:'Cus', permissoes:['modelo.cadastrar','custo.ver'] };
+  let pedida = null;
+  require('./sobmedida_material').ligarFicha({ linhas:() => [], embalado:() => [], produtos:() => [],
+    naMedida:(id, l, a) => { pedida = [id, l, a]; return { linhas:[
+      { nome:'Parafuso', unidade:'un', quando:'sempre', quantidade:6, custo_unitario:0.1, custo_centavos:60 },
+      { nome:'Bando', unidade:'m', quando:'bando', quantidade:1.5, custo_unitario:10, custo_centavos:1500 }],
+      sem_custo:[], custo_material_centavos:1560, custo_material_piso_centavos:1560 }; } });
+  r = await get('/api/catalogo/sobmedida/3/medida?largura=150&altura=200', CUS);
+  ok('a medida chega ao sob medida em milimetros', r.status === 200 && pedida && pedida[0] === 3 && pedida[1] === 1500 && pedida[2] === 2000, () => JSON.stringify([r.status, r.corpo, pedida]));
+  ok('com custo.ver: a lista com o R$, e o total do que entra sempre separado do opcional', r.corpo.linhas.length === 2 &&
+    r.corpo.linhas[0].custo_centavos === 60 && r.corpo.custo_sempre_centavos === 60 && r.corpo.custo_opcional_centavos === 1500, () => JSON.stringify(r.corpo));
+  r = await get('/api/catalogo/sobmedida/3/medida?largura=150&altura=200', CAD);
+  ok('sem custo.ver: a quantidade vem, e nenhum campo de custo viaja', r.status === 200 && r.corpo.linhas.length === 2 &&
+    r.corpo.linhas[0].quantidade === 6 && !/custo/.test(JSON.stringify(r.corpo)), () => JSON.stringify(r.corpo));
+  r = await get('/api/catalogo/sobmedida/3/medida?largura=abc&altura=200', CUS);
+  ok('medida impossivel e recusada (400), e nao vira zero', r.status === 400, () => JSON.stringify([r.status, r.corpo]));
+  require('./sobmedida_material').ligarFicha(null);
+  r = await get('/api/catalogo/sobmedida/3/medida?largura=150&altura=200', CUS);
+  ok('sem o sob medida ligado, a resposta diz que esta fora', r.status === 200 && r.corpo.fora === true, () => JSON.stringify(r.corpo));
+
   require('./sobmedida_material').ligarFicha({ linhas:() => [{ componente_id:paraf, expressao:'6', quando:'sempre', produto:'Romana', produto_id:3 }], embalado:() => [{ componente_id:paraf, quantidade:12 }], produtos:() => [] });
   r = await get('/api/componentes', ADM);
   const P2 = r.corpo.find(c => c.id === paraf);

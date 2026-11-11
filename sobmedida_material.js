@@ -70,4 +70,10 @@ function produtos(){
   try{ return { fora:false, produtos:(ficha.produtos() || []).map(p => ({ id:p.id, nome:p.nome, ativo:p.ativo ? 1 : 0, materiais:p.materiais || 0 })) }; }
   catch(e){ return { fora:true, produtos:[], motivo:e.message }; }
 }
-module.exports = { ligar, ligada, consumo, ligarFicha, linhasDaFicha, consumoEmbalado, produtos };
+/* A lista de material de um produto do sob medida numa medida (mm), com o
+   custo pela conta da 404 (item 1, 11/11/2026). Quem poda o custo e a rota. */
+function naMedida(id, largura_mm, altura_mm){
+  if(!ficha || typeof ficha.naMedida !== 'function') return { fora:true, linhas:[] };
+  return Object.assign({ fora:false }, ficha.naMedida(id, largura_mm, altura_mm));
+}
+module.exports = { ligar, ligada, consumo, ligarFicha, linhasDaFicha, consumoEmbalado, produtos, naMedida };

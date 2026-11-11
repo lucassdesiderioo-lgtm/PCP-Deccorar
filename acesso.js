@@ -1089,6 +1089,7 @@ module.exports = function(app, db){
        medida listados na 404, pelas chaves que abrem a 404. So nome e se esta
        ativo — nenhum preco. */
     if(M === 'GET' && eq('/api/catalogo/sobmedida')) return ['modelo.cadastrar','custo.ver','compras.ver'];
+    if(M === 'GET' && /^\/api\/catalogo\/sobmedida\/\d+\/medida$/.test(p)) return ['modelo.cadastrar','custo.ver','compras.ver'];
     if(pre('/api/ficha')) return 'custo.ver';
     // Quem mexe numa formula mexe no consumo de material de toda a linha.
     if(M !== 'GET' && pre('/api/formulas')) return 'modelo.cadastrar';

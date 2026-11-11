@@ -260,6 +260,32 @@ module.exports = function(app, db){
      `fora`, e a tela diz. */
   app.get('/api/catalogo/sobmedida',(req,res)=>res.json(require('./sobmedida_material').produtos()));
 
+  /* O CUSTO DA PERSIANA SOB MEDIDA NUMA MEDIDA (item 1, 11/11/2026): a 404
+     confere a lista de material de um produto do sob medida, como confere a
+     ficha de um SKU. Medida em centimetros (a da 404). O total separa o que
+     entra SEMPRE do que depende de escolha (bando, comando...): somar tudo
+     seria o custo de uma persiana que ninguem vende. Sem custo.ver, nenhum
+     campo de custo viaja (a regra do valor, §23). */
+  app.get('/api/catalogo/sobmedida/:id/medida',(req,res)=>{
+    const num = v => (/^\d+([.,]\d+)?$/.test(String(v==null?'':v).trim()) ? +String(v).replace(',','.') : null);
+    const l = num(req.query.largura), a = num(req.query.altura);
+    if(!l || !a) return res.status(400).json({ erro:'Digite a largura e a altura em centímetros.' });
+    let r;
+    try{ r = require('./sobmedida_material').naMedida(+req.params.id, Math.round(l*10), Math.round(a*10)); }
+    catch(e){ return res.status(400).json({ erro:e.message }); }
+    if(r.fora) return res.json({ fora:true, linhas:[] });
+    let ve = false; try{ ve = !!app.locals.acesso.podePermissao(req.usuario, 'custo.ver'); }catch(e){}
+    const linhas = (r.linhas || []).map(x => ({ nome:x.nome, unidade:x.unidade, quando:x.quando || 'sempre',
+      quantidade:x.quantidade, erro:x.erro || null, custo_unitario:x.custo_unitario, custo_centavos:x.custo_centavos }));
+    const soma = f => { let t = 0; for(const x of linhas.filter(f)){ if(x.custo_centavos == null) return null; t += x.custo_centavos; } return t; };
+    const out = { fora:false, largura_cm:l, altura_cm:a, linhas,
+      custo_sempre_centavos:soma(x => x.quando === 'sempre'), custo_opcional_centavos:soma(x => x.quando !== 'sempre'),
+      sem_custo:r.sem_custo || [] };
+    if(!ve){ for(const x of linhas){ delete x.custo_unitario; delete x.custo_centavos; }
+      delete out.custo_sempre_centavos; delete out.custo_opcional_centavos; delete out.sem_custo; }
+    res.json(out);
+  });
+
   app.get('/api/ficha/:sku',(req,res)=>{
     const f = calcular(req.params.sku);
     let ve = false; try{ ve = !!app.locals.acesso.podePermissao(req.usuario, 'custo.ver'); }catch(e){}

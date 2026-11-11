@@ -195,7 +195,10 @@ function montar(app, prefixo, opcoes){
     fichaMaterial: ()=>require('./dominio/ficha_material').linhasParaPcp(),
     materialEmbalado: (desde,ate)=>require('./dominio/ficha_material').embaladoNoPeriodo(desde,ate),
     /* fase 5: os produtos para o catalogo unico da 404 (so nome e ativo) */
-    produtosParaPcp: ()=>require('./dominio/ficha_material').produtosParaPcp() };
+    produtosParaPcp: ()=>require('./dominio/ficha_material').produtosParaPcp(),
+    /* item 1 (11/11/2026): a lista de um produto numa medida, com o custo,
+       para a 404 do PCP (quem poda o custo e a rota de la) */
+    materialNaMedida: (id,l,a)=>require('./dominio/ficha_material').naMedida(id,l,a) };
 }
 
 module.exports={montar, MODULOS, PREFIXO:'/sobmedida'};

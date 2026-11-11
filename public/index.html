@@ -884,7 +884,55 @@ async function catalogoSobMedida(){
           +(abre?'<a href="/sobmedida/catalogo?modelo='+p.id+'">'+esc(p.nome)+'</a>':esc(p.nome))
           +(p.ativo?'':' <span class="sub">(inativo)</span>')
           +' <span class="sub">· '+p.materiais+' material(is)</span></span>').join('')+'</div>'
+          +'<div id="fxSmConf" style="margin-top:10px"></div>'
         :'<div class="sub" style="margin-top:6px">Nenhum produto cadastrado.</div>'));
+  desenharSmConf(r.produtos);
+}
+
+/* CONFERIR NUMA MEDIDA (item 1, 11/11/2026): a lista de material de um
+   produto do sob medida e o custo dela, como a ficha de um SKU. O R$ so vem a
+   quem tem "ver custo" (o servidor poda). O que foi digitado e guardado: o
+   catalogoSobMedida roda de novo a cada abertura da aba (§12). */
+const SMCONF={produto:'',largura:'',altura:''};
+function desenharSmConf(produtos){
+  const box=$('#fxSmConf'); if(!box) return;
+  const lista=(produtos||[]).filter(p=>p.materiais>0);
+  if(!lista.length){ box.innerHTML='<div class="sub">Nenhum produto com lista de material para conferir.</div>'; return; }
+  box.innerHTML='<div class="sub" style="margin-bottom:4px">Conferir numa medida:</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">'
+    +'<select id="smcP">'+lista.map(p=>'<option value="'+p.id+'"'+(String(p.id)===SMCONF.produto?' selected':'')+'>'+esc(p.nome)+'</option>').join('')+'</select>'
+    +'<input id="smcL" inputmode="decimal" placeholder="largura (cm)" style="width:110px" value="'+esc(SMCONF.largura)+'">'
+    +'<span>×</span><input id="smcA" inputmode="decimal" placeholder="altura (cm)" style="width:110px" value="'+esc(SMCONF.altura)+'">'
+    +'<button class="btn" id="smcB">Conferir</button></div><div id="smcR" style="margin-top:8px"></div>';
+  const guarda=()=>{ SMCONF.produto=$('#smcP').value; SMCONF.largura=$('#smcL').value; SMCONF.altura=$('#smcA').value; };
+  ['#smcP','#smcL','#smcA'].forEach(q=>$(q).addEventListener('input',guarda));
+  $('#smcP').addEventListener('change',guarda);
+  $('#smcB').onclick=conferirSm;
+  [$('#smcL'),$('#smcA')].forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter') conferirSm(); }));
+}
+const QUANDO_TXT={sempre:'sempre',bando:'com bandô',barra:'com barra',sem_adicional:'sem adicional',reducao:'com redução',
+  com_comando:'com comando',sem_comando:'sem comando',abertura_lateral:'abertura lateral',abertura_central:'abertura central'};
+async function conferirSm(){
+  const out=$('#smcR'); if(!out) return;
+  out.innerHTML='<span class="sub">calculando…</span>';
+  let r=null, st=0;
+  try{ const x=await fetch('/api/catalogo/sobmedida/'+encodeURIComponent($('#smcP').value)+'/medida?largura='
+      +encodeURIComponent($('#smcL').value)+'&altura='+encodeURIComponent($('#smcA').value)); st=x.status; r=await x.json(); }
+  catch(e){ out.innerHTML='<span style="color:var(--verm,#e5484d)">Não deu para calcular agora. Tente de novo.</span>'; return; }
+  if(st!==200||!r){ out.innerHTML='<span style="color:var(--verm,#e5484d)">'+esc((r&&r.erro)||'Não deu para calcular.')+'</span>'; return; }
+  if(r.fora){ out.innerHTML='<span class="sub">O sob medida não está ligado neste servidor.</span>'; return; }
+  const ve=('custo_sempre_centavos' in r);
+  const rs=c=>c==null?'—':'R$ '+(c/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const num=v=>v==null?'—':(+v).toLocaleString('pt-BR',{maximumFractionDigits:3});
+  out.innerHTML='<div style="overflow-x:auto"><table><thead><tr><th>Material</th><th>Quando entra</th><th>Quantidade</th>'
+    +(ve?'<th>Custo</th>':'')+'</tr></thead><tbody>'
+    +r.linhas.map(x=>'<tr><td>'+esc(x.nome||'')+'</td><td>'+esc(QUANDO_TXT[x.quando]||x.quando)+'</td><td>'
+      +(x.erro?'<span style="color:var(--ambar,#f5a524)">'+esc(x.erro)+'</span>':num(x.quantidade)+' '+esc(x.unidade||''))+'</td>'
+      +(ve?'<td>'+rs(x.custo_centavos)+'</td>':'')+'</tr>').join('')+'</tbody></table></div>'
+    +(ve?'<div style="margin-top:6px"><b>Custo de material, o que entra sempre: '+rs(r.custo_sempre_centavos)+'</b>'
+      +' <span class="sub">· o que depende de escolha (bandô, comando…), à parte: '+rs(r.custo_opcional_centavos)+'</span></div>'
+      +(r.sem_custo&&r.sem_custo.length?'<div style="color:var(--ambar,#f5a524);margin-top:4px">Sem preço: '+esc(r.sem_custo.join(', '))+' — o custo fica indefinido.</div>':'')
+      :'<div class="sub" style="margin-top:6px">Os valores em R$ não aparecem para o seu acesso.</div>');
 }
 
 async function carregarFicha(){
