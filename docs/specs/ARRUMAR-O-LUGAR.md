@@ -2,10 +2,10 @@
 
 ```
 STATUS
-Situação: RASCUNHO · espera a aprovação do dono
+Situação: APROVADA pelo dono em 11/11/2026 · planejado
 Criada em: 11/11/2026
 Última atualização: 11/11/2026
-Fase atual: nenhuma construída
+Fase atual: 1 (PLANO a apresentar)
 Fases: 1 ☐  2 ☐  3 ☐  4 ☐  5 ☐
 Risco: 🔴 (cria tela, mexe em permissão e na tela de Acessos; a fase 4 muda regra do sob medida)
 Depende de: ORGANIZACAO-DO-SISTEMA (os 18 módulos, o mapa com módulo e bloco, o menu único)
@@ -20,7 +20,8 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
 | Tela nova | Nº | Módulo | Bloco | Liga-se a |
 |---|---|---|---|---|
 | Materiais | 1101 | Cadastros | Comum | 501 (lista de compras e pedidos leem o material), 404 (a ficha aponta o material), 502–504 |
-| Parceiros (fornecedores e transportadoras) | 1102 | Cadastros | Comum | 501 (pedido), 502 (recebimento), 252 (coleta de devolução), 604 (rolo do sob medida) |
+| Fornecedores | 1102 | Cadastros | Comum | 501 (pedido), 502 (recebimento), 604 (rolo do sob medida) |
+| Transportadoras | 1104 | Cadastros | Comum | 252 (coleta de devolução e envio de item faltante) |
 | Almoxarifados e endereços | 1103 | Cadastros | Comum | 503 (guardar e mover), 504 (contar), 603/604 (sobra e rolo do sob medida) |
 | Recebimento retido | 1201 | Almoxarifado | Comum | 502 (de onde o retido vem) |
 | Notas fiscais de compra | 1301 | Fiscal | Comum | 501 (pedido), 502 (recebido), custo médio do material |
@@ -112,7 +113,8 @@ acesso. O endereço antigo (`/admin/compras#notas`, por exemplo) leva à tela no
 | Sai de | O pedaço | Vai para |
 |---|---|---|
 | 501 Compras | aba Materiais (com mínimo e ideal) | **1101 Materiais** |
-| 501 Compras · 252 · 606 | aba Fornecedores · aba Transportadoras · o fornecedor do sob medida | **1102 Parceiros**, com as abas Fornecedores e Transportadoras |
+| 501 Compras · 606 | aba Fornecedores · o fornecedor do sob medida | **1102 Fornecedores** |
+| 252 Devoluções | aba Transportadoras | **1104 Transportadoras** |
 | 501 Compras · 606 | aba Almoxarifados e a criação de endereços · aba Endereços | **1103 Almoxarifados e endereços** — uma porta só para as duas operações |
 | 501 Compras | aba Recebimento retido | **1201 Recebimento retido** |
 | 302 Contagem | os ajustes antigos de material esperando aprovação e o cartão "Material" | entram na **504** (sem tela nova) |
@@ -159,8 +161,7 @@ e o custo lerem. Renomear e juntar duplicados continua no PCP.
 
 ## 7. Fica de fora
 
-- Juntar fornecedor e transportadora **numa tabela só**: a 1102 junta as duas telas,
-  o banco continua com as duas tabelas.
+- Juntar fornecedor e transportadora num cadastro só (decisão do dono: duas telas).
 - Mudar o preço do Catálogo de lugar (D2) e a Alçada de compra (D3).
 - O "quem vende" no material e o tecido completo da medida padrão (`CADASTRO-DE-MATERIAL`).
 - As duas fichas técnicas no cadastro único (`FICHAS-NO-CADASTRO-UNICO`).
@@ -175,7 +176,8 @@ para ninguém perder acesso):
 | Nº | Tela | Módulo | Nível | Abre com |
 |---|---|---|---|---|
 | 1101 | Materiais | Cadastros | Admin | as chaves da aba Materiais da 501 |
-| 1102 | Parceiros | Cadastros | Admin | as da aba Fornecedores da 501 **ou** as da aba Transportadoras da 252 (cada aba de dentro, com a sua) |
+| 1102 | Fornecedores | Cadastros | Admin | as da aba Fornecedores da 501 |
+| 1104 | Transportadoras | Cadastros | Supervisor | as da aba Transportadoras da 252 |
 | 1103 | Almoxarifados e endereços | Cadastros | Admin | as da aba Almoxarifados da 501 e as da aba Endereços da 606 |
 | 1201 | Recebimento retido | Almoxarifado | Admin | `recebimento.liberar` |
 | 1301 | Notas fiscais de compra | Fiscal | Admin | `nota.lancar` (e as de leitura de hoje) |
@@ -207,7 +209,7 @@ para ninguém perder acesso):
   rodando duas vezes, e alguém que via o valor deixando de ver.
 
 ### Fase 2 — A 501 fica só com compra 🔴
-1101, 1102 (só a aba Fornecedores; a de Transportadoras entra na fase 4), 1103 (só
+1101, 1102, 1103 (só
 a parte do PCP), 1201, 1301, 1302; a parte de material da 302 na 504. Inaugura o
 Fiscal. A lista `FORA_DO_LUGAR` perde os seis itens da 501 e o da 302.
 
@@ -217,7 +219,7 @@ parâmetros e feriados do sob medida. A lista perde o `902/horarios`.
 
 ### Fase 4 — O sob medida e as transportadoras 🔴
 O fornecedor da 606 para de ser criado lá (D1, regra); a aba Endereços da 606 vai à
-1103; a aba Transportadoras da 252 vai à 1102; saem a aba Entrada de rolo (604) e
+1103; a aba Transportadoras da 252 vai à 1104; saem a aba Entrada de rolo (604) e
 "Quem entra" (606).
 
 ### Fase 5 — Os relatórios na 904 🟡
@@ -238,7 +240,14 @@ endereço antigo leva à aba da 904).
 - **Abrir as telas** com quatro perfis: Admin Geral; Admin sem chave de valor;
   quem só recebe material; vendedor do sob medida — em 1440 px.
 
-## 11. Perguntas ao dono (antes do "pode seguir")
+## 11. Respostas do dono (11/11/2026)
+
+1. **Sim:** a regra permite tirar os valores das devoluções de quem lança ou acompanha (backfill: ninguém perde no deploy).
+2. **Sim:** o sob medida separa "ver preço de venda" de "ver custo e valor do estoque" (backfill: quem tem hoje recebe as duas).
+3. **Duas telas:** 1102 Fornecedores e 1104 Transportadoras.
+4. **Os números estão bons.**
+
+### As perguntas, como foram feitas
 
 1. **A 252:** tudo bem a regra nova permitir tirar os valores de quem lança ou
    acompanha devolução (§3)? No deploy ninguém perde nada.
