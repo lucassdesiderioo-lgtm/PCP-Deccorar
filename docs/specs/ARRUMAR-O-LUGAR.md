@@ -38,6 +38,12 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
   /api/config/horarios` deixou de ser descartado calado — 400 dizendo o dia e o
   campo, e nada grava.
 - **A lista do que está fora do lugar está vazia.**
+- **Divergência D12 — os horários de corte e despacho moram na 206, e não na
+  906** (AJUSTE de 11/11/2026, decisão do dono, linha em `docs/DECISOES.md`): é
+  o mesmo assunto das coletas lançadas (horário de saída). Viraram o bloco
+  "Horário padrão da semana" da 206, que abre também com `horarios.editar`; a 906
+  ficou com o segundo bipe e o sob medida, e aponta o caminho. A regra não mudou.
+  Ficou de fora, e é REGRA: a Revisão ler o corte da coleta lançada na 206.
 - **③ REVISÃO (três rodadas, `revisor-fabrica` e `testador-tela`), consertado
   com o teste antes:** a 610 continua mostrando, só leitura, os números do prazo
   e os feriados (o vendedor os lia ali e não abre a 906); o dia que não vem como
@@ -48,7 +54,7 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
   horário recusado não ficava marcado; e o último número de pedido do Decorsoft,
   agora mandado como texto, aceitava letra — o `config.js` do sob medida passou
   a gravá-lo só inteiro, ou vazio ("ainda não lançado", §4.18).
-- `teste_parametros.js` (63), escrito antes; o `teste_lugar.js` e o
+- `teste_parametros.js` (88; 63 na entrega, 25 no AJUSTE da D12), escrito antes; o `teste_lugar.js` e o
   `teste_501_so_compra.js` passaram a esperar a lista vazia e a 906 no inventário.
 
 ### Fase 2 — a 501 fica só com compra (11/11/2026, no ar, PR #336)
