@@ -228,8 +228,9 @@ redução     = R$ por peça, cobrada inclusive quando entra automática
 > parcial —, o que se sabe sai como **piso** (`≥`) e a linha que falta é
 > **nomeada**. Zero é um custo válido e mentiroso.
 
-> ⚠️ **QUEM NÃO TEM `custo.ver` NÃO RECEBE OS CAMPOS.** A poda é a mesma do
-> resto do módulo (`custo.podar`), que corta **por padrão de nome**. Por isso
+> ⚠️ **QUEM NÃO TEM `preco.ver` NÃO RECEBE OS CAMPOS** (desde 11/11/2026, a
+> regra do valor; antes era a `custo.ver`). A poda é a de venda do módulo
+> (`custo.podarVenda`), que corta **por padrão de nome**. Por isso
 > todo campo de dinheiro daqui se chama `preco_*` ou `valor_*`: um
 > `total_centavos` **não casaria** com o padrão e vazaria em silêncio. Há caso
 > travando os dois lados.
@@ -263,7 +264,8 @@ aviso que ninguém leu.
 | `modulo.entrar` | abrir o módulo (tela inicial e menu) | ✅ | ✅ | ✅ |
 | `catalogo.ler` | ver o catálogo e usar o simulador | ❌ | ✅ | ✅ |
 | `catalogo.editar` | modelo, coleções, escada, ficha, preços | ❌ | ❌ | ✅ |
-| `custo.ver` | os campos de dinheiro no JSON | ❌ | ✅ | ✅ |
+| `preco.ver` | o preço de venda no JSON (catálogo, simulador, pedido, revendas, financeiro) — desde 11/11/2026 | ❌ | ✅ | ✅ |
+| `custo.ver` | o custo e o valor do estoque no JSON (corte, sobras, rolos, cadastros, painel) | ❌ | ✅ | ✅ |
 | `revenda.ler` | as revendas e a carteira | ❌ | ✅ | ✅ |
 | `revenda.editar` | cadastro, endereços, contatos, tabela, desconto | ❌ | ❌ | ✅ |
 | `credito.editar` | o limite de crédito e a revisão dele | ❌ | ❌ | ✅ |
@@ -293,10 +295,11 @@ As três telas de venda são **escritório** (tema escuro):
 > módulo inteiro que ela veio tirar dele — sem ninguém pedir, e sem erro em
 > tela nenhuma.
 >
-> ⚠️ **`custo.ver` ESTÁ NO PAPEL DELE, E TEM QUE ESTAR.** A poda do `custo.js`
-> corta todo campo de dinheiro de quem não a tem — sem ela o vendedor abriria
-> o simulador e veria a persiana inteira **sem o preço**, que é justamente o
-> número que ele foi buscar.
+> ⚠️ **`preco.ver` ESTÁ NO PAPEL DELE, E TEM QUE ESTAR** (desde 11/11/2026;
+> antes era a `custo.ver`). A poda de venda do `custo.js` corta o preço de
+> quem não a tem — sem ela o vendedor abriria o simulador e veria a persiana
+> inteira **sem o preço**, que é justamente o número que ele foi buscar. A
+> `custo.ver` ele também recebe, e o dono pode tirá-la na tela de Acessos.
 >
 > ⚠️ **E `revenda.editar`/`credito.editar` NÃO SÃO DELE**, por decisão da fase
 > 2: a tabela, o desconto e o limite são decisão de quem responde pelo
@@ -2408,7 +2411,7 @@ As quatro regras do `custo.js` continuam valendo:
   saem como **piso** (`≥`) enquanto houver alguma.
 - **Sem preço, traço.** Nunca `R$ 0,00` na linha.
 - **Quem não tem `custo.ver` não recebe os campos.** A poda é na rota, pela
-  `custo.podar` (dono único, usada por rolos, sobras e **tecidos**: o preço do
+  `custo.podarCusto` (dono único desde 11/11/2026, ao lado da `podarVenda`; usada por rolos, sobras e **tecidos**: o preço do
   m² viaja em `/api/tecidos`, a rota que a bancada usa para montar as fileiras
   do lançamento).
 - **Mudança de preço deixa rastro.** O do tecido em `tecido_preco` (de → para,

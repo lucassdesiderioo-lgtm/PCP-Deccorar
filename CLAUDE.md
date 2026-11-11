@@ -1850,7 +1850,9 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 >
 > ⚠️ **O PEDIDO SE PODA PARA QUEM SÓ RECEBE** (R-CMP-28): sem chave de compra, nota ou
 > custo, o `GET /api/pedidos` sai sem `valor*`, `preco*`, `custo*`, `qtd_*`, `frete*`,
-> `desconto*`, `desembolso*` e `alcada*`, e o texto de WhatsApp é 403. **Campo de
+> `desconto*`, `desembolso*` e `alcada*`, e o texto de WhatsApp é 403. **Desde
+> 11/11/2026 (§23) quem tem `compras.ver` sem `compras.valores` também recebe o
+> pedido sem o dinheiro** (as quantidades ficam), e o WhatsApp é 403 para ele. **Campo de
 > dinheiro novo no pedido segue esse prefixo**, senão viaja.
 >
 > ⚠️ **O ROLO DO SOB MEDIDA NASCE NUMA CHAMADA SÓ, NO FIM DA TRANSAÇÃO DO PCP**
@@ -2358,8 +2360,9 @@ dinheiro não vem junto.
 > cobertura escrita à mão, que envelheceria calada.
 >
 > ⚠️ ~~**O DINHEIRO NEM VIAJA** para quem não tem `devolucao.dinheiro`~~ —
-> **desde 03/11/2026 os valores viajam a quem lança ou acompanha** (bloco
-> abaixo). Continuam fora do fio para quem não tem nenhuma das três chaves
+> ~~**desde 03/11/2026 os valores viajam a quem lança ou acompanha**~~ —
+> **desde 11/11/2026 viajam a quem tem `devolucao.valores` ou
+> `devolucao.dinheiro`** (§23). Continuam fora do fio para quem não tem
 > (R15): lista, caso, encerrados e busca saem sem `valor_ml`, `custo`,
 > `valor_devolvido`, `valor_perdido`, `limite_frete` e `saldo` (o teste varre
 > as chaves do JSON), e os **totais em reais do relatório** só com
@@ -2453,7 +2456,8 @@ dinheiro não vem junto.
 > custo, a situação do valor e o valor do ML — pelas **mesmas** funções da
 > tela do caso (`devcaso_dominio.lancarCompleto`), numa transação só: parte
 > recusada, caso não nasce pela metade. Valor, custo, etiqueta e limite do
-> frete no lançamento são de **quem lança** (desde 03/11/2026). Valor sem
+> frete no lançamento são de **quem lança** (desde 03/11/2026) **e tem
+`devolucao.valores`** (desde 11/11/2026, §23). Valor sem
 > situação escolhida vira "já veio", a regra que já valia no caso.
 >
 > ⚠️ **O CEP NÃO VEM DA NF, e não é esquecimento.** O PCP não grava o CEP da
@@ -2518,7 +2522,7 @@ dinheiro não vem junto.
 > ⚠️ **O "ML DEVOLVE" TAMBÉM TEM CUSTO: A ETIQUETA DE DEVOLUÇÃO** (decisão do
 > dono). Quando o ML entende que o problema é nosso, ele cobra a etiqueta
 > (R$ 48,70 no caso que originou isto). `devolucao_caso.custo_etiqueta`, nos
-> dois tipos, é um **valor do caso**: de quem lança ou acompanha, no lançamento
+> dois tipos, é um **valor do caso**: de quem tem `devolucao.valores` (§23), no lançamento
 > ou no "Salvar alterações". O relatório soma as
 > etiquetas **à parte** — não entram no saldo da coleta. Vazio não é zero, mas
 > também não é "falta": o ML nem sempre cobra.
@@ -2528,8 +2532,8 @@ dinheiro não vem junto.
 > não é nossa, **depois de a caixa chegar** pede-se revisão ("Pedi revisão do
 > frete ao ML", com o número da solicitação se houver); a resposta é "devolveu"
 > ou "negou". Pedir e responder são de `devolucao.acompanhar` (conferida também
-> na rota), e o **valor devolvido** (`valor_revisao`) também, como os outros
-> valores do caso. Só no "ML devolve" — no "Nós coletamos"
+> na rota), e o **valor devolvido** (`valor_revisao`) também pede
+> `devolucao.valores`, como os outros valores do caso (§23). Só no "ML devolve" — no "Nós coletamos"
 > quem cobra é a transportadora. Pedida e sem resposta, o caso mostra "revisão
 > do frete pedida há N dias", âmbar a partir do `devol_parado_dias`. **Antes o
 > "ML devolve" encerrava sempre na baixa; agora, com a revisão pendente, a
@@ -2864,7 +2868,7 @@ dinheiro não vem junto.
 >   digitado é recusado — envio de graça seria `REGRA` nova. A mesma porta
 >   corrige depois, e a história diz "frete lançado / trocado", **nunca o
 >   número** (o número vai à auditoria). O `custo_envio` está na lista
->   `DINHEIRO`: viaja a quem lança ou acompanha (ou tem o dinheiro), e o
+>   `DINHEIRO`: viaja a quem tem `devolucao.valores` (ou o dinheiro, §23), e o
 >   **frete total do mês** só com `devolucao.dinheiro`.
 > - **"ML avisado" só existe na origem ML** (sem ele na trilha do WhatsApp) e
 >   pede o anexo `print_ml`, pela rota `aviso-ml` de sempre. Depois do último
@@ -3221,7 +3225,7 @@ logado"*. Linhas em `docs/DECISOES.md`.
 > recusado na bancada, um desfazer de verdade e a primeira sessão nova gravada
 > em `sessao`. Prova que não foi feita se escreve como não feita.
 
-**Rode `node teste_quem.js` (306) ao criar QUALQUER rota de escrita, mexer no
+**Rode `node teste_quem.js` (308) ao criar QUALQUER rota de escrita, mexer no
 `quem.js` ou num `require` de módulo de rotas.** Ele sobe os módulos na ordem do
 `server.js` e chama cada escrita sem login; rota nova que não passa pelo `quem.js`
 reprova no mesmo minuto em que é escrita.
@@ -4162,8 +4166,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   pode ter havido prorrogação não lançada, e quem decide é o admin geral (§9-B, R7)
 - ❌ Gravar custo, valor do ML ou valor perdido vazio como zero: o saldo e o
   total do mês ficam incompletos e saem como piso (§9-B, R9)
-- ❌ Mandar `valor_ml`, `custo`, `saldo` ou os valores pelo fio a quem não lança
-  nem acompanha, mandar os totais do relatório sem `devolucao.dinheiro`, ou
+- ❌ Mandar `valor_ml`, `custo`, `saldo` ou os valores pelo fio a quem não tem
+  `devolucao.valores` (§23), mandar os totais do relatório sem `devolucao.dinheiro`, ou
   escrever o número na história do caso (§9-B, R15)
 - ❌ Fazer a baixa encerrar sozinha o "ML devolve", ou fechar com a revisão no
   ML pedida e sem resposta: sem o "Já revisei" o prazo de contestar passa, e a

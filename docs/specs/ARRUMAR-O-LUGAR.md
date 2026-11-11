@@ -17,8 +17,8 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
 
 ### Fase 1 — a regra do valor (11/11/2026, em código)
 
-- **O mapa:** `valor:` em 17 telas (301, 302, 404, 501, 252 e 602–604, 606–611,
-  614–616). **`valor.js`** (novo) é o dono único de "esta pessoa vê este
+- **O mapa:** `valor:` em 16 telas (301, 302, 404, 501, 252 e 603, 604, 606–611,
+  614–616; a 602 saiu na ③ REVISÃO: não mostra dinheiro). **`valor.js`** (novo) é o dono único de "esta pessoa vê este
   dinheiro?", com a lista de quem lança vê o que lança.
 - **As chaves:** `devolucao.valores` e `compras.valores` (Supervisor, sensíveis) e
   a `preco.ver` do sob medida (Operação, sensível); a `custo.ver` do sob medida
@@ -68,9 +68,9 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
   **Fica para o dono (P5):** sem a caixinha, o "Enviado" do item faltante não
   se marca nem para corrigir só o rastreio.
 - `teste_valor.js` (108) e `tecido/teste/valor.test.js` (12), escritos antes do
-  conserto. Mudaram as pessoas de mentira de quatro testes (as de depois do
+  conserto. Mudaram as pessoas de mentira de cinco testes (as de depois do
   backfill), sem mudar o esperado de nenhum: `teste_devolucao_casos.js` (1104),
-  `teste_devolucao_casos_tela.js` (247), `teste_revisao_compras.js` (46) e
+  `teste_devolucao_casos_tela.js` (247), `teste_revisao_compras.js` (46), `teste_pedido_compra.js` (64) e
   `teste_acessos_f2.js` (89, com o caso novo da `preco.ver`); dois testes do
   sob medida trocaram a poda única pela de venda.
 
@@ -248,8 +248,9 @@ para ninguém perder acesso):
 | Chave | Rótulo | Nível | Tela | Backfill de uma vez só |
 |---|---|---|---|---|
 | `devolucao.valores` | Ver valores das devoluções | Supervisor | 252 | quem tem `devolucao.lancar` ou `devolucao.acompanhar` |
-| `sobmedida.preco.ver` | Ver preço de venda | Operação | 608, 609, 611, 614 | quem tem `sobmedida.custo.ver` |
-| `sobmedida.custo.ver` (rótulo muda) | Ver custo e valor do estoque | Operação (o de hoje) | 604, 607, 904 | nenhum — é a chave de hoje, só o rótulo muda (a chave **não** muda, #13) |
+| `sobmedida.preco.ver` | Ver preço de venda | Operação | 608, 609, 611, 614 — **na construção, também 610, 615 e 616** (as três mostram preço de venda) | quem tem `sobmedida.custo.ver` |
+| `sobmedida.custo.ver` (rótulo muda) | Ver custo e valor do estoque | Operação (o de hoje) | 604, 607, 904 — **na construção, 603, 604, 606 e 607**; a 904 fica para a fase 5 | nenhum — é a chave de hoje, só o rótulo muda (a chave **não** muda, #13) |
+| `compras.valores` (é a "uma por tela com valor sem chave" da linha de baixo, para a 501) | Ver valores das compras | Supervisor | 501 | quem tem `compras.ver` |
 | uma por tela com valor sem chave | a definir no inventário da fase 1 | | | quem vê hoje |
 
 **Setores novos:** nenhum.
