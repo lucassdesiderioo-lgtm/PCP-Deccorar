@@ -343,6 +343,25 @@ function desenhar(r){
   (r.avisos||[]).filter(a=>!/^INATIVO/.test(a)).forEach(a=>s.appendChild(el('div',{class:'aviso'},[a])));
 }
 
+function desenharMaterial(m){
+  const box=el('div',{class:'cartao'},[el('h2',{},['Material da ficha'])]);
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('thead',{},[el('tr',{},[el('th',{},['Material']),el('th',{class:'n'},['Quantidade'])]
+    .concat(m.custo_material_piso_centavos!==undefined?[el('th',{class:'n'},['Custo'])]:[]))]));
+  const tb=el('tbody');
+  (m.linhas||m.materiais||[]).forEach(l=>tb.appendChild(el('tr',{},[el('td',{},[l.nome||'']),
+    el('td',{class:'n'},[l.quantidade==null?(l.erro||'—'):String(l.quantidade).replace('.',',')+' '+(l.unidade||'')])]
+    .concat(m.custo_material_piso_centavos!==undefined?[el('td',{class:'n'},[l.custo_centavos==null?'—':reais(l.custo_centavos)])]:[]))));
+  t.appendChild(tb);
+  box.appendChild(rolaH(t));
+  if(m.custo_material_piso_centavos!==undefined){
+    box.appendChild(el('div',{class:'total'},[el('span',{},['Custo de material']),
+      el('span',{},[m.custo_material_centavos!=null?reais(m.custo_material_centavos):'≥ '+reais(m.custo_material_piso_centavos)])]));
+    if((m.sem_custo||[]).length) box.appendChild(el('p',{class:'nota'},['Sem preço de fornecedor: '+m.sem_custo.join(', ')+'. O custo sai como piso (≥).']));
+  }
+  $('#saida').appendChild(box);
+}
+
 let pendente=null;
 function simular(){
   desenharEscolhas();
@@ -370,6 +389,13 @@ async function rodar(){
     if(r.reducao.automatica) estado.reducao='nao';
     desenharEscolhas();
     desenhar(r);
+    /* A LISTA DE MATERIAL (FICHAS-NO-CADASTRO-UNICO): quanto desta persiana sai
+       do cadastro de material do PCP, e o custo dela — o custo so viaja a quem
+       ve custo (a rota poda). Produto sem lista nao mostra nada. Falhou, cala:
+       o simulador e do preco, e a lista e um bloco a mais. */
+    if((r.materiais||[]).length){
+      try{ desenharMaterial(await api('/api/sm/simular/material',{metodo:'POST',corpo,silencioso:true})); }catch(x){}
+    }
     if(estado.recado){
       $('#saida').insertBefore(el('div',{class:'aviso'},[estado.recado]),$('#saida').firstChild);
       estado.recado=null;

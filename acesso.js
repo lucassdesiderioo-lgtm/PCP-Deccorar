@@ -933,6 +933,7 @@ module.exports = function(app, db){
        desfaria revisao sem operar a bancada. */
     if(eq('/api/revisao/cancelar') || eq('/api/revisao/desfazer') || eq('/api/revisao/ultima')) return 'revisao.executar';
     if(M !== 'GET' && eq('/api/rejeicao')) return 'revisao.rejeitar';
+    if(pre('/api/material-extra')) return 'material.extra';   // a 106 (FICHAS-NO-CADASTRO-UNICO)
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';
     if(M !== 'GET' && eq('/api/embalar')) return 'etiqueta.emitir';
     if(M !== 'GET' && eq('/api/carregar')) return 'carregamento.executar';
@@ -1084,6 +1085,10 @@ module.exports = function(app, db){
        inteira — via a tela e não via a ficha. Agora a leitura sai sem o custo
        (a poda é do ficha_route.js), e gravar a ficha continua pedindo custo.ver. */
     if(M === 'GET' && /^\/api\/ficha\/[^/]+$/.test(p)) return ['modelo.cadastrar','custo.ver','compras.ver'];
+    /* O catalogo unico (FICHAS-NO-CADASTRO-UNICO fase 5): os produtos do sob
+       medida listados na 404, pelas chaves que abrem a 404. So nome e se esta
+       ativo — nenhum preco. */
+    if(M === 'GET' && eq('/api/catalogo/sobmedida')) return ['modelo.cadastrar','custo.ver','compras.ver'];
     if(pre('/api/ficha')) return 'custo.ver';
     // Quem mexe numa formula mexe no consumo de material de toda a linha.
     if(M !== 'GET' && pre('/api/formulas')) return 'modelo.cadastrar';

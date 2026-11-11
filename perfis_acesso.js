@@ -124,7 +124,12 @@ const NASCERAM_DEPOIS = ['coleta.horario',   // HORARIOS-DE-COLETA, 05/11/2026
      devolução, vê compras, tem a custo.ver do sob medida). Saem da comparação
      pelo nome; a outra ponta (quem as ganhou tinha a chave de origem, e mais
      ninguém) é travada no teste_valor.js, seção 3. */
-  'devolucao.valores','compras.valores','sobmedida.preco.ver'];
+  'devolucao.valores','compras.valores','sobmedida.preco.ver',
+  /* FICHAS-NO-CADASTRO-UNICO (11/11/2026): o material extra nasce so para o
+     Admin Geral (R-ALC-06); o dono a da aos Supervisores pela tela de Acessos.
+     Sai da comparacao pelo nome; que so o Admin Geral a recebe e travado no
+     teste_fichas_material.js. */
+  'material.extra'];
 function comparar(antes, agora){
   if(!antes) return 'sem retrato de antes';
   /* A 203 Subir PDF SAIU em 05/11/2026 (decisão do dono, D2): o endereço

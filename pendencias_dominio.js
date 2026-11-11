@@ -125,6 +125,11 @@ const LINHAS = [
   { chave:'nota_sem_pedido', nome:'Nota da Receita sem pedido ou que não entrou', perm:['nota.lancar'], onde:{ url:'/admin/notas' },
     ajuda:'nota emitida contra a Deccorar por fornecedor sem pedido no sistema, ou documento da Receita que não entrou',
     contar(db){ return require('./dfe_dominio').pendencias(db); } },
+  /* FICHAS-NO-CADASTRO-UNICO §3-G (11/11/2026): a peca refeita espera alguem
+     dizer se usou material. A conta e a da tela dona (material_extra_dominio). */
+  { chave:'material_extra', nome:'Material extra a decidir', perm:['material.extra'], onde:{ url:'/material-extra' },
+    ajuda:'peça com problema ou recusada: dizer se usou material, e baixar',
+    contar(db){ return require('./material_extra_dominio').pendentes(db); } },
   { chave:'devolucoes', nome:'Devoluções', perm:['devolucao.baixar'], onde:{ aba:'dv' },
     ajuda:'devoluções esperando a baixa com reputação e motivo',
     contar(db){

@@ -108,7 +108,7 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   <div class="tab" data-t="rel">Relatórios</div>
   <div class="tab" data-t="acs">Acessos &amp; Permissões</div>
   <div class="tab" data-t="pend" id="tabPend">SKU incompleto</div>
-  <div class="tab" data-t="ficha">Ficha técnica</div>
+  <div class="tab" data-t="ficha">Catálogo e ficha técnica</div>
   <div class="tab" data-t="compras">Compras</div>
   <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="cor" id="tabCor">Correções</div><div class="tab" data-t="blq" id="tabBlq">Pendências</div><div class="tab" data-t="tst">Modo teste</div>
 </div>
@@ -204,6 +204,12 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
       </div>
       <div id="fxEscopo" style="margin-top:12px"></div>
     </div>
+    <!-- O CATÁLOGO ÚNICO (FICHAS-NO-CADASTRO-UNICO fase 5, decisão do dono:
+         "catálogo e ficha técnica são a mesma coisa"). Os modelos da medida
+         padrão são o seletor de cima; os produtos do sob medida vêm aqui, com o
+         caminho para a ficha deles (608). A CONTA continua diferente em cada
+         operação: o que se junta é o lugar. -->
+    <div class="card" id="fxCatalogo" style="display:none"></div>
 
     <div class="card">
       <div id="fxLinhas"></div>
@@ -861,7 +867,28 @@ function analisarForma(expr){
   return {id:'livre'};
 }
 
+/* O catálogo único: os produtos do sob medida, com o caminho para a ficha
+   deles quando a pessoa abre a 608 (pela lista de telas dela). Falhou, some. */
+async function catalogoSobMedida(){
+  const box=$('#fxCatalogo'); if(!box) return;
+  let r=null, telas=null;
+  try{ r=await (await fetch('/api/catalogo/sobmedida')).json(); }catch(e){ r=null; }
+  try{ telas=await (await fetch('/api/telas/minhas')).json(); }catch(e){ telas=null; }
+  if(!r||!Array.isArray(r.produtos)){ box.style.display='none'; return; }
+  const abre=!!(telas&&(telas.telas||[]).some(t=>+t.n===608));
+  box.style.display='';
+  box.innerHTML='<b>Produtos do sob medida</b> <span class="sub">— a ficha deles (peças e lista de material) mora no Catálogo do sob medida</span>'
+    +(r.fora?'<div class="sub" style="margin-top:6px">O sob medida não está ligado neste servidor.</div>'
+      :(r.produtos.length?'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">'
+        +r.produtos.map(p=>'<span class="chip" style="padding:4px 10px;border:1px solid var(--borda,#2a3140);border-radius:99px">'
+          +(abre?'<a href="/sobmedida/catalogo?modelo='+p.id+'">'+esc(p.nome)+'</a>':esc(p.nome))
+          +(p.ativo?'':' <span class="sub">(inativo)</span>')
+          +' <span class="sub">· '+p.materiais+' material(is)</span></span>').join('')+'</div>'
+        :'<div class="sub" style="margin-top:6px">Nenhum produto cadastrado.</div>'));
+}
+
 async function carregarFicha(){
+  catalogoSobMedida();
   try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){ COMPS=[]; }
   if(!Array.isArray(COMPS)) COMPS=[];   // sem compras.ver a rota responde {erro}: lista vazia, e nao estouro (rodada 2)
   /* A aba pode abrir antes do carregar() geral preencher os SKUS (③ REVISÃO,
@@ -1090,7 +1117,7 @@ function prepararEditor(){
        simplesmente não roda. Tecido se aponta pela FAMÍLIA, e a cor do SKU mais
        a largura da bobina decidem qual item de estoque sai. */
     c.innerHTML='<option value="">— escolha —</option>'
-      +COMPS.filter(x=>x.ativo && !x.familia && x.vai_ficha!==0).map(x=>'<option value="'+x.id+'">'+esc(x.nome)
+      +COMPS.filter(x=>x.ativo && !x.familia && x.vai_ficha!==0).map(x=>'<option value="'+x.id+'">'+esc((x.codigo_cadastro?x.codigo_cadastro+' · ':'')+x.nome)
         +(x.unidade?' ('+esc(x.unidade)+')':'')+'</option>').join('')
       +[...new Set(COMPS.filter(x=>x.familia && x.ativo && x.vai_ficha!==0).map(x=>x.familia))]
         .map(fam=>'<option value="fam:'+esc(fam)+'">Tecido da família '+esc(fam)

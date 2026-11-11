@@ -43,6 +43,10 @@ module.exports=function(app, db){
     // linha aqui (regra 10). Sem esta cobertura, "apagar tudo" apagaria a
     // contagem de teste e deixaria o estoque de materia prima mexido.
     {nome:'movimento_componente', pk:'id', rotulo:'movimento de material'},
+    /* O material extra a decidir (FICHAS-NO-CADASTRO-UNICO, 11/11/2026): a peca
+       com problema registrada em modo teste nao pode virar decisao de verdade
+       para o Supervisor, e a decisao de teste baixa material de teste. */
+    {nome:'material_extra',    pk:'id', rotulo:'material extra a decidir'},
     /* O LIVRO DA PERSIANA (fase 1, 21/09/2026). Mesma razao do
        movimento_componente logo acima: "apagar tudo" restaura o saldo pela
        foto, e sem esta cobertura as linhas de teste ficariam de pe descrevendo

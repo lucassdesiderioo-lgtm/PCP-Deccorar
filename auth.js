@@ -68,6 +68,7 @@ const TELAS={
   '/inventario':'inventario','/inventario.html':'inventario',
   '/devolucao-casos':'devolucao_casos','/devolucao-casos.html':'devolucao_casos',
   '/coleta-horarios':'coleta_horarios','/coleta-horarios.html':'coleta_horarios',
+  '/material-extra':'material_extra','/material-extra.html':'material_extra',   // a 106 (FICHAS-NO-CADASTRO-UNICO)
   /* COMPRAS-E-RECEBIMENTO (07/11/2026): a 503 Almoxarifado e a 504 Contagem de
      material. Fora desta lista, sem sessao, o pedido cairia no next() e a tela
      seria servida do disco — o teste de seguranca da §10 pegou a 503 com 200

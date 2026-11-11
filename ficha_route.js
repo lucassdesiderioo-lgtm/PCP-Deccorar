@@ -254,6 +254,12 @@ module.exports = function(app, db){
     for(const k of Object.keys(o)) if(!CUSTO_DA_FICHA.test(k)) n[k] = semCusto(o[k]);
     return n;
   }
+  /* O CATALOGO UNICO (FICHAS-NO-CADASTRO-UNICO fase 5, decisao do dono): a 404
+     lista tambem os produtos do sob medida, com o caminho para a ficha deles
+     (608). So nome e ativo atravessam; sem a porta, a lista vem vazia com
+     `fora`, e a tela diz. */
+  app.get('/api/catalogo/sobmedida',(req,res)=>res.json(require('./sobmedida_material').produtos()));
+
   app.get('/api/ficha/:sku',(req,res)=>{
     const f = calcular(req.params.sku);
     let ve = false; try{ ve = !!app.locals.acesso.podePermissao(req.usuario, 'custo.ver'); }catch(e){}

@@ -166,6 +166,9 @@ require('./st_route')(app, db);
 /* Os horarios de saida do dia e a tela 206 (spec HORARIOS-DE-COLETA, 05/11/2026). */
 require('./coleta_horario_route')(app, db);
 app.get('/coleta-horarios',(req,res)=> res.sendFile(path.join(__dirname,'public','coleta-horarios.html')));
+/* A 106 Material extra (FICHAS-NO-CADASTRO-UNICO §3-G, 11/11/2026). */
+require('./material_extra_route')(app, db);
+app.get('/material-extra',(req,res)=> res.sendFile(path.join(__dirname,'public','material-extra.html')));
 // A central de pendencias (fase 1): so le, e pergunta a funcao de cada tela
 // dona — por isso depois de todas elas.
 require('./pendencias_route')(app, db);
@@ -223,7 +226,24 @@ try{
   const sm = require('./tecido/montar').montar(app, null, {
     permissoes: uid => [...app.locals.acesso.permissoesDe(uid)],
     pessoas: () => db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all(),
-    materiais: () => db.prepare('SELECT id,nome,unidade,marca,modelo FROM componente WHERE ativo=1 ORDER BY nome').all(),
+    materiais: () => db.prepare('SELECT id,nome,unidade,marca,modelo,vai_ficha FROM componente WHERE ativo=1 ORDER BY nome').all()
+      .map(m => Object.assign(m, { codigo_cadastro:require('./material_dominio').codigoCadastro(m.id) })),
+    /* FICHAS-NO-CADASTRO-UNICO (11/11/2026): a lista de material da ficha do sob
+       medida e do cadastro unico daqui. Tres portas de ida, todas por aqui:
+       o custo medio (so o custo da persiana, que la e podado por custo.ver),
+       a baixa pela ficha na embalagem e o material extra da peca recusada.
+       O saldo anda SO pelo componente_dominio, numa transacao do dados.db. */
+    /* O custo da unidade pela MESMA conta da ficha da 404 (o melhor preco
+       vigente das ofertas, ficha_dominio.precoUnitario): custo nunca se calcula
+       em dois lugares. Sem oferta, null — nunca zero (regra 4). */
+    custoMaterial: ids => {
+      const out = {};
+      for(const id of (ids || [])) out[id] = require('./ficha_dominio').precoUnitario(db, +id);
+      return out;
+    },
+    baixarMaterial: a => db.transaction(() => require('./baixa_material_dominio').baixar(db, Object.assign({ operacao:'sobmedida', motivo:'ficha',
+      teste:(db.prepare("SELECT valor FROM config WHERE chave='modo_teste'").get() || {}).valor === '1' ? 1 : 0 }, a)))(),
+    materialExtra: a => require('./material_extra_dominio').registrar(db, Object.assign({ origem:'sobmedida_recusa', operacao:'sobmedida' }, a)),
     /* COMPRAS-E-RECEBIMENTO fase 10 (R-CMP-50): o PCP e dono do ENDERECO; o sob
        medida le a arvore, cria o buraco novo da bancada e pergunta se um volume
        do PCP ocupa o nivel — tudo por aqui. */
@@ -232,6 +252,7 @@ try{
                  ocupado: id => require('./almox_dominio').ocupadoPorVolume(db, id) }
   });
   require('./sobmedida_material').ligar(sm && sm.consumoDeMaterial);
+  require('./sobmedida_material').ligarFicha(sm && { linhas:sm.fichaMaterial, embalado:sm.materialEmbalado, produtos:sm.produtosParaPcp });
   /* A PORTA DO ROLO (COMPRAS-E-RECEBIMENTO fase 9): o recebimento do tecido do
      sob medida cria o rolo la, e o cadastro de material do PCP aponta o tecido. */
   require('./sobmedida_rolo').ligar(sm && { criarRolos:sm.criarRolosDoRecebimento, tecidos:sm.tecidosParaCompras });

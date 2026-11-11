@@ -81,6 +81,8 @@ function modelo(id){
     ficha: dCat.ficha(id),
     faixas_suporte: dCat.faixas(id),
     reducao: dCat.reducaoRegra(id)||{modelo_id:id,m2_acima_mm2:null,largura_acima_mm:null},
+    /* A lista de material do cadastro unico (FICHAS-NO-CADASTRO-UNICO). */
+    lista_material: require('./ficha_material').listar(id),
     /* O que a tela precisa para OFERECER so o que o servidor aceita: os
        `quando` e as referencias validas, e os setores do cadastro. Uma lista
        copiada no navegador divergiria na primeira fase que acrescentasse um. */
@@ -203,7 +205,9 @@ const FILHAS=['sm_modelo_colecao','sm_modelo_cor_acessorio','sm_degrau_tubo',
 /* Acrescentada pela fase que cria a tabela — um nome a mais aqui, e o duplicar
    leva junto. */
 const filhas=()=>FILHAS.concat(FILHAS_EXTRAS);
-const FILHAS_EXTRAS=[];
+/* A lista de material (FICHAS-NO-CADASTRO-UNICO) vai junto na copia: o produto
+   copiado gasta o mesmo material. */
+const FILHAS_EXTRAS=['sm_ficha_material'];
 
 function nomeDeCopia(original){
   const raiz='Cópia de '+original;

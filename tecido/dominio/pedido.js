@@ -451,6 +451,10 @@ function aprovar(id,usuario){
         for(let k=1;k<=n;k++) d.criarComponente(Object.assign({},comum,{
           quantidade:c.gera_etiqueta?1:c.quantidade, unidade_k:k, unidade_n:n}));
       });
+      /* A LISTA DE MATERIAL CONGELA AQUI, junto com a ficha (FICHAS-NO-CADASTRO-
+         UNICO): e dela que a embalagem baixa, e mudar a formula amanha nao mexe
+         na persiana aprovada hoje. */
+      require('./ficha_material').congelar(item.id,r.materiais||[]);
     }
     /* ⚠️ O CODIGO DA ETIQUETA NASCE AQUI, e nao na impressao (secao 4.14).
        Junto com a ficha, na MESMA transacao: codigo gravado com a ficha

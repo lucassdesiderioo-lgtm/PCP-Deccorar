@@ -18,6 +18,13 @@ module.exports = [
     rotulo:'Devolver peça à produção', desc:'Registrar peça com problema' },
   { chave:'embalagem.executar',   grupo:'Produção',   tela:102, nivel:'operacao',
     rotulo:'Embalar peças',       desc:'Bipar SKU, kit e finalizar' },
+  /* O MATERIAL EXTRA (FICHAS-NO-CADASTRO-UNICO §3-G, 11/11/2026): a peca com
+     problema e a refeita nao baixam material sozinhas; quem tem esta chave
+     decide no fim do dia se usou e qual. Sensivel: mexe em saldo de material.
+     Nasce so para o Admin Geral (R-ALC-06); o dono a da aos Supervisores. */
+  { chave:'material.extra',       grupo:'Produção',   tela:106, nivel:'supervisor',
+    rotulo:'Decidir material extra', desc:'Dizer se a peça refeita usou material, e baixar',
+    sensivel:true },
 
   // ─── EXPEDIÇÃO ──────────────────────────────────────────────
   { chave:'pdf.subir',            grupo:'Expedição',  tela:103, nivel:'operacao',

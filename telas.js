@@ -68,6 +68,11 @@ const TELAS = [
     modulo:'comercial', bloco:'mercado_livre', liga:[201, 401, 'lote (vendas do PDF)'] },
   { n:104, nome:'Problemas',             rota:'/admin/problemas', nivel:'admin',    onde:'computador', perms:['@admin'],                aba:'pb',
     modulo:'producao', bloco:'medida_padrao', liga:[101] },
+  /* A 106 (FICHAS-NO-CADASTRO-UNICO §3-G, 11/11/2026): o Supervisor decide se a
+     peca com problema (101) ou recusada no sob medida (613) usou material.
+     As duas operacoes, por isso bloco Comum. */
+  { n:106, nome:'Material extra',        rota:'/material-extra', nivel:'supervisor', onde:'computador', perms:['material.extra'],
+    modulo:'producao', bloco:'comum', liga:[101, 613, 1101, 204] },
   { n:105, nome:'Painel da TV',          rota:'/painel',        nivel:'operacao',   onde:'TV',         perms:['painel.ver'],            area:'painel',
     modulo:'producao', bloco:'medida_padrao', liga:[101, 102, 201, 401] },
   // ── 200 · Expedição ──
@@ -111,7 +116,7 @@ const TELAS = [
     modulo:'cadastros', bloco:'medida_padrao', liga:[403, 404, 'skus'] },
   { n:403, nome:'SKU incompleto',        rota:'/admin/sku-incompleto', nivel:'admin', onde:'computador', perms:['sku.cadastrar'],      aba:'pend',
     modulo:'cadastros', bloco:'medida_padrao', liga:[402] },
-  { n:404, nome:'Ficha técnica',         rota:'/admin/ficha',   nivel:'admin',      onde:'computador', perms:['modelo.cadastrar','custo.ver','compras.ver'], aba:'ficha',
+  { n:404, nome:'Catálogo e ficha técnica', rota:'/admin/ficha',   nivel:'admin',      onde:'computador', perms:['modelo.cadastrar','custo.ver','compras.ver'], aba:'ficha',
     valor:['custo.ver'],
     modulo:'cadastros', bloco:'medida_padrao', liga:[402, 401, 501, 'componente'] },
   // ── 500 · Compras ──

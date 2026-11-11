@@ -44,7 +44,11 @@ function listar(){
   const t=v=>v==null||String(v).trim()===''?null:String(v).trim();
   return (porta()||[]).map(m=>({
     id:Number(m.id), nome:String(m.nome||''), unidade:String(m.unidade||''),
-    marca:t(m.marca), modelo:t(m.modelo)
+    marca:t(m.marca), modelo:t(m.modelo),
+    /* FICHAS-NO-CADASTRO-UNICO: "vai para a ficha" (0 = material de consumo
+       da empresa, recusado na lista de material). Ausente conta como vai. */
+    vai_ficha:m.vai_ficha===0?0:1,
+    codigo_cadastro:t(m.codigo_cadastro)   // MAT-0001, quem escreve e o material_dominio do PCP
   }));
 }
 

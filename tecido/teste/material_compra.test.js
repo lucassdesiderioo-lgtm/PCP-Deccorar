@@ -133,7 +133,10 @@ module.exports=[
   materiais.ligar(()=>[{id:101,nome:'Tubo 32 mm',unidade:'m',
     preco:66.13, fornecedor:'JP', estoque:1200}]);
   const m=materiais.listar()[0];
-  igual(Object.keys(m).sort().join(','),'id,marca,modelo,nome,unidade','campos que atravessam');
+  /* FICHAS-NO-CADASTRO-UNICO (11/11/2026): "vai para a ficha" e o codigo de
+     cadastro (MAT-0001) atravessam tambem — a lista de material recusa o
+     material de consumo e mostra o codigo. Nenhum dos dois e dinheiro. */
+  igual(Object.keys(m).sort().join(','),'codigo_cadastro,id,marca,modelo,nome,unidade,vai_ficha','campos que atravessam');
   igual(m.marca,null,'marca ausente vira null — e nao sai no papel');
   materiais.ligar(()=>DO_COMPRAS);
 }},

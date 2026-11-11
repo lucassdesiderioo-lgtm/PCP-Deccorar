@@ -93,7 +93,7 @@ let modelo=null, aba='produto', editando=null, erro=null, novoAberto=false, erro
 let modelos=[];
 
 const ABAS=[['produto','Produto'],['escolhas','Escolhas do cliente'],['colecoes','Coleções de venda'],['escada','Escada de tubos'],
-            ['ficha','Ficha técnica'],['kit','Kit e suportes'],
+            ['ficha','Ficha técnica'],['material','Lista de material'],['kit','Kit e suportes'],
             ['componentes','Componentes e preços']];
 
 /* ⚠️ EDITAR ABRE UMA LINHA DE CADA VEZ, e a tabela continua so de leitura.
@@ -644,6 +644,60 @@ function novaLinhaFicha(){
   return box;
 }
 
+// ── A lista de material (FICHAS-NO-CADASTRO-UNICO, 11/11/2026) ─────────────
+/* O MATERIAL do cadastro unico do PCP (tela 1101) que esta persiana gasta: o
+   parafuso, a corrente — o que nao e peca de producao. A formula e a da ficha
+   da 404 (largura e altura em CENTIMETROS; o resultado na unidade do
+   material). Entra no CUSTO da persiana (o simulador mostra a quem ve custo),
+   e a embalagem baixa daqui quando o material sai pela ficha. Nao mexe em
+   etapa, setor nem etiqueta. */
+function codigoMat(id){ const m=((window.__materiais||{}).materiais||[]).find(x=>x.id===id); return m&&m.codigo_cadastro?m.codigo_cadastro+' · ':''; }
+function abaMaterial(){
+  const c=el('div',{class:'cartao'},[
+    el('h2',{},['Lista de material']),
+    el('p',{class:'nota'},['O material do cadastro de material (tela 1101) que a persiana gasta. '+
+      'A fórmula usa largura e altura em CENTÍMETROS e dá a quantidade na unidade do material '+
+      '(ex.: corrente "(2 * altura - 20) / 100" em metros; parafuso "4"). Ela entra no custo da persiana; '+
+      'o preço de venda não muda.'])
+  ]);
+  const mat=window.__materiais||{};
+  if(mat.ligada===false) c.appendChild(el('p',{class:'erro-linha'},['O cadastro de material do PCP não está ligado neste servidor: não dá para apontar material agora.']));
+  const lista=modelo.lista_material||[];
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('thead',{},[el('tr',{},[el('th',{},['Material']),el('th',{},['Fórmula']),el('th',{},['Quando']),el('th',{},[''])])]));
+  const tb=el('tbody');
+  lista.forEach(l=>{
+    tb.appendChild(el('tr',{class:l.ativo?'':'inativa'},[
+      el('td',{},[codigoMat(l.componente_pcp_id)+(l.nome||('material '+l.componente_pcp_id)), el('div',{class:'setor'},[l.unidade||''])]),
+      el('td',{class:'medida'},[l.expressao]),
+      el('td',{},[l.quando]),
+      el('td',{},[l.ativo?botao('Editar',()=>{ editando='mat-'+l.id; erro=null; desenhar(); }):'',
+        botao(l.ativo?'Tirar':'Voltar',()=>tentar(()=>api('/api/sm/material/'+l.id,{metodo:'PUT',corpo:{ativo:!l.ativo},silencioso:true})))])
+    ]));
+    if(editando==='mat-'+l.id) tb.appendChild(el('tr',{},[el('td',{colspan:'4'},[editor([
+      {chave:'expressao',rotulo:'Fórmula',valor:l.expressao},
+      {chave:'quando',rotulo:'Quando entra',valor:l.quando,opcoes:(modelo.quandos||['sempre']).map(q=>({valor:q,rotulo:q}))}
+    ],v=>tentar(()=>api('/api/sm/material/'+l.id,{metodo:'PUT',corpo:{expressao:v.expressao,quando:v.quando},silencioso:true})),
+      ()=>{ editando=null; erro=null; desenhar(); })])]));
+  });
+  if(!lista.length) tb.appendChild(el('tr',{},[el('td',{colspan:'4',class:'nota'},['Nenhum material na lista ainda.'])]));
+  t.appendChild(tb);
+  c.appendChild(rolaH(t));
+  const box=el('div',{class:'editor'},[el('h2',{},['Acrescentar material'])]);
+  if(editando==='mat-nova'){
+    const op=(mat.materiais||[]).filter(m=>m.vai_ficha!==0).map(m=>({valor:m.id,rotulo:(m.codigo_cadastro?m.codigo_cadastro+' · ':'')+m.nome+' ('+m.unidade+')'}));
+    box.appendChild(editor([
+      {chave:'componente_pcp_id',rotulo:'Material',valor:'',opcoes:[{valor:'',rotulo:'— escolha —'}].concat(op)},
+      {chave:'expressao',rotulo:'Fórmula',valor:'',dica:'largura / 100'},
+      {chave:'quando',rotulo:'Quando entra',valor:'sempre',opcoes:(modelo.quandos||['sempre']).map(q=>({valor:q,rotulo:q}))}
+    ],v=>tentar(()=>api('/api/sm/modelos/'+modelo.id+'/material',{metodo:'POST',
+      corpo:{componente_pcp_id:Number(v.componente_pcp_id),expressao:v.expressao,quando:v.quando},silencioso:true})),
+      ()=>{ editando=null; erro=null; desenhar(); }));
+  }else if(mat.ligada!==false) box.appendChild(botao('+ Acrescentar material',()=>{ editando='mat-nova'; erro=null; desenhar(); }));
+  c.appendChild(box);
+  return c;
+}
+
 // ── Kit e suportes ─────────────────────────────────────────────────────────
 function abaKit(){
   /* ⚠️ A FAIXA E DE CADA KIT (secao 8.5): um Painel com bandô leva os suportes
@@ -818,7 +872,7 @@ function desenhar(){
     ['SEM KIT — a ficha técnica não tem kit de instalação. Todo produto leva kit: '+
      'sem ele o produto não ativa.']));
   raiz.appendChild({produto:abaProduto, escolhas:abaEscolhas, colecoes:abaColecoes, escada:abaEscada, ficha:abaFicha,
-                    kit:abaKit, componentes:abaComponentes}[aba]());
+                    material:abaMaterial, kit:abaKit, componentes:abaComponentes}[aba]());
 
   $('#sobreModelo').textContent='Mínimo faturado de '+emM2(modelo.m2_min_faturado_mm2)+
     ' m² · '+modelo.degraus.length+' degraus · '+modelo.colecoes.length+' coleções ligadas · '+
@@ -862,7 +916,11 @@ async function carregarModelos(escolher){
   $('#modelo').addEventListener('change',()=>{
     modelo={id:Number($('#modelo').value)}; editando=null; erro=null; recarregar(); });
   $('#btNovo').addEventListener('click',()=>{ novoAberto=!novoAberto; erroNovo=null; desenharNovo(); });
+  /* ?modelo=N abre direto no produto: e o caminho do catalogo unico da 404
+     (FICHAS-NO-CADASTRO-UNICO fase 5). Produto que nao existe cai no primeiro. */
+  const pedido=Number(new URLSearchParams(location.search).get('modelo'))||null;
   await carregarModelos();
+  if(pedido&&modelos.some(m=>m.id===pedido)&&modelo.id!==pedido){ modelo={id:pedido}; $('#modelo').value=String(pedido); await recarregar(); }
 })();
 </script>
 </body>

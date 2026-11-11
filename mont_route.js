@@ -45,12 +45,12 @@ module.exports=function(app,db){
      deploy: o código parou de lê-los, e nada foi destruído. Limpar é `rm` na
      pasta `kit/`, com o gerador já rodando. */
   // teste vem por ultimo: e a coluna que o teste_route adicionava por ALTER
-  db.exec("CREATE TABLE IF NOT EXISTS montagem (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, inicio TEXT, fim TEXT, segundos INTEGER, kit_ok INTEGER DEFAULT 1, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, usuario_id INTEGER, usuario_nome TEXT);");
+  db.exec("CREATE TABLE IF NOT EXISTS montagem (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, inicio TEXT, fim TEXT, segundos INTEGER, kit_ok INTEGER DEFAULT 1, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, usuario_id INTEGER, usuario_nome TEXT, modo TEXT);");
   /* QUEM EMBALOU (fase 4 da ACESSOS-UNIFICADOS, divida 9, 26/10/2026): o id e
      o nome de quem fechou a embalagem — o nome como retrato. O ALTER guardado
      e para o banco de producao, onde a tabela ja existe sem as colunas; elas
      entram no FIM, onde o SQLite as poe (§17). */
-  for(const c of ['usuario_id INTEGER','usuario_nome TEXT'])
+  for(const c of ['usuario_id INTEGER','usuario_nome TEXT','modo TEXT'])
     try{ db.exec('ALTER TABLE montagem ADD COLUMN '+c); }catch(e){}
   app.get('/api/config/kit',(req,res)=>{ const r=db.prepare("SELECT valor FROM config WHERE chave='kit_codigo'").get(); res.json({kit:r?r.valor:null}); });
   // Guarda o valor COMO VEIO (so trim) — o link do Drive e case-sensitive e
@@ -277,6 +277,9 @@ module.exports=function(app,db){
           .run(cod,inicio,fim,Math.round(+segundos||0),q.usuario_id,q.usuario_nome).lastInsertRowid;
         const f=db.prepare("SELECT id,modo FROM fila WHERE codigo=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod,emTeste);
         if(f){ db.prepare("UPDATE fila SET situacao='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(f.id); naFila=true; modo=f.modo; }
+        /* O modo da fila fica na linha da embalagem (FICHAS-NO-CADASTRO-UNICO):
+           o "consumido por operacao" nao conta a devolucao reembalada. */
+        db.prepare('UPDATE montagem SET modo=? WHERE id=?').run(naFila?modo:'estoque',mid);
         /* A PORTA DE ENTRADA DO ESTOQUE, e ela passa pelo dono unico desde a
            fase 1 do livro (21/09/2026). A referencia e a linha de `montagem`:
            daqui a um mes, o extrato do SKU responde QUAL embalagem somou esta
@@ -292,6 +295,30 @@ module.exports=function(app,db){
              sobMedida=!!(m&&m.s); }catch(e){ sobMedida=false; }
         if(!sobMedida) ESTOQUE.movimentar(db,{codigo:cod, delta:+1, tipo:'embalagem',
           referencia:'montagem:'+mid, usuario_id:q.usuario_id, usuario_nome:q.usuario_nome});
+        /* ⚠️ O MATERIAL SAI AQUI, PELA FICHA (FICHAS-NO-CADASTRO-UNICO fase 4,
+           decisao do dono de 11/11/2026). So o material marcado "pela ficha"
+           (por quantidade, com contagem na 504) baixa; o resto continua saindo
+           pela contagem. A DEVOLUCAO REEMBALADA NAO BAIXA: a peca ja existia.
+           ⚠️ A BAIXA QUE FALHA NAO TRAVA A EMBALAGEM (#6): ela roda num ponto
+           de salvamento proprio; se estourar, desfaz so ela, a peca embala, e
+           a falha vira "material extra a decidir" para o Supervisor. */
+        if(!sobMedida && modo!=='devolucao'){
+          const BM=require('./baixa_material_dominio');
+          let ficha={itens:[]};
+          try{
+            ficha=BM.daFichaPadrao(db,cod);
+            db.transaction(()=>BM.baixar(db,{itens:ficha.itens, operacao:'padrao', motivo:'ficha',
+              referencia:'montagem:'+mid, usuario_id:q.usuario_id, usuario_nome:q.usuario_nome, teste:emTeste}))();
+          }catch(e){
+            console.error('[montagem] a baixa de material de '+cod+' falhou (a embalagem seguiu):', e.message);
+            /* O registro da falha tambem nao trava: sem a tabela (banco velho,
+               teste antigo), a falha fica so no log, e a peca embala. */
+            try{ require('./material_extra_dominio').registrar(db,{origem:'falha_baixa', operacao:'padrao',
+              referencia:'montagem:'+mid, descricao:cod, motivo:'a baixa pela ficha falhou: '+e.message,
+              sugestao:ficha.itens, registrado_por:q.usuario_nome, registrado_por_id:null}); }
+            catch(e2){ console.error('[montagem] e o material extra da falha tambem nao gravou:', e2.message); }
+          }
+        }
         if(modo==='hoje'){
           const r=db.prepare("SELECT id FROM producao WHERE codigo=? AND data=date('now','localtime') AND produzido<qtd ORDER BY id LIMIT 1").get(cod);
           if(r){ db.prepare('UPDATE producao SET produzido=produzido+1 WHERE id=?').run(r.id); abatido=true; }

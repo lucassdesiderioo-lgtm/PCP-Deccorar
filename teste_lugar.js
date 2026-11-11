@@ -133,6 +133,7 @@ ok('tela no lugar num módulo reservado inaugura o módulo (situação "existe")
 const INV = {   // as 45 telas do §5 da spec, sem faltar nenhuma (③ REVISÃO: eram 26)
   101:['producao','medida_padrao'], 102:['producao','medida_padrao'], 103:['comercial','mercado_livre'],
   104:['producao','medida_padrao'], 105:['producao','medida_padrao'],
+  106:['producao','comum'],   // FICHAS-NO-CADASTRO-UNICO (11/11/2026): o material extra, das duas operacoes
   201:['expedicao','comum'], 202:['expedicao','comum'], 204:['expedicao','comum'], 205:['expedicao','comum'], 206:['expedicao','comum'],
   251:['posvenda','mercado_livre'], 252:['posvenda','mercado_livre'], 253:['posvenda','mercado_livre'],
   301:['estoque','medida_padrao'], 302:['estoque','medida_padrao'], 303:['estoque','medida_padrao'],

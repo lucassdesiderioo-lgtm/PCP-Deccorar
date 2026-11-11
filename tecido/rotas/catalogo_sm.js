@@ -132,6 +132,26 @@ module.exports={rotas:[
    manipulador:({params,corpo})=>catalogo.editarFichaLinha(params.id,corpo),
    detalhe:(req,d)=>'linha de ficha '+(d&&d.chave)},
 
+  /* ── A LISTA DE MATERIAL (FICHAS-NO-CADASTRO-UNICO, 11/11/2026) ────────────
+     O material do cadastro unico do PCP (1101) que a persiana gasta, com a
+     formula da 404. Cadastrar e `catalogo.editar`, como o resto da ficha. O
+     CUSTO tem rota propria, podada por custo.ver (podarCusto) — e nao pela
+     poda de venda: o vendedor ve o preco, nao o custo. */
+  {metodo:'GET', caminho:'/api/sm/modelos/:id/material', permissao:LER,
+   manipulador:({params})=>require('../dominio/ficha_material').listar(Number(params.id))},
+  {metodo:'POST', caminho:'/api/sm/modelos/:id/material', permissao:EDITAR,
+   manipulador:({params,corpo})=>require('../dominio/ficha_material').criar(Object.assign({},corpo,{modelo_id:params.id})),
+   detalhe:(req,d)=>'lista de material: '+(d&&d.nome)+' = '+(d&&d.expressao)},
+  {metodo:'PUT', caminho:'/api/sm/material/:id', permissao:EDITAR,
+   manipulador:({params,corpo})=>require('../dominio/ficha_material').editar(params.id,corpo),
+   detalhe:(req,d)=>'lista de material: '+(d&&d.nome)+(d&&!d.ativo?' (tirada)':'')},
+  {metodo:'POST', caminho:'/api/sm/simular/material', permissao:LER,
+   manipulador:({corpo,usuario})=>{
+     const r=persiana.calcular(corpo,{aceitaInativo:pode(usuario,EDITAR)});
+     return custo.podarCusto(usuario,Object.assign({materiais:r.materiais},
+       require('../dominio/ficha_material').custo(r.materiais)));
+   }},
+
   // ── Faixas de suporte e regra da reducao ────────────────────────────────
   {metodo:'POST', caminho:'/api/sm/modelos/:id/faixas', permissao:EDITAR,
    manipulador:({params,corpo})=>catalogo.criarFaixaSuporte(
