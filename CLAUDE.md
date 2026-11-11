@@ -1850,7 +1850,9 @@ As três regras da #25 valem aqui inteiras, e agora com teste:
 >
 > ⚠️ **O PEDIDO SE PODA PARA QUEM SÓ RECEBE** (R-CMP-28): sem chave de compra, nota ou
 > custo, o `GET /api/pedidos` sai sem `valor*`, `preco*`, `custo*`, `qtd_*`, `frete*`,
-> `desconto*`, `desembolso*` e `alcada*`, e o texto de WhatsApp é 403. **Campo de
+> `desconto*`, `desembolso*` e `alcada*`, e o texto de WhatsApp é 403. **Desde
+> 11/11/2026 (§23) quem tem `compras.ver` sem `compras.valores` também recebe o
+> pedido sem o dinheiro** (as quantidades ficam), e o WhatsApp é 403 para ele. **Campo de
 > dinheiro novo no pedido segue esse prefixo**, senão viaja.
 >
 > ⚠️ **O ROLO DO SOB MEDIDA NASCE NUMA CHAMADA SÓ, NO FIM DA TRANSAÇÃO DO PCP**
@@ -2358,8 +2360,9 @@ dinheiro não vem junto.
 > cobertura escrita à mão, que envelheceria calada.
 >
 > ⚠️ ~~**O DINHEIRO NEM VIAJA** para quem não tem `devolucao.dinheiro`~~ —
-> **desde 03/11/2026 os valores viajam a quem lança ou acompanha** (bloco
-> abaixo). Continuam fora do fio para quem não tem nenhuma das três chaves
+> ~~**desde 03/11/2026 os valores viajam a quem lança ou acompanha**~~ —
+> **desde 11/11/2026 viajam a quem tem `devolucao.valores` ou
+> `devolucao.dinheiro`** (§23). Continuam fora do fio para quem não tem
 > (R15): lista, caso, encerrados e busca saem sem `valor_ml`, `custo`,
 > `valor_devolvido`, `valor_perdido`, `limite_frete` e `saldo` (o teste varre
 > as chaves do JSON), e os **totais em reais do relatório** só com
@@ -2453,7 +2456,8 @@ dinheiro não vem junto.
 > custo, a situação do valor e o valor do ML — pelas **mesmas** funções da
 > tela do caso (`devcaso_dominio.lancarCompleto`), numa transação só: parte
 > recusada, caso não nasce pela metade. Valor, custo, etiqueta e limite do
-> frete no lançamento são de **quem lança** (desde 03/11/2026). Valor sem
+> frete no lançamento são de **quem lança** (desde 03/11/2026) **e tem
+`devolucao.valores`** (desde 11/11/2026, §23). Valor sem
 > situação escolhida vira "já veio", a regra que já valia no caso.
 >
 > ⚠️ **O CEP NÃO VEM DA NF, e não é esquecimento.** O PCP não grava o CEP da
@@ -2518,7 +2522,7 @@ dinheiro não vem junto.
 > ⚠️ **O "ML DEVOLVE" TAMBÉM TEM CUSTO: A ETIQUETA DE DEVOLUÇÃO** (decisão do
 > dono). Quando o ML entende que o problema é nosso, ele cobra a etiqueta
 > (R$ 48,70 no caso que originou isto). `devolucao_caso.custo_etiqueta`, nos
-> dois tipos, é um **valor do caso**: de quem lança ou acompanha, no lançamento
+> dois tipos, é um **valor do caso**: de quem tem `devolucao.valores` (§23), no lançamento
 > ou no "Salvar alterações". O relatório soma as
 > etiquetas **à parte** — não entram no saldo da coleta. Vazio não é zero, mas
 > também não é "falta": o ML nem sempre cobra.
@@ -2528,8 +2532,8 @@ dinheiro não vem junto.
 > não é nossa, **depois de a caixa chegar** pede-se revisão ("Pedi revisão do
 > frete ao ML", com o número da solicitação se houver); a resposta é "devolveu"
 > ou "negou". Pedir e responder são de `devolucao.acompanhar` (conferida também
-> na rota), e o **valor devolvido** (`valor_revisao`) também, como os outros
-> valores do caso. Só no "ML devolve" — no "Nós coletamos"
+> na rota), e o **valor devolvido** (`valor_revisao`) também pede
+> `devolucao.valores`, como os outros valores do caso (§23). Só no "ML devolve" — no "Nós coletamos"
 > quem cobra é a transportadora. Pedida e sem resposta, o caso mostra "revisão
 > do frete pedida há N dias", âmbar a partir do `devol_parado_dias`. **Antes o
 > "ML devolve" encerrava sempre na baixa; agora, com a revisão pendente, a
@@ -2593,11 +2597,16 @@ dinheiro não vem junto.
 > - No "ML devolve" não há abertura, prazo da coleta nem limite de frete — o
 >   limite é **recusado** (400).
 >
-> ⚠️ **OS VALORES SÃO DE QUEM LANÇA E ACOMPANHA; O DINHEIRO FICOU COM AS
+> ⚠️ ~~**OS VALORES SÃO DE QUEM LANÇA E ACOMPANHA**~~ — **desde 11/11/2026 os
+> valores do caso são a caixinha `devolucao.valores`** (a regra do valor, §23):
+> o backfill a deu a quem lançava ou acompanhava, e o dono pode tirá-la. Sem
+> ela, a pessoa lança e acompanha o caso, mas não vê nem digita valor (403
+> dizendo a chave), e não marca o "Enviado" do item faltante, que pede o frete.
+> **O DINHEIRO FICOU COM AS
 > DECISÕES** (decisão do dono, 03/11/2026: *"quem estiver lançando e quem
 > estiver à frente do problema"*). Valor do ML, custo das tentativas, etiqueta,
-> limite do frete e frete devolvido: **vê e lança** quem tem
-> `devolucao.lancar` ou `devolucao.acompanhar`. Com `devolucao.dinheiro` ficam
+> limite do frete e frete devolvido: ~~**vê e lança** quem tem
+> `devolucao.lancar` ou `devolucao.acompanhar`~~ (hoje: `devolucao.valores`). Com `devolucao.dinheiro` ficam
 > só a **baixa do reembolso**, **encerrar como perda**, **devolver ao
 > comprador**, o valor perdido e o devolvido, e os **totais em reais do
 > relatório**. A chave deixou de ser intransferível e virou nível `admin`, para
@@ -2859,7 +2868,7 @@ dinheiro não vem junto.
 >   digitado é recusado — envio de graça seria `REGRA` nova. A mesma porta
 >   corrige depois, e a história diz "frete lançado / trocado", **nunca o
 >   número** (o número vai à auditoria). O `custo_envio` está na lista
->   `DINHEIRO`: viaja a quem lança ou acompanha (ou tem o dinheiro), e o
+>   `DINHEIRO`: viaja a quem tem `devolucao.valores` (ou o dinheiro, §23), e o
 >   **frete total do mês** só com `devolucao.dinheiro`.
 > - **"ML avisado" só existe na origem ML** (sem ele na trilha do WhatsApp) e
 >   pede o anexo `print_ml`, pela rota `aviso-ml` de sempre. Depois do último
@@ -3216,7 +3225,7 @@ logado"*. Linhas em `docs/DECISOES.md`.
 > recusado na bancada, um desfazer de verdade e a primeira sessão nova gravada
 > em `sessao`. Prova que não foi feita se escreve como não feita.
 
-**Rode `node teste_quem.js` (306) ao criar QUALQUER rota de escrita, mexer no
+**Rode `node teste_quem.js` (308) ao criar QUALQUER rota de escrita, mexer no
 `quem.js` ou num `require` de módulo de rotas.** Ele sobe os módulos na ordem do
 `server.js` e chama cada escrita sem login; rota nova que não passa pelo `quem.js`
 reprova no mesmo minuto em que é escrita.
@@ -3892,7 +3901,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). ~~**Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa~~ — **fechado em 08/11/2026**: a 905 Minha produção e a aba Por pessoa da 904 (§21) · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (76), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (306), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (25 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (308), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (73), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (46), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (64), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (54), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (108); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4083,6 +4092,9 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 - ❌ Rejeitar o cookie antigo (só com o id) ou pôr `sessao`/`sessao_evento` no
   modo teste: o deploy deslogaria os tablets, e o login em teste é de verdade (§10)
 - ❌ Chamar `getDocument` do pdf.js sem `isEvalSupported:false`, ou rodar `npm audit fix --force` "para zerar o aviso": o force troca o pdfjs para a 6, que muda a leitura do PDF do ML (§12, dívida 22)
+- ❌ Mostrar dinheiro numa tela sem a chave `valor` no mapa, mandar o campo pelo
+  fio a quem não a tem, ou escrever uma segunda lista de "quem lança vê o que
+  lança" fora do `valor.js` (§23, `docs/regras/valor.md`)
 - ❌ Pôr tela nova no módulo da spec que a criou, ou numa faixa que não é a do
   módulo do assunto dela — e nunca na faixa 600, que está fechada (§22, R-ORG-02 e 06)
 - ❌ Pendurar aba de outro assunto numa tela "para não criar tela nova": aba de
@@ -4154,8 +4166,8 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
   pode ter havido prorrogação não lançada, e quem decide é o admin geral (§9-B, R7)
 - ❌ Gravar custo, valor do ML ou valor perdido vazio como zero: o saldo e o
   total do mês ficam incompletos e saem como piso (§9-B, R9)
-- ❌ Mandar `valor_ml`, `custo`, `saldo` ou os valores pelo fio a quem não lança
-  nem acompanha, mandar os totais do relatório sem `devolucao.dinheiro`, ou
+- ❌ Mandar `valor_ml`, `custo`, `saldo` ou os valores pelo fio a quem não tem
+  `devolucao.valores` (§23), mandar os totais do relatório sem `devolucao.dinheiro`, ou
   escrever o número na história do caso (§9-B, R15)
 - ❌ Fazer a baixa encerrar sozinha o "ML devolve", ou fechar com a revisão no
   ML pedida e sem resposta: sem o "Já revisei" o prazo de contestar passa, e a
@@ -4621,7 +4633,7 @@ de material do PCP (marca e modelo): `node teste_componentes.js`. Todos os
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 857 casos
+cd tecido && npm test          # 869 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
@@ -5132,3 +5144,85 @@ reprova a tela nova que não está lá. Não é para mexer no número: é para d
 >
 > ⚠️ **A 204 PENDÊNCIAS FICA EM EXPEDIÇÃO** de propósito: ela junta pendência de
 > vários módulos, e a maior parte das linhas é de lá, até uma spec decidir.
+
+---
+
+## 23. O dinheiro nas telas — a regra do valor (11/11/2026)
+
+Spec `docs/specs/ARRUMAR-O-LUGAR.md`, fase 1; linhas de 11/11/2026 em
+`docs/DECISOES.md`; cartões **R-VAL-01 a R-VAL-07** em
+[`docs/regras/valor.md`](docs/regras/valor.md). O dono: *"sempre que uma tela
+tiver valor, ela tem que estar linkada ao acessos. Então, a gente assinala ou
+não assinala essa opção para que a pessoa tem ou não tem acesso a ver a tela com
+dinheiro, com valores."*
+
+- **Toda tela com dinheiro declara a chave do valor no mapa** (`valor:[…]` no
+  `telas.js` e no `tecido/nucleo/telas.js`). Hoje: 301, 302 e 404 → `custo.ver`;
+  501 → `compras.valores`; 252 → `devolucao.valores`; 603, 604, 606 e 607 → a
+  `custo.ver` do sob medida; 608–611, 614–616 → `preco.ver`. ⚠️ **Uma chave de
+  VER por tela**: `pedido.pagar` (Pix e banco) e `devolucao.dinheiro` (os totais
+  e as decisões) são AÇÕES, e na tela de Acessos apareceriam como "Ver valores"
+  dando muito mais que ver (③ REVISÃO). ⚠️ **A 602 Corte não tem `valor`**: não
+  mostra dinheiro, e a linha "os valores não aparecem" acenderia todo dia para
+  o cortador.
+- **Na tela de Acessos**, debaixo de cada tela com dinheiro, a linha **"R$ Ver
+  valores (R$) desta tela"**. A mesma chave em duas telas é uma permissão só, e
+  as caixinhas andam juntas.
+- **Sem a caixinha, a tela abre sem o dinheiro, e quem tira é o servidor**: o
+  campo nem viaja, a tela escreve "—", e a barra diz uma vez *"Os valores em R$
+  desta tela não aparecem para o seu acesso."* (`sem_valor` do
+  `/api/telas/minhas`, desenhado pelo `public/menu_telas.js` nas duas operações).
+- ⚠️ **`valor.js` É O DONO ÚNICO DE "ESTA PESSOA VÊ ESTE DINHEIRO?"**, com a
+  lista de quem lança vê o que lança (R-VAL-04): `compras.valores` ← quem cria,
+  aprova ou paga pedido, lança nota ou preço, ou tem `custo.ver`;
+  `devolucao.valores` ← `devolucao.dinheiro`; a `custo.ver` do sob medida ←
+  `rolo.nota`; a `preco.ver` ← quem lança preço no Catálogo, boleto ou limite de
+  crédito (quem só monta pedido, não: ali o preço é calculado). As rotas do
+  Compras e da 252 e a barra perguntam a ele, e a tela de Acessos escreve debaixo
+  da caixinha *"também vê sem esta caixinha quem tem: …"* — desmarcada, ela não
+  tira o valor de quem lança.
+- ⚠️ **NO SOB MEDIDA SÃO DUAS PODAS**, no `tecido/dominio/custo.js`: `podarVenda`
+  (`preco.ver`: catálogo, simulador, pedido e o PDF dele, quadro, indicadores,
+  revendas, financeiro) e `podarCusto` (`custo.ver` ou `rolo.nota`: corte,
+  sobras, rolos, cadastros, painel, produção). A `custo.ver` **não mudou de
+  chave**, só de rótulo (#13). A poda de venda também tira o texto com "R$" (o
+  `base` da linha da conta do pedido).
+- ⚠️ **O BACKFILL RODOU UMA VEZ SÓ** (`config.seed_valor_1`): `devolucao.valores`
+  a quem lançava ou acompanhava devolução, `compras.valores` a quem tinha
+  `compras.ver`, `preco.ver` a quem tinha a `custo.ver` do sob medida. Ninguém
+  perdeu nada no deploy; rodar de novo devolveria a chave a quem o dono tirou.
+  As três saem do retrato de antes pelo nome (`perfis_acesso.js`). ⚠️ **E a
+  conta é pessoa a pessoa** (③ REVISÃO): quem tinha a chave de origem
+  REVOGADA por exceção herdaria a de valor pelo setor; o seed compara as
+  permissões efetivas antes e depois e cria a exceção que revoga a nova. Na 252
+  há duas origens: quem perdeu o lançar mas acompanha continua vendo.
+- ⚠️ **A 404 ABRE A FICHA SEM O CUSTO**: até aqui a leitura da ficha (e a das
+  fórmulas) pedia `custo.ver` ou `compras.ver`, e quem abria a tela com
+  `modelo.cadastrar` via a tabela vazia. A leitura passou às chaves da 404 (a
+  fórmula não tem dinheiro). Gravar continua como era.
+- ⚠️ **O DINHEIRO TAMBÉM VEM ESCRITO, e sai junto**: os avisos do comparar ("o
+  desembolso de B é R$ 60.00 menor"), o texto com "R$" no sob medida, e o total
+  que o marco "enviado" do pedido do sob medida escreve no detalhe sem "R$". E
+  o **orçamento e o comprovante do pedido de compra** (arquivos com preço) só se
+  baixam com a caixinha das compras — como o anexo da nota —, e nem aparecem
+  na lista do detalhe do pedido: a conta é uma só, o `anexo_compra.js`.
+- **Os seis vazamentos que a varredura achou, fechados**: o `custo_direto` do SKU
+  no `/api/skus` (ia a qualquer pessoa logada); os valores da 252 (a "poda" usava
+  as chaves que abrem a tela); e, no sob medida, o valor da sobra no pedido de
+  descarte, a nota e o preço no histórico do rolo, o PDF do pedido e o "R$" no
+  texto da conta.
+- ⚠️ **`subtotal` E `total` NÃO ESTÃO NA PODA DO COMPRAS**: na lista de compras o
+  `subtotal` da origem é QUANTIDADE (peças × consumo), e em outras leituras o
+  `total` é contagem. Só a lista de compras corta o `total` (o previsto).
+- **A 904 continua sem valor** nesta fase; o valor dela, pela chave do assunto, é
+  da fase 5 da spec.
+
+**Rode `node teste_valor.js` (108, sobe o servidor de verdade numa porta livre —
+nunca na 3010) e `cd tecido && npm test` (o `valor.test.js`) ao mexer em tela com
+dinheiro, numa rota que leve valor, no `valor.js`, no `custo.js` do sob medida, no
+mapa ou na tela de Acessos.**
+
+> ⚠️ **EM CÓDIGO DESDE 11/11/2026, FALTA SUBIR.** Ainda não provado com dado real:
+> a caixinha marcada e desmarcada na tela de Acessos com uma pessoa de verdade, e
+> o vendedor do sob medida sem a `custo.ver`. Prova que não foi feita se escreve
+> como não feita.

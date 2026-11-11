@@ -21,6 +21,6 @@ const custo=require('../dominio/custo');
 module.exports={rotas:[
 
   {metodo:'GET', caminho:'/api/indicadores', permissao:'painel.ler',
-   manipulador:({query,usuario})=>custo.podar(usuario,indicadores.painel({dias:query.dias}))}
+   manipulador:({query,usuario})=>custo.podarVenda(usuario,indicadores.painel({dias:query.dias}))}
 
 ]};

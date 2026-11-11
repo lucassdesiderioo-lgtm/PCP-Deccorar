@@ -195,7 +195,7 @@
 ## E. Recebimento (fase 3)
 
 ### R-CMP-28 · Quem recebe não vê preço
-- Regra:            a fila (`GET /api/recebimento/aguardando`) e a resposta do receber montam o JSON sem nenhum campo de preço, valor ou custo — escolhidos campo a campo no `recebimento_dominio.fila`. **O pedido também**: `GET /api/pedidos` e `/api/pedidos/:id` a quem não tem `compras.ver`, `pedido.criar`, `pedido.aprovar`, `pedido.pagar`, `nota.lancar` nem `custo.ver` saem sem dinheiro, sem o declarado e sem a alçada (a poda é pelo nome: `valor*`, `preco*`, `desembolso*`, `frete*`, `desconto*`, `custo*`, `qtd_*`, `alcada*`), e o texto de WhatsApp (que tem preço) é 403 (revisão do PR #305).
+- Regra:            a fila (`GET /api/recebimento/aguardando`) e a resposta do receber montam o JSON sem nenhum campo de preço, valor ou custo — escolhidos campo a campo no `recebimento_dominio.fila`. **O pedido também**: `GET /api/pedidos` e `/api/pedidos/:id` a quem não tem `compras.ver`, `pedido.criar`, `pedido.aprovar`, `pedido.pagar`, `nota.lancar` nem `custo.ver` saem sem dinheiro, sem o declarado e sem a alçada (a poda é pelo nome: `valor*`, `preco*`, `desembolso*`, `frete*`, `desconto*`, `custo*`, `qtd_*`, `alcada*`), e o texto de WhatsApp (que tem preço) é 403 (revisão do PR #305). **Desde 11/11/2026 (R-VAL)** quem tem `compras.ver` sem `compras.valores` (nem uma ação que lança aquele dinheiro, o `valor.js`) também recebe o pedido sem o dinheiro — as quantidades ficam —, e o WhatsApp é 403 para ele.
 - Por quê:          quem confere vendo valor confirma o que está escrito.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_recebimento.js`; `teste_revisao_compras.js` (o pedido pelo fio a quem só recebe)
@@ -317,7 +317,7 @@
 - História:         fase 4.
 
 ### R-CMP-27 · Quem vê nota, impostos e parcelas
-- Regra:            só `custo.ver` ou `nota.lancar` (as parcelas, também `pedido.pagar`). As rotas `/api/notas` pedem essas chaves, e o pedido completo poda as notas no JSON. **Os anexos da nota** (XML, PDF e foto da nota, ou anexo ligado a uma nota) também: a lista não os mostra e o download é 403 a quem não tem uma das duas — o orçamento continua de quem vê compras.
+- Regra:            só `custo.ver` ou `nota.lancar` (as parcelas, também `pedido.pagar`). As rotas `/api/notas` pedem essas chaves, e o pedido completo poda as notas no JSON. **Os anexos da nota** (XML, PDF e foto da nota, ou anexo ligado a uma nota) também: a lista não os mostra e o download é 403 a quem não tem uma das duas — e desde 11/11/2026 o orçamento e o comprovante do pedido são de quem vê os valores das compras (`compras.valores`, R-VAL-03): a lista e o detalhe do pedido não os mostram, e o download é 403. A conta mora no `anexo_compra.js`.
 - Por quê:          regra 14 do §13: não é a tela que esconde.
 - Exceções:         nenhuma.
 - Teste que trava:  `teste_nota_compra.js` (notas sem poda, reprova 1); `teste_acesso_compras.js`; `teste_revisao_compras.js` (o XML baixado por quem só vê compras, 2)

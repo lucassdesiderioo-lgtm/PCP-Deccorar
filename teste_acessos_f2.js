@@ -161,10 +161,18 @@ require('./acesso')(app, db);
 const AC = app.locals.acesso;
 
 console.log('\n── 1. NINGUEM GANHA NEM PERDE: pessoa a pessoa, chave a chave ──');
+/* A REGRA DO VALOR (R-VAL, spec ARRUMAR-O-LUGAR, 11/11/2026) nasceu depois
+   desta migração: o backfill `seed_valor_1` dá a `preco.ver` a quem tinha a
+   `custo.ver` (a chave que até ali liberava o preço de venda). Ela sai da
+   comparação PELO NOME, e o caso de baixo confere a outra ponta: quem a ganhou
+   tinha a custo.ver, e quem não tinha não ganhou. */
+const semPrecoVer = l => String(l || '').split(',').filter(c => c && c !== 'preco.ver').join(',');
 for(const [k, id] of Object.entries(P)){
   const d = depoisDe(AC, id), a = ANTES[k];
   eq(k + ': entra no sob medida igual a antes', d.entra, a.entra);
-  eq(k + ': as mesmas permissoes', d.pode, a.pode);
+  eq(k + ': as mesmas permissoes', semPrecoVer(d.pode), semPrecoVer(a.pode));
+  const tinhaCusto = String(a.pode || '').split(',').indexOf('custo.ver') >= 0, temPreco = String(d.pode || '').split(',').indexOf('preco.ver') >= 0;
+  ok(k + ': a preco.ver veio só para quem tinha a custo.ver (R-VAL)', tinhaCusto === temPreco || (temPreco && String(d.pode).indexOf('*') >= 0), 'tinha custo.ver: ' + tinhaCusto + ' · tem preco.ver: ' + temPreco);
   eq(k + ': as mesmas bancadas', d.setores, a.setores);
 }
 

@@ -305,7 +305,7 @@ function abaColecoes(){
     const tr=el('tr',{class:col.disponivel?'':'inativa'});
     tr.appendChild(el('td',{},[col.colecao_nome]));
     tr.appendChild(el('td',{class:'setor'},[col.linha_nome]));
-    // O preco so chega a quem tem custo.ver — o JSON vem sem o campo.
+    // O preco so chega a quem tem preco.ver — o JSON vem sem o campo.
     const temPreco='preco_m2_centavos' in col;
     tr.appendChild(el('td',{class:'n'},[ temPreco
       ? (col.preco_m2_centavos==null?el('span',{class:'falta'},['sem preço'])

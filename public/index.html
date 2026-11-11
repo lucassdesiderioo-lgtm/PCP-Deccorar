@@ -882,7 +882,8 @@ async function trocarModelo(){
 async function recarregar(){
   const mid=$('#fxModelo').value;
   FXLINHAS=[]; FXFICHA=null;
-  if(mid){ try{ FXLINHAS=await (await fetch('/api/formulas?modelo_id='+mid)).json(); }catch(e){} }
+  /* só vale como LISTA: a recusa (403) é um objeto, e o render estourava nele */
+  if(mid){ try{ const fl=await (await fetch('/api/formulas?modelo_id='+mid)).json(); FXLINHAS=Array.isArray(fl)?fl:[]; }catch(e){} }
   const sku=$('#fxSku')&&$('#fxSku').value;
   if(sku){ try{ FXFICHA=await (await fetch('/api/ficha/'+encodeURIComponent(sku))).json(); }catch(e){} }
   render();
@@ -1209,11 +1210,11 @@ async function compararItem(){
     h+='<tr'+(l.vencedor?' style="background:rgba(255,184,0,.07)"':'')+'>'
       +'<td>'+(l.vencedor?'<b style="color:var(--amber)">✓</b>':'')+'</td>'
       +'<td>'+esc(l.fornecedor)+'</td><td>'+esc(l.embalagem)+'</td>'
-      +'<td>'+l.preco_unitario.toFixed(3).replace('.',',')+'</td>'
+      +'<td>'+(l.preco_unitario==null?'—':l.preco_unitario.toFixed(3).replace('.',','))+'</td>'
       +'<td class="sub">'+l.embalagens+' × '+esc(l.embalagem)+'</td>'
       +'<td><b>'+brl(l.desembolso)+'</b></td>'
       +'<td>'+qtd(l.sobra)+' '+un+'</td>'
-      +'<td>'+l.custo_efetivo.toFixed(3).replace('.',',')+'</td>'
+      +'<td>'+(l.custo_efetivo==null?'—':l.custo_efetivo.toFixed(3).replace('.',','))+'</td>'
       +'<td class="sub">'+(l.prazo!=null?l.prazo+' d':'—')+(l.pagamento?' · '+esc(l.pagamento):'')+'</td></tr>';
     if(l.vencedor&&l.motivo) h+='<tr><td></td><td colspan="8" class="sub" style="color:var(--amber);border-top:0">↳ '+esc(l.motivo)+'</td></tr>';
     if(l.aviso_minimo) h+='<tr><td></td><td colspan="8" class="sub" style="border-top:0">↳ '+esc(l.aviso_minimo)+'</td></tr>';

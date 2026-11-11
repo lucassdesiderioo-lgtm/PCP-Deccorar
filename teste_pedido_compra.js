@@ -37,7 +37,10 @@ const ANA   = { id:2, nome:'Ana', permissoes:['pedido.criar','compras.ver'] };
 const BETO  = { id:3, nome:'Beto', permissoes:['pedido.criar','pedido.aprovar','compras.ver'] };
 const CAIO  = { id:4, nome:'Caio', permissoes:['pedido.criar','pedido.aprovar','compras.ver'] };
 const FIN   = { id:5, nome:'Fina', permissoes:['pedido.pagar','compras.ver'] };
-const LEIT  = { id:6, nome:'Leo', permissoes:['compras.ver'] };
+/* `compras.valores` (R-VAL, spec ARRUMAR-O-LUGAR, 11/11/2026): o backfill a deu a
+   quem tinha compras.ver — esta é a pessoa de depois do deploy. O orçamento do
+   pedido (que tem preço) sem a caixinha está no teste_valor.js. */
+const LEIT  = { id:6, nome:'Leo', permissoes:['compras.ver','compras.valores'] };
 
 (async () => {
   db.exec('CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY, nome TEXT, pin_hash TEXT, salt TEXT, areas TEXT, ativo INTEGER DEFAULT 1)');

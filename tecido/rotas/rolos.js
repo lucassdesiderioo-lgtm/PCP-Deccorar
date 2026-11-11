@@ -16,7 +16,7 @@ const {pode}=require('../nucleo/permissoes');
    lancar. */
 // A regra de quem ve mora no custo.js (dono unico): sobras usa a mesma.
 const veComercial=custo.veComercial;
-const podar=custo.podar;
+const podar=custo.podarCusto;
 
 module.exports={rotas:[
   {metodo:'GET', caminho:'/api/rolos', permissao:'rolo.ler',
@@ -48,8 +48,18 @@ module.exports={rotas:[
   {metodo:'GET', caminho:'/api/rolos/ocupacao', permissao:'rolo.ler',
    manipulador:()=>rolo.ocupacao()},
 
+  /* ⚠️ A LINHA DA NOTA NAO LEVA A NOTA (R-VAL, 11/11/2026). O historico e da
+     bancada (`rolo.ler`), e a observacao do movimento `nota` traz "NF: ... ·
+     fornecedor: ... · preco/m²: x -> y" em texto — a poda por nome de campo
+     nao a pegava. Para quem nao ve custo, a linha fica (o historico nao
+     some) e o texto diz so que houve nota. */
   {metodo:'GET', caminho:'/api/rolos/:id/movimentos', permissao:'rolo.ler',
-   manipulador:({params})=>rolo.movimentos(params.id)},
+   manipulador:({params,usuario})=>{
+     const l=rolo.movimentos(params.id);
+     if(veComercial(usuario)) return l;
+     return l.map(m=>m.motivo==='nota'
+       ?{...m, observacao:'NF, fornecedor ou preço lançados (o detalhe é de quem vê o custo)'}:m);
+   }},
 
   /* A ENTRADA DE ROLO ESTA APOSENTADA (COMPRAS-E-RECEBIMENTO R-CMP-49/50, fase
      9): rolo novo so nasce pelo Recebimento do PCP (502), que o cria aqui pela

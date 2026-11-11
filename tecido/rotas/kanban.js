@@ -18,7 +18,7 @@ const custo=require('../dominio/custo');
    do custo.js — ela corta por PADRAO DE NOME, e nao por lista escrita a mao
    (CLAUDE.md §19). Sem isto o valor de cada pedido viajaria pelo fio para
    quem nao tem `custo.ver`. */
-const podar=(usuario,dados)=>custo.podar(usuario,dados);
+const podar=(usuario,dados)=>custo.podarVenda(usuario,dados);
 
 module.exports={rotas:[
 

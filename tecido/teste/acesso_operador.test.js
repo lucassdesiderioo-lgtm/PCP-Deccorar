@@ -196,9 +196,9 @@ module.exports=[
 
   const antes=dinheiroEm(r,'simular');
   igual(antes.length>0,true,'o calculo TEM dinheiro dentro: '+antes.join(', '));
-  igual(dinheiroEm(custo.podar(CORTADOR,r),'simular').join(', '),'',
+  igual(dinheiroEm(custo.podarVenda(CORTADOR,r),'simular').join(', '),'',
     'e nada disso sobra depois da poda');
-  igual(dinheiroEm(custo.podar(DIRETOR,r),'simular').length,antes.length,
+  igual(dinheiroEm(custo.podarVenda(DIRETOR,r),'simular').length,antes.length,
     'enquanto a chefia recebe tudo');
 
   /* ⚠️ E O NOME DO CAMPO E O QUE FAZ A PODA FUNCIONAR. Um `total_centavos`
@@ -286,13 +286,16 @@ module.exports=[
 
 {nome:'⚠️ O VENDEDOR VE O PRECO — sem isso o simulador nao serviria pra nada',
  executar({igual}){
-  igual(pode(VENDEDOR,'custo.ver'),true,'ele tem custo.ver');
-  igual(custo.veComercial(VENDEDOR),true,'e por isso recebe os campos de dinheiro');
-  igual(custo.veComercial(CORTADOR),false,'enquanto a bancada continua sem');
+  /* Desde 11/11/2026 (R-VAL, spec ARRUMAR-O-LUGAR) o preco de venda e a chave
+     `preco.ver`, e a poda de venda e a `podarVenda`; a `custo.ver` ficou com o
+     custo. O vendedor nasce com as duas — o dono decide se tira o custo. */
+  igual(pode(VENDEDOR,'preco.ver'),true,'ele tem preco.ver');
+  igual(custo.vePreco(VENDEDOR),true,'e por isso recebe os campos de dinheiro da venda');
+  igual(custo.vePreco(CORTADOR),false,'enquanto a bancada continua sem');
   const amostra={valor_subtotal_centavos:20900, revenda:{valor_final_centavos:17870}};
-  igual(JSON.stringify(custo.podar(VENDEDOR,amostra)),JSON.stringify(amostra),
+  igual(JSON.stringify(custo.podarVenda(VENDEDOR,amostra)),JSON.stringify(amostra),
     'o preco da revenda chega inteiro a quem vende');
-  igual(JSON.stringify(custo.podar(CORTADOR,amostra)),'{"revenda":{}}',
+  igual(JSON.stringify(custo.podarVenda(CORTADOR,amostra)),'{"revenda":{}}',
     'e nao sobra um centavo do lado da bancada');
 }},
 
@@ -376,9 +379,9 @@ module.exports=[
     itens:[{valor_subtotal_centavos:20900, valor_final_centavos:17870,
             linhas:[{preco_unitario_centavos:11000, valor_centavos:16500}]}]};
   igual(dinheiroEm(amostra,'pedido').length,6,'a amostra tem seis campos de dinheiro');
-  igual(dinheiroEm(custo.podar(CORTADOR,amostra),'pedido').join(', '),'',
+  igual(dinheiroEm(custo.podarVenda(CORTADOR,amostra),'pedido').join(', '),'',
     'e nada disso sobra do lado da bancada');
-  igual(dinheiroEm(custo.podar(VENDEDOR,amostra),'pedido').length,6,
+  igual(dinheiroEm(custo.podarVenda(VENDEDOR,amostra),'pedido').length,6,
     'enquanto quem vende recebe tudo');
 }},
 /* ═══ A ETIQUETA DE PRODUCAO (fase 4-A) ════════════════════════════════════

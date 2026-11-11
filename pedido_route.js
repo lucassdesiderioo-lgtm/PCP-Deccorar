@@ -124,17 +124,31 @@ module.exports = function(app, db){
     for(const k of Object.keys(o)) if(!CEGO.test(k)) n[k] = podar(o[k]);
     return n;
   }
-  app.get('/api/pedidos',(req,res,next)=>{
-    if(veInteiro(req)) return next();
-    const j = res.json.bind(res); res.json = c => j(podar(c)); next();
-  });
-  app.get('/api/pedidos/:id',(req,res,next)=>{
-    if(veInteiro(req)) return next();
-    const j = res.json.bind(res); res.json = c => j(podar(c)); next();
-  });
+  /* ⚠️ E O DINHEIRO É OUTRA CAIXINHA (R-VAL, spec ARRUMAR-O-LUGAR, 11/11/2026).
+     Quem vê o pedido inteiro (as quantidades, acima) e não tem
+     compras.valores — nem lança dinheiro de compra (pedido, nota, parcela,
+     preço), que vê o que lança — recebe o pedido com as quantidades e SEM o
+     dinheiro. Quem decide é o valor.js. */
+  const VA = require('./valor');
+  const veValor = req => VA.ve(c => { try{ return !!app.locals.acesso.podePermissao(req.usuario, c); }catch(e){ return false; } }, 'compras.valores');
+  const DINHEIRO = /^(valor|preco|desembolso|frete|desconto|custo|alcada)/;
+  function semDinheiro(o){
+    if(Array.isArray(o)) return o.map(semDinheiro);
+    if(!o || typeof o !== 'object') return o;
+    const n = {};
+    for(const k of Object.keys(o)) if(!DINHEIRO.test(k)) n[k] = semDinheiro(o[k]);
+    return n;
+  }
+  const podaDoPedido = (req, res, next) => {
+    if(!veInteiro(req)){ const j = res.json.bind(res); res.json = c => j(podar(c)); return next(); }
+    if(!veValor(req)){ const j = res.json.bind(res); res.json = c => j(semDinheiro(c)); }
+    next();
+  };
+  app.get('/api/pedidos', podaDoPedido);
+  app.get('/api/pedidos/:id', podaDoPedido);
   app.get('/api/pedidos/:id/whatsapp',(req,res,next)=>{
-    if(veInteiro(req)) return next();
-    res.status(403).json({ erro:'o texto do pedido tem preço: só para quem compra' });
+    if(veInteiro(req) && veValor(req)) return next();
+    res.status(403).json({ erro:'o texto do pedido tem preço: só para quem vê os valores das compras', chave:'compras.valores' });
   });
   app.get('/api/pedidos',(req,res)=>{
     const w=[], p=[];
@@ -172,7 +186,14 @@ module.exports = function(app, db){
     if(pode(req,'custo.ver')||pode(req,'nota.lancar')){ try{ p.notas=require('./nota_dominio').listar(db,{pedido_id:p.id}); }catch(e){ p.notas=[]; } }
     const a=D.alcadaDe(db,p.criado_por_id);
     p.alcada=a?{limite:a.limite, aprovador_id:a.aprovador_id}:null;
-    try{ p.anexos=db.prepare('SELECT id,tipo,nome,criado_em,criado_por FROM compra_anexo WHERE pedido_id=? ORDER BY id').all(p.id); }catch(e){ p.anexos=[]; }
+    /* A lista do detalhe passa pela mesma conta da lista de anexos
+       (anexo_compra.js): o orçamento com preço não aparece a quem não pode abri-lo. */
+    try{
+      const AX=require('./anexo_compra');
+      p.anexos=db.prepare('SELECT id,tipo,nome,criado_em,criado_por,pedido_id,nota_id,recebimento_id FROM compra_anexo WHERE pedido_id=? ORDER BY id').all(p.id)
+        .filter(a=>AX.podeVer(c=>pode(req,c),a))
+        .map(a=>({id:a.id,tipo:a.tipo,nome:a.nome,criado_em:a.criado_em,criado_por:a.criado_por}));
+    }catch(e){ p.anexos=[]; }
     res.json(p);
   });
 

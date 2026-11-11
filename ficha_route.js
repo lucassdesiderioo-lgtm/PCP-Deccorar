@@ -228,7 +228,22 @@ module.exports = function(app, db){
      conta, e duas copias divergiriam no primeiro ajuste (§9). */
   const calcular = sku => FICHA.calcularFicha(db, sku);
 
-  app.get('/api/ficha/:sku',(req,res)=> res.json(calcular(req.params.sku)));
+  /* SEM custo.ver, A FICHA SAI SEM O CUSTO (R-VAL): o consumo, o material e a
+     medida de corte são de quem abre a 404; o dinheiro (o custo da linha, o
+     custo do material, o preço da bobina) é da caixinha de valor. */
+  const CUSTO_DA_FICHA = /^(custo|preco)/;
+  function semCusto(o){
+    if(Array.isArray(o)) return o.map(semCusto);
+    if(!o || typeof o !== 'object') return o;
+    const n = {};
+    for(const k of Object.keys(o)) if(!CUSTO_DA_FICHA.test(k)) n[k] = semCusto(o[k]);
+    return n;
+  }
+  app.get('/api/ficha/:sku',(req,res)=>{
+    const f = calcular(req.params.sku);
+    let ve = false; try{ ve = !!app.locals.acesso.podePermissao(req.usuario, 'custo.ver'); }catch(e){}
+    res.json(ve ? f : semCusto(f));
+  });
 
   /* Materializa a ficha na `ficha_tecnica`, que e o que a montagem ja le. */
   app.post('/api/ficha/:sku/materializar',(req,res)=>{

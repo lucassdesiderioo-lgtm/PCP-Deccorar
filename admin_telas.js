@@ -26,6 +26,7 @@
 const fs = require('fs'), path = require('path');
 const M = require('./telas');
 const MO = require('./modulos');
+const VA = require('./valor');
 
 module.exports = function(app, db){
   const ARQ = path.join(__dirname, 'public', 'index.html');
@@ -43,7 +44,10 @@ module.exports = function(app, db){
        módulo do ASSUNTO e o bloco declarados no mapa, e não mais pela centena
        do número (R-ORG-06, R-ORG-08). Quem decide o que entra continua sendo
        o portão. */
-    const lista = M.TELAS.filter(t => pode(t.rota)).map(t => ({ n:t.n, nome:t.nome, rota:t.rota, modulo:t.modulo, bloco:t.bloco, aba:t.aba || null }));
+    /* `valor` (R-VAL): as chaves que liberam o dinheiro da tela. O nav.js
+       compara com as permissões da própria pessoa e diz, uma vez, que os
+       valores em R$ não aparecem para ela — quem TIRA o dinheiro é o servidor. */
+    const lista = M.TELAS.filter(t => pode(t.rota)).map(t => ({ n:t.n, nome:t.nome, rota:t.rota, modulo:t.modulo, bloco:t.bloco, aba:t.aba || null, valor:t.valor || [] }));
     /* O SOB MEDIDA TEM PORTÃO PRÓPRIO (tecido/montar.js), e o menu pergunta A
        ELE, pela mesma conta: as chaves do PCP (`permissoesDe`, as que o
        server.js passa ao portão) viram o usuário de lá (`daSessaoDoPcp`), e
@@ -56,10 +60,10 @@ module.exports = function(app, db){
     try{
       const SMA = require('./tecido/nucleo/acesso'), SMP = require('./tecido/nucleo/permissoes');
       const TSM = require('./tecido/nucleo/telas').TELAS;
-      const sm = SMA.daSessaoDoPcp({ id:u.id, nome:u.nome }, Array.from(ac.permissoesDe(u.id)));
+      const sm = SMA.daSessaoDoPcp(u, Array.from(ac.permissoesDe(u.id)));   // ele só copia o id e o nome; aqui ninguém grava autoria
       if(sm) M.telasSobMedida().forEach(t => {
         const decl = TSM[t.rota.slice('/sobmedida'.length) || '/'];
-        if(decl && SMP.pode(sm, decl.permissao)) lista.push({ n:t.n, nome:t.nome, rota:t.rota, modulo:t.modulo, bloco:t.bloco, aba:null });
+        if(decl && SMP.pode(sm, decl.permissao)) lista.push({ n:t.n, nome:t.nome, rota:t.rota, modulo:t.modulo, bloco:t.bloco, aba:null, valor:t.valor || [] });
       });
     }catch(e){}
     return lista;
@@ -95,7 +99,11 @@ module.exports = function(app, db){
     /* `modulos` é a lista dos 18, NA ORDEM do menu (a da spec, `modulos.js`);
        `blocos`, o nome de cada bloco. O desenho é o `public/menu_telas.js`,
        o mesmo nas duas operações. */
-    res.json({ telas: telasDe(u), rota_da_aba: ROTA_DA_ABA, perms: ag ? [] : perms, admin_geral: ag,
+    /* `sem_valor` (R-VAL): a tela tem dinheiro e esta pessoa não vê o valor
+       principal dela — a barra diz isso uma vez. Quem decide é o valor.js. */
+    const comPerms = new Set(perms);
+    const telas = telasDe(u).map(t => Object.assign(t, { sem_valor: VA.semValor(t, comPerms, ag) }));
+    res.json({ telas, rota_da_aba: ROTA_DA_ABA, perms: ag ? [] : perms, admin_geral: ag,
       modulos: MO.MODULOS.map(m => ({ chave:m.chave, nome:m.nome })), blocos: MO.BLOCOS });
   });
 

@@ -100,7 +100,7 @@ const data=v=>{
   return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t.split('-').reverse().join('/') : '—';
 };
 const plural=(n,um,varios)=>n+' '+(n===1?um:varios);
-/* ⚠️ SEM `custo.ver` O CAMPO NÃO VEM NO JSON (a poda do custo.js), e aí a
+/* ⚠️ SEM `preco.ver` O CAMPO NÃO VEM NO JSON (a poda do custo.js), e aí a
    linha do dinheiro simplesmente não existe — não é a tela que esconde. */
 const reais=c=>(c===null||c===undefined)?null:dinheiro(c/100);
 
@@ -277,7 +277,7 @@ function acoesDoBoleto(b){
    escrita quando separa alguma coisa (§5).
    Um limiar em centavos seria chute escondido no código (o que a 6-B recusa);
    o número ao lado deixa a marca de ser binária e quem lê julga sozinho —
-   R$ 0,20 ele ignora, R$ 7.217,96 ele investiga. Quem não tem `custo.ver`
+   R$ 0,20 ele ignora, R$ 7.217,96 ele investiga. Quem não tem `preco.ver`
    perde o valor na poda e fica com a frase, que continua verdadeira. */
 /* ⚠️ O LADO DE BAIXO NÃO SE CHAMA "FALTA", e a diferença importa: um título
    menor que os pedidos é o PARCELAMENTO, o caso legítimo — as outras parcelas

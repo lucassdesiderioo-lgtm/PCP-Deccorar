@@ -138,6 +138,14 @@ module.exports = [
   { chave:'devolucao.dinheiro',   grupo:'Devoluções', tela:252, nivel:'admin',
     rotulo:'Dinheiro das devoluções', desc:'Dar baixa no reembolso, devolver ao comprador, encerrar como perda e ver os totais em reais do relatório',
     sensivel:true },
+  /* A REGRA DO VALOR (spec ARRUMAR-O-LUGAR, fase 1, R-VAL, 11/11/2026): toda
+     tela com dinheiro tem a sua caixinha de "ver valores". Até aqui os valores
+     do caso iam a quem lança ou acompanha, sem caixinha nenhuma; o backfill de
+     uma vez só (`seed_valor_1`) dá esta chave a quem tinha uma das duas, e
+     daí em diante quem decide é o dono, na tela de Acessos. */
+  { chave:'devolucao.valores',    grupo:'Devoluções', tela:252, nivel:'supervisor',
+    rotulo:'Ver valores das devoluções', desc:'Ver e lançar os valores em reais do caso: valor do ML, custos, etiqueta, limite e frete',
+    sensivel:true },
 
   // ─── ESTOQUE ────────────────────────────────────────────────
   { chave:'contagem.contar',      grupo:'Estoque',    tela:303, nivel:'operacao',
@@ -225,6 +233,12 @@ module.exports = [
   // lista de compras nem dos precos comparados.
   { chave:'compras.ver',          grupo:'Compras', tela:501, nivel:'supervisor',
     rotulo:'Ver lista de compras', desc:'O que precisa ser comprado' },
+  /* R-VAL: abrir a 501 e ver os preços são duas caixinhas. Quem LANÇA dinheiro
+     (pedido, nota, parcela, preço) vê o que lança mesmo sem esta (R-VAL-04).
+     Backfill de uma vez só: quem tinha compras.ver. */
+  { chave:'compras.valores',      grupo:'Compras', tela:501, nivel:'supervisor',
+    rotulo:'Ver valores das compras', desc:'Preço, desembolso, custo médio, pedido mínimo, frete e o valor dos pedidos',
+    sensivel:true },
   { chave:'fornecedor.cadastrar', grupo:'Compras', tela:501, nivel:'admin',
     rotulo:'Cadastrar fornecedor', desc:'Criar e editar fornecedores' },
   { chave:'preco.lancar',         grupo:'Compras', tela:501, nivel:'admin',

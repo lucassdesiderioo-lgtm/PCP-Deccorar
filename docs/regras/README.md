@@ -12,6 +12,7 @@ que provocou a regra, as datas, as conferências na fábrica — fica em
 | Sob medida (`/sobmedida`) | [`sobmedida.md`](sobmedida.md) | [`historia/sobmedida.md`](../historia/sobmedida.md) |
 | Compras e Recebimento (501, 502, 503, 504) | [`compras.md`](compras.md) | [`historia/compras.md`](../historia/compras.md) |
 | Como o sistema se organiza: módulos, bloco e o lugar de cada tela | [`organizacao.md`](organizacao.md) | spec [`ORGANIZACAO-DO-SISTEMA`](../specs/ORGANIZACAO-DO-SISTEMA.md) |
+| O dinheiro nas telas: a caixinha "Ver valores (R$)" | [`valor.md`](valor.md) | spec [`ARRUMAR-O-LUGAR`](../specs/ARRUMAR-O-LUGAR.md) |
 
 As outras áreas continuam no `CLAUDE.md` até serem passadas para cá, uma por vez.
 

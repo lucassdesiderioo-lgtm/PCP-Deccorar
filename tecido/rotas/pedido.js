@@ -9,6 +9,7 @@ const pedido=require('../dominio/pedido');
 const consumo=require('../dominio/consumo');
 const pdf=require('../dominio/pedido_pdf');
 const custo=require('../dominio/custo');
+const {ErroDeRegra}=require('../nucleo/erros');
 
 const LER='pedido.ler', LANCAR='pedido.lancar', APROVAR='pedido.aprovar',
       PRAZO='pedido.prazo', CANCELAR='pedido.cancelar';
@@ -18,7 +19,15 @@ const LER='pedido.ler', LANCAR='pedido.lancar', APROVAR='pedido.aprovar',
    (preco|valor|custo|...), e e por isso que os campos daqui se chamam
    `valor_total_centavos` e `preco_unitario_centavos` — um `total_centavos`
    viajaria pelo fio para quem nao tem `custo.ver` (CLAUDE.md §19). */
-const podar=(usuario,dados)=>custo.podar(usuario,dados);
+/* ⚠️ O MARCO "enviado" ESCREVE O TOTAL NO DETALHE ("pedido 5001 · 1.234,56 ·
+   pronto ..."), sem "R$" e num campo de nome que a regra nao pega (③ REVISAO).
+   Para quem nao ve o preco de venda, o detalhe desse marco sai; o marco fica. */
+function semTotalNoMarco(d){
+  if(Array.isArray(d)) return d.map(semTotalNoMarco);
+  if(!d||typeof d!=='object'||!Array.isArray(d.marcos)) return d;
+  return {...d, marcos:d.marcos.map(m=>m&&m.marco==='enviado'?{...m,detalhe:null}:m)};
+}
+const podar=(usuario,dados)=>custo.vePreco(usuario)?dados:semTotalNoMarco(custo.podarVenda(usuario,dados));
 
 module.exports={rotas:[
 
@@ -48,8 +57,14 @@ module.exports={rotas:[
 
   /* A FOLHA QUE A REVENDA CONFERE. E um GET que vira papel, entao vai
      auditado como a etiqueta de sobra: gasta tinta e vira compromisso. */
+  /* ⚠️ O PAPEL TEM OS R$ (R-VAL, 11/11/2026): so sai para quem ve o preco de
+     venda. Ate aqui bastava ler o pedido, e o PDF nao passava por poda nenhuma. */
   {metodo:'GET', caminho:'/api/pedidos/:id/pdf', permissao:LER, tipo:'pdf',
-   manipulador:({params})=>pdf.gerar(pedido.porId(Number(params.id))),
+   manipulador:({params,usuario})=>{
+     if(!custo.vePreco(usuario)) throw new ErroDeRegra('sem_valor',
+       'A folha do pedido tem os preços: ela sai para quem tem "Ver preço de venda" no acesso.');
+     return pdf.gerar(pedido.porId(Number(params.id)));
+   },
    detalhe:(req)=>'folha do pedido '+req.params.id},
 
   {metodo:'POST', caminho:'/api/pedidos', permissao:LANCAR,

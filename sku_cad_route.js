@@ -43,14 +43,26 @@ module.exports = function(app, db){
    codigo ('BEGE'), e quem confere a peca na bancada precisa ler a palavra. Sao
    campos a MAIS: tudo que existia continua igual, e nenhuma tela que so lia
    `codigo`/`estoque` muda de comportamento. */
-app.get('/api/skus', (req,res)=> res.json(db.prepare(`SELECT s.*,
+/* ⚠️ O CUSTO DO SKU NÃO VIAJA PARA QUEM NÃO TEM custo.ver (R-VAL, spec
+   ARRUMAR-O-LUGAR, 11/11/2026). A rota é `@logado` — a Revisão, a Embalagem e
+   a Devolução leem os SKUs no tablet —, e o `SELECT s.*` levava junto o
+   `custo_direto` do SKU de revenda a qualquer pessoa logada. Nenhuma tela o
+   mostrava; o dado ia pelo fio do mesmo jeito. Quem tira é o servidor. */
+const CUSTO_DO_SKU = ['custo_direto'];
+app.get('/api/skus', (req,res)=>{
+  const l = db.prepare(`SELECT s.*,
     c.nome cor_nome, t.nome tecido_nome, m.nome modelo_nome,
     COALESCE(m.exige_medida,1) exige_medida
   FROM skus s
   LEFT JOIN cor c ON c.codigo=s.cor_codigo
   LEFT JOIN tecido t ON t.codigo=s.tecido_codigo
   LEFT JOIN modelo m ON m.id=s.modelo_id
-  ORDER BY s.codigo`).all()));
+  ORDER BY s.codigo`).all();
+  let veCusto = false;
+  try{ veCusto = !!app.locals.acesso.podePermissao(req.usuario, 'custo.ver'); }catch(e){}
+  if(!veCusto) l.forEach(s => CUSTO_DO_SKU.forEach(k => delete s[k]));
+  res.json(l);
+});
 /* Compras Fase 0: o que a tela grava e o que esta NOS CAMPOS, nunca o que o
    codigo do SKU diz. Quem cadastra corrige o preenchimento automatico, e um SKU
    fora da nomenclatura salva normalmente com as medidas digitadas a mao.

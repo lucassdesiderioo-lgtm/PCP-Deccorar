@@ -17,7 +17,7 @@ module.exports={rotas:[
      campo novo com nome de preco que entrasse aqui amanha viajaria pelo fio
      sem ninguem notar (§19). */
   {metodo:'GET', caminho:'/api/producao/etiquetas', permissao:LER,
-   manipulador:({usuario})=>custo.podar(usuario,etq.aImprimir())},
+   manipulador:({usuario})=>custo.podarCusto(usuario,etq.aImprimir())},
 
   {metodo:'GET', caminho:'/api/producao/impressoes', permissao:LER,
    manipulador:({query})=>etq.impressoes(Number(query.limite)||30)},

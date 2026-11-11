@@ -109,12 +109,12 @@ function desenharCartao(c){
   const filhos=[
     el('div',{class:'topo2'},[
       el('span',{class:'num'},[c.numero?('#'+c.numero):'orçamento']),
-      /* ⚠️ Sem `custo.ver` o campo NÃO VEM no JSON (a poda do custo.js), e
+      /* ⚠️ Sem `preco.ver` o campo NÃO VEM no JSON (a poda do custo.js), e
          aí a linha do valor simplesmente não existe — não é a tela que
          esconde. */
       /* Sem valor lançado, a linha simplesmente não existe — `R$ 0,00` se
          lê como "de graça", e a verdade é "não vale nada AINDA". E sem
-         `custo.ver` o campo nem vem no JSON (a poda do custo.js). */
+         `preco.ver` o campo nem vem no JSON (a poda do custo.js). */
       (c.valor_total_centavos!==undefined&&c.valor_total_centavos!==null)
         ? el('span',{class:'val'},[dinheiro(c.valor_total_centavos/100)])
         : el('span',{})

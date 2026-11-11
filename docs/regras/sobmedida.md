@@ -60,7 +60,7 @@
 - **Regra:** desde 26/10/2026 (fase 2 da `ACESSOS-UNIFICADOS`) cada chave do módulo aparece no PCP como `sobmedida.<chave>`, no grupo "Sob medida". A lista **mora no módulo** (`tecido/nucleo/permissoes.js`, com nível e marca de sensível) e o `permissoes.js` do PCP a traz sem cópia. O portão do módulo pergunta ao resolvedor do PCP (`permissoesDe`, ligado no `server.js` como `opcoes.permissoes`) quais chaves a pessoa tem; **não há mais área virando papel** (`papelDe`, `sobmedida_adm`, `_venda` e as áreas de setor saíram). A sombra `usuarios.areas` guarda só `sobmedida`, para o destino depois do PIN.
 - **Por quê:** a tradução área → papel falhou em silêncio três vezes (#13, #28, #34), e o pacote fixo obrigava a dar o módulo inteiro a quem só lança boleto.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_acessos_f2.js` (73: ninguém ganha nem perde nada na migração, pessoa a pessoa e chave a chave) · `tecido/teste/acesso.test.js` · `teste_acesso.js` (6-B).
+- **Teste que trava:** `teste_acessos_f2.js` (89: ninguém ganha nem perde nada na migração, pessoa a pessoa e chave a chave) · `tecido/teste/acesso.test.js` · `teste_acesso.js` (6-B).
 - **Status:** em código em 26/10/2026; a migração rodou sobre um banco antigo de teste sem precisar de exceção nenhuma.
 - **História:** armadilha #13; spec `ACESSOS-UNIFICADOS` fase 2.
 
@@ -225,8 +225,8 @@
 - **Status:** no ar desde 22/09/2026.
 
 ### R-SMR-04 · O vendedor tem setor próprio, de chaves `operacao`, e não edita revenda nem crédito
-- **Regra:** o setor "Sob medida / Venda" nasce com o pacote do vendedor (simulador, catálogo de leitura, a carteira dele), todo de nível `operacao`: tem `custo.ver` e `modulo.entrar`, e **não** tem `revenda.editar` nem `credito.editar`. Desde 26/10/2026 cada uma se marca ou desmarca na tela de Acessos.
-- **Por quê:** declarada como admin, a área `'admin'` viraria **diretor** no portão e devolveria o módulo inteiro (porta A da #28). Sem `custo.ver` o simulador chegaria sem o preço; sem `modulo.entrar` o módulo abriria em branco. Tabela, desconto e limite são decisão de quem responde pelo dinheiro.
+- **Regra:** o setor "Sob medida / Venda" nasce com o pacote do vendedor (simulador, catálogo de leitura, a carteira dele), todo de nível `operacao`: tem `preco.ver` (desde 11/11/2026, R-VAL-05), `custo.ver` e `modulo.entrar`, e **não** tem `revenda.editar` nem `credito.editar`. Desde 26/10/2026 cada uma se marca ou desmarca na tela de Acessos.
+- **Por quê:** declarada como admin, a área `'admin'` viraria **diretor** no portão e devolveria o módulo inteiro (porta A da #28). Sem `preco.ver` o simulador chegaria sem o preço (a `custo.ver`, desde 11/11/2026, é só o custo e o valor do estoque, e o dono pode tirá-la); sem `modulo.entrar` o módulo abriria em branco. Tabela, desconto e limite são decisão de quem responde pelo dinheiro.
 - **Exceções:** nenhuma. Desde 21/10/2026 nenhuma chave de nível admin do PCP abre o sob medida como diretor (R-SMA-03).
 - **Teste que trava:** `teste_acesso.js` (seção 6-B, confere o nível declarado) · `tecido/teste/acesso_operador.test.js`.
 - **Status:** no ar desde 22/09/2026.
@@ -240,7 +240,7 @@
 
 ### R-SMR-06 · Campo de dinheiro tem nome do padrão de poda
 - **Regra:** todo dinheiro do módulo se chama `preco_*` ou `valor_*` (ex.: `valor_limite_credito_centavos`).
-- **Por quê:** a poda do `custo.js` corta por nome; um `limite_credito_centavos` ou `total_centavos` viajaria pelo fio para quem não tem `custo.ver`.
+- **Por quê:** a poda do `custo.js` corta por nome; um `limite_credito_centavos` ou `total_centavos` viajaria pelo fio para quem não tem a chave do lado dele (`preco.ver` na venda, `custo.ver` no custo — R-VAL-05).
 - **Exceções:** nenhuma.
 - **Teste que trava:** `tecido/teste/revenda.test.js` (trava o nome certo e o errado).
 - **Status:** no ar.
@@ -1020,8 +1020,9 @@ da R-SML-03.
   sob medida, e o vendedor sairia com o módulo inteiro (§19)
 - ❌ Dar `revenda.editar` ou `credito.editar` ao vendedor "para facilitar": a
   tabela, o desconto e o limite são decisão de quem responde pelo dinheiro (§19)
-- ❌ Tirar `custo.ver` do papel do vendedor — o simulador chegaria nele sem o
-  preço, que é justamente o número que ele foi buscar (§19)
+- ❌ Tirar `preco.ver` do papel do vendedor — o simulador chegaria nele sem o
+  preço, que é justamente o número que ele foi buscar (§19, R-VAL-05). A
+  `custo.ver` o dono pode tirar: é o custo e o valor do estoque
 - ❌ Voltar a pedir `cadastro.ler` na tela inicial ou no `/api/eu` do sob
   medida: com três papéis ela deixou de ser a chave que todos têm, e o efeito
   é tela em branco com 403 no console (§19)

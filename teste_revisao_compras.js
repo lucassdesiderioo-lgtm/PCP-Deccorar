@@ -14,7 +14,11 @@ const { db, get, post, ok, fim, secao, chamar } = B;
 
 const AG   = { id:1, nome:'Lucas', admin_geral:true, permissoes:['alcada.definir'] };
 const REC  = { id:2, nome:'Edu', permissoes:['pedido.ver','pedido.receber','pedido.devolver'] };
-const SUP  = { id:3, nome:'Sup', permissoes:['compras.ver'] };
+/* `compras.valores` (R-VAL, spec ARRUMAR-O-LUGAR, 11/11/2026): o backfill de
+   uma vez só a deu a quem tinha compras.ver — esta é a pessoa de depois do
+   deploy. Quem vê compras SEM a caixinha (o pedido sem dinheiro) está no
+   teste_valor.js. */
+const SUP  = { id:3, nome:'Sup', permissoes:['compras.ver','compras.valores'] };
 const NOTA = { id:4, nome:'Nina', permissoes:['nota.lancar','pedido.ver'] };
 
 function chaves(o, acc){ acc = acc || new Set(); if(Array.isArray(o)) o.forEach(x => chaves(x, acc)); else if(o && typeof o === 'object') for(const k of Object.keys(o)){ acc.add(k); chaves(o[k], acc); } return acc; }
