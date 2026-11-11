@@ -186,7 +186,14 @@ module.exports = function(app, db){
     if(pode(req,'custo.ver')||pode(req,'nota.lancar')){ try{ p.notas=require('./nota_dominio').listar(db,{pedido_id:p.id}); }catch(e){ p.notas=[]; } }
     const a=D.alcadaDe(db,p.criado_por_id);
     p.alcada=a?{limite:a.limite, aprovador_id:a.aprovador_id}:null;
-    try{ p.anexos=db.prepare('SELECT id,tipo,nome,criado_em,criado_por FROM compra_anexo WHERE pedido_id=? ORDER BY id').all(p.id); }catch(e){ p.anexos=[]; }
+    /* A lista do detalhe passa pela mesma conta da lista de anexos
+       (anexo_compra.js): o orçamento com preço não aparece a quem não pode abri-lo. */
+    try{
+      const AX=require('./anexo_compra');
+      p.anexos=db.prepare('SELECT id,tipo,nome,criado_em,criado_por,pedido_id,nota_id,recebimento_id FROM compra_anexo WHERE pedido_id=? ORDER BY id').all(p.id)
+        .filter(a=>AX.podeVer(c=>pode(req,c),a))
+        .map(a=>({id:a.id,tipo:a.tipo,nome:a.nome,criado_em:a.criado_em,criado_por:a.criado_por}));
+    }catch(e){ p.anexos=[]; }
     res.json(p);
   });
 

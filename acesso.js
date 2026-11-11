@@ -1625,11 +1625,16 @@ module.exports = function(app, db){
             SELECT usuario_id, ?, 1 FROM usuario_excecao e WHERE chave=? AND concede=1
               AND NOT EXISTS (SELECT 1 FROM usuario_excecao x WHERE x.usuario_id=e.usuario_id AND x.chave=?)`).run(para, de, para);
         }
+        /* A exceção que revoga diz de onde veio: na tela de Acessos o dono lê o
+           motivo, e uma caixinha desmarcada sem motivo pareceria engano. */
+        const MOT = 'regra do valor (seed_valor_1): a pessoa não tinha a chave de origem — não ganha a de valor';
+        let revogadas = 0;
         pessoas.forEach(id => {
           const p = permissoesDe(id);
-          DESTINOS.forEach(d => { if(p.has(d) && !tinha[id].has(d))
-            db.prepare('INSERT OR REPLACE INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,?,0)').run(id, d); });
+          DESTINOS.forEach(d => { if(p.has(d) && !tinha[id].has(d)){
+            db.prepare('INSERT OR REPLACE INTO usuario_excecao (usuario_id,chave,concede,motivo) VALUES (?,?,0,?)').run(id, d, MOT); revogadas++; } });
         });
+        console.log('[acesso] chaves de valor dadas a quem já via o valor; ' + revogadas + ' exceção(ões) para quem não via');
         db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('seed_valor_1','1')").run();
       })();
     }

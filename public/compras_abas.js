@@ -306,7 +306,7 @@
         + '<button class="primary" data-perm="pedido.aprovar" id="paAprovar">Aprovar e passar para comprado</button> <span class="msg" id="paMsg"></span>';
     }
     if(['rascunho','aguardando_aprovacao','comprado','parcial'].indexOf(p.status) >= 0)
-      h += ' <button class="ghost" data-perm="pedido.criar" id="pcCancelar">Cancelar pedido</button> <button class="ghost" id="pcWa" data-perm="compras.valores pedido.criar pedido.aprovar pedido.pagar nota.lancar preco.lancar custo.ver">Texto de WhatsApp</button>';
+      h += ' <button class="ghost" data-perm="pedido.criar" id="pcCancelar">Cancelar pedido</button> <button class="ghost" id="pcWa" data-perm="compras.valores pedido.criar pedido.aprovar pedido.pagar nota.lancar custo.ver">Texto de WhatsApp</button>';
     h += '<div id="pcWaTxt"></div>';
     /* PARCELAS: so chegam a quem pode ver (a poda e no servidor). */
     if(Array.isArray(p.parcelas)){

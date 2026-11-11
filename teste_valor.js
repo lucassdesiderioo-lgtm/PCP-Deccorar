@@ -147,6 +147,8 @@ console.log('\n── 3. o backfill: quem via o valor continua vendo, uma vez s�
     !AC0.permissoesDe(pRev).has('sobmedida.preco.ver'), JSON.stringify(Array.from(AC0.permissoesDe(pRev))));
   ok('quem teve a compras.ver revogada não ganhou compras.valores', !AC0.permissoesDe(pRevCmp).has('compras.valores'));
   ok('quem teve só o lançar revogado, mas acompanha pelo setor, continua com devolucao.valores', AC0.permissoesDe(pDuas).has('devolucao.valores'));
+  const excRev = db.prepare("SELECT concede, motivo FROM usuario_excecao WHERE usuario_id=? AND chave='sobmedida.preco.ver'").get(pRev);
+  ok('a exceção que o backfill cria diz de onde veio (o motivo), para o dono entender na tela de Acessos', excRev && excRev.concede === 0 && /valor/i.test(excRev.motivo || ''), JSON.stringify(excRev));
   ok('o setor sem nenhuma chave de origem não ganhou nada',
     !['devolucao.valores','compras.valores','sobmedida.preco.ver'].some(c => tem(sNada, c)));
   ok('a exceção sem chave de origem (só a baixa) não ganhou nada', !exc(pNada, 'devolucao.valores'));
@@ -374,6 +376,11 @@ function temCampo(o, nome){
   const baixaSem = await get('CmpSem', '/api/compras/anexos/' + anx.d.id), baixaCom = await get('CmpCom', '/api/compras/anexos/' + anx.d.id);
   ok('sem a caixinha, o orçamento do pedido não se baixa (403)', baixaSem.st === 403, baixaSem.st + ' ' + JSON.stringify(baixaSem.d).slice(0, 120));
   ok('com a caixinha, baixa', baixaCom.st === 200);
+  const detSem = await get('CmpSem', '/api/pedidos/' + ped), detCom = await get('CmpCom', '/api/pedidos/' + ped);
+  ok('o detalhe do pedido (o que a 501 desenha) não lista o orçamento a quem não pode abrir', detSem.st === 200 && !(detSem.d.anexos || []).some(a => a.id === anx.d.id), JSON.stringify(detSem.d.anexos));
+  ok('…e lista para quem pode', detCom.st === 200 && (detCom.d.anexos || []).some(a => a.id === anx.d.id));
+  ok('o botão de WhatsApp não aparece para quem só lança preço (a rota pede ver o pedido inteiro e o valor)',
+    !/id="pcWa" data-perm="[^"]*preco\.lancar/.test(fs.readFileSync(path.join(__dirname, 'public', 'compras_abas.js'), 'utf8')));
   const listaSem = await get('CmpSem', '/api/compras/anexos?pedido_id=' + ped);
   ok('…e a lista de anexos não o oferece a quem não pode abrir', listaSem.st === 200 && Array.isArray(listaSem.d) && !listaSem.d.some(a => a.id === anx.d.id));
 

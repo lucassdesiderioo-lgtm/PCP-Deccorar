@@ -59,9 +59,15 @@ Página da varredura: https://claude.ai/artifact/8zuuvTdWuLmSC5rvVmt27t
   ela quem lança preço no Catálogo, boleto ou limite de crédito vê o preço de
   venda; quem só monta pedido não (o preço é calculado). Um verificador leu
   isso como mudança de regra; vale o texto aprovado do §3, e fica no FECHAMENTO.
+  **Rodada 2 (só no que foi consertado):** o botão da folha da 611 olhava um
+  campo que o detalhe nunca traz e sumia para todo mundo (hoje olha o `preco`,
+  que é o que a poda tira); o detalhe do pedido de compra listava o orçamento
+  a quem não pode abri-lo (a conta dos anexos mora num lugar só, o
+  `anexo_compra.js`); a exceção que o backfill cria ganhou motivo e o boot diz
+  quantas; e o botão de WhatsApp deixou de aparecer a quem só lança preço.
   **Fica para o dono (P5):** sem a caixinha, o "Enviado" do item faltante não
   se marca nem para corrigir só o rastreio.
-- `teste_valor.js` (104) e `tecido/teste/valor.test.js` (12), escritos antes do
+- `teste_valor.js` (108) e `tecido/teste/valor.test.js` (12), escritos antes do
   conserto. Mudaram as pessoas de mentira de quatro testes (as de depois do
   backfill), sem mudar o esperado de nenhum: `teste_devolucao_casos.js` (1104),
   `teste_devolucao_casos_tela.js` (247), `teste_revisao_compras.js` (46) e

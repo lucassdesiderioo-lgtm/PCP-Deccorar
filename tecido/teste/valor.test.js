@@ -124,9 +124,15 @@ module.exports=[
   igual(custo.vePreco({permissoes:['modulo.entrar','pedido.lancar']}),false,'quem so monta pedido nao (o preco e calculado, nao lancado)');
 }},
 
-{nome:'③ REVISAO S4: o botao da folha do pedido so aparece quando o preco veio', executar({igual}){
+{nome:'③ REVISAO S4: o botao da folha do pedido aparece quando o preco veio — e so entao', executar({igual}){
+  /* O detalhe do pedido traz o preco DENTRO de `preco` (pedido.porId), e a
+     poda de venda tira o objeto inteiro. A rodada 1 olhava um campo do topo que
+     o detalhe nunca tem, e o botao sumiu para todo mundo (rodada 2). */
+  const detalhe={id:1,congelado:1,preco:{valor_total_centavos:123456}};
+  igual('preco' in custo.podarVenda(SO_PRECO,detalhe),true,'quem ve o preco recebe o objeto preco');
+  igual('preco' in custo.podarVenda(SO_CUSTO,detalhe),false,'quem nao ve, nao');
   const html=fs.readFileSync(path.join(__dirname,'..','public','telas','pedidos.html'),'utf8');
-  igual(/'valor_total_centavos' in p\)?\s*\n?\s*bt\('Abrir a folha/.test(html)||/p\.congelado&&'valor_total_centavos' in p/.test(html),true,'o botao olha o campo que o servidor deixou passar');
+  igual(/if\(p\.congelado&&p\.preco\)\s*\n?\s*bt\('Abrir a folha/.test(html),true,'o botao olha o objeto preco, que e o que a poda tira');
 }},
 
 {nome:'③ REVISAO T1: a 611 nao quebra quando o preco nao vem (o objeto preco some na poda)', executar({igual}){

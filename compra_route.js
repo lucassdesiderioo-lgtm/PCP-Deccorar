@@ -65,18 +65,19 @@ module.exports = function(app, db){
   /* O ANEXO DA NOTA SÓ PARA QUEM VÊ A NOTA (revisão do PR #305, R-CMP-27): o
      XML, o PDF e a foto da nota trazem impostos e valores que o JSON poda para
      quem não tem custo.ver nem nota.lancar — o arquivo não pode contornar a poda. */
-  const DA_NOTA = ['xml', 'nota_pdf', 'nota_foto'];
+  const AX = require('./anexo_compra');
+  const DA_NOTA = AX.DA_NOTA;
   const podeAcesso = (req, c) => { try{ return !!app.locals.acesso.podePermissao(req.usuario, c); }catch(e){ return false; } };
-  const veNota = req => podeAcesso(req, 'custo.ver') || podeAcesso(req, 'nota.lancar');
-  const anexoDeNota = a => DA_NOTA.indexOf(a.tipo) >= 0 || !!a.nota_id;
+  const temDe = req => c => podeAcesso(req, c);
+  const veNota = req => AX.veNota(temDe(req));
+  const anexoDeNota = AX.deNota;
   /* O ORÇAMENTO E O COMPROVANTE DO PEDIDO TÊM PREÇO (R-VAL, ③ REVISÃO): o
      arquivo não pode contornar a poda do pedido, como a nota não pode. São de
      quem vê os valores das compras (ou lança aquele dinheiro, o valor.js). O
      anexo do recebimento continua de quem recebe. */
-  const VA = require('./valor');
-  const veValorCompras = req => VA.ve(c => podeAcesso(req, c), 'compras.valores');
-  const anexoComPreco = a => !anexoDeNota(a) && !!a.pedido_id && !a.recebimento_id;
-  const podeVerAnexo = (req, a) => (!anexoDeNota(a) || veNota(req)) && (!anexoComPreco(a) || veValorCompras(req));
+  const veValorCompras = req => AX.veValor(temDe(req));
+  const anexoComPreco = AX.comPreco;
+  const podeVerAnexo = (req, a) => AX.podeVer(temDe(req), a);
   app.get('/api/compras/anexos', (req, res) => {
     const w = [], p = [];
     for(const k of ['pedido_id', 'nota_id', 'recebimento_id']) if(req.query[k]){ w.push(k + '=?'); p.push(+req.query[k]); }

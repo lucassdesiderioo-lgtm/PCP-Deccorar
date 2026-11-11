@@ -551,7 +551,7 @@ function acoes(p){
     },'data'));
   /* A folha tem os R$: o botao so aparece quando o servidor deixou o preco
      passar (R-VAL; a rota recusa do mesmo jeito). */
-  if(p.congelado&&'valor_total_centavos' in p)
+  if(p.congelado&&p.preco)
     bt('Abrir a folha (PDF)',null,()=>window.open(NAV_BASE+'/api/pedidos/'+p.id+'/pdf','_blank'));
   if(p.marco!=='cancelado'&&posso('pedido.cancelar'))
     bt('Cancelar o pedido',null,()=>comMotivo('Por que o pedido foi cancelado?',async motivo=>{
