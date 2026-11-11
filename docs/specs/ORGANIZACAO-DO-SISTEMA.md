@@ -4,8 +4,8 @@
 STATUS
 Situação: EM CONSTRUÇÃO · aprovada pelo dono em 10/11/2026
 Criada em: 10/11/2026
-Última atualização: 10/11/2026
-Fase atual: 3 em código (10/11/2026), falta subir · 1 e 2 no ar
+Última atualização: 11/11/2026
+Fase atual: as três no ar (1 e 2 em 10/11/2026, PRs #327 e #328; 3 em 11/11/2026, PR #330) · falta a prova de fábrica do menu único (três perfis num tablet)
 Fases: 1 ☑  2 ☑  3 ☑ (o menu único — a fase 3 veio do prompt do dono, divergência D1 abaixo)
 Risco: 🟡 (não mexe em estoque, banco, permissão nem em tela; cria regra, mapa e teste)
 Depende de: ACESSO-POR-TELA-E-NIVEL (o mapa de telas, `telas.js`) · NAVEGACAO-E-LINGUAGEM (§20)
