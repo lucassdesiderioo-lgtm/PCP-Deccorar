@@ -6,7 +6,7 @@ Situação: RASCUNHO · aguardando o desenho no Projeto do Claude e a aprovaçã
 Criada em: 11/11/2026
 Última atualização: 11/11/2026
 Fase atual: nenhuma — nada construído
-Fases: 1 ☐  2 ☐  3 ☐  4 ☐
+Fases: 1 ☐  2 ☐  3 ☐  4 ☐  (a 4 pode vir logo depois da 1 na medida padrão — §7)
 Risco: 🔴 (schema nos dois bancos, cadastro de material, e a fase 4 mexe em saldo)
 Depende de: ORGANIZACAO-DO-SISTEMA (R-ORG-09 a 12), ARRUMAR-O-LUGAR fase 2 (a 1101 Materiais)
              a fase 4 depende também de PRODUCAO-MONTAGEM (a baixa pela ficha, R-CMP-09)
@@ -61,7 +61,18 @@ entra no custo, não entra na compra e não sai do saldo.
    com o que já existe. Ninguém é obrigado a ligar a um material antigo.
 5. **Todo material ganha um código de cadastro** na criação: *"facilita"*.
 6. **Logo a saída de material vai ser pelo que foi produzido** — o SKU produzido
-   na medida padrão, a persiana pronta no sob medida.
+   na medida padrão, a persiana pronta no sob medida. **E o dono quer começar já**
+   (11/11/2026): *"já podemos fazer essa transformação … o saldo do material ir
+   abatendo por persianas produzidas"*.
+7. **A baixa pela ficha só vale para o material que foi contado inteiro antes**
+   (o dono, 11/11/2026: *"vai funcionar apenas no dia que conseguir parar e fazer
+   a contagem de todo o material, como por exemplo dos alumínios"*).
+8. **Parafuso e bucha são só do kit da medida padrão** — e lá eles já são linhas
+   da própria ficha do modelo (ROLO BK ML). Não existe "receita do kit".
+9. **No sob medida, a ficha técnica mora no Catálogo** (a tela do produto, 608),
+   junto com o preço e as escolhas. Na medida padrão, a ficha é a 404.
+10. **O código de cadastro é `MAT-0001`**, e o "Código (opcional)" de hoje fica
+    como código de barras ou do fornecedor.
 
 ## 3. O que a spec decide
 
@@ -118,8 +129,21 @@ entra no custo, não entra na compra e não sai do saldo.
   (dono único do saldo de material), com a **operação** gravada em cada linha do
   livro de material. Aí o "consumido por operação" deixa de ser estimativa.
 - **Isso muda regra (R-CMP-09) e mexe em saldo**: é fase própria, com linha em
-  `DECISOES.md`, teste escrito antes e decisão do dono sobre o que fazer com o
-  material que é contado e baixado ao mesmo tempo (pergunta 4).
+  `DECISOES.md` e teste escrito antes.
+- **Liga-se material por material, e só depois de contado** (resposta 7). O
+  material já tem o campo "como sai do estoque" (`componente.como_sai`:
+  `contagem` · `ficha`); hoje o `ficha` é recusado (R-CMP-09). A proposta é
+  aceitar `ficha` só em material com **uma contagem aprovada na 504** — é essa
+  contagem que dá o saldo de partida. O alumínio passa para "pela ficha" no dia
+  em que todo o alumínio for contado; o que não foi contado continua saindo pela
+  contagem, como hoje.
+- **A ficha baixa e a contagem continua corrigindo**: a diferença entre as duas
+  é a perda (o mesmo que o §7-B já prevê).
+- **Medida padrão: o momento é a EMBALAGEM** (o +1 do estoque, §2). ⚠️ **A
+  devolução reembalada não baixa material** (`fila.modo='devolucao'`): a peça já
+  existia. Embalagem em modo teste também não baixa de verdade.
+- **Sob medida: o momento é a persiana PRONTA** (`pronto_em`), e só depois da
+  fase 2 (sem lista de material não há o que baixar).
 
 ## 4. A passagem
 
@@ -164,7 +188,9 @@ Na 1101, o consumido no período por operação, calculado pelas duas fichas e p
 que cada operação produziu, escrito como estimativa.
 
 ### Fase 4 — A saída pelo que foi produzido 🔴 (REGRA)
-Depende da decisão do dono e da `PRODUCAO-MONTAGEM`. Ver §3-E.
+Ver §3-E. **Na medida padrão pode vir logo depois da fase 1** (a ficha da 404 já
+existe e o ROLO BK ML está lançado); no sob medida, depois da fase 2. Não depende
+mais da `PRODUCAO-MONTAGEM`: o evento é a embalagem (proposta, pergunta 6).
 
 ## 8. Testes (todos rodados pelo Claude Code)
 
@@ -180,18 +206,16 @@ Depende da decisão do dono e da `PRODUCAO-MONTAGEM`. Ver §3-E.
 
 ## 9. Perguntas ao dono
 
-1. **Onde se monta a lista de material do sob medida:** na tela do produto
-   (608 Catálogo, onde já se cria e duplica o produto) ou na 606 Cadastros?
-   Recomendação: no produto, ao lado das peças — é ali que a ficha dele mora.
-2. **O código de cadastro:** formato `MAT-0001`? E o "Código (opcional)" de hoje
-   fica como código de barras / do fornecedor, separado? Recomendação: sim aos
-   dois.
-3. **O material do kit:** o kit de instalação do sob medida é uma peça (com
-   etiqueta e bipe). O conteúdo dele (suporte, parafuso, bucha) entra como
-   material na lista do produto, ou como uma "receita" do próprio kit, que vale
-   para todo produto que o usa? Recomendação: receita do kit — mudar o kit muda
-   em todos os produtos de uma vez, como a ficha por modelo.
-4. **Fase 4, a saída pelo produzido:** quando ligar, a contagem continua
-   corrigindo o saldo (a diferença vira perda), ou o material passa a sair só
-   pela ficha? Recomendação: as duas — a ficha baixa, e a contagem corrige e mede
-   a perda.
+Respondidas em 11/11/2026: onde se monta a lista do sob medida (no Catálogo, 608),
+o formato do código (`MAT-0001`), o kit (não há receita: parafuso e bucha são
+linhas da ficha da medida padrão) e a contagem (ficha baixa, contagem corrige).
+
+Abertas:
+
+5. **A peça refeita no sob medida** (recusada e feita de novo) gasta material
+   outra vez. Baixa de novo pela ficha? Recomendação: sim — o material foi gasto.
+6. **O momento da baixa na medida padrão é a embalagem?** Recomendação: sim, é
+   onde a peça vira estoque. A revisão não mexe em estoque (R-EST-01).
+7. **A peça com problema na revisão** (volta para a produção) gastou material e
+   não foi embalada: fica como perda, que a contagem mostra. Recomendação: sim —
+   não baixar nada na revisão.
