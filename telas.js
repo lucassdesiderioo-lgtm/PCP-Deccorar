@@ -146,9 +146,16 @@ const TELAS = [
   // ── 900 · Sistema ──
   { n:901, nome:'Acessos',               rota:'/acessos',       nivel:'admin_geral', onde:'computador', perms:['pessoas.gerenciar'],    aba:'acs',
     modulo:'administracao', bloco:'comum', liga:['usuarios', 'setores'] },
-  { n:902, nome:'Cadastros',             rota:'/admin/cadastros', nivel:'admin',    onde:'computador', perms:['listas.editar','kit.editar','kit.imprimir','horarios.editar'], aba:'cd',
-    modulo:'cadastros', bloco:'comum', liga:[102, 206, 'listas'],
-    partes:[{ id:'horarios', nome:'Horários de corte e despacho', modulo:'administracao' }] },
+  { n:902, nome:'Cadastros',             rota:'/admin/cadastros', nivel:'admin',    onde:'computador', perms:['listas.editar','kit.editar','kit.imprimir'], aba:'cd',
+    modulo:'cadastros', bloco:'comum', liga:[102, 'listas'] },
+  /* ARRUMAR-O-LUGAR fase 3 (11/11/2026): os ajustes que governam a fábrica, num
+     lugar só — o segundo bipe (era da 902), os horários de corte e despacho
+     (a rota existia sem tela), e os parâmetros do corte, os números do prazo e
+     os feriados do sob medida (eram da 606 e da 610). Nível Supervisor (decisão
+     do dono): as chaves do sob medida são de Supervisor (R-SMA-02). Cada parte
+     aparece para quem tem a chave dela; o segundo bipe muda quem é nível Admin. */
+  { n:906, nome:'Parâmetros',            rota:'/parametros',    nivel:'supervisor', onde:'computador', perms:['horarios.editar','sobmedida.parametro.ler','sobmedida.parametro.editar','@admin'],
+    modulo:'administracao', bloco:'comum', liga:[202, 201, 206, 602, 609, 610, 611] },
   { n:903, nome:'Modo teste',            rota:'/admin/teste',   nivel:'admin',      onde:'computador', perms:['teste.operar'],          aba:'tst',
     modulo:'administracao', bloco:'comum', liga:['todas as tabelas do modo teste'] },
   { n:904, nome:'Relatórios',            rota:'/relatorios',    nivel:'supervisor', onde:'computador', perms:['relatorios.ver'],        area:'relatorios', aba:'rel',

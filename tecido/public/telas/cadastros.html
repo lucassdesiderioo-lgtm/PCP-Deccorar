@@ -40,7 +40,6 @@ const ABAS=[
   {id:'tecido',    nome:'Tecido'},
   {id:'endereco',  nome:'Enderecos'},
   {id:'motivo',    nome:'Motivos e condicoes'},
-  {id:'parametro', nome:'Parametros'},
   {id:'acesso',    nome:'Quem entra', soDiretor:true}
 ];
 
@@ -58,7 +57,6 @@ async function desenhar(){
   if(aba==='tecido')    return telaTecido(c);
   if(aba==='endereco')  return telaEndereco(c);
   if(aba==='motivo')    return telaMotivo(c);
-  if(aba==='parametro') return telaParametro(c);
   if(aba==='acesso')    return telaAcesso(c);
 }
 
@@ -816,35 +814,9 @@ async function telaMotivo(pai){
   cC.appendChild(rolaH(tC));
 }
 
-// ── ABA PARAMETROS ───────────────────────────────────────────────────────
-async function telaParametro(pai){
-  const params=await api('/api/parametros');
-  pai=limpar(pai);
-  const c=cartao(pai,'Parametros do plano de corte','Tres numeros governam o calculo. Ficam aqui, no banco, e nao no codigo — mudar e um campo, nao um deploy.');
-
-  params.forEach(p=>{
-    const bloco=el('div',{style:'border-top:1px solid var(--linha);padding:14px 0'});
-    bloco.appendChild(el('strong',{texto:p.rotulo+(p.unidade?' ('+p.unidade+')':'')}));
-    bloco.appendChild(el('p',{class:'ajuda',texto:p.ajuda||''}));
-    const linha=el('div',{class:'campos',style:'margin-top:8px'});
-    const campo=el('div',{class:'campo'});
-    const input=el('input',{type:'text',inputmode:'decimal',value:String(p.valor).replace('.',',')});
-    input.disabled=!podeEditar();
-    campo.appendChild(input);
-    linha.appendChild(campo);
-    if(podeEditar()) linha.appendChild(el('div',{class:'campo'},[
-      el('button',{class:'bt primario',texto:'Salvar',onclick:async()=>{
-        const n=comoNumero(input.value);
-        if(n===null) return banner('Digite um numero, com virgula ou ponto.','erro');
-        await api('/api/parametros/'+p.chave,{metodo:'PUT',corpo:{valor:n}});
-        banner(p.rotulo+' salvo.'); await telaParametro($('#conteudo'));
-      }})]));
-    if(p.alterado_em) linha.appendChild(el('div',{class:'campo'},[
-      el('span',{class:'quem',texto:'alterado em '+p.alterado_em+(p.alterado_por?' por '+p.alterado_por:'')})]));
-    bloco.appendChild(linha);
-    c.appendChild(bloco);
-  });
-}
+// ── A ABA PARAMETROS SAIU (ARRUMAR-O-LUGAR fase 3, 11/11/2026) ───────────
+// Os parametros do plano de corte se mudam na 906 Parametros, junto com os
+// outros ajustes da fabrica. O Corte e as Sobras continuam lendo-os pela rota.
 
 // ── ABA QUEM ENTRA ───────────────────────────────────────────────────────
 async function telaAcesso(pai){

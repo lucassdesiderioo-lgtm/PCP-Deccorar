@@ -61,16 +61,30 @@ module.exports=function(app,db){
     DIAS.forEach(d=>{ r[d]={corte:cfg('corte_'+d,'10:30'), despacho:cfg('despacho_'+d,'15:00')}; });
     res.json(r);
   });
+  /* O HORÁRIO IMPOSSÍVEL É RECUSADO, E NADA GRAVA (ARRUMAR-O-LUGAR fase 3,
+     11/11/2026). Até aqui "25:99" e "9h" eram descartados calados e a resposta
+     dizia ok — com a tela 906 em cima, ela diria "salvo" sobre o que não
+     salvou. Campo AUSENTE não é vazio: fica como estava; vazio ou fora do
+     formato é 400 dizendo o dia, antes de gravar qualquer campo. */
+  const NOME_DIA={dom:'domingo',seg:'segunda',ter:'terça',qua:'quarta',qui:'quinta',sex:'sexta',sab:'sábado'};
+  const horaValida=s=>{ const m=/^(\d{2}):(\d{2})$/.exec(s); return !!m && +m[1]<24 && +m[2]<60; };
   app.post('/api/config/horarios',(req,res)=>{
     const b=req.body||{};
-    const ins=db.prepare("INSERT INTO config (chave,valor) VALUES (?,?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor");
-    let n=0;
-    DIAS.forEach(d=>{
-      if(b[d]){
-        if(/^\d{2}:\d{2}$/.test(b[d].corte||'')){ ins.run('corte_'+d,b[d].corte); n++; }
-        if(/^\d{2}:\d{2}$/.test(b[d].despacho||'')){ ins.run('despacho_'+d,b[d].despacho); n++; }
+    const grava=[];
+    for(const d of DIAS){
+      if(!(d in b)) continue;
+      if(!b[d]||typeof b[d]!=='object'||Array.isArray(b[d]))
+        return res.status(400).json({erro:'Os horários de '+NOME_DIA[d]+' vêm como {corte, despacho}. Nada foi gravado.'});
+      for(const campo of ['corte','despacho']){
+        if(!(campo in b[d])) continue;
+        const v=b[d][campo];
+        if(typeof v!=='string'||!horaValida(v))
+          return res.status(400).json({erro:'O '+campo+' de '+NOME_DIA[d]+' não é uma hora válida ('+JSON.stringify(v)+'): use HH:MM, de 00:00 a 23:59. Nada foi gravado.'});
+        grava.push([campo+'_'+d,v]);
       }
-    });
-    res.json({ok:true,salvos:n});
+    }
+    const ins=db.prepare("INSERT INTO config (chave,valor) VALUES (?,?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor");
+    db.transaction(()=>grava.forEach(g=>ins.run(g[0],g[1])))();
+    res.json({ok:true,salvos:grava.length});
   });
 };

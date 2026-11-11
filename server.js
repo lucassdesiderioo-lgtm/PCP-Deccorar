@@ -166,6 +166,7 @@ require('./st_route')(app, db);
 /* Os horarios de saida do dia e a tela 206 (spec HORARIOS-DE-COLETA, 05/11/2026). */
 require('./coleta_horario_route')(app, db);
 app.get('/coleta-horarios',(req,res)=> res.sendFile(path.join(__dirname,'public','coleta-horarios.html')));
+app.get('/parametros',(req,res)=> res.sendFile(path.join(__dirname,'public','parametros.html')));   // 906 Parâmetros (ARRUMAR-O-LUGAR fase 3)
 // A central de pendencias (fase 1): so le, e pergunta a funcao de cada tela
 // dona — por isso depois de todas elas.
 require('./pendencias_route')(app, db);

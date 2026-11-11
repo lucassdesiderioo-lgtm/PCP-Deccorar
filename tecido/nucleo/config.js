@@ -61,7 +61,13 @@ const FAIXA={
   bipeAbertoMaxHoras: n=>(n>0&&n<=24)||'O tempo maximo de um bipe vai de 0 a 24 horas — zero descartaria todos, e acima de um dia ele deixa de pegar o bipe esquecido.'
 };
 const FORMATO={
-  prazoCorteHora: v=>/^([01]\d|2[0-3]):[0-5]\d$/.test(v)||'A hora do corte se escreve hh:mm, de 00:00 a 23:59.'
+  prazoCorteHora: v=>/^([01]\d|2[0-3]):[0-5]\d$/.test(v)||'A hora do corte se escreve hh:mm, de 00:00 a 23:59.',
+  /* ARRUMAR-O-LUGAR fase 3 (③ REVISAO): a 906 Parametros manda o parametro de
+     texto como veio. Com letra ou fracao, TODO envio de pedido passaria a ser
+     recusado (pedido.numeroInicial) ate alguem achar o campo. O VAZIO continua
+     aceito: e o "ainda nao lancado" da secao 4.18, e o envio o recusa dizendo o
+     que fazer. */
+  pedidoNumeroInicial: v=>v===''||/^\d+$/.test(v)||'O ultimo numero de pedido do Decorsoft e um inteiro, so com algarismos (ex.: 5001).'
 };
 
 function gravar(chave,valor,usuarioNome){
