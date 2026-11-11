@@ -4650,8 +4650,7 @@ com as duas linhas em `docs/DECISOES.md`.
 junto: ele mostrava os mesmos atalhos a todo mundo, ninguém usava, e aparecia
 duplicado no Admin. No lugar dele, o botão **☰ Menu** da barra de sessão abre
 as telas que **a pessoa** alcança, por módulo, com o número ao lado do nome
-(*"253 Devoluções — baixa"*). **Com o menu único (10/11/2026, em código, falta
-subir) o módulo é o do ASSUNTO, com o bloco** (§22): a 402 aparece em Cadastros, a 609 em Comercial →
+(*"253 Devoluções — baixa"*). **Com o menu único (no ar desde 11/11/2026, PR #330) o módulo é o do ASSUNTO, com o bloco** (§22): a 402 aparece em Cadastros, a 609 em Comercial →
 Revenda — e o sob medida usa o mesmo menu. Módulo sem tela dela não aparece; a tela aberta
 vem marcada. Ficam **"Trocar setor"**, o atalho para a outra operação (Regra A
 abaixo) e o **Alt+0** do "Sair".
@@ -4977,8 +4976,8 @@ cada coisa"*. **A causa é uma só: a tela nascia onde a spec nasceu, e não ond
 assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 
 > ⚠️ **O ☰ MENU AGRUPA POR MÓDULO → BLOCO → TELA NAS DUAS OPERAÇÕES** (fase 3,
-> menu único, 10/11/2026), e o rodapé do sob medida saiu. **Em código, falta
-> subir**; ⚠️ **ainda não provado** com os três perfis num tablet de verdade, na
+> menu único, 10/11/2026), e o rodapé do sob medida saiu. ✅ **No ar desde 11/11/2026**
+> (PR #330): o dono fez o deploy e disse *"deu tudo certo"*. ⚠️ **ainda não provado** com os três perfis num tablet de verdade, na
 > fábrica (foi aberto num Chromium a 1440, 1024 e 768 px). Quem manda:
 > - `GET /api/telas/minhas` (`admin_telas.js`) devolve cada tela com o `modulo`
 >   e o `bloco` declarados, os módulos **em lista, na ordem do `modulos.js`** (a
