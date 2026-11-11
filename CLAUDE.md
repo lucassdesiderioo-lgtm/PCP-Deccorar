@@ -5058,8 +5058,8 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 
 > **Fase 2 (10/11/2026), o que veio antes do menu:** Toda
 > tela das duas operações declara `modulo` (o do **assunto**), `bloco` e `liga`
-> no `telas.js` e no `tecido/nucleo/telas.js`; as abas da 501 e as "partes"
-> da 902 (e da 302, até 11/11/2026) também têm módulo. A lista dos 18 módulos, os blocos, as
+> no `telas.js` e no `tecido/nucleo/telas.js`; as abas da 501 também têm módulo
+> (as "partes" da 302 e da 902 saíram em 11/11/2026, nas fases 2 e 3 da ARRUMAR-O-LUGAR). A lista dos 18 módulos, os blocos, as
 > faixas, os números antigos e a lista do que está fora do lugar moram **num
 > lugar só**, o `modulos.js`. ✅ No ar desde 10/11/2026 (PR #328): o dono fez o
 > deploy e disse *"deu tudo certo"*. Valem também o 📍 LUGAR (§0) e a seção
@@ -5237,7 +5237,7 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 `tecido/nucleo/telas.js`.** Nove defeitos foram reintroduzidos um a um, e cada
 um reprova (mais seis na ③ REVISÃO, um a um: o módulo ou o bloco trocado numa
 tela ou numa parte que o inventário não conferia — ele passou de 26 para as 45
-telas e as duas partes; hoje são 51 telas e uma parte): tela sem módulo (2), módulo inventado (3), aba de outro assunto fora
+telas e as duas partes; hoje são 52 telas e nenhuma parte): tela sem módulo (2), módulo inventado (3), aba de outro assunto fora
 da lista (2), aba registrada sem declaração no mapa (1), tela nova na faixa 600
 (3), item arrumado esquecido na lista (2), bloco "Revenda" numa tela de Produção
 (2), a lista de números antigos crescendo (1) e tela nova fora da faixa do módulo (2).

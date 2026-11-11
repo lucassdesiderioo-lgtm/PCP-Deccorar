@@ -12,7 +12,7 @@
 //   operador acerta a configuracao e o que vai falhar. Aqui a pagina JA nasce
 //   no tamanho certo e nao ha o que ajustar.
 //
-// NENHUMA MEDIDA MORA AQUI. Todas vem do cadastro (Cadastros -> Parametros),
+// NENHUMA MEDIDA MORA AQUI. Todas vem do cadastro (a tela 906 Parametros),
 // porque a etiqueta e um objeto fisico que a equipe ajusta olhando o
 // resultado na bancada: "a letra ta pequena", "a barra some quando amassa".
 // Cada um desses ajustes era um deploy.

@@ -580,6 +580,10 @@ As duas datas são diferentes de propósito, e estão na spec: preço congela no
 
 O parâmetro **`pedidoNumeroInicial`** nasce **em branco**, e enquanto estiver
 assim o envio é **recusado** dizendo onde se lança. Não é falta: é a decisão.
+Ele se lança na **906 Parâmetros**, e **só grava inteiro, ou vazio**
+(`nucleo/config.js`, `FORMATO`, desde 11/11/2026): a 906 manda o parâmetro de
+texto como veio, e um `5O01` faria todo envio ser recusado até alguém achar o
+campo.
 
 > O plano de corte agrupa o **tom único** pelo TEXTO do pedido e olha para trás
 > (`cortesAnteriores`, em `plano.js`). Um `4272` novo colado num `4272` antigo
