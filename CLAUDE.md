@@ -4629,7 +4629,7 @@ de material do PCP (marca e modelo): `node teste_componentes.js`. Todos os
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 865 casos
+cd tecido && npm test          # 869 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
