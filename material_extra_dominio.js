@@ -65,6 +65,11 @@ function decidir(db, id, b, req){
     const m = db.prepare('SELECT * FROM material_extra WHERE id=?').get(+id);
     if(!m) throw new Recusa(404, 'linha de material extra não encontrada');
     if(m.decisao) throw new Recusa(409, 'esta linha já foi decidida por ' + (m.decidido_por || 'outra pessoa') + ' em ' + (m.decidido_em || '—'));
+    /* ⚠️ O MODO TESTE NAO DECIDE LINHA DE VERDADE (③ REVISAO, a regra do
+       travaTeste do §11): a baixa nasceria teste=1 e o "apagar tudo" a desfaria
+       pela foto, com a linha ja decidida — a baixa sumiria sem volta. */
+    const emTeste = (db.prepare("SELECT valor FROM config WHERE chave='modo_teste'").get() || {}).valor === '1';
+    if(emTeste && !m.teste) throw new Recusa(409, 'Modo teste ligado: esta linha é de verdade. Desligue o modo teste para decidir.');
     if(m.registrado_por_id && p.id && +m.registrado_por_id === +p.id)
       throw new Recusa(409, 'quem registrou o problema não decide o material dele — outra pessoa decide');
     const decisao = b && b.decisao;
@@ -73,8 +78,12 @@ function decidir(db, id, b, req){
     if(decisao === 'usou'){
       const lista = Array.isArray(b.itens) ? b.itens : [];
       for(const it of lista){
-        const q = parseFloat(String(it && it.quantidade == null ? '' : it.quantidade).replace(',', '.'));
-        if(!Number.isFinite(q) || q < 0) throw new Recusa(400, 'a quantidade tem que ser um número maior ou igual a 0 — veio "' + (it && it.quantidade) + '"');
+        /* Numero escrito pela metade ("3abc", "2,5kg") e RECUSADO, nunca
+           aproveitado (#25, #33). Tres casas, como o saldo (componente_dominio):
+           o que vira zero nao e baixa. */
+        const t = String(it && it.quantidade == null ? '' : it.quantidade).trim();
+        if(!/^\d+([.,]\d+)?$/.test(t)) throw new Recusa(400, 'a quantidade tem que ser um número maior ou igual a 0 — veio "' + t + '"');
+        const q = Math.round(parseFloat(t.replace(',', '.')) * 1000) / 1000;
         if(q === 0) continue;
         const c = db.prepare('SELECT id, nome, unidade, modo_saldo FROM componente WHERE id=?').get(+(it && it.componente_id));
         if(!c) throw new Recusa(400, 'o material ' + (it && it.componente_id) + ' não existe');

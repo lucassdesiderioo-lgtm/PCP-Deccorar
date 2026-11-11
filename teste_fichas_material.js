@@ -144,5 +144,58 @@ const MAT = require('./material_dominio');
   ok('e o consumido do mes junta o sob medida', P2.consumo_mes.sobmedida === 12, () => JSON.stringify(P2.consumo_mes));
   require('./sobmedida_material').ligarFicha(null);
 
+  /* ── ③ REVISAO (11/11/2026): os achados confirmados pelo verificador ──── */
+  secao('③ 1 · o modo teste nao mexe no que e de verdade');
+  const PORTA = require('./porta_material_sm')(db);
+  cfg('modo_teste', '1');
+  const sAntes = saldo(tubo);
+  let rb = PORTA.baixarMaterial({ itens:[{ componente_id:tubo, quantidade:2 }], referencia:'sm_item:1' });
+  ok('a baixa do sob medida (peca de verdade) fica ADIADA com o modo teste ligado', rb && rb.adiado === true && saldo(tubo) === sAntes, () => JSON.stringify(rb));
+  const ex = PORTA.materialExtra({ referencia:'sm_item:1', descricao:'pedido 1 · peca 1', motivo:'x', sugestao:[], registrado_por:'Ana', registrado_por_id:301 });
+  ok('o material extra da recusa do sob medida nasce de verdade (teste=0)', db.prepare('SELECT teste FROM material_extra WHERE id=?').get(ex.id).teste === 0);
+  r = await post('/api/material-extra/' + ex.id + '/decidir', { decisao:'usou', itens:[{ componente_id:tubo, quantidade:1 }] }, SUP);
+  ok('decidir uma linha de VERDADE com o modo teste ligado e recusado (409)', r.status === 409 && /modo teste/i.test(r.corpo.erro || ''), () => JSON.stringify(r.corpo));
+  ok('e o saldo nao mexeu', saldo(tubo) === sAntes);
+  cfg('modo_teste', '0');
+  rb = PORTA.baixarMaterial({ itens:[{ componente_id:tubo, quantidade:2 }], referencia:'sm_item:1' });
+  ok('fora do modo teste a baixa do sob medida acontece, e de verdade (teste=0)', !rb.adiado && saldo(tubo) === sAntes - 2 &&
+    db.prepare("SELECT teste FROM movimento_componente WHERE referencia='sm_item:1'").get().teste === 0);
+
+  secao('③ 2 · a linha de ficha minuscula nao trava a baixa do SKU');
+  const cola = novo({ nome:'Cola', unidade:'l', modo:'quantidade', estoque:10 });
+  db.prepare("INSERT INTO contagem_material_item (contagem_id,componente_id,contado,situacao) VALUES (88,?,10,'aprovado')").run(cola);
+  db.prepare("UPDATE componente SET como_sai='ficha' WHERE id=?").run(cola);
+  fins(cola, '0.0004');
+  const t0 = saldo(tubo), nExtra0 = db.prepare('SELECT COUNT(*) n FROM material_extra').get().n;
+  r = await post('/api/montagem', { codigo:'RT160', kit_ok:1 }, OPE);
+  ok('o tubo baixa normalmente com uma linha de 0,0004 na ficha', r.status === 200 && Math.abs(saldo(tubo) - (t0 - 1.6)) < 1e-9, () => saldo(tubo));
+  ok('e nao nasce linha de falha a cada embalagem', db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n === 0);
+
+  secao('③ 3 · a 106 recusa o numero escrito pela metade');
+  await post('/api/rejeicao', { codigo:'RT160', motivo:'Mais um' }, OPE);
+  const me3 = db.prepare("SELECT id FROM material_extra WHERE origem='revisao' AND decisao IS NULL ORDER BY id DESC LIMIT 1").get().id;
+  const t1 = saldo(tubo);
+  r = await post('/api/material-extra/' + me3 + '/decidir', { decisao:'usou', itens:[{ componente_id:tubo, quantidade:'3abc' }] }, SUP);
+  ok('"3abc" e recusado (400) e o saldo nao mexe', r.status === 400 && saldo(tubo) === t1, () => r.status + ' ' + saldo(tubo));
+  r = await post('/api/material-extra/' + me3 + '/decidir', { decisao:'usou', itens:[{ componente_id:tubo, quantidade:'0.0004' }] }, SUP);
+  ok('quantidade que vira zero e 400, e nao 500', r.status === 400, () => r.status + ' ' + JSON.stringify(r.corpo));
+
+  secao('③ 4 · a ficha que nao da a quantidade vira material extra');
+  db.prepare('UPDATE ficha_formula SET ativo=0 WHERE componente_id=?').run(cola);
+  fins(cola, '1 / (altura - 140)');
+  const n4 = db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n;
+  r = await post('/api/montagem', { codigo:'RT160', kit_ok:1 }, OPE);
+  const fx = db.prepare("SELECT * FROM material_extra WHERE origem='falha_baixa' ORDER BY id DESC LIMIT 1").get();
+  ok('a embalagem passa e uma linha diz que a ficha nao deu a quantidade da Cola', r.status === 200 &&
+    db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n === n4 + 1 && /Cola/.test(fx.motivo), () => JSON.stringify(fx));
+  db.prepare('UPDATE ficha_formula SET ativo=0 WHERE componente_id=?').run(cola);
+  db.pragma('foreign_keys = OFF');
+  db.exec("INSERT INTO skus (codigo,descricao,estoque,modelo_id,tem_ficha) VALUES ('RTSEM','sem medida',0,50,1)");
+  db.pragma('foreign_keys = ON');
+  const n5 = db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n;
+  r = await post('/api/montagem', { codigo:'RTSEM', kit_ok:1 }, OPE);
+  ok('o SKU sem medida, com material pela ficha no modelo, tambem vira linha', r.status === 200 &&
+    db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n === n5 + 1);
+
   fim();
 })();

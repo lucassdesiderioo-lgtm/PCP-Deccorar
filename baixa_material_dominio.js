@@ -34,6 +34,11 @@ function baixar(db, a){
     soma[id] = (soma[id] || 0) + q;
   }
   for(const id of Object.keys(soma)){
+    /* ⚠️ Tres casas, como o saldo (③ REVISAO): a linha de 0,0004 viraria
+       "delta invalido" no componente_dominio e desfaria a baixa do SKU
+       inteiro, a cada embalagem. Abaixo de 0,001 fica de fora, dito. */
+    soma[id] = Math.round(soma[id] * 1000) / 1000;
+    if(soma[id] === 0){ ignorados.push({ componente_id:+id, motivo:'menos de 0,001 por peça' }); continue; }
     const c = db.prepare('SELECT id, nome, como_sai, modo_saldo, ativo FROM componente WHERE id=?').get(+id);
     if(!c){ ignorados.push({ componente_id:+id, motivo:'material não existe' }); continue; }
     if(c.como_sai !== 'ficha'){ ignorados.push({ componente_id:c.id, nome:c.nome, motivo:'sai pela contagem' }); continue; }
@@ -50,16 +55,32 @@ function baixar(db, a){
    unidade, quantidade}]. Linha com erro (sem preco nao conta: a quantidade
    existe mesmo sem preco; a formula que nao avalia, sim) fica de fora e volta
    em `faltam`. O tecido sai pela bobina que a ficha escolheu. */
+/* `semQuantidade` ([{componente_id, motivo}]): o material da ficha cuja
+   quantidade nao saiu — a formula que nao avalia neste SKU, ou o SKU inteiro
+   sem medida/modelo (③ REVISAO). Quem embala decide: se algum deles sai pela
+   ficha, a falta vira "material extra a decidir", e nunca some calada. */
 function daFichaPadrao(db, sku){
   const F = require('./ficha_dominio').calcularFicha(db, sku);
-  const itens = [], faltam = [];
-  if(!F || F.erro || F.pendencia || !F.linhas) return { itens, faltam:[F && (F.erro || F.pendencia) || 'sem ficha'] };
+  const itens = [], faltam = [], semQuantidade = [];
+  const doModelo = () => { try{
+    return db.prepare(`SELECT f.componente_id FROM ficha_formula f JOIN skus s ON s.modelo_id=f.modelo_id
+      WHERE s.codigo=? AND f.ativo=1 AND f.componente_id IS NOT NULL`).all(sku).map(r => r.componente_id);
+  }catch(e){ return []; } };
+  if(!F || F.erro || F.pendencia || !F.linhas){
+    const m = F && (F.erro || F.pendencia) || 'sem ficha';
+    return { itens, faltam:[m], semQuantidade:doModelo().map(id => ({ componente_id:id, motivo:m })) };
+  }
   for(const l of F.linhas){
     if(l.componente_id && Number.isFinite(+l.quantidade) && +l.quantidade > 0)
       itens.push({ componente_id:l.componente_id, nome:l.componente_nome, unidade:l.unidade, quantidade:+l.quantidade });
-    else if(l.erro && !/sem preço/.test(l.erro)) faltam.push(l.erro);
+    else if(l.erro && !/sem preço/.test(l.erro)){
+      faltam.push(l.erro);
+      let cid = l.componente_id || null;
+      if(!cid && l.formula_id){ try{ const f = db.prepare('SELECT componente_id FROM ficha_formula WHERE id=?').get(l.formula_id); cid = f && f.componente_id; }catch(e){} }
+      if(cid) semQuantidade.push({ componente_id:cid, motivo:l.erro });
+    }
   }
-  return { itens, faltam };
+  return { itens, faltam, semQuantidade };
 }
 
 /* ── O CONSUMIDO POR OPERACAO (fase 3, §3-D) ────────────────────────────────

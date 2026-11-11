@@ -309,6 +309,14 @@ module.exports=function(app,db){
             ficha=BM.daFichaPadrao(db,cod);
             db.transaction(()=>BM.baixar(db,{itens:ficha.itens, operacao:'padrao', motivo:'ficha',
               referencia:'montagem:'+mid, usuario_id:q.usuario_id, usuario_nome:q.usuario_nome, teste:emTeste}))();
+            /* O material PELA FICHA cuja quantidade nao saiu (a formula que nao
+               avalia neste SKU, o SKU sem medida) nao some calado (③ REVISAO):
+               vira "material extra a decidir", com o motivo. */
+            const semQ=(ficha.semQuantidade||[]).filter(x=>{ const c=db.prepare('SELECT como_sai FROM componente WHERE id=?').get(x.componente_id); return c&&c.como_sai==='ficha'; });
+            if(semQ.length) require('./material_extra_dominio').registrar(db,{origem:'falha_baixa', operacao:'padrao',
+              referencia:'montagem:'+mid, descricao:cod,
+              motivo:'a ficha não deu a quantidade de: '+semQ.map(x=>{ const c=db.prepare('SELECT nome FROM componente WHERE id=?').get(x.componente_id); return (c?c.nome:'#'+x.componente_id)+' ('+x.motivo+')'; }).join(' · '),
+              sugestao:ficha.itens, registrado_por:q.usuario_nome, registrado_por_id:null});
           }catch(e){
             console.error('[montagem] a baixa de material de '+cod+' falhou (a embalagem seguiu):', e.message);
             /* O registro da falha tambem nao trava: sem a tabela (banco velho,

@@ -18,10 +18,11 @@
   .chip.am{border-color:var(--amb);color:var(--amb)}
   .sub{color:var(--sub);font-size:12px;margin-top:4px;overflow-wrap:anywhere}
   table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
-  td,th{padding:5px 6px;border-top:1px solid var(--borda);text-align:left;vertical-align:middle}
+  td,th{padding:5px 6px;white-space:normal;border-top:1px solid var(--borda);text-align:left;vertical-align:middle}
   th{color:var(--sub);font-weight:600;font-size:12px}
   input,select{font:inherit;font-size:13px;padding:4px 6px;border-radius:6px;border:1px solid var(--borda);background:#0b0f14;color:var(--txt);max-width:100%}
-  input.q{width:6.5em}
+  input.q{width:5.5em}
+  .uni{white-space:nowrap}
   .acoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
   button.p{font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:0;background:var(--amb);color:#1a1300;font-weight:700;cursor:pointer}
   button.g{font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--borda);background:transparent;color:var(--txt);cursor:pointer}
@@ -45,7 +46,26 @@ function num(n){ return (Math.round((+n || 0) * 1000) / 1000).toString().replace
 function data(t){ if(!t) return '—'; var m = String(t).match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/); return m ? m[3] + '/' + m[2] + (m[4] ? ' ' + m[4] + ':' + m[5] : '') : t; }
 var ORIGEM = { revisao:'Peça com problema na revisão', sobmedida_recusa:'Peça recusada no sob medida', falha_baixa:'A baixa pela ficha falhou' };
 var OPER = { padrao:'Medida padrão', sobmedida:'Sob medida' };
-var aba = 'pendentes', MATS = [];
+var aba = 'pendentes', MATS = [], EU = null;
+/* O DIGITADO SOBREVIVE AO REDESENHO (③ REVISAO, §12 e §9-B: nada digitado some
+   calado). Decidir uma linha redesenha a lista; o que estava preparado nas
+   outras e guardado antes e devolvido depois, cartao a cartao. */
+function guardar(){
+  var g = {};
+  [].forEach.call(document.querySelectorAll('[data-id]'), function(card){
+    g[card.getAttribute('data-id')] = { obs:card.querySelector('.obs') ? card.querySelector('.obs').value : '',
+      linhas:[].map.call(card.querySelectorAll('tbody tr'), function(tr){ return { m:tr.querySelector('.mat').value, q:tr.querySelector('.q').value }; }) };
+  });
+  return g;
+}
+function devolver(g){
+  Object.keys(g || {}).forEach(function(id){
+    var card = document.querySelector('[data-id="' + id + '"]'); if(!card) return;
+    var tb = card.querySelector('tbody'); tb.innerHTML = '';
+    g[id].linhas.forEach(function(l, i){ tb.insertAdjacentHTML('beforeend', linhaItem({ componente_id:l.m }, i)); var tr = tb.lastElementChild; tr.querySelector('.q').value = l.q; });
+    if(card.querySelector('.obs')) card.querySelector('.obs').value = g[id].obs;
+  });
+}
 async function api(m, u, c){
   var r = await fetch(u, { method:m, headers:{ 'Content-Type':'application/json' }, body:c ? JSON.stringify(c) : undefined });
   var j = {}; try{ j = await r.json(); }catch(e){ j = { erro:'resposta inválida do servidor (' + r.status + ')' }; }
@@ -55,7 +75,7 @@ async function api(m, u, c){
 function linhaItem(it, i){
   var opts = MATS.map(function(m){ return '<option value="' + m.id + '"' + (+m.id === +it.componente_id ? ' selected' : '') + '>' + esc(m.codigo_cadastro + ' · ' + m.nome) + '</option>'; }).join('');
   return '<tr data-i="' + i + '"><td><select class="mat"><option value="">— material —</option>' + opts + '</select></td>'
-    + '<td><input class="q" inputmode="decimal" value="' + (it.quantidade != null ? num(it.quantidade) : '') + '"> <span class="sub">' + esc(it.unidade || '') + '</span></td>'
+    + '<td><input class="q" inputmode="decimal" value="' + (it.quantidade != null ? num(it.quantidade) : '') + '"> <span class="sub uni">' + esc(it.unidade || '') + '</span></td>'
     + '<td><button class="g" data-tira>tirar</button></td></tr>';
 }
 function cartao(l){
@@ -69,6 +89,9 @@ function cartao(l){
     return '<div class="card">' + cab + '<div class="sub" style="color:var(--txt)">' + o + '</div><div class="sub">decidido ' + esc(data(l.decidido_em)) + ' por ' + esc(l.decidido_por || '—') + (l.obs ? ' · ' + esc(l.obs) : '') + '</div></div>';
   }
   var sug = (l.sugestao || []).filter(function(it){ return MATS.some(function(m){ return +m.id === +it.componente_id; }); });
+  /* Quem registrou o problema nao decide: a tela diz antes do clique. */
+  if(EU && l.registrado_por_id && +l.registrado_por_id === +EU.id)
+    return '<div class="card">' + cab + '<div class="sub" style="color:var(--amb)">Você registrou este problema: outra pessoa decide o material dele.</div></div>';
   return '<div class="card" data-id="' + l.id + '">' + cab
     + '<div class="rola"><table><thead><tr><th>Material (da ficha da peça — mude se for preciso)</th><th>Quantidade</th><th></th></tr></thead><tbody>'
     + (sug.length ? sug.map(linhaItem).join('') : linhaItem({}, 0)) + '</tbody></table></div>'
@@ -76,12 +99,15 @@ function cartao(l){
     + '<button class="p" data-usou>Usou material — baixar</button><button class="g" data-nao>Não precisou de material</button><span class="msg"></span></div></div>';
 }
 async function carregar(){
+  var g = guardar();
+  if(!EU){ try{ EU = await api('GET', '/api/auth/eu'); }catch(e){ EU = null; } }
   if(!MATS.length){ var m = await api('GET', '/api/material-extra/materiais'); MATS = Array.isArray(m) ? m : []; }
   var r = await api('GET', '/api/material-extra?filtro=' + aba);
   if(r.erro){ $('#lista').innerHTML = '<div class="vazio">' + esc(r.erro) + '</div>'; return; }
   $('#abaP').textContent = 'Esperando decisão' + (r.pendentes && r.pendentes.n ? ' (' + r.pendentes.n + ')' : '');
   $('#lista').innerHTML = r.linhas.length ? r.linhas.map(cartao).join('')
     : '<div class="vazio">' + (aba === 'pendentes' ? 'Nenhuma peça esperando decisão.' : 'Nenhuma decisão ainda.') + '</div>';
+  devolver(g);
 }
 $('#abaP').onclick = function(){ aba = 'pendentes'; $('#abaP').className = 'on'; $('#abaD').className = ''; carregar(); };
 $('#abaD').onclick = function(){ aba = 'decididas'; $('#abaD').className = 'on'; $('#abaP').className = ''; carregar(); };

@@ -228,22 +228,10 @@ try{
     pessoas: () => db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all(),
     materiais: () => db.prepare('SELECT id,nome,unidade,marca,modelo,vai_ficha FROM componente WHERE ativo=1 ORDER BY nome').all()
       .map(m => Object.assign(m, { codigo_cadastro:require('./material_dominio').codigoCadastro(m.id) })),
-    /* FICHAS-NO-CADASTRO-UNICO (11/11/2026): a lista de material da ficha do sob
-       medida e do cadastro unico daqui. Tres portas de ida, todas por aqui:
-       o custo medio (so o custo da persiana, que la e podado por custo.ver),
-       a baixa pela ficha na embalagem e o material extra da peca recusada.
-       O saldo anda SO pelo componente_dominio, numa transacao do dados.db. */
-    /* O custo da unidade pela MESMA conta da ficha da 404 (o melhor preco
-       vigente das ofertas, ficha_dominio.precoUnitario): custo nunca se calcula
-       em dois lugares. Sem oferta, null — nunca zero (regra 4). */
-    custoMaterial: ids => {
-      const out = {};
-      for(const id of (ids || [])) out[id] = require('./ficha_dominio').precoUnitario(db, +id);
-      return out;
-    },
-    baixarMaterial: a => db.transaction(() => require('./baixa_material_dominio').baixar(db, Object.assign({ operacao:'sobmedida', motivo:'ficha',
-      teste:(db.prepare("SELECT valor FROM config WHERE chave='modo_teste'").get() || {}).valor === '1' ? 1 : 0 }, a)))(),
-    materialExtra: a => require('./material_extra_dominio').registrar(db, Object.assign({ origem:'sobmedida_recusa', operacao:'sobmedida' }, a)),
+    /* FICHAS-NO-CADASTRO-UNICO (11/11/2026): o custo, a baixa pela ficha e o
+       material extra do sob medida — as tres portas moram no porta_material_sm.js
+       (com o modo teste do PCP, a baixa da peca de verdade de la e adiada). */
+    ...require('./porta_material_sm')(db),
     /* COMPRAS-E-RECEBIMENTO fase 10 (R-CMP-50): o PCP e dono do ENDERECO; o sob
        medida le a arvore, cria o buraco novo da bancada e pergunta se um volume
        do PCP ocupa o nivel — tudo por aqui. */

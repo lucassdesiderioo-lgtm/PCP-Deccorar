@@ -20,13 +20,13 @@ const DIRETOR={id:1, nome:'Lucas', papel:'diretor'};
 const MATS=[{id:11,nome:'Parafuso 4x40',unidade:'un'},{id:12,nome:'Corrente bola',unidade:'m'},
   {id:13,nome:'Café',unidade:'un',vai_ficha:0}];
 
-let chamadas=[], extras=[], falhar=false, precos={11:0.1,12:2.5};
+let chamadas=[], extras=[], falhar=false, adiar=false, precos={11:0.1,12:2.5};
 function ligar(){
   materiais.ligar(()=>MATS);
   chamadas=[]; extras=[];
   PCP.ligar({
     custoMaterial:ids=>{ const o={}; ids.forEach(i=>o[i]=precos[i]==null?null:precos[i]); return o; },
-    baixarMaterial:a=>{ if(falhar) throw new Error('banco travado'); chamadas.push(a); return {baixados:a.itens, ignorados:[]}; },
+    baixarMaterial:a=>{ if(falhar) throw new Error('banco travado'); if(adiar) return {adiado:true, motivo:'modo teste ligado no PCP'}; chamadas.push(a); return {baixados:a.itens, ignorados:[]}; },
     materialExtra:a=>{ extras.push(a); return {id:extras.length}; }
   });
 }
@@ -139,6 +139,43 @@ module.exports=[
   igual(extras.length,1,'registrou'); igual(extras[0].registrado_por_id,301,'quem registrou');
   igual(extras[0].sugestao[0].componente_id,11,'a sugestao e a lista congelada');
   igual(/pedido 7900/.test(extras[0].descricao),true,'descreve o pedido');
+ }},
+{nome:'③ com o modo teste do PCP ligado, a baixa fica ESPERANDO e e feita na proxima embalagem',
+ executar({igual,db}){
+  produto();
+  db.pragma('foreign_keys = OFF');
+  db.prepare(`INSERT INTO sm_pedido_item(id,pedido_id,n,modelo_id,abertura_id,cor_tecido_id,cor_acessorio_id,largura_mm,altura_mm,comando,rolamento)
+    VALUES(903,900,3,1,1,1,1,1500,2000,'d',''),(904,900,4,1,1,1,1,1500,2000,'d','')`).run();
+  db.pragma('foreign_keys = ON');
+  FM.congelar(903,[{componente_pcp_id:11,nome:'Parafuso',unidade:'un',quantidade:4}]);
+  FM.congelar(904,[{componente_pcp_id:11,nome:'Parafuso',unidade:'un',quantidade:2}]);
+  adiar=true;
+  FM.baixarDaEmbalagem(903,{id:300,nome:'Bia'});
+  adiar=false;
+  const l=db.prepare('SELECT baixado_em, baixa_resultado r FROM sm_pedido_material WHERE item_id=903').get();
+  igual(l.baixado_em,null,'nao marcada como baixada'); igual(/esperando/.test(l.r),true,'diz que esta esperando');
+  igual(chamadas.length,0,'nada baixou');
+  FM.baixarDaEmbalagem(904,{id:300,nome:'Bia'});
+  igual(chamadas.length,2,'a proxima embalagem baixa a dela e a que esperava');
+  igual(db.prepare('SELECT COUNT(*) n FROM sm_pedido_material WHERE item_id IN (903,904) AND baixado_em IS NULL').get().n,0,'as duas baixadas');
+ }},
+{nome:'③ a linha da lista que nao deu quantidade nao some: vira material extra na embalagem',
+ executar({igual,db}){
+  produto();
+  db.pragma('foreign_keys = OFF');
+  db.prepare(`INSERT INTO sm_pedido_item(id,pedido_id,n,modelo_id,abertura_id,cor_tecido_id,cor_acessorio_id,largura_mm,altura_mm,comando,rolamento)
+    VALUES(905,900,5,1,1,1,1,1500,2000,'d','')`).run();
+  db.pragma('foreign_keys = ON');
+  FM.congelar(905,[{componente_pcp_id:11,nome:'Parafuso',unidade:'un',quantidade:4},{componente_pcp_id:12,nome:'Corrente',unidade:'m',quantidade:null,erro:'divisão por zero'}]);
+  FM.baixarDaEmbalagem(905,{id:300,nome:'Bia'});
+  igual(extras.length,1,'virou material extra'); igual(/Corrente/.test(extras[0].motivo)&&/divisão por zero/.test(extras[0].motivo),true,'diz qual e por que');
+  igual(chamadas.length,1,'o parafuso baixou'); igual(chamadas[0].itens.length,1,'so o parafuso foi a baixa');
+ }},
+{nome:'③ o catalogo unico da 404 nao mostra produto inativo (R-SMN-01)',
+ executar({igual}){
+  produto();
+  const nomes=FM.produtosParaPcp().map(p=>p.nome);
+  igual(nomes.includes('Romana teste lista'),false,'o inativo nao vai');
  }},
 {nome:'sem a porta do PCP, a recusa nao trava (nao registra, e nao estoura)',
  executar({igual}){

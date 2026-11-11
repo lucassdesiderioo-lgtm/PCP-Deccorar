@@ -125,10 +125,18 @@ function custo(itens){
 }
 
 /* Congela na aprovacao (chamado DENTRO da transacao do aprovar). */
+/* ⚠️ A LINHA QUE NAO DEU QUANTIDADE NAO SOME (③ REVISAO): ela congela com
+   quantidade 0 e o motivo em baixa_resultado ('sem quantidade: …'), e na
+   embalagem vira "material extra a decidir". A formula e conferida em tres
+   medidas no cadastro; a medida do pedido pode ser outra. */
+const SEM_Q='sem quantidade: ';
 function congelar(item_id,itens){
   db.prepare('DELETE FROM sm_pedido_material WHERE item_id=?').run(item_id);
-  const ins=db.prepare('INSERT INTO sm_pedido_material(item_id,componente_pcp_id,nome,unidade,quantidade) VALUES(?,?,?,?,?)');
-  for(const i of itens) if(i.quantidade!=null&&i.quantidade>0) ins.run(item_id,i.componente_pcp_id,i.nome,i.unidade,i.quantidade);
+  const ins=db.prepare('INSERT INTO sm_pedido_material(item_id,componente_pcp_id,nome,unidade,quantidade,baixa_resultado) VALUES(?,?,?,?,?,?)');
+  for(const i of itens){
+    if(i.quantidade!=null&&i.quantidade>0) ins.run(item_id,i.componente_pcp_id,i.nome,i.unidade,i.quantidade,null);
+    else if(i.quantidade==null) ins.run(item_id,i.componente_pcp_id,i.nome,i.unidade,0,SEM_Q+(i.erro||'a fórmula não avaliou'));
+  }
 }
 
 /* A BAIXA NA EMBALAGEM (fase 4). Chamada DEPOIS da transacao da bancada — o
@@ -136,19 +144,49 @@ function congelar(item_id,itens){
    tropecou (#6). Uma vez por peca: a que ja tem baixado_em nao baixa de novo
    (a embalada de novo depois de uma recusa). Falhou: fica escrito na linha e
    vira "material extra a decidir" do Supervisor. */
+const ESPERANDO='esperando: ';
+/* As pecas embaladas cuja baixa ficou ESPERANDO (o modo teste do PCP estava
+   ligado — ③ REVISAO): tentadas de novo a cada embalagem, ate 20 por vez. */
+function baixarEsperando(usuario){
+  const ids=db.prepare("SELECT DISTINCT item_id FROM sm_pedido_material WHERE baixado_em IS NULL AND baixa_resultado LIKE '"+ESPERANDO+"%' LIMIT 20").all().map(r=>r.item_id);
+  for(const id of ids) baixarUma(id,usuario);
+}
 function baixarDaEmbalagem(item_id,usuario){
-  const pend=db.prepare('SELECT * FROM sm_pedido_material WHERE item_id=? AND baixado_em IS NULL').all(item_id);
-  if(!pend.length) return {baixados:[], ignorados:[], nada:true};
+  const r=baixarUma(item_id,usuario);
+  if(!r.adiado) try{ baixarEsperando(usuario); }catch(e){ console.error('[ficha_material] baixa das que esperavam:',e.message); }
+  return r;
+}
+function baixarUma(item_id,usuario){
+  const todas=db.prepare('SELECT * FROM sm_pedido_material WHERE item_id=? AND baixado_em IS NULL').all(item_id);
+  if(!todas.length) return {baixados:[], ignorados:[], nada:true};
+  const semQ=todas.filter(x=>String(x.baixa_resultado||'').indexOf(SEM_Q)===0);
+  const pend=todas.filter(x=>!semQ.includes(x));
   const item=db.prepare(`SELECT i.n, p.numero, p.id pedido_id FROM sm_pedido_item i JOIN sm_pedido p ON p.id=i.pedido_id WHERE i.id=?`).get(item_id)||{};
   const ref='sm_item:'+item_id, desc='pedido '+(item.numero||item.pedido_id)+' · peça '+(item.n||'?');
-  let r=null, falha=null;
-  try{
-    r=PCP.baixar({itens:pend.map(x=>({componente_id:x.componente_pcp_id, quantidade:x.quantidade})),
-      referencia:ref, usuario_id:usuario&&usuario.id, usuario_nome:usuario&&usuario.nome});
-  }catch(e){ falha=e.message; }
+  let r={baixados:[], ignorados:[]}, falha=null;
+  if(pend.length){
+    try{
+      r=PCP.baixar({itens:pend.map(x=>({componente_id:x.componente_pcp_id, quantidade:x.quantidade})),
+        referencia:ref, usuario_id:usuario&&usuario.id, usuario_nome:usuario&&usuario.nome});
+    }catch(e){ falha=e.message; }
+    /* ADIADA: a peca e de verdade e o PCP esta em modo teste. Nada marcado — a
+       linha espera, e a proxima embalagem tenta de novo. */
+    if(!falha&&r&&r.adiado){
+      db.prepare('UPDATE sm_pedido_material SET baixa_resultado=? WHERE item_id=? AND baixado_em IS NULL AND (baixa_resultado IS NULL OR baixa_resultado LIKE ?)')
+        .run(ESPERANDO+(r.motivo||'adiada'),item_id,ESPERANDO+'%');
+      return {adiado:true};
+    }
+  }
   const res=falha?('falhou: '+falha):('baixou '+r.baixados.length+', pela contagem '+r.ignorados.length);
-  db.prepare('UPDATE sm_pedido_material SET baixado_em=?, baixa_resultado=? WHERE item_id=? AND baixado_em IS NULL')
-    .run(dia.agora(),res,item_id);
+  const agora=dia.agora();
+  for(const x of pend) db.prepare('UPDATE sm_pedido_material SET baixado_em=?, baixa_resultado=? WHERE id=?').run(agora,res,x.id);
+  for(const x of semQ) db.prepare('UPDATE sm_pedido_material SET baixado_em=? WHERE id=?').run(agora,x.id);
+  if(semQ.length){
+    try{ PCP.extra({origem:'falha_baixa', referencia:ref, descricao:desc,
+      motivo:'a ficha não deu a quantidade de: '+semQ.map(x=>x.nome+' ('+String(x.baixa_resultado).slice(SEM_Q.length)+')').join(' · '),
+      sugestao:pend.map(x=>({componente_id:x.componente_pcp_id, nome:x.nome, unidade:x.unidade, quantidade:x.quantidade})),
+      registrado_por:usuario&&usuario.nome, registrado_por_id:null}); }catch(e){ console.error('[ficha_material] material extra da linha sem quantidade:',e.message); }
+  }
   if(falha){
     try{ PCP.extra({origem:'falha_baixa', referencia:ref, descricao:desc, motivo:'a baixa pela ficha falhou: '+falha,
       sugestao:pend.map(x=>({componente_id:x.componente_pcp_id, nome:x.nome, unidade:x.unidade, quantidade:x.quantidade})),
@@ -185,9 +223,11 @@ const embaladoNoPeriodo=(desde,ate)=>db.prepare(`SELECT pm.componente_pcp_id com
 
 /* Para o catalogo unico da 404 (fase 5): nome, ativo e quantas linhas de
    material — nada de preco. */
+/* So o ATIVO (③ REVISAO, R-SMN-01): o inativo so chega a quem edita o
+   catalogo de la, e a 404 e aberta por quem nao edita. */
 const produtosParaPcp=()=>db.prepare(`SELECT m.id, m.nome, m.ativo,
   (SELECT COUNT(*) FROM sm_ficha_material f WHERE f.modelo_id=m.id AND f.ativo=1) materiais
-  FROM sm_modelo m ORDER BY m.ativo DESC, m.nome`).all();
+  FROM sm_modelo m WHERE m.ativo=1 ORDER BY m.nome`).all();
 
 module.exports={produtosParaPcp,QUANDOS,listar,criar,editar,calcular,custo,congelar,baixarDaEmbalagem,registrarRecusa,
   linhasParaPcp,embaladoNoPeriodo};

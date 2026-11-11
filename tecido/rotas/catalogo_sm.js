@@ -145,7 +145,10 @@ module.exports={rotas:[
   {metodo:'PUT', caminho:'/api/sm/material/:id', permissao:EDITAR,
    manipulador:({params,corpo})=>require('../dominio/ficha_material').editar(params.id,corpo),
    detalhe:(req,d)=>'lista de material: '+(d&&d.nome)+(d&&!d.ativo?' (tirada)':'')},
-  {metodo:'POST', caminho:'/api/sm/simular/material', permissao:LER,
+  /* ⚠️ So quem EDITA o catalogo (③ REVISAO): o custo e preco de compra do PCP,
+     e o vendedor tem a custo.ver do sob medida. Nenhuma tela o mostra ainda —
+     onde o custo da persiana aparece e decisao do dono (ver o FECHAMENTO). */
+  {metodo:'POST', caminho:'/api/sm/simular/material', permissao:EDITAR,
    manipulador:({corpo,usuario})=>{
      const r=persiana.calcular(corpo,{aceitaInativo:pode(usuario,EDITAR)});
      return custo.podarCusto(usuario,Object.assign({materiais:r.materiais},

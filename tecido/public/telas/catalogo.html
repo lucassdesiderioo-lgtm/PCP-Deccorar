@@ -651,6 +651,11 @@ function novaLinhaFicha(){
    material). Entra no CUSTO da persiana (o simulador mostra a quem ve custo),
    e a embalagem baixa daqui quando o material sai pela ficha. Nao mexe em
    etapa, setor nem etiqueta. */
+/* O digitado da lista de material SOBREVIVE a recusa (③ REVISAO, a regra da
+   ficha do §7-B): o tentar() redesenha, e o editor nasceria com o valor antigo. */
+let rascunhoMat=null;
+function salvarMat(chave,corpo,fn){ rascunhoMat={chave,valores:corpo}; return tentar(async()=>{ await fn(); rascunhoMat=null; }); }
+const valMat=(chave,campo,padrao)=>rascunhoMat&&rascunhoMat.chave===chave&&rascunhoMat.valores[campo]!=null?rascunhoMat.valores[campo]:padrao;
 function codigoMat(id){ const m=((window.__materiais||{}).materiais||[]).find(x=>x.id===id); return m&&m.codigo_cadastro?m.codigo_cadastro+' · ':''; }
 function abaMaterial(){
   const c=el('div',{class:'cartao'},[
@@ -675,10 +680,10 @@ function abaMaterial(){
         botao(l.ativo?'Tirar':'Voltar',()=>tentar(()=>api('/api/sm/material/'+l.id,{metodo:'PUT',corpo:{ativo:!l.ativo},silencioso:true})))])
     ]));
     if(editando==='mat-'+l.id) tb.appendChild(el('tr',{},[el('td',{colspan:'4'},[editor([
-      {chave:'expressao',rotulo:'Fórmula',valor:l.expressao},
-      {chave:'quando',rotulo:'Quando entra',valor:l.quando,opcoes:(modelo.quandos||['sempre']).map(q=>({valor:q,rotulo:q}))}
-    ],v=>tentar(()=>api('/api/sm/material/'+l.id,{metodo:'PUT',corpo:{expressao:v.expressao,quando:v.quando},silencioso:true})),
-      ()=>{ editando=null; erro=null; desenhar(); })])]));
+      {chave:'expressao',rotulo:'Fórmula',valor:valMat('mat-'+l.id,'expressao',l.expressao)},
+      {chave:'quando',rotulo:'Quando entra',valor:valMat('mat-'+l.id,'quando',l.quando),opcoes:(modelo.quandos||['sempre']).map(q=>({valor:q,rotulo:q}))}
+    ],v=>salvarMat('mat-'+l.id,v,()=>api('/api/sm/material/'+l.id,{metodo:'PUT',corpo:{expressao:v.expressao,quando:v.quando},silencioso:true})),
+      ()=>{ editando=null; erro=null; rascunhoMat=null; desenhar(); })])]));
   });
   if(!lista.length) tb.appendChild(el('tr',{},[el('td',{colspan:'4',class:'nota'},['Nenhum material na lista ainda.'])]));
   t.appendChild(tb);
@@ -687,12 +692,12 @@ function abaMaterial(){
   if(editando==='mat-nova'){
     const op=(mat.materiais||[]).filter(m=>m.vai_ficha!==0).map(m=>({valor:m.id,rotulo:(m.codigo_cadastro?m.codigo_cadastro+' · ':'')+m.nome+' ('+m.unidade+')'}));
     box.appendChild(editor([
-      {chave:'componente_pcp_id',rotulo:'Material',valor:'',opcoes:[{valor:'',rotulo:'— escolha —'}].concat(op)},
-      {chave:'expressao',rotulo:'Fórmula',valor:'',dica:'largura / 100'},
-      {chave:'quando',rotulo:'Quando entra',valor:'sempre',opcoes:(modelo.quandos||['sempre']).map(q=>({valor:q,rotulo:q}))}
-    ],v=>tentar(()=>api('/api/sm/modelos/'+modelo.id+'/material',{metodo:'POST',
+      {chave:'componente_pcp_id',rotulo:'Material',valor:valMat('mat-nova','componente_pcp_id',''),opcoes:[{valor:'',rotulo:'— escolha —'}].concat(op)},
+      {chave:'expressao',rotulo:'Fórmula',valor:valMat('mat-nova','expressao',''),dica:'largura / 100'},
+      {chave:'quando',rotulo:'Quando entra',valor:valMat('mat-nova','quando','sempre'),opcoes:(modelo.quandos||['sempre']).map(q=>({valor:q,rotulo:q}))}
+    ],v=>salvarMat('mat-nova',v,()=>api('/api/sm/modelos/'+modelo.id+'/material',{metodo:'POST',
       corpo:{componente_pcp_id:Number(v.componente_pcp_id),expressao:v.expressao,quando:v.quando},silencioso:true})),
-      ()=>{ editando=null; erro=null; desenhar(); }));
+      ()=>{ editando=null; erro=null; rascunhoMat=null; desenhar(); }));
   }else if(mat.ligada!==false) box.appendChild(botao('+ Acrescentar material',()=>{ editando='mat-nova'; erro=null; desenhar(); }));
   c.appendChild(box);
   return c;
