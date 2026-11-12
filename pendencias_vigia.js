@@ -41,8 +41,10 @@ const VIGIA = [
   [/^\/api\/recebimento$/,                  ['recebimento_retido','recebimento_aviso']], // 502
   [/^\/api\/pedidos\/\d+\/fechar$/,         ['recebimento_retido']],                  // fechar com falta
   [/^\/api\/contagem-material\/\d+\/terminar$/, ['contagem_material']],               // 504
-  [/^\/api\/componentes$/,                  ['material_sem_almox']],                  // 1101
-  [/^\/api\/devolucao$/,                    ['devolucoes']]                           // 251 receber peça
+  [/^\/api\/componentes$/,                  ['material_sem_almox']]                   // 1101
+  /* ⚠️ A 251 (POST /api/devolucao) FICA DE FORA, por decisão do dono (12/11/2026):
+     toda peça recebida nasce esperando a baixa, e a caixinha apareceria em toda
+     devolução bipada, sem botão — quem recebe aprenderia a fechar sem ler. */
 ];
 
 const linhaDe = c => PEND.LINHAS.find(L => L.chave === c);

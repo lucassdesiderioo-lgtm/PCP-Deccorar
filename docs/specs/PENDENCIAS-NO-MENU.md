@@ -2,7 +2,7 @@
 
 ```
 STATUS
-Situação: EM CONSTRUÇÃO · aprovada pelo dono em 12/11/2026 · fase 1 construída e revisada, falta subir · próxima: fase 2
+Situação: EM CONSTRUÇÃO · aprovada pelo dono em 12/11/2026 · fase 1 aprovada para subir em 12/11/2026 (falta o deploy) · próxima: fase 2
 Criada em: 12/11/2026
 Última atualização: 12/11/2026
 Fases: 1 ☑  2 ☐  3 ☐
@@ -33,9 +33,12 @@ Tipo: NOVIDADE
   antes: o upload lê o PDF por segundos, e a conta de "antes" somava o que outra
   pessoa fez nesse meio — hoje ele recomeça a conta depois da leitura
   (`req.recontarPendencias`); e a caixinha nova apagava a anterior (a 103 sobe
-  vários PDFs seguidos). Em dúvida, para o dono: a 251 mostra a caixinha em
-  TODA peça recebida (toda devolução nasce esperando a baixa).
-- `teste_pendencias_caminho.js` (66).
+  vários PDFs seguidos).
+- **Divergência D11 — a 251 saiu da caixinha** (decisão do dono, 12/11/2026,
+  linha em `docs/DECISOES.md`): a §3.2 a listava, mas toda peça recebida nasce
+  esperando a baixa, e a caixa apareceria em toda devolução bipada, sem botão.
+  Quem dá a baixa a vê pela 253 e, na fase 2, pela etiqueta do ☰ Menu.
+- `teste_pendencias_caminho.js` (65).
 
 ## 1. O problema, nas palavras do dono (12/11/2026)
 

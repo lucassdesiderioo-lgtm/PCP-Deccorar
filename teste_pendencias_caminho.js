@@ -45,7 +45,7 @@ const codigo = fs.readdirSync(__dirname).filter(f => /\.js$/.test(f) && !/^teste
 const AMOSTRA = { '/api/lote/upload':1, '/api/carregamento/sobra':1, '/api/estoque/ajuste':1, '/api/inventario/terminar':1,
   '/api/inventario/geral/terminar-prateleira':1, '/api/inventario/rejeitar':1, '/api/skus':1, '/api/pedidos/:id/comprar':1,
   '/api/compras/rapida':1, '/api/recebimento':1, '/api/pedidos/:id/fechar':1, '/api/contagem-material/:id/terminar':1,
-  '/api/componentes':1, '/api/devolucao':1 };
+  '/api/componentes':1 };
 VIG.VIGIA.forEach(([re, chaves]) => {
   chaves.forEach(c => {
     const L = PEND.LINHAS.find(x => x.chave === c);
@@ -124,8 +124,12 @@ db.prepare("INSERT OR IGNORE INTO skus (codigo, estoque, descricao) VALUES ('BKC
   ok('editar o mesmo SKU incompleto não repete a caixinha', !r.corpo.pendencias, JSON.stringify(r.corpo));
 
   r = await post('/api/devolucao', { sku_fisico:'BKCAMINHO1', codigo_ml:'ML77', buyer:'Cliente Secreto' });
-  const d = (r.corpo.pendencias || [])[0] || {};
-  ok('devolução recebida aponta a baixa (253)', d.chave === 'devolucoes' && d.tela === 253, JSON.stringify(r.corpo));
+  const d = {};
+  /* A 251 FICA DE FORA (decisão do dono, 12/11/2026): toda peça recebida nasce
+     esperando a baixa, e a caixinha apareceria em toda devolução bipada, sem
+     botão — quem recebe aprende a fechar sem ler. Quem dá a baixa vê pela 253. */
+  ok('devolução recebida (251) NÃO mostra a caixinha', r.status === 200 && r.corpo.ok && !r.corpo.pendencias, JSON.stringify(r.corpo));
+  ok('a 251 não está na lista vigiada', VIG.vigiaDe('/api/devolucao') == null);
 
   r = await post('/api/lote/upload', {});
   const u = (r.corpo.pendencias || [])[0] || {};
