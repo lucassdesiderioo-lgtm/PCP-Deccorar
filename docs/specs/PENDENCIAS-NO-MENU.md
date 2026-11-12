@@ -2,15 +2,38 @@
 
 ```
 STATUS
-Situação: EM CONSTRUÇÃO · aprovada pelo dono em 12/11/2026 · fase 1 no ar desde 12/11/2026 (PR #346; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: o primeiro PDF que retém uma caixa mostrando a caixinha na 103 · próxima: fase 2
+Situação: EM CONSTRUÇÃO · aprovada pelo dono em 12/11/2026 · fase 1 no ar desde 12/11/2026 (PR #346; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: o primeiro PDF que retém uma caixa mostrando a caixinha na 103 · fase 2 construída e revisada, falta subir · próxima: fase 3
 Criada em: 12/11/2026
 Última atualização: 12/11/2026
-Fases: 1 ☑  2 ☐  3 ☐
+Fases: 1 ☑  2 ☑  3 ☐
 Risco: 🟡 (comportamento de tela e uma rota de leitura nova; não mexe em estoque, permissão, schema do PCP)
 Depende de: a central de Pendências (docs/arquivo/CENTRAL-DE-PENDENCIAS.md, a 204)
             o menu único (ORGANIZACAO-DO-SISTEMA, public/menu_telas.js)
 Tipo: NOVIDADE
 ```
+
+### Fase 2 — a etiqueta vermelha no ☰ Menu (12/11/2026, construída, falta subir)
+
+- `pendencias_dominio.minhas` + `GET /api/pendencias/minhas` (`@logado`, quem é
+  vem do login): por tela e o total, só números. O desenho é o
+  `public/menu_telas.js`, chamado pelos dois `nav.js`; pergunta a cada 60 s, ao
+  tocar no ☰ Menu e ao voltar para a aba.
+- **Divergência D12 — "pode resolver" é a régua de cada DONO, pessoa a pessoa**,
+  e não só a lista `perm` como a §3.1 escrevia (③ REVISÃO): quem pediu o ajuste
+  não o aprova, quem contou o SKU não o decide nem faz a 2ª contagem, quem
+  marcou a venda cancelada não a confirma, e quem só confere não vê a que espera
+  confirmação. A linha da central ganhou `minha(db, pessoa)`, que pergunta ao
+  dono (`ajuste_dominio.pendentes`, `inventario_dominio.aprovacao` e `hoje`,
+  `cancel_conf.podeDecidir`). Sem isso, a etiqueta nunca zeraria para essa
+  pessoa — o motivo do D1.
+- **"Inventário — sem acordo" aponta a 302**, onde a decisão mora (a 303 só abre
+  com contar/desempatar, e quem tem `contagem.resolver` não via). Vale também
+  para a caixinha da fase 1 e para o caminho da central.
+- **O portão vem antes da conta**: a linha que a pessoa não resolve nem é contada.
+- ⚠️ **Em dúvida, para o dono:** Bloqueados (perm vazia) dá bolinha a todo nível
+  Admin que abre a 204, inclusive quem não tem a chave de resolver o card (por
+  exemplo `sku.cadastrar`). Restringir é decidir quem resolve cada card.
+- `teste_pendencias_menu.js` (43).
 
 ### Fase 1 — a caixinha "Abrir em Pendências" (12/11/2026, no ar, PR #346)
 
