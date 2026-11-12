@@ -78,9 +78,21 @@ function nfDaNota(texto){
    (rota JADLOG), que e ligada pela ordem das paginas. O nome do destinatario
    NAO serve: em 85 notas reais, 27 estavam em nome de parente, empresa ou
    condominio. A UF bateu nas 85. Ilegivel devolve null e nao vota (#10). */
+/* ③ REVISAO: a sigla e lida na MESMA linha do primeiro "UF:" depois do
+   destinatario, e so vale se for uma UF que existe — "UF:" vazio com "IE: 123"
+   embaixo lia "IE", e retinha caixa legitima (#6). */
+const UFS=new Set(['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR',
+  'PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']);
 function ufDaNota(texto){
-  const m=String(texto||'').match(/DESTINAT[AÁ]RIO[\s\S]*?\bUF:\s*([A-Z]{2})\b/i);
-  return m?m[1].toUpperCase():null;
+  const ls=String(texto||'').split('\n');
+  const d=ls.findIndex(l=>/DESTINAT[AÁ]RIO/i.test(l)); if(d<0) return null;
+  for(let k=d;k<ls.length;k++){
+    const m=ls[k].match(/\bUF:[ \t]*([A-Za-z]{2})?\b/i);
+    if(!m) continue;
+    const uf=(m[1]||'').toUpperCase();
+    return UFS.has(uf)?uf:null;                     // o primeiro "UF:" decide; ilegivel nao vota
+  }
+  return null;
 }
 const ESTADOS={'acre':'AC','alagoas':'AL','amapa':'AP','amazonas':'AM','bahia':'BA','ceara':'CE',
   'distrito federal':'DF','espirito santo':'ES','goias':'GO','maranhao':'MA','mato grosso do sul':'MS',

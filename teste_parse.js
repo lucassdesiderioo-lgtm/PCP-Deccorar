@@ -1093,6 +1093,34 @@ function conferir(nome, orders, esperado){
     if(e.nf!=='106') erros.push('com o estado ilegivel e a nota livre, a NF nao foi gravada: '+JSON.stringify(e.nf));
     if(g.conflito) erros.push('a etiqueta com "NF:" passou a conferir UF: '+g.conflito);
     if(h.conflito || h.nf!=='108') erros.push('Pará (o estado curto) nao casou com PA: '+JSON.stringify({c:h.conflito,nf:h.nf}));
+    /* ③ REVISAO: a pagina seguinte que e a CONTINUACAO de uma nota ja ligada a
+       outra etiqueta nao e nota desta caixa (R-PDF-04), nem a nota cujo numero
+       outra etiqueta sem "NF:" ja pegou. */
+    {
+      const d2=await PDFDocument.create(), f2=await d2.embedFont(StandardFonts.Helvetica);
+      const pg2=ls=>{ const pg=d2.addPage([595,842]); let y=800; for(const l of ls){ pg.drawText(l.replace(/[^\x20-\xff]/g,'?'),{x:30,y,size:9,font:f2}); y-=14; } };
+      const A={pack:'2000015000000201', sku:'BK160160BEGE', comprador:'Ana Lima', cidade:'Campinas, São Paulo'};
+      const B={pack:'2000015000000202', sku:'BK150150BEGE', comprador:'Beto Reis', cidade:'Salvador, Bahia'};
+      const C={pack:'2000015000000203', sku:'BK140140BEGE', comprador:'Caio Melo', cidade:'Santos, São Paulo'};
+      pg2(etq(A)); pg2(danfe({nf:'301',uf:'SP'}));
+      pg2(etq(B)); pg2(['DANFE continuação','Número 301/Serie 2','Folha 2']);   // a continuacao da 301, sem destinatario
+      pg2(danfe({nf:'302',uf:'BA'}));
+      pg2(etq(C)); pg2(['1 - Saida Chave de acesso','Número 301/Serie 2','DESTINATARIO: Outro','UF: SP']); // a 301 de novo
+      pg2(['Despachem as suas vendas o quanto antes.','Identifiicação Produtos'].concat(
+        [A,B,C].map(v=>['X'+v.pack.slice(-3)+'ABC Cortina Rolo Blackout '+v.sku.slice(2,3)+','+v.sku.slice(3,5)+'x'+v.sku.slice(5,6)+','+v.sku.slice(6,8)+' Persiana Bege','Pack ID: '+v.pack+' SKU: '+v.sku,
+          'Venda: 20000190'+v.pack.slice(-8)+' Quantidade: 1',v.comprador+' Cor: Bege','Desenho do tecido: Liso']).reduce((x,y)=>x.concat(y),[])));
+      const o2=await parsePdf(new Uint8Array(await d2.save()));
+      const q=k=>o2.find(o=>o.packId===k)||{};
+      if(q(A.pack).nf!=='301' || q(A.pack).conflito) erros.push('a primeira etiqueta perdeu a sua nota: '+JSON.stringify({nf:q(A.pack).nf,c:q(A.pack).conflito}));
+      if(q(B.pack).nf==='301' || q(B.pack).danfePage!=null) erros.push('a continuacao da nota de outra caixa foi ligada: nf '+q(B.pack).nf+', pagina '+q(B.pack).danfePage);
+      if(!q(B.pack).conflito) erros.push('a continuacao da nota de outra caixa nao reteve');
+      if(q(C.pack).nf==='301' || !q(C.pack).conflito) erros.push('a nota que outra etiqueta sem "NF:" ja pegou foi ligada de novo: '+JSON.stringify({nf:q(C.pack).nf,c:q(C.pack).conflito}));
+      /* a UF lida tem que ser uma UF, e na mesma linha */
+      const F=require('./folha');
+      if(F.ufDaNota('DESTINATARIO: Fulano\nUF:\nIE: 123')!==null) erros.push('"UF:" vazio leu a linha de baixo: '+F.ufDaNota('DESTINATARIO: Fulano\nUF:\nIE: 123'));
+      if(F.ufDaNota('DESTINATARIO: Fulano\nUF: XX')!==null) erros.push('aceitou uma UF que nao existe');
+      if(F.ufDaNota('DESTINATARIO: Fulano\nUF: go')!=='GO') erros.push('nao leu a UF em minuscula');
+    }
     if(erros.length){ falhas++; console.log('FALHOU  a nota da etiqueta sem "NF:" e conferida pela UF e pelo numero');
       erros.forEach(x=>console.log('        '+x)); }
     else console.log('ok      a nota da etiqueta sem "NF:" e conferida pela UF e pelo numero');

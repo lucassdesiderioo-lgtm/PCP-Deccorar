@@ -77,9 +77,11 @@ function limparEtiqueta(linhas, nome){
   });
   return out;
 }
-/* A nota: número, chave e destinatário bastam ao leitor. */
+/* A nota: número, chave, destinatário e a UF dele bastam ao leitor. A linha
+   "UF:" fica (12/11/2026): é ela que a conferência da nota da etiqueta sem
+   "NF:" compara com o estado de destino (R-CONF-07). */
 function limparNota(linhas, nome){
-  return linhas.filter(l=>/Sa[ií]da|Chave|N[úu]mero|Emiss|Protocolo|DANFE|Remetente|CNPJ|^\d{20,}$|DESTINAT/i.test(l))
+  return linhas.filter(l=>/Sa[ií]da|Chave|N[úu]mero|Emiss|Protocolo|DANFE|Remetente|CNPJ|^\d{20,}$|DESTINAT|^UF:\s*[A-Z]{2}\s*$/i.test(l))
     .map(l=>/DESTINAT/i.test(l)?'DESTINATARIO: '+(nome||'Cliente'):l);
 }
 

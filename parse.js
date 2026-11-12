@@ -296,7 +296,7 @@ async function parsePdf(uint8){
 
   /* As NFs que as etiquetas DIZEM (a linha "NF:"): a nota da pagina seguinte
      de uma etiqueta sem "NF:" nao pode ser uma delas (R-CONF-07). */
-  const nfsDasEtiquetas=new Set();
+  const nfsDasEtiquetas=new Set(), notasPelaOrdem=new Set();
   for(let p=1;p<=N;p++){ if(pages[p].type==='label'){ const x=nfDaEtiqueta(pages[p].text); if(x) nfsDasEtiquetas.add(x); } }
   const orders=[], seen=new Map();
   for(let p=1;p<=N;p++){
@@ -549,6 +549,15 @@ async function parsePdf(uint8){
       if(!nf && nfNota && nfsDasEtiquetas.has(nfNota))
         motivoNota.push('a etiqueta nao traz NF, e a nota da pagina seguinte (NF '+nfNota
           +') e a de outra etiqueta deste PDF');
+      /* ③ REVISAO: a pagina seguinte tem que ser a PRIMEIRA folha da nota
+         (R-PDF-04) — a continuacao e da caixa de cima — e a nota nao pode ter
+         sido pega, pela ordem, por outra etiqueta sem "NF:" deste PDF. */
+      else if(!nf && nfNota && danfeByNf[nfNota]!==p+1)
+        motivoNota.push('a etiqueta nao traz NF, e a pagina seguinte e a continuacao da nota '+nfNota
+          +', que comeca antes, em outra caixa');
+      else if(!nf && nfNota && notasPelaOrdem.has(nfNota))
+        motivoNota.push('a etiqueta nao traz NF, e a nota da pagina seguinte (NF '+nfNota
+          +') ja foi ligada a outra etiqueta deste PDF');
       if(!nf && ufN && ufE && ufN!==ufE)
         motivoNota.push('a etiqueta nao traz NF, e a nota da pagina seguinte'+(nfNota?' (NF '+nfNota+')':'')
           +' e de um destinatario de '+ufN+', mas a etiqueta vai para '+ufE);
@@ -556,7 +565,7 @@ async function parsePdf(uint8){
         motivos.push(motivoNota.join(' · ')+' — confira a nota no Mercado Livre: ela nao sai junto na impressao');
       } else {
         danfePage=p+1;
-        if(!nf && nfNota) nfGravada=nfNota;
+        if(!nf && nfNota){ nfGravada=nfNota; notasPelaOrdem.add(nfNota); }
       }
     }
     const conflito=motivos.length?motivos.join(' · '):null;
