@@ -38,7 +38,8 @@ async function montarPdf(paginas){
 const SCRIPT=path.join(__dirname,'gravar_nf_da_nota.js');
 const rodar=(...a)=>{
   try{ return execFileSync(process.execPath,[SCRIPT,...a],
-    {env:{...process.env, PCP_DIR:tmp}, encoding:'utf8', stdio:['ignore','pipe','pipe']}); }
+    {env:{...process.env, PCP_DIR:tmp, PCP_DB:path.join(tmp,'dados.db'), PCP_LOTES:path.join(tmp,'lotes'),
+      PCP_BACKUPS:path.join(tmp,'backups')}, encoding:'utf8', stdio:['ignore','pipe','pipe']}); }
   catch(e){ return 'ERRO: '+(e.stdout||'')+(e.stderr||e.message); }
 };
 
@@ -141,7 +142,7 @@ const item=v=>['X'+v.envio.slice(-4)+'ABC1 Cortina Rolo Blackout '+medida(v.sku)
 
   /* Banco que nao existe e recusado, e nao criado vazio (§13). */
   const vazio=require('fs').mkdtempSync(require('path').join(require('os').tmpdir(),'pcp-gravarnf-vazio-'));
-  let saida=''; try{ saida=execFileSync(process.execPath,[SCRIPT],{env:{...process.env, PCP_DIR:vazio}, encoding:'utf8', stdio:['ignore','pipe','pipe']}); }catch(e){ saida='ERRO '+(e.stderr||'')+(e.stdout||''); }
+  let saida=''; try{ saida=execFileSync(process.execPath,[SCRIPT],{env:{...process.env, PCP_DIR:vazio, PCP_DB:path.join(vazio,'dados.db'), PCP_LOTES:path.join(vazio,'lotes'), PCP_BACKUPS:path.join(vazio,'backups')}, encoding:'utf8', stdio:['ignore','pipe','pipe']}); }catch(e){ saida='ERRO '+(e.stderr||'')+(e.stdout||''); }
   ok('com a pasta errada ele recusa e nao cria dados.db vazio', !fs.existsSync(path.join(vazio,'dados.db')) && /nao existe|ERRO/i.test(saida), saida);
   fs.rmSync(vazio,{recursive:true,force:true});
 

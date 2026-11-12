@@ -39,8 +39,9 @@ async function analisar(db, lerPdf){
     if(!porPdf.has(cx.srcfile)) porPdf.set(cx.srcfile, await lerPdf(cx.srcfile));
     const ordens=porPdf.get(cx.srcfile);
     if(!ordens){ out.push({caixa:cx, gravar:false, porque:'o PDF '+path.basename(cx.srcfile)+' ja saiu de lotes/ (7 dias)'}); continue; }
-    /* Pela chave, e entre as que casam, a da MESMA pagina: o pacote com duas
-       etiquetas do mesmo pack tem as duas no PDF (③ REVISAO). */
+    /* Pela chave, e a da MESMA pagina. Hoje so ha uma por chave (o leitor
+       descarta a etiqueta repetida dentro do PDF, R-PDF-06); escolher entre
+       as que casam so evita depender disso. A pagina diferente nao grava. */
     const cands=ordens.filter(x=>
       (cx.packId && x.packId===cx.packId) || (cx.venda && x.venda===cx.venda)
       || (!cx.packId && !cx.venda && cx.envio && x.envio===cx.envio));
