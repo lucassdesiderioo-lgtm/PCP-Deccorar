@@ -211,8 +211,17 @@ function cancelar(id,motivo,usuario){
   const m=String(motivo||'').trim();
   exigir(m,'motivo_obrigatorio',
     'Diga por que o titulo saiu — cancelar sem motivo e apagar.');
-  return d.atualizar(b.id,{cancelado_em:dia.agora(), cancelado_por:nome(usuario),
-    cancelado_motivo:m});
+  /* ⚠️ A BAIXA PEDIDA E QUE ESPERA APROVACAO SAI JUNTO, NA MESMA TRANSACAO
+     (CONSERTO de 12/11/2026): boleto cancelado nao se baixa, e o pedido ficaria
+     pendente para sempre na 616 e na central 204. O `require` e aqui dentro
+     porque `aprovacao.js` ja faz require deste arquivo. */
+  const aprovacao=require('./aprovacao');
+  return db.transaction(()=>{
+    const r=d.atualizar(b.id,{cancelado_em:dia.agora(), cancelado_por:nome(usuario),
+      cancelado_motivo:m});
+    aprovacao.fecharPorCancelamento('baixa_boleto',b.id,'Boleto cancelado: '+m,usuario);
+    return r;
+  })();
 }
 
 /* ⚠️ O SQLite DEVOLVE 0 e 1, e a tela le booleano. Converter aqui, e nao em

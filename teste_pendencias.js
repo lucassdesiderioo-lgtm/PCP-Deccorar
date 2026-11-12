@@ -60,6 +60,9 @@ async function post(url, corpo){
   return { status:r.status, corpo:await r.json() };
 }
 const linha = (r, chave) => (r.linhas || []).find(l => l.chave === chave) || {};
+/* o sob medida de pé, sem nada esperando (a porta dele é testada no
+   teste_pendencias_sobmedida.js) */
+require('./sobmedida_pendencias').ligar(() => ({ n:0, desde:null }));
 
 function semear(){
   /* Um SKU de nome reconhecível: se ele aparecer no JSON da central, vazou detalhe. */
@@ -201,6 +204,18 @@ function semear(){
   ok('diz há quantos dias espera a mais antiga', tt.dias >= dias - 1 && tt.dias <= dias + 1, 'veio ' + tt.dias + ', esperado ~' + dias);
   eq('e só isso: três números, nenhum detalhe', JSON.stringify(Object.keys(tt).sort()), JSON.stringify(['dias','sem_etiqueta','total']));
   ok('nenhum SKU nem cliente vai para a bancada', JSON.stringify(tt).indexOf('BKCENTRAL') < 0 && JSON.stringify(tt).indexOf('Cliente') < 0);
+  /* A TV E A BANCADA CONTAM SÓ A MEDIDA PADRÃO (D14, decisão do dono, 12/11/2026):
+     as filas do sob medida entram na 204 e na bolinha de quem resolve, e não no
+     número da bancada nem no quadro da TV — o pedido da revenda esperando
+     aprovação é fluxo de todo dia, e o vermelho viraria paisagem. */
+  require('./sobmedida_pendencias').ligar(() => ({ n:3, desde:'2026-01-05 08:00:00' }));
+  const rs = await get('/api/pendencias/resumo');
+  const smN = (rs.linhas || []).filter(l => /^sm_/.test(l.chave)).reduce((s, l) => s + (l.n || 0), 0);
+  ok('a 204 conta as filas do sob medida', smN === 15 && rs.total === rb.total + 15, 'sm=' + smN + ' total=' + rs.total + ' antes=' + rb.total);
+  const ts = await get('/api/pendencias/total');
+  eq('o total da TV e da bancada NÃO conta o sob medida', ts.total, rb.total);
+  eq('…nem a idade da mais antiga (a de janeiro é do sob medida)', ts.dias, tt.dias);
+  require('./sobmedida_pendencias').ligar(() => ({ n:0, desde:null }));
   eq('a bancada, a Conferência, a TV e o admin leem o total', JSON.stringify(AC.permDaRota('/api/pendencias/total', 'GET')),
      JSON.stringify(['etiqueta.emitir','carregamento.executar','painel.ver','@admin']));
   ok('a aba não monta mais a linha Bloqueados sozinha', !/nome:'Bloqueados',n:nBloq/.test(tela));

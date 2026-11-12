@@ -129,6 +129,38 @@ module.exports=[
   igual(apr('pedirBaixa',b.id,{},LUCAS).status,'pendente','um pedido novo e aceito');
  }},
 
+{nome:'P2 — cancelar o boleto FECHA a baixa pendente dele: sai da fila, com rastro, e a linha fica',
+ executar({igual,recusa}){
+  const b=boleto();
+  const p=apr('pedirBaixa',b.id,{},LUCAS);
+  /* cancelamento recusado (sem motivo) nao fecha nada */
+  recusa(()=>bol('cancelar',b.id,'',ISA),'motivo_obrigatorio','cancelar sem motivo');
+  igual(apr('porId',p.id).status,'pendente','o cancelamento recusado nao fecha o pedido');
+  bol('cancelar',b.id,'lancado em dobro',ISA);
+  const h=apr('porId',p.id);
+  igual(h.status,'cancelado','o pedido fecha como cancelado — nao foi aprovado nem recusado');
+  igual(h.decidido_por,'Isabela','quem cancelou o boleto fica no pedido');
+  igual(h.decidido_por_id,2,'pelo id');
+  igual(!!h.decidido_em,true,'com a hora');
+  igual(/cancelado/i.test(h.decisao_motivo||'')&&/lancado em dobro/.test(h.decisao_motivo||''),true,
+    'o motivo diz que o boleto foi cancelado, e por que');
+  igual(apr('pendentes','baixa_boleto').some(x=>x.id===p.id),false,'sai da lista de quem aprova (616 e 204)');
+  igual(apr('pendentePorAlvo','baixa_boleto')[b.id],undefined,'e do selo "baixa pedida" ao lado do boleto');
+  recusa(()=>apr('aprovar',p.id,OUTRO_LUCAS),'aprovacao_decidida','aprovar depois do cancelamento');
+  const e=recusa(()=>apr('recusar',p.id,'tanto faz',OUTRO_LUCAS),'aprovacao_decidida','recusar depois');
+  igual(/cancelad/.test(e.message),true,'a frase diz que foi cancelado, e nao "recusado"');
+ }},
+
+{nome:'P2 — cancelar boleto sem baixa pedida continua como sempre, e nao mexe no pedido de outro boleto',
+ executar({igual}){
+  const outro=boleto();
+  const p=apr('pedirBaixa',outro.id,{},LUCAS);
+  const b=boleto();
+  const c=bol('cancelar',b.id,'errado',ISA);
+  igual(!!c.cancelado_em,true,'o boleto foi cancelado');
+  igual(apr('porId',p.id).status,'pendente','o pedido do outro boleto continua esperando');
+ }},
+
 /* ═══ A SOBRA ════════════════════════════════════════════════════════════ */
 
 {nome:'P2 — pedir o descarte NAO descarta: a sobra continua disponivel',

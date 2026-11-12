@@ -198,7 +198,10 @@ function montar(app, prefixo, opcoes){
     produtosParaPcp: ()=>require('./dominio/ficha_material').produtosParaPcp(),
     /* item 1 (11/11/2026): a lista de um produto numa medida, com o custo,
        para a 404 do PCP (quem poda o custo e a rota de la) */
-    materialNaMedida: (id,l,a)=>require('./dominio/ficha_material').naMedida(id,l,a) };
+    materialNaMedida: (id,l,a)=>require('./dominio/ficha_material').naMedida(id,l,a),
+    /* PENDENCIAS-NO-MENU fase 3: as filas que esperam decisão aqui, para a
+       central de Pendências do PCP — só número e data (dominio/pendencias_pcp.js) */
+    pendenciasParaPcp: (tipo,usuario)=>require('./dominio/pendencias_pcp').contar(tipo,usuario) };
 }
 
 module.exports={montar, MODULOS, PREFIXO:'/sobmedida'};

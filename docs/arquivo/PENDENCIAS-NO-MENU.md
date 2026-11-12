@@ -2,17 +2,44 @@
 
 ```
 STATUS
-Situação: EM CONSTRUÇÃO · aprovada pelo dono em 12/11/2026 · fase 1 no ar desde 12/11/2026 (PR #346; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: o primeiro PDF que retém uma caixa mostrando a caixinha na 103 · fase 2 construída e revisada, falta subir · próxima: fase 3
+Situação: CONCLUÍDA · aprovada pelo dono em 12/11/2026 · fase 1 no ar desde 12/11/2026 (PR #346; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: o primeiro PDF que retém uma caixa mostrando a caixinha na 103 · fase 2 no ar desde 12/11/2026 (PR #348; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: a bolinha aparecendo e sumindo com pendência de verdade, e quem pediu o ajuste não a vendo · fase 3 no ar desde 12/11/2026 (PR #350; o dono fez o deploy e disse "tudo certo") · ⚠️ ainda não provado com dado real: as filas do sob medida aparecendo e sumindo com pendência de verdade, e a TV parada no número da medida padrão · as três fases no ar: a spec foi para docs/arquivo/
 Criada em: 12/11/2026
 Última atualização: 12/11/2026
-Fases: 1 ☑  2 ☑  3 ☐
+Fases: 1 ☑  2 ☑  3 ☑
 Risco: 🟡 (comportamento de tela e uma rota de leitura nova; não mexe em estoque, permissão, schema do PCP)
 Depende de: a central de Pendências (docs/arquivo/CENTRAL-DE-PENDENCIAS.md, a 204)
             o menu único (ORGANIZACAO-DO-SISTEMA, public/menu_telas.js)
 Tipo: NOVIDADE
 ```
 
-### Fase 2 — a etiqueta vermelha no ☰ Menu (12/11/2026, construída, falta subir)
+### Fase 3 — o sob medida na central (12/11/2026, no ar, PR #350)
+
+- Cinco linhas `sm_*` na central (616, 603, 602, 611, 606), contadas por
+  `tecido/dominio/pendencias_pcp.js` com a MESMA lista da tela dona, pela porta
+  do `montar()` (`pendenciasParaPcp` → `sobmedida_pendencias.js`). Sem a porta,
+  "não consegui contar".
+- "Abre a tela" do sob medida: `abre_tela.js` (o portão de lá), a mesma conta do
+  ☰ Menu, que passou a chamá-la.
+- **Divergências da §3.3, decididas pelo dono (12/11/2026):** a "pendência de
+  produção aberta (612/613)" **ficou de fora** — não existe como lista (a
+  `sm_pendencia` só guarda o que foi fechado, e nenhuma tela chama a rota de
+  fechar); e a correção de corte compara quem pediu **pelo nome** (a
+  `plano_correcao` não guarda o id; gravá-lo é mudar o banco de lá, 🔴, outra
+  tarefa).
+- **③ REVISÃO:** a baixa de boleto conta só dentro da carteira da pessoa e com
+  o boleto em aberto, como a 616 a desenha (`boleto.carteira`); criar haste,
+  andar, nível ou fornecedor no sob medida **não** mostra a caixinha (só a
+  bancada cria "a conferir", e ela não abre a 606); enviar pedido (611) **não** mostra a caixinha (todo envio cria
+  um pedido esperando — o motivo da D11); a entrada de rolo de lá (aposentada)
+  saiu da lista; a frase do cadastro a conferir diz "do sob medida" (ela aparece
+  também na 502 do PCP).
+- **D14 (decisão do dono, 12/11/2026): a TV e a linha da Etiqueta de Venda
+  contam só a medida padrão.** O `total()` é o resumo da 204 sem as linhas do
+  sob medida; a 204 e a bolinha mostram tudo. Antes o número da bancada era
+  sempre o mesmo da 204; agora a diferença é o sob medida.
+- `teste_pendencias_sobmedida.js` (67) e `tecido/teste/pendencias_pcp.test.js` (8).
+
+### Fase 2 — a etiqueta vermelha no ☰ Menu (12/11/2026, no ar desde 12/11/2026, PR #348)
 
 - `pendencias_dominio.minhas` + `GET /api/pendencias/minhas` (`@logado`, quem é
   vem do login): por tela e o total, só números. A forma do fio mudou da §3.1:
