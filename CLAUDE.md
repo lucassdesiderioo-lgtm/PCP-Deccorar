@@ -4869,6 +4869,11 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 > `tecido.db` antes), que fecha cada um na data e com o nome de quem cancelou o
 > boleto. ⚠️ **O descarte de sobra não ganhou o mesmo**: sobra usada no corte
 > continua esperando quem recuse com motivo, como sempre foi.
+>
+> ⚠️ **AINDA NÃO NO AR, E O SCRIPT AINDA NÃO RODOU NO SERVIDOR.** A prova: a
+> simulação lista os pedidos órfãos, o `--aplicar` os fecha, a linha da baixa de
+> boleto na 616 e na 204 desce, e a segunda rodada diz "nenhum". Prova que não foi
+> feita se escreve como não feita.
 
 ### ⚠️ O CADASTRO DE PRODUTO — o que parece bug e não é (28/10/2026)
 

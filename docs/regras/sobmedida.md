@@ -696,7 +696,7 @@
 - **Por quê:** resposta P2 do dono (21/10/2026): "quem pede não aprova" vale também para dinheiro e para estoque de tecido, como no ajuste de estoque do PCP (R-EST-18) e na correção de corte (R-SMK-06).
 - **Exceções:** nenhuma.
 - **Teste que trava:** `tecido/teste/aprovacao.test.js` (10) · `tecido/teste/limpar_baixas_orfas.test.js` (2) · `teste_acessos_f2.js` (seção 8, a semeadura).
-- **Status:** em código em 26/10/2026 (fase 6 da `ACESSOS-UNIFICADOS`); rodado na tela com duas pessoas.
+- **Status:** em código em 26/10/2026 (fase 6 da `ACESSOS-UNIFICADOS`); rodado na tela com duas pessoas. O fechamento pelo cancelamento do boleto (12/11/2026) **ainda não está no ar**, e o `limpar_baixas_orfas.js` ainda não rodou no servidor.
 
 ### R-SMF-11 · NF e entrega não existem, por decisão
 - **Regra:** não há coluna `entregue`, selo de NF nem faturamento no sob medida.
