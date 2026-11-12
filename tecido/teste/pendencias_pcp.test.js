@@ -78,7 +78,20 @@ module.exports=[
      contasse a baixa nunca zeraria. */
   igual(P.contar('baixa_boleto',{id:4,nome:'Fina',permissoes:['boleto.aprovar_baixa'],setores:[]}).n,0,'sem carteira (nem a casa inteira), a tela nao mostra: zero');
   igual(P.contar('baixa_boleto',VEND7).n,r.n,'o vendedor da revenda ve a baixa da carteira dele');
-  igual(P.contar('baixa_boleto',VEND8).n,0,'a vendedora de outra carteira nao ve');
+  /* a OITO tambem tem boleto em aberto: a carteira da Paula NAO e vazia, e
+     mesmo assim a baixa da SETE nao e dela (③ REVISAO, rodada 2) */
+  boleto.lancar({revenda_id:montar().r8,numero:'PD8'+(++nB),valor_centavos:50000,vencimento:'2026-12-31'},LUCAS);
+  igual(P.contar('baixa_boleto',VEND8).n,0,'a vendedora de outra carteira (com boleto em aberto) nao ve a baixa da SETE');
+ }},
+
+{nome:'pendencias_pcp — a baixa de um boleto cancelado ou pago nao conta na bolinha (a 616 so desenha o boleto em aberto)',
+ executar({igual}){
+  const QUALQUER={id:9,nome:'Chefe',permissoes:['pedido.aprovar_qualquer'],setores:[]};
+  const b=novoBoleto();
+  aprovacao.pedirBaixa(b.id,{},LUCAS);
+  const antes=P.contar('baixa_boleto',QUALQUER).n;
+  boleto.cancelar(b.id,'lancado em dobro',LUCAS);
+  igual(P.contar('baixa_boleto',QUALQUER).n,antes-1,'cancelado o boleto, a baixa dele sai da bolinha');
  }},
 
 {nome:'pendencias_pcp — o descarte de sobra conta o que a 603 lista, e quem pediu nao o ve',

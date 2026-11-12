@@ -26,14 +26,16 @@ Tipo: NOVIDADE
   fechar); e a correção de corte compara quem pediu **pelo nome** (a
   `plano_correcao` não guarda o id; gravá-lo é mudar o banco de lá, 🔴, outra
   tarefa).
-- **③ REVISÃO:** a baixa de boleto conta só dentro da carteira da pessoa, como
-  a 616 a desenha (`boleto.carteira`); enviar pedido (611) **não** mostra a caixinha (todo envio cria
+- **③ REVISÃO:** a baixa de boleto conta só dentro da carteira da pessoa e com
+  o boleto em aberto, como a 616 a desenha (`boleto.carteira`); criar haste,
+  andar, nível ou fornecedor no sob medida **não** mostra a caixinha (só a
+  bancada cria "a conferir", e ela não abre a 606); enviar pedido (611) **não** mostra a caixinha (todo envio cria
   um pedido esperando — o motivo da D11); a entrada de rolo de lá (aposentada)
   saiu da lista; a frase do cadastro a conferir diz "do sob medida" (ela aparece
   também na 502 do PCP).
 - ⚠️ **O total da TV e da linha da Etiqueta de Venda passa a contar o sob
   medida** (é o mesmo número da 204). O jeito delas não mudou (D6).
-- `teste_pendencias_sobmedida.js` (65) e `tecido/teste/pendencias_pcp.test.js` (7).
+- `teste_pendencias_sobmedida.js` (67) e `tecido/teste/pendencias_pcp.test.js` (8).
 
 ### Fase 2 — a etiqueta vermelha no ☰ Menu (12/11/2026, no ar desde 12/11/2026, PR #348)
 

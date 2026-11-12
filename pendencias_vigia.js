@@ -46,11 +46,14 @@ const VIGIA = [
      prefixo, e o vigia as vê pelo caminho inteiro. */
   [/^\/sobmedida\/api\/boletos\/\d+\/baixa$/,     ['sm_baixa_boleto']],                     // 616 pedir baixa
   [/^\/sobmedida\/api\/sobras\/\d+\/descartar$/,  ['sm_descarte_sobra']],                   // 603 propor descarte
-  [/^\/sobmedida\/api\/planos\/\d+\/correcao$/,   ['sm_correcao_corte']],                   // 602 pedir correção
-  [/^\/sobmedida\/api\/(hastes|andares|niveis|fornecedores)$/, ['sm_conferir']]           // cadastro criado na bancada
+  [/^\/sobmedida\/api\/planos\/\d+\/correcao$/,   ['sm_correcao_corte']]                    // 602 pedir correção
   /* ⚠️ ENVIAR PEDIDO (611) FICA DE FORA (③ REVISÃO): todo envio cria, por
      definição, um pedido esperando aprovação, e a caixinha apareceria em todo
-     envio — o motivo da 251 (D11). O pedido fica na central e na bolinha. A
+     envio — o motivo da 251 (D11). O pedido fica na central e na bolinha.
+     ⚠️ CRIAR HASTE, ANDAR, NÍVEL OU FORNECEDOR NO SOB MEDIDA TAMBÉM (③ REVISÃO,
+     rodada 2): só cria cadastro "a conferir" quem NÃO tem cadastro.editar — a
+     bancada, que não abre a 606 —, e a caixinha sairia sem botão em toda
+     criação. O cadastro a conferir fica na central e na bolinha. A
      entrada de rolo do sob medida (POST /api/rolos) está aposentada (R-CMP-49):
      o rolo nasce pelo recebimento do PCP, que já está na lista. */
   /* ⚠️ A 251 (POST /api/devolucao) FICA DE FORA, por decisão do dono (12/11/2026):

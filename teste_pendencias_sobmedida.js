@@ -111,8 +111,7 @@ ok('a etiqueta pergunta ao abre_tela.js (as duas operações)', /AT\.abre\(ac, u
 console.log('\n5. a caixinha nas ações do sob medida');
 const VIG = require('./pendencias_vigia');
 [['/sobmedida/api/boletos/12/baixa','sm_baixa_boleto'], ['/sobmedida/api/sobras/3/descartar','sm_descarte_sobra'],
- ['/sobmedida/api/planos/9/correcao','sm_correcao_corte'], ['/sobmedida/api/niveis','sm_conferir'],
- ['/sobmedida/api/fornecedores','sm_conferir']].forEach(([r, c]) => {
+ ['/sobmedida/api/planos/9/correcao','sm_correcao_corte']].forEach(([r, c]) => {
   ok(r + ' é vigiada, pela linha ' + c, (VIG.vigiaDe(r) || []).indexOf(c) >= 0, JSON.stringify(VIG.vigiaDe(r)));
 });
 /* ③ REVISÃO: todo envio cria, por definição, um pedido esperando aprovação — a
@@ -120,6 +119,12 @@ const VIG = require('./pendencias_vigia');
    central e na bolinha; a caixinha, não. */
 ok('enviar pedido (611) NÃO mostra a caixinha', VIG.vigiaDe('/sobmedida/api/pedidos/4/enviar') == null);
 ok('a entrada de rolo do sob medida (aposentada, sempre recusa) não está na lista', VIG.vigiaDe('/sobmedida/api/rolos') == null);
+/* ③ REVISÃO (rodada 2): só cria cadastro "a conferir" quem NÃO tem
+   cadastro.editar — a bancada, na 604, que não abre a 606: a caixinha sairia
+   sem botão em toda haste ou nível criado (o motivo da D11). A tabela §3.2 da
+   spec só lista 602, 603 e 616. O cadastro fica na central e na bolinha. */
+['hastes','andares','niveis','fornecedores'].forEach(r =>
+  ok('criar ' + r + ' no sob medida NÃO mostra a caixinha', VIG.vigiaDe('/sobmedida/api/' + r) == null));
 ok('a frase do cadastro a conferir diz que é do sob medida (aparece também na 502 do PCP)', /sob medida/.test(PEND.frase(linha('sm_conferir'), 1)) && /sob medida/.test(PEND.frase(linha('sm_conferir'), 2)), PEND.frase(linha('sm_conferir'), 1));
 ok('a prévia da correção (que não cria nada) não é vigiada', VIG.vigiaDe('/sobmedida/api/planos/9/correcao/previa') == null);
 ok('aprovar e recusar a baixa não são vigiados', VIG.vigiaDe('/sobmedida/api/boletos/baixas/3/aprovar') == null);

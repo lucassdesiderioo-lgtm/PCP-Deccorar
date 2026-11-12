@@ -34,12 +34,16 @@ const TIPOS={
      contasse nunca zeraria. */
   baixa_boleto:{ lista:()=>aprovacao.pendentes('baixa_boleto'), em:a=>a.pedido_em,
     daPessoa:(l,u)=>{
+      if(!l.length) return l;   // sem baixa nenhuma, nem monta a carteira (a bolinha pergunta a cada minuto)
       const c=boleto.carteira(u);
       const minhas=new Set((c.revendas||[]).map(r=>Number(r.revenda_id!=null?r.revenda_id:r.id)));
       return l.filter(a=>{
         if(aprovacao.mesmaPessoa(a,u)) return false;
-        const b=boleto.porId(a.alvo_id);
-        return !!(b && minhas.has(Number(b.revenda_id)));
+        let b=null; try{ b=boleto.porId(a.alvo_id); }catch(e){ return false; }
+        /* a 616 só desenha o boleto EM ABERTO: a baixa de um boleto cancelado
+           ou pago some da tela, e na bolinha ela nunca zeraria (③ REVISÃO) */
+        if(!b || b.cancelado_em || b.pago_em) return false;
+        return minhas.has(Number(b.revenda_id));
       });
     } },
   descarte_sobra:{ lista:()=>aprovacao.pendentes('descarte_sobra'), em:a=>a.pedido_em,
