@@ -2,7 +2,7 @@
 
 ```
 STATUS
-Situação: EM CONSTRUÇÃO · aprovada pelo dono em 12/11/2026 · fase 1 aprovada para subir em 12/11/2026 (falta o deploy) · próxima: fase 2
+Situação: EM CONSTRUÇÃO · aprovada pelo dono em 12/11/2026 · fase 1 no ar desde 12/11/2026 (PR #346; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: o primeiro PDF que retém uma caixa mostrando a caixinha na 103 · próxima: fase 2
 Criada em: 12/11/2026
 Última atualização: 12/11/2026
 Fases: 1 ☑  2 ☐  3 ☐
@@ -12,7 +12,7 @@ Depende de: a central de Pendências (docs/arquivo/CENTRAL-DE-PENDENCIAS.md, a 2
 Tipo: NOVIDADE
 ```
 
-### Fase 1 — a caixinha "Abrir em Pendências" (12/11/2026, construída, falta subir)
+### Fase 1 — a caixinha "Abrir em Pendências" (12/11/2026, no ar, PR #346)
 
 - **Quem sabe é o servidor** (`pendencias_vigia.js`, registrado no `server.js`
   antes de qualquer rota): para cada ação da lista `VIGIA` ele conta as linhas

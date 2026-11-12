@@ -1240,9 +1240,9 @@ caixinha para clicar e ir para a tela de pendência — em todas as telas"*.
 - ⚠️ **Editar o que já era pendência não repete a caixinha**: ela só aparece
   quando o número SOBE (o SKU incompleto salvo de novo, ainda incompleto, não).
 
-⚠️ **CONSTRUÍDO, FALTA SUBIR** (12/11/2026). ⚠️ **AINDA NÃO PROVADO COM DADO
-REAL:** o primeiro PDF que retém uma caixa mostrando a caixinha na 103, com o
-botão levando à 204. Prova que não foi feita se escreve como não feita.
+✅ **NO AR DESDE 12/11/2026** (PR #346): o dono fez o deploy e disse *"deu tudo
+certo no deploy"*. ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** o primeiro PDF que
+retém uma caixa mostrando a caixinha na 103, com o botão levando à 204. Prova que não foi feita se escreve como não feita.
 
 **Rode `node teste_pendencias_caminho.js` (65) ao mexer no `pendencias_vigia.js`, no
 `tela`/`frase` das linhas da central, na caixinha do `pendencias_aviso.js` ou na
