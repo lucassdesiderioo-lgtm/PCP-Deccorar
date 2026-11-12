@@ -118,13 +118,15 @@ const LINHAS = [
       return { n:l.length, desde:maisAntiga(l.map(x => x.cancelada_em)),
                canceladas:l.filter(x => x.de === 'cancelada').map(x => x.id) };
     },
-    /* a separar: quem confere; aguardando confirmação: quem confirma, e nunca
-       quem marcou (R-REC-06, pela régua do cancel_conf) */
+    /* a separar: só quem confere (a rota é carregamento.executar), e nunca quem
+       conferiu a caixa (D8, pela régua da rota: QUEM.mesmaPessoa, pelo id);
+       aguardando confirmação: quem confirma, e nunca quem marcou (R-REC-06,
+       pela régua do cancel_conf sobre o pedido inteiro — com o id) */
     minha(db, p){
-      const CONF = require('./cancel_conf');
+      const CONF = require('./cancel_conf'), QUEM = require('./quem');
       const l = require('./carreg_route').sobrasEsperando(db).filter(x => x.de === 'cancelada'
-        ? p.tem('carregamento.executar') || p.tem('cancelamento.confirmar')
-        : p.tem('cancelamento.confirmar') && CONF.podeDecidir(db, Object.assign({ situacao:'aguardando' }, x), p.quem));
+        ? p.tem('carregamento.executar') && !QUEM.mesmaPessoa({ id:x.conferido_por_id, nome:x.conferido_por }, p.quem)
+        : p.tem('cancelamento.confirmar') && CONF.podeDecidir(db, CONF.pegar(db, x.id), p.quem));
       return { n:l.length, desde:maisAntiga(l.map(x => x.cancelada_em)),
                canceladas:l.filter(x => x.de === 'cancelada').map(x => x.id) };
     } },

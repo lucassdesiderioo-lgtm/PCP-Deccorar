@@ -113,17 +113,22 @@ db.prepare("INSERT INTO ajuste_pedido (codigo, delta, saldo_no_pedido, motivo, p
   db.prepare("INSERT INTO ajuste_pedido (codigo, delta, saldo_no_pedido, motivo, pedido_por, pedido_por_id, status, pedido_em) VALUES ('BKMENU1',1,5,'Achei','Quem Olha',5,'pendente',datetime('now','localtime'))").run();
   j = await (await fetch(base + '/api/pendencias/minhas')).json();
   ok('o pedido de ajuste da própria pessoa não entra na etiqueta dela', j.por_tela[301] && j.por_tela[301].n === 1, JSON.stringify(j));
-  /* a venda cancelada aguardando confirmação: só quem confirma, e nunca quem marcou (R-REC-06) */
+  /* a venda cancelada aguardando confirmação: só quem confirma, e nunca quem
+     marcou (R-REC-06) — pelo ID, como a rota: o nome mudou e não engana, e o
+     homônimo não some (③ REVISÃO, 2ª rodada) */
   require('./cancel_conf').garantir(db);
-  db.prepare("INSERT INTO cancelamento_caixa (lote_id, situacao, marcado_por, marcado_por_id) VALUES (901,'aguardando','Quem Olha',5)").run();
-  db.prepare("INSERT INTO cancelamento_caixa (lote_id, situacao, marcado_por, marcado_por_id) VALUES (902,'aguardando','Outra',9)").run();
-  chavesDeEu = ['carregamento.executar'];
+  db.prepare("INSERT INTO cancelamento_caixa (lote_id, situacao, marcado_por, marcado_por_id) VALUES (901,'aguardando','Nome Antigo',5)").run();
+  db.prepare("INSERT INTO cancelamento_caixa (lote_id, situacao, marcado_por, marcado_por_id) VALUES (902,'aguardando','Quem Olha',9)").run();
+  /* a separar: só quem confere (carregamento.executar), e nunca quem conferiu a caixa (D8) */
+  const lt = db.prepare("INSERT INTO lote (codigo, estagio, cancelada_estagio, cancelada_em, conferido_por, conferido_por_id) VALUES ('BKMENU1','cancelado','embalado',datetime('now','localtime'),?,?)");
+  lt.run('Quem Olha', 5); lt.run('Outra', 9);
   AC.decidir = (u, rota) => ({ ok: rota === '/carregamento' });
+  chavesDeEu = ['carregamento.executar'];
   j = await (await fetch(base + '/api/pendencias/minhas')).json();
-  ok('quem só confere (sem confirmar) não vê a cancelada aguardando confirmação', !j.por_tela[202] || j.por_tela[202].n === 0, JSON.stringify(j));
+  ok('quem só confere vê só a caixa a separar que ele NÃO conferiu', j.por_tela[202] && j.por_tela[202].n === 1, JSON.stringify(j));
   chavesDeEu = ['cancelamento.confirmar'];
   j = await (await fetch(base + '/api/pendencias/minhas')).json();
-  ok('quem confirma vê só a que outra pessoa marcou', j.por_tela[202] && j.por_tela[202].n === 1, JSON.stringify(j));
+  ok('quem só confirma não vê a caixa a separar, e vê só a que outra pessoa marcou (pelo id, não pelo nome)', j.por_tela[202] && j.por_tela[202].n === 1, JSON.stringify(j));
   chavesDeEu = ['estoque.aprovar_ajuste']; AC.decidir = (u, rota) => ({ ok: rota === '/admin/estoque' });
   eu = null;
   res = await fetch(base + '/api/pendencias/minhas');
@@ -142,7 +147,7 @@ db.prepare("INSERT INTO ajuste_pedido (codigo, delta, saldo_no_pedido, motivo, p
   const navP = fs.readFileSync(path.join(__dirname, 'public', 'nav.js'), 'utf8');
   const navS = fs.readFileSync(path.join(__dirname, 'tecido', 'public', 'nav.js'), 'utf8');
   ok('o nav.js da medida padrão pede a bolinha com o botão ☰ Menu', /MENU_TELAS\.pendencias\(m, document\.getElementById\('sessMenu'\)\)/.test(navP));
-  ok('ao voltar para a aba, a etiqueta pergunta de novo', /visibilitychange/.test(mt));
+  ok('ao voltar para a aba, a etiqueta pergunta de novo — no máximo a cada 15 s', /visibilitychange/.test(mt) && /15000/.test(mt));
   ok('o nav.js do sob medida também', /MENU_TELAS\.pendencias\(MENU\.painel, MENU\.botao\)/.test(navS) && /MENU\.botao=bm/.test(navS));
 
   console.log('\n' + (falhas ? falhas + ' FALHA(S) em ' : 'tudo certo: ') + casos + ' casos');

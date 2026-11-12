@@ -97,9 +97,10 @@
       else if(p.erro) botao.insertAdjacentHTML('beforeend', bolinha('?', 'Não deu para contar as pendências'));
     }
   }
-  var PEND = { painel:null, botao:null, dados:null, ligado:false };
+  var PEND = { painel:null, botao:null, dados:null, ligado:false, ultima:0 };
   function pedirPendencias(){
     if(typeof fetch === 'undefined' || (typeof document !== 'undefined' && document.hidden)) return;
+    PEND.ultima = Date.now();
     fetch('/api/pendencias/minhas', { credentials:'same-origin' })
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(d){ if(d){ PEND.dados = d; etiquetas(PEND.painel, PEND.botao, d); } })
@@ -118,7 +119,9 @@
     pedirPendencias();
     setInterval(pedirPendencias, 60000);
     /* o tablet que dormiu pergunta logo ao acordar, sem esperar o minuto */
-    if(typeof document !== 'undefined') document.addEventListener('visibilitychange', function(){ if(!document.hidden) pedirPendencias(); });
+    /* …no máximo a cada 15 s: quem troca de aba toda hora não refaz a conta toda hora */
+    if(typeof document !== 'undefined') document.addEventListener('visibilitychange', function(){
+      if(document.hidden || Date.now() - PEND.ultima < 15000) return; pedirPendencias(); });
   }
   raiz.MENU_TELAS = { html:html, avisoValor:avisoValor, marcarSemValor:marcarSemValor, FRASE_SEM_VALOR:FRASE_SEM_VALOR,
                       etiquetas:etiquetas, pendencias:pendencias };

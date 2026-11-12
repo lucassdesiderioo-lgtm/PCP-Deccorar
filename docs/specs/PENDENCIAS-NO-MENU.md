@@ -30,6 +30,11 @@ Tipo: NOVIDADE
   com contar/desempatar, e quem tem `contagem.resolver` não via). Vale também
   para a caixinha da fase 1 e para o caminho da central.
 - **O portão vem antes da conta**: a linha que a pessoa não resolve nem é contada.
+- **③ REVISÃO, 2ª rodada:** a caixa "a separar" conta só para quem tem
+  `carregamento.executar` e não a conferiu (D8); "quem marcou não confirma" e
+  "quem conferiu não separa" comparam pelo id, como as rotas; o "voltar para a
+  aba" pergunta no máximo a cada 15 s. Fica escrito (não é defeito): a etiqueta
+  do Inventário pode criar a lista do dia, como a tarja já faz.
 - ⚠️ **Em dúvida, para o dono:** Bloqueados (perm vazia) dá bolinha a todo nível
   Admin que abre a 204, inclusive quem não tem a chave de resolver o card (por
   exemplo `sku.cadastrar`). Restringir é decidir quem resolve cada card.

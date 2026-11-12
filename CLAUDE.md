@@ -1266,8 +1266,16 @@ total. Some quando zera; o título diz há quantos dias espera a mais antiga.
   erro, e a bolinha mostra **"?"**, nunca zero.
 - **O desenho mora no `public/menu_telas.js`** (`etiquetas`, `pendencias`), e os
   dois `nav.js` o chamam depois de desenhar o menu: pergunta a cada 60 s e ao
-  tocar no ☰ Menu e ao voltar para a aba, nunca com a aba escondida e nunca
-  dentro do redesenho da tela (§12). ⚠️ **Construído, falta subir** (12/11/2026). A TV e a linha da bancada não mudaram (D6).
+  tocar no ☰ Menu e ao voltar para a aba (no máximo a cada 15 s), nunca com a
+  aba escondida e nunca dentro do redesenho da tela (§12).
+- ⚠️ **A ETIQUETA NÃO É LEITURA PURA**: a do Inventário pergunta a lista do dia
+  (`inventario_dominio.hoje`), que pode **criar** a lista e a escala e carimbar
+  as 10h — como a tarja do Inventário já faz a cada minuto (§18, R-EST-24). É
+  idempotente, e agora pode nascer também de quem abre o menu no sob medida.
+- ⚠️ **O "QUEM CONFERIU NÃO SEPARA" E O "QUEM MARCOU NÃO CONFIRMA" SÃO PELO ID**,
+  como nas rotas (`QUEM.mesmaPessoa` e `cancel_conf.podeDecidir` sobre o pedido
+  inteiro): pelo nome, o homônimo sumia e o nome trocado enganava.
+  ⚠️ **Construído, falta subir** (12/11/2026). A TV e a linha da bancada não mudaram (D6).
 
 **Rode `node teste_pendencias_caminho.js` (65) ao mexer no `pendencias_vigia.js`, no
 `tela`/`frase` das linhas da central, na caixinha do `pendencias_aviso.js` ou na
