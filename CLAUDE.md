@@ -1936,8 +1936,10 @@ porque o Mercado Livre altera o corte sem aviso — já houve quarta-feira com c
 ao meio-dia em vez de 10:30. **Editam-se na 206 Horários de coleta**, no bloco
 **"Horário padrão da semana"** (AJUSTE de 11/11/2026, decisão do dono; de manhã
 eles tinham ido para a 906 Parâmetros, ARRUMAR-O-LUGAR fase 3 — até ali a rota
-existia sem tela), com `horarios.editar`. É o padrão: vale quando o dia não
-tem horário lançado na própria 206. O horário impossível é recusado sem gravar
+existia sem tela), com `horarios.editar`. É o padrão: o **despacho** vale para a
+agência quando o dia não tem horário lançado na própria 206; o **corte** desde
+12/11/2026 não é lido por mais ninguém (a Revisão mostra o lançado, bloco logo
+abaixo) e fica como referência. O horário impossível é recusado sem gravar
 nada. **(AJUSTE D12 construído, falta subir.)**
 
 > ⚠️ **A 206 ABRE TAMBÉM COM `horarios.editar` E PARA TODO NÍVEL ADMIN, E QUEM

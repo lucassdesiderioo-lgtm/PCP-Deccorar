@@ -179,8 +179,9 @@ document.getElementById('abaA').onclick=function(){ this.classList.add('on'); do
 document.getElementById('abaP').onclick=function(){ this.classList.add('on'); document.getElementById('abaA').classList.remove('on'); carregar(somar(estado.de,7)); };
 /* ── O HORÁRIO PADRÃO DA SEMANA (AJUSTE de 11/11/2026, decisão do dono) ──────
    O corte e o despacho por dia da semana (`config.corte_<dia>`,
-   `despacho_<dia>`): o que vale quando o dia não tem horário lançado aqui em
-   cima — o corte que a Revisão mostra, e o despacho de reserva da agência. Até
+   `despacho_<dia>`): o despacho de reserva da agência quando o dia não tem a
+   agência lançada aqui em cima. O corte daqui não é lido por mais ninguém desde
+   12/11/2026 (a Revisão mostra o lançado, HORARIOS-E-FERIADOS fase 1). Até
    aqui ele morava na 906 Parâmetros, longe do assunto. A rota é a de sempre
    (`/api/config/horarios`): muda quem tem horarios.editar; quem só tem
    coleta.horario vê. O horário impossível é recusado pelo servidor, sem gravar. */
@@ -194,8 +195,8 @@ async function padrao(pode){
   if(!x){ c.innerHTML='<h3>Horário padrão da semana</h3><div class="msg err" id="padraoErro">Não deu para ler o horário padrão. Recarregue a tela.</div>'; return; }
   /* "acima" só para quem vê as semanas lançadas acima (③ REVISÃO) */
   var acimaTxt=naoVeSemanas?'nesta tela 206, por quem lança os horários de coleta':'acima';
-  var h='<h3>Horário padrão da semana <small>vale quando o dia não tem horário lançado</small></h3>'
-    +'<p class="ajuda" style="margin:0 0 8px">O <b>corte</b> é o que a Revisão mostra ("passou do corte"). O <b>despacho</b> é o limite para levar à agência quando o dia não tem a agência lançada '+acimaTxt+'. As coletas do Mercado Livre continuam sendo lançadas dia a dia, '+(naoVeSemanas?'por essas pessoas':'acima')+'.</p>'
+  var h='<h3>Horário padrão da semana <small>o despacho vale quando o dia não tem a agência lançada</small></h3>'
+    +'<p class="ajuda" style="margin:0 0 8px">O <b>corte</b> aqui é só referência: a Revisão mostra o corte de cada coleta lançada no dia. O <b>despacho</b> é o limite para levar à agência quando o dia não tem a agência lançada '+acimaTxt+'. As coletas do Mercado Livre continuam sendo lançadas dia a dia, '+(naoVeSemanas?'por essas pessoas':'acima')+'.</p>'
     +'<table><tr><th>Dia</th><th>Corte</th><th>Despacho</th></tr>';
   PADRAO_DIAS.forEach(function(d){ var v=x[d[0]]||{};
     h+='<tr><td>'+d[1]+'</td><td><input type="time" data-pdia="'+d[0]+'" data-pcampo="corte" value="'+esc(v.corte)+'"'+(pode?'':' disabled')+'></td>'

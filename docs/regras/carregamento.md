@@ -92,7 +92,7 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 `coleta.horario` (nível Supervisor), e desde 11/11/2026 também com `horarios.editar` e para todo nível Admin, pelo horário padrão (D12 da ARRUMAR-O-LUGAR). **`node teste_horario_coleta.js`** trava os cartões abaixo.
 
 ### R-HCO-01 · O horário é da DATA, e não do dia da semana
-- **Regra:** cada data tem as suas coletas e a sua agência; o `corte_<dia>`/`despacho_<dia>` do `config` só vale para a agência sem horário lançado. Esse padrão por dia da semana se edita na própria 206, no bloco "Horário padrão da semana" (`horarios.editar`, desde 11/11/2026; o corte dele é o que a Revisão mostra).
+- **Regra:** cada data tem as suas coletas e a sua agência; o `corte_<dia>`/`despacho_<dia>` do `config` só vale para a agência sem horário lançado. Esse padrão por dia da semana se edita na própria 206, no bloco "Horário padrão da semana" (`horarios.editar`, desde 11/11/2026). O corte desse padrão não é lido por mais ninguém desde 12/11/2026 — a Revisão mostra o lançado (R-HCO-17) — e fica só como referência.
 - **Por quê:** o ML muda o horário durante a semana (na quinta 05/11 a coleta das 9h sumiu e as outras andaram).
 - **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 
