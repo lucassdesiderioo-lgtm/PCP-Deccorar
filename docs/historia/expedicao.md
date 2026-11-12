@@ -1569,9 +1569,19 @@ ligadas pelo número):
 | nome do destinatário × comprador da etiqueta | **27 de 85 diferentes** — parente, empresa ("SERV FESTAS JNS LTDA"), condomínio, nome abreviado — e todas legítimas |
 | UF da nota × estado da "Cidade de destino" | **85 de 85 lidas, 0 diferentes** |
 
-Reter pelo nome pararia uma caixa em cada três: a armadilha #6. Ficaram as duas
+Reter pelo nome pararia uma caixa em cada três: a armadilha #6. Ficaram três
 conferências que não acusam inocente: a nota não pode ser a NF que outra
-etiqueta diz, e a UF tem que bater. Retida, a nota **não** fica ligada — nota
+etiqueta diz, a página tem que ser a primeira folha daquele número, e a UF tem
+que bater.
+
+A da primeira folha custou três rodadas de revisão. Primeiro, a continuação de
+uma nota de outra caixa passava e gravava a NF errada. Depois, a "via inteira
+repetida" foi liberada para não reter o pedido de várias caixas (R-PDF-05) — e a
+revisão seguinte mostrou que assim a nota de um cliente ia na caixa de outro do
+mesmo estado, que o nome não separa. Ficou o lado seguro: só a primeira folha
+liga. O pedido de várias caixas com a via repetida ficaria retido; isso nunca
+apareceu em mais de 120 notas reais, e separar a via legítima (comprador
+etiqueta × etiqueta, ou chave de acesso) fica como decisão do dono. Retida, a nota **não** fica ligada — nota
 errada na caixa é pior que nota faltando. Passando, o volume ganha a NF, e a
 devolução passa a achá-lo por ela (antes, as três vendas JADLOG de cada PDF
 ficavam com a NF vazia).

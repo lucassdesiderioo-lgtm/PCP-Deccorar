@@ -531,7 +531,8 @@ async function parsePdf(uint8){
        dono). A etiqueta da rota JADLOG nao traz a linha "NF:", e a nota dela e
        a PAGINA SEGUINTE do PDF — uma ligacao pela ordem, que ate aqui ninguem
        conferia: se o ML mudasse a ordem, a caixa saia com a nota de outro
-       cliente. Duas conferencias, e qualquer uma retem:
+       cliente. Tres conferencias, e qualquer uma retem (a da primeira folha,
+       logo abaixo, veio da ③ REVISAO):
          a. o numero dessa nota nao pode ser a NF que OUTRA etiqueta do PDF diz;
          b. a UF do destinatario da nota tem que bater com o estado da "Cidade
             de destino" da etiqueta (lado ilegivel nao vota, #10).

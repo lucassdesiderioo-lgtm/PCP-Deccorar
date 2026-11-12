@@ -950,8 +950,10 @@ upload.
 > ⚠️ **A NOTA DA ETIQUETA SEM "NF:" É CONFERIDA (REGRA de 12/11/2026, decisão
 > do dono, linha em `docs/DECISOES.md`, cartão R-CONF-07).** A etiqueta de rota
 > JADLOG não traz "NF:", e a nota dela é a página seguinte do PDF. Agora o
-> número dessa nota não pode ser o de outra etiqueta, e a UF do destinatário tem
-> que bater com o estado da etiqueta; senão a caixa fica retida em Bloqueados
+> número dessa nota não pode ser o de outra etiqueta, a página tem que ser a
+> **primeira folha** daquele número (a continuação e a via repetida retêm), e a
+> UF do destinatário tem que bater com o estado da etiqueta; senão a caixa fica
+> retida em Bloqueados
 > (divergência), **sem** a nota ligada. Passando, o volume grava a NF.
 > ⚠️ **O NOME DO DESTINATÁRIO NÃO RETÉM, e é de propósito:** 27 de 85 notas
 > reais estavam em nome de parente, empresa ou condomínio. A troca de nota no
@@ -1396,7 +1398,7 @@ medida abriria um buraco de uma peça no SKU.
 > enquanto na bancada as peças vêm etiquetadas por pedido (`1027/01`, `1027/02`)
 > e com **medidas quase sempre diferentes**. Nada liga o volume do ML à peça
 > física — a fila pega "a mais antiga de `SOBMEDIDA`", que não diz *qual peça*.
-> Hoje quem resolve é a memória de quem embala, e nenhuma das cinco conferências
+> Hoje quem resolve é a memória de quem embala, e nenhuma das seis conferências
 > do §5 pega uma troca, porque as duas peças têm o mesmo código. Falta o cadastro
 > do item sob medida (pedido, item, medida, cor, cliente) e o bipe que fecha esse
 > vínculo contra **o cliente** — que é onde o erro caro mora: item trocado dentro
