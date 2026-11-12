@@ -984,6 +984,64 @@ function conferir(nome, orders, esperado){
     else console.log('ok      o pack acima do SKU volta pro item que ja tinha a venda');
   }
 
+  /* ── A ETIQUETA SO COM "Envio:" (12/11/2026, NFs 9718 a 9744) ───────────
+     O ML mandou etiqueta sem Pack ID e sem Venda: no lugar, "Envio: 485023
+     18254". O PDF real esta no caderno (casos/2026-11-12-nf-9738.json); aqui
+     ficam as bordas que ele nao tem. */
+  casos++;
+  {
+    const F=require('./folha');
+    const {envioDaEtiqueta}=require('./parse');
+    const erros=[];
+    if(F.tipoDaPagina('Envio: 485023 18254\nDespachar: quinta 12/nov\nNF: 9738')!=='label')
+      erros.push('a pagina so com "Envio:" nao foi lida como etiqueta');
+    if(F.tipoDaPagina('Despachar: quinta 12/nov\nNF: 9738')!=='other')
+      erros.push('pagina sem pack, venda nem envio virou etiqueta');
+    if(envioDaEtiqueta(['Envio: 485023 18254','Despachar: quinta 12/nov','485023 18254'])!=='48502318254')
+      erros.push('nao leu o numero do envio da etiqueta');
+    if(envioDaEtiqueta(['Envio: 485023 18254'])!=='48502318254')
+      erros.push('sem a linha so de digitos, nao leu o numero da linha "Envio:"');
+    const linhas=[
+      'AAA111 Cortina Rolo Blackout 1,50x1,50 Persiana Branco',
+      'Pack ID: 2000015985224319 SKU: BK150150BRANCO','Venda: 2000019474843354 Quantidade: 1',
+      'Vanessa Lins Cor: Branco','Desenho do tecido: Liso',
+      'BBB222 Cortina Rolo Blackout 1,50x1,50 Persiana Branco',
+      'Envio: 48491219717 SKU: BK150150BRANCO','Silvia Souza Quantidade: 1','Cor: Branco','Desenho do tecido: Liso',
+      'CCC333 Cortina Rolo Blackout Medida L 1,80 X A 1,50 Blecaute Roller Cor Bege Claro -',
+      'Tóquio 002','Envio: 48495222827','SKU: BK180150BEGE','Jucelaine Sebold','Quantidade: 1',
+      'Cor: Bege claro - Tóquio 002','Desenho do tecido: Liso',
+      /* o pacote de varios produtos neste formato: o segundo item nao tem
+         envio nem comprador — e irmao do de cima, como sempre */
+      'DDD444 Cortina Rolo Blackout 1,40x1,40 Persiana Cinza',
+      'Envio: 48400000001 SKU: BK140140CINZA','Pedro Alves Quantidade: 1','Cor: Cinza','Desenho do tecido: Liso',
+      'Cortina Rolo Blackout 1,30x1,30 Persiana Cinza','SKU: BK130130CINZA','Quantidade: 2','Cor: Cinza','Desenho do tecido: Liso'];
+    const its=F.itensDaFolha(linhas);
+    const [a,b,c,d,e]=its;
+    if(its.length!==5) erros.push('esperava 5 itens, veio '+its.length);
+    if((b||{}).envio!=='48491219717') erros.push('nao leu o envio da linha do SKU: '+JSON.stringify((b||{}).envio));
+    if((c||{}).envio!=='48495222827') erros.push('nao recuperou o envio que subiu acima do SKU: '+JSON.stringify((c||{}).envio));
+    if((c||{}).venda || (c||{}).packId) erros.push('o item do envio pegou venda ou pack do vizinho');
+    if((b||{}).comprador!=='Silvia Souza') erros.push('perdeu o comprador do item do envio: '+JSON.stringify((b||{}).comprador));
+    /* A folha crua: cada venda do formato novo e uma caixa de 1, e a de cima
+       continua com 1 (antes ela levava as de baixo: NF 9700 gravou 7). */
+    const cr=F.pecasCruas(linhas, its);
+    if(!cr.get(a) || cr.get(a).total!==1) erros.push('a caixa de cima levou as de baixo: '+(cr.get(a)||{}).total);
+    if(!cr.get(b) || cr.get(b).total!==1) erros.push('a venda do envio nao abriu caixa na folha crua');
+    if(!cr.get(c) || cr.get(c).total!==1) erros.push('a venda do envio que subiu nao abriu caixa na folha crua');
+    if(!cr.get(d) || cr.get(d).total!==3) erros.push('o pacote do envio nao contou o irmao: '+(cr.get(d)||{}).total);
+    const g=F.irmaosDoPacote(its);
+    if(g.length!==1 || g[0].pai!==d || g[0].irmaos[0]!==e) erros.push('o irmao do pacote nao ficou com o item do envio de cima');
+    /* Dois envios livres acima do SKU nao desempatam. */
+    const dois=F.itensDaFolha(['Titulo longo 1,80 X A 1,50 Tóquio','Envio: 111111111111','Envio: 222222222222','SKU: BK180150BEGE','Quantidade: 1']);
+    if((dois[0]||{}).envio) erros.push('escolheu um entre dois envios livres: '+dois[0].envio);
+    /* A auditoria acha o volume pelo envio, so quando ele nao tem pack nem venda. */
+    if(F.itemDaFolha({envio:'48491219717'},its)!==b) erros.push('itemDaFolha nao achou o volume pelo envio');
+    if(F.itemDaFolha({venda:'999',envio:'48491219717'},its)) erros.push('itemDaFolha usou o envio num volume que tem venda');
+    if(erros.length){ falhas++; console.log('FALHOU  a etiqueta so com "Envio:" vira volume, com a sua caixa');
+      erros.forEach(x=>console.log('        '+x)); }
+    else console.log('ok      a etiqueta so com "Envio:" vira volume, com a sua caixa');
+  }
+
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));

@@ -1490,3 +1490,64 @@ antiga reprova de 2 a 4 casos.
 > ⚠️ **Lançamento manual e PDF não se conversam.** O manual (`origem='manual'`)
 > não é apagado pelo recálculo. Usar os dois no mesmo SKU **duplica a ordem**.
 > Regra prática: PDF cobre as vendas, manual cobre produção sem venda.
+
+---
+
+### ⚠️ A ETIQUETA SÓ COM "Envio:" — sem Pack ID e sem Venda (12/11/2026, NFs 9718 a 9744)
+
+O ML mandou, no mesmo PDF (97 páginas, 46 etiquetas), 27 etiquetas num
+formato que o sistema não conhecia. No lugar do `Pack ID:` ou da `Venda:`, a
+etiqueta traz `Envio: 485023 18254` — o mesmo número do código de barras —, e
+a folha traz o item assim:
+
+```
+U2FSOIOQX5LJVPSQLCPQDWSQMY Cortina Rolô Blackout 1,30x1,30 Quarto 0% Luz Persiana Bege
+Envio: 48502318254 SKU: BK130130BEGE
+Tatiana ... Quantidade: 1
+```
+
+A nota (DANFE) também não traz a venda: o número do envio é a única chave.
+
+**Dois defeitos de uma vez, e o segundo era o mais perigoso:**
+
+1. `tipoDaPagina` só chamava de etiqueta a página com `Pack ID:` ou `Venda:`.
+   As 27 viraram "other" e não viraram volume — todas com "Despachar: quinta
+   12/nov", vencendo no dia.
+2. A **folha inteira** (`pecasCruas`, a leitura L3 da quantidade) só abre uma
+   venda em item com pack ou venda. Os itens "Envio" foram contados dentro da
+   caixa de cima, e como a regra é ir com o **maior** número lido, a caixa
+   inchou: NF 9700 com 7 persianas, 9717 e 9665 com 3, 9683 com 2 (todas eram
+   de 1). Elas ficaram retidas no card do pacote — a trava funcionou, e foi o
+   card "PDF cuja conta não fechou" (folha 48, sistema 32) que levou o dono a
+   olhar. A conta: 27 que faltaram − 11 a mais = 16.
+
+**O que não era:** irmão do pacote. Os itens "Envio" têm comprador, então não
+eram órfãos; o caminho do irmão nunca disparou.
+
+**O título longo repetiu o caso Tóquio por uma porta nova.** Em duas vendas
+("…Bege Claro - Tóquio 002") a linha `Envio:` subiu para cima do `SKU:`. A
+mesma regra do `reivindicarAcima` (R-PDF-02) a recupera: só o número que nenhum
+outro item pegou, e só se for o único livre.
+
+**A duplicidade precisou de uma terceira chave** (`lote.envio`): sem ela, cada
+upload do mesmo PDF gravaria essas vendas de novo. A primeira versão a usava
+só na etiqueta sem pack e sem venda, e a ③ REVISÃO achou o furo: a etiqueta de
+sempre traz o MESMO número no código de barras, então a venda que subisse só
+com "Envio:" e voltasse com Pack ID virava dois volumes — e a que já estava no
+banco antes do deploy (número só nos `codes`) entrava de novo. Hoje o envio
+vale para toda etiqueta, nos dois sentidos, e o `seen` do upload lê os `codes`
+dos volumes antigos. Na segunda rodada o revisor achou o avesso: envio igual
+com pack diferente era recusado como repetido, e a venda nova sumia calada.
+Hoje o envio só recusa quando o pack e a venda não divergem — a régua que o
+religar já usava. O verificador conferiu nos dois PDFs reais: em toda
+etiqueta há uma linha só de dígitos de 10 a 12 posições, e ela é o código de
+barras.
+
+**O que esse formato não tem, e fica de fora:** o relatório do ML não o cancela,
+o planejamento não tira a venda com etiqueta do comprometido, e a devolução o
+acha pela NF e não pela venda — tudo porque não há venda nem pack no PDF.
+
+O PDF real está no caderno (`casos/2026-11-12-nf-9738.json`), com a conta
+exigindo 48 = 48, 46 volumes e o segundo upload sem gravar nada. Cartão
+R-PDF-11.
+
