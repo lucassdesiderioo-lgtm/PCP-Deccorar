@@ -48,6 +48,11 @@ e não ao `config`.
   fica na 206 como referência. Divergência anotada na construção.
 - **Dia "sem coleta" (D3).** A Revisão diz *"Hoje não tem coleta"* e o motivo
   (*"feriado: <nome>"*, ou o motivo escrito). Nesse dia não aparece corte.
+- **Na construção (③ REVISÃO) entraram três casos que as decisões não citavam**,
+  pela mesma régua do D2: o dia avisado como **"Mudou"** não mostra o corte velho;
+  o **domingo** diz *"Hoje não tem coleta — domingo"* (a 206 não tem domingo); o
+  dia **só com agência** diz *"Hoje não tem coleta lançada na 206 — só agência"*.
+  A leitura do corte que falha não derruba o aviso de urgente.
 - A agência e o despacho não mudam.
 
 ### Fase 2 — uma lista de feriados, no PCP (🔴: schema, dois bancos, migração)
