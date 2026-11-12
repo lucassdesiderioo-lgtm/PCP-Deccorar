@@ -155,6 +155,11 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 - **Regra:** o "não tem coleta" do dia leva o motivo **Feriado** (com o nome) ou **Outro** (com o texto); o motivo sem o "sem coleta", o motivo desconhecido e o feriado sem nome são recusados (400). Sem calendário anual (D3).
 - **Teste que trava:** `teste_horario_coleta.js` (seção 9).
 
+### R-HCO-17 · A Revisão mostra o corte lançado, e nunca o padrão (12/11/2026)
+- **Regra:** a frase do corte na Revisão (101) vem do `coleta_horario.corteDoDia`: cada coleta lançada com o seu corte, a próxima em destaque, *"Lista fechada às …"* quando todos passaram. O corte vazio ou "a conferir" não vale e segura a lista aberta. O dia sem coleta lançada, ou só com o rascunho da semana (R-HCO-13), diz *"O horário de corte de hoje não foi lançado na 206"*; o dia "sem coleta" diz o motivo.
+- **Por quê:** decisões D1 a D3 do dono (spec `HORARIOS-E-FERIADOS`): o padrão mostrava um corte que o ML já tinha mudado, e pô-lo no lugar do que falta esconderia que ninguém lançou.
+- **Teste que trava:** `teste_horario_coleta.js` (seção 11).
+
 ### R-HCO-11 · Operação vê e escolhe; Supervisor e Admin corrigem (05/11/2026)
 - **Regra:** ver os horários do dia e escolher a saída no upload são de quem sobe o PDF (`pdf.subir`, nível Operação), com os horários travados no quadro. Lançar ou corrigir horário, a tela 206, a semana e a história são de `coleta.horario`, de nível Supervisor.
 - **Por quê:** decisão do dono — quem sobe o PDF confere, mas quem responde pelo horário é Supervisor ou Admin.

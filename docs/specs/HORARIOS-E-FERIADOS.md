@@ -1,6 +1,6 @@
 # HORARIOS-E-FERIADOS — o corte da Revisão pela coleta lançada, e uma lista só de feriados
 
-> **STATUS (11/11/2026): RASCUNHO COM AS DECISÕES DO DONO — falta o "pode seguir".** Nada construído. Nasceu dos dois
+> **STATUS (12/11/2026): APROVADA (o dono: "pode seguir") · fase 1 construída, falta subir · fase 2 não começou.** Nasceu dos dois
 > "achei no caminho" do AJUSTE D12 da `ARRUMAR-O-LUGAR` (o horário padrão foi para a
 > 206). O dono disse *"devemos arrumar isso"*. As decisões marcadas **D** são dele.
 
@@ -42,8 +42,10 @@ e não ao `config`.
   - para a coleta cujo corte está "a conferir". Nesse caso a frase é *"O corte
     da coleta das HH:MM não foi confirmado"*.
 
-  **O padrão da semana deixa de aparecer na Revisão.** Ele continua valendo para
-  o despacho da agência sem horário lançado, e para a cópia da semana.
+  **O padrão da semana deixa de aparecer na Revisão.** O despacho padrão continua
+  valendo para a agência sem horário lançado. ⚠️ **O corte padrão deixa de ser lido
+  por qualquer conta** (a cópia da semana copia a semana anterior, não o padrão):
+  fica na 206 como referência. Divergência anotada na construção.
 - **Dia "sem coleta" (D3).** A Revisão diz *"Hoje não tem coleta"* e o motivo
   (*"feriado: <nome>"*, ou o motivo escrito). Nesse dia não aparece corte.
 - A agência e o despacho não mudam.
