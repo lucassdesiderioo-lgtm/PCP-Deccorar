@@ -1,394 +1,292 @@
-> **STATUS · 17/09/2026 — PLANEJADO · não iniciado** · mantido pelo dono em 17/09/2026, começa depois da fila de consertos
-> Nenhuma tabela deste desenho existe (`etapa`, `sessao_producao`, `unidade`,
-> `unidade_consumo`). Atenção a dois pontos que mudaram desde a escrita:
-> a rota `/montagem` hoje serve a tela de **Embalagem**; e o **SKU não tem mais formato**
-> (`CLAUDE.md` §7) — os exemplos com `BK…` são só ilustração.
-> Movido do Projeto "PCP - Deccorar" para o repositório em 17/09/2026.
+> **STATUS · 12/11/2026 — APROVADA pelo dono (v6)** · **fase 1 construída, falta subir** (o roteiro na ficha: `etapas.js`, `ficha_formula.etapa`, a 404; `teste_roteiro.js`, 25; ③ REVISÃO: modelo sem ficha e sob medida ficam sem roteiro, decisão de construção; **REGRA do dono em 12/11/2026: toda linha da ficha tem etapa de preparo — sem "sai direto na embalagem" —, e o kit passa só por montagem e embalagem**, linha em `docs/DECISOES.md`) · próxima: fase 2
+> Reescrita sobre o processo que o dono descreveu em 11/11/2026 e as respostas de
+> 12/11/2026 (§10). A versão de 17/08/2026 está em
+> `docs/arquivo/PRODUCAO-MAPA-E-MOTOR-v1.md` (histórico, não é regra). Absorve a
+> `PRODUCAO-MONTAGEM.md` (a montagem é a fase 3 daqui).
 >
-> **11/11/2026 — o processo como funciona hoje, nas palavras do dono** (para a
-> revisão desta spec, que vem depois da `FICHAS-NO-CADASTRO-UNICO`):
-> 1 corte de tecido · 2 corte de tubo e base (preparados em lote, com etiqueta) ·
-> 3 kit de comando (em lote, vira estoque) · **4 kit de instalação (em lote, vira
-> estoque)** → 5 **montagem consome 1 + 2** → 6 revisão → **7 embalagem consome 3
-> e 4** → 8 estoque. Diverge do desenho abaixo: lá a montagem consome o kit de
-> comando e o kit de envio é o 4; vale a frase do dono.
+> ⚠️ **A BAIXA DO MATERIAL CONTINUA NA EMBALAGEM** (a regra de 11/11/2026, §24 do
+> CLAUDE.md, não muda). A v3 propunha baixar tecido, tubo e base no corte; o dono
+> voltou atrás no mesmo dia: *"a regra deveria continuar em dar baixa final no
+> estoque quando de fato for embalado"*. O que esta spec acrescenta é **ver** o que
+> está cortado: a pré-fabricação.
+
+# Produção da medida padrão — o mapa e o motor de etapas
+
+> O dono, 11/11/2026: *"o medida padrão é uma produção em série, onde deixamos
+> muitas coisas já meio que preparadas apenas para a montagem."* E: *"isso está
+> totalmente ligado à ficha técnica, onde cada ficha técnica segue um processo
+> produtivo."*
 
 ---
 
-# Produção — Mapa do Processo e Motor de Etapas
+## 1. O processo
 
-> A cadeia produtiva inteira, do corte do tecido ao carregamento, e a engrenagem
-> única que vai rodar todas as etapas.
-> **Data:** 17/08/2026 · **Status:** desenho para revisão, nada implementado
+```
+  MATERIAL (saldo de sempre)          PRÉ-FABRICAÇÃO (etiqueta sequencial)     A PERSIANA
+  ─────────────────────────────────   ─────────────────────────────────────    ─────────────────────
+  rolo de tecido ──corte de tecido──▶ tecido cortado   (TC-000001…)  ─┐
+  barras de tubo e base ──corte─────▶ tubo cortado     (TB-000001…)  ─┴──▶ MONTAGEM (bipa as 2)
+                                      (a base vai junto, sem etiqueta)         ▼
+                                                                          REVISÃO   (101)
+  corrente, comando ──kit de comando▶ kit de comando   (KC-000001…)  ─┐       ▼
+  parafuso, bucha ──kit de instalação▶ kit de instalação (KI-000001…) ─┴──▶ EMBALAGEM (102)
+                                                                              ▼
+                                                     o material todo baixa AQUI, como hoje
+                                                                          ESTOQUE (+1)
+```
+
+**O que o sistema já mede:** a revisão e a embalagem, com quem fez e o tempo.
+**O que ele não mede:** o corte, os kits e a montagem — nem o que está cortado
+esperando, nem quem montou a peça que a revisão rejeitou.
+
+**O que já existe e esta spec aproveita:** o que cortar (a aba Corte e separação da
+401, `corte_dominio.js`); o que cada persiana usa e a medida de corte (a ficha da
+404); a etiqueta Zebra (`kit_pdf.js`, `public/barras.js`); a baixa pela ficha na
+embalagem (`baixa_material_dominio.js`).
 
 ---
 
-## 1. A cadeia
+## 2. A ideia: etapas em lote, cada peça com a sua etiqueta sequencial
+
+O dono: *"uma etiqueta sequencial de corte de tecido. Quem estiver cortando tecido
+vai selecionar o SKU com a cor que ele está cortando e vai colocar etiqueta número 1
+até a número 10."* E para o tubo: *"ele assinala no sistema dizendo que cortou 10
+tubos de 177, 5 tubos de 157. E base é a mesma coisa. Só que para a base não precisa
+da etiqueta, porque quem corta tubo tem que cortar base também."*
+
+| Etapa | Quem faz diz | Sai | Etiqueta |
+|---|---|---|---|
+| 1 Corte de tecido | o SKU (a cor e a medida saem dele) e quantas cortou | N tecidos cortados | **uma por peça**, sequencial (TC) |
+| 2 Corte de tubo e base | a medida e quantas: *"10 de 177, 5 de 157"* | N tubos + N bases | **uma por tubo**, sequencial (TB); a base vai junto, sem etiqueta |
+| 3 Kit de comando (o comando com a corrente montada) | a medida da corrente e quantos: *"100 kits de 1,60"* | N kits | **uma por kit**, sequencial (KC) |
+| 4 Kit de instalação (único, um por persiana) | quantos | N kits | **uma por kit**, sequencial (KI) |
+| 5 Montagem | bipa o tecido e o tubo de cada persiana | a persiana | — (vai para a revisão) |
+
+**As etiquetas são impressas ANTES, em maço** (o dono: *"deixar uma pancada de
+etiqueta impressa na mesa do tecido, na bancada da serralheria, e quando tiver
+acabando a gente vai imprimindo mais"*). Cada maço é uma faixa sequencial de um
+tipo (TC 000001 a 000500, por exemplo), com o número e o código de barras, **sem o
+item**: o item se liga à etiqueta quando ela é usada. Etiqueta impressa e não usada
+**não é** pré-fabricação.
+
+**Cada pessoa abre e fecha o lote** (o dono: *"ela coloca que iniciou e assinala as
+quantidades e os SKUs que ela está cortando, e quando terminar diz que terminou —
+assim fecha"*). **Um lote é de peças iguais** (o dono: *"só pode cortar em lote se
+as peças forem iguais"*): um SKU de tecido, ou uma medida de tubo.
 
 ```
-  ┌─ 1. CORTE DE TECIDO ──────────┐   produz tecido cortado  ▸ etiqueta
-  │                                │
-  ├─ 2. CORTE DE TUBO E BASE ─────┤   produz tubo + base     ▸ etiqueta
-  │                                │
-  ├─ 3. KIT DE COMANDO ───────────┤   produz kit             ▸ estoque
-  │                                │
-  └────────────┬───────────────────┘
-               ▼
-      5. MONTAGEM DA PERSIANA          consome 1+2+3
-               ▼
-      6. REVISÃO
-               ▼
-      7. EMBALAGEM                     consome 4 (kit de envio) ▸ estoque
-               ▼
-      8. ESTOQUE
-
-  ─────────── VENDEU ───────────
-      Bipa SKU  →  entrega a NF  →  imprime a NF  →  carrega
+ A TELA DIZ:  "Próxima etiqueta disponível: TC 000041"   ← a pessoa confere com o maço
+ INICIAR ─▶ escolhe o item e a quantidade ─▶ cola as etiquetas ─▶ TERMINEI
+            "BK160140BEGE · 10"               TC 000041 … 000050 (o sistema liga sozinho)
 ```
 
-O **kit de envio (4)** não entra na linha da persiana — ele é montado em lote,
-vira estoque, e é consumido lá na embalagem.
+- **A tela mostra a próxima etiqueta disponível** de cada tipo, e o lote fica com as
+  N etiquetas a partir dela (o dono, 12/11/2026: *"na tela do PCP já vai ter ali
+  falando que a etiqueta próxima disponível é a 10 e ele confere"*). Ninguém digita
+  número.
+- ⚠️ **No Iniciar, a pessoa bipa a etiqueta de cima do maço** (um bipe só, a
+  proposta): bateu com a da tela, segue; não bateu (o maço de outra bancada, uma
+  etiqueta estragada e jogada fora, duas pessoas no mesmo tipo), o sistema usa **a
+  bipada**, se não estiver usada, e diz quantas ficaram para trás. Sem esse bipe, um
+  maço fora de ordem ligaria as etiquetas aos itens errados, e a montagem recusaria a
+  peça certa.
+- **O tempo** é do início ao fim do lote, e por unidade é o tempo ÷ a quantidade —
+  é daí que sai *"o que cada pessoa está fazendo na fábrica"* e quantas peças faz no
+  dia.
+- **O tempo** é do início ao fim do lote, e por unidade é o tempo ÷ a quantidade —
+  é daí que sai *"o que cada pessoa está fazendo na fábrica"* e quantas peças faz no
+  dia.
 
-### As oito etapas, lado a lado
-
-| # | Etapa | Consome | Produz | Etiqueta | Lote |
-|---|---|---|---|---|---|
-| 1 | Corte de tecido | rolo de tecido | tecido cortado | **sim** | sim |
-| 2 | Corte de tubo e base | barra de tubo, barra de base | tubo + base | **sim** | sim |
-| 3 | Kit de comando | insumos | kit pronto | não | sim |
-| 4 | Kit de envio | insumos | kit pronto | não | sim |
-| 5 | Montagem da persiana | tecido + tubo + kit comando | peça | herda a do tecido | sim, mesmo SKU |
-| 6 | Revisão | peça | peça aprovada | — | **não**, 1 por vez |
-| 7 | Embalagem | peça + kit de envio | volume | — | a definir |
-| 8 | Estoque | volume | — | — | — |
-
-Sete das oito são a mesma coisa: **alguém bipa, faz N unidades, bipa de novo.**
-A revisão é a exceção — sempre uma peça por vez. Por isso não faz sentido escrever
-sete telas.
+**O roteiro é da ficha:** cada linha da 404 diz em que etapa o material é preparado
+(uma caixinha a mais, como a "vai para o planejamento" de 10/11).
 
 ---
 
-## 2. O motor de etapas
+## 3. A pré-fabricação — o que está cortado, à vista
 
-Uma única engrenagem: sessão, cronômetro, quantidade, produtividade, auditoria.
-Cada etapa é um **cadastro** que descreve como ela se comporta.
+As etiquetas que ainda não foram usadas **são** a pré-fabricação: uma lista de
+peças, e não um número solto.
 
-```js
-{
-  chave:            'corte_tecido',
-  nome:             'Corte de tecido',
-  ordem:            1,
-  permite_lote:     true,      // N unidades numa sessão
-  gera_etiqueta:    true,      // imprime código único por unidade
-  prefixo_etiqueta: 'T',       // T-000184
-  consome:          ['insumo'],          // via ficha técnica
-  produz:           'tecido_cortado',
-  entrada_bipada:   [],                  // nada a bipar na entrada
-  permissao:        'corte_tecido.executar'
-}
-```
-
-A montagem da persiana é o caso mais completo:
-
-```js
-{
-  chave:          'montagem_persiana',
-  nome:           'Montagem da persiana',
-  ordem:          5,
-  permite_lote:   true,
-  gera_etiqueta:  false,       // herda a etiqueta do tecido
-  consome:        ['tecido_cortado','tubo_base','kit_comando'],
-  entrada_bipada: ['tecido_cortado','tubo_base'],   // bipa as duas etiquetas
-  produz:         'peca',
-  permissao:      'montagem.executar'
-}
-```
-
-**Criar a 9ª etapa vira cadastro, não código.** É o mesmo princípio do registro de
-permissões: declarar faz a coisa existir.
-
-### O que o motor entrega de graça para toda etapa
-
-- Sessão com início, fim e tempo total
-- Quantidade, com quantidade real diferente da prevista
-- Uma sessão aberta por pessoa, fica aberta até a pessoa dar baixa
-- Tempo médio por unidade
-- Produtividade própria / equipe / nominal
-- Registro em auditoria
-- Permissão própria, declarada no registro
-
-### O que é específico de cada etapa
-
-Só três coisas: **o que consome, o que produz, e se gera etiqueta.**
-
----
-
-## 3. Rastreabilidade — a etiqueta é a identidade
-
-Este é o ponto que muda tudo.
-
-```
-  T-000184   tecido    ← cortado por Maria,  14:22, rolo #77
-  U-000921   tubo      ← cortado por José,   09:10, barra #12
-       │
-       └──▶  bipados na montagem por Edivaldo, 16:04
-             ▼
-           PEÇA
-             ▼
-           revisada por Ana, 16:41  →  REJEITADA: "tecido com defeito"
-```
-
-Quando a Ana rejeita e escolhe o motivo, o sistema já sabe **de quem é o problema**:
-tecido aponta para a Maria, tubo para o José, montagem para o Edivaldo. Sem a
-etiqueta, tudo cai no montador.
-
-### Duas consequências práticas
-
-**1. A quantidade deixa de ser digitada.** Hoje o montador digita "6". Com etiqueta,
-ele bipa 6 tecidos e a quantidade se conta sozinha. O campo continua existindo, só
-para de ser preenchido à mão.
-
-```
-HOJE      bipa SKU  →  digita 6   →  monta  →  bipa fim
-DEPOIS    bipa T-184, T-185, T-186...  →  monta  →  bipa fim
-```
-
-**2. O FIFO da fila de revisão vira desnecessário.** A peça carrega a etiqueta do
-tecido. O revisor bipa essa etiqueta e o vínculo é exato, não estatístico.
-
-> **Por isso o FIFO é uma ponte, não uma solução.** Vale enquanto a etiqueta não
-> existe. Vale construir a peça já com o campo da etiqueta vazio, para que o dia em
-> que a impressora chegar seja um cadastro e não uma migração.
-
-### O que precisa estar decidido antes de imprimir a primeira etiqueta
-
-| Pergunta | Por quê |
+| Item | Agrupado por |
 |---|---|
-| Que impressora? Térmica de bancada? | Muda o formato do código |
-| A etiqueta fica na peça até quando? | Se sair na embalagem, o vínculo com a venda se perde |
-| Código sequencial ou com significado (SKU + data)? | Sequencial é mais robusto; legível ajuda no chão de fábrica |
-| Tubo e base saem juntos numa etiqueta ou separados? | Você falou "corte de tubo e base" como uma etapa só |
+| Tecido cortado | **cor + medida de corte** (a régua da aba Corte e separação, #12) |
+| Tubo cortado (+ base) | **medida de corte**, sem cor (*"serve para qualquer cor"*) |
+| Kit de comando | **altura** da persiana (o comprimento da corrente) |
+| Kit de instalação | um só |
+
+**O material continua no saldo até a embalagem.** O que muda é que ele aparece
+dividido (o dono: *"tantos rolos de tecido fechado e tantos cortados de cada SKU,
+tantos tubos cortados e tantos não cortados"*):
+
+```
+Blackout bege 3,20 ........ saldo 120 m  =  92 m em rolo  +  28 m já cortados (40 peças)
+Tubo 38 (barra 6 m) ....... saldo  60 m  =  45 m em barra +  15 m já cortados (10 tubos)
+```
+
+- **Quanto está cortado** sai da ficha: as peças cortadas × o consumo da linha
+  (`expressao`, R-CMP / #18 — o consumo, nunca a medida de corte). Nenhuma conta nova
+  de material.
+- **Isto aparece onde a compra olha:** na 1101 Materiais (ao lado do saldo, com
+  "usado em") e na lista de compras da 501 (*"28 m deste saldo já estão cortados"*).
+  A conta da necessidade não muda: o cortado ainda é saldo, e a persiana que ele vai
+  virar já está na demanda. É só para quem compra **saber**.
+- **Para os kits**, a pré-fabricação mostra quantos estão prontos contra o que o
+  planejamento pede (a falta da aba Corte e separação), para *"montar antes de
+  acabar"*.
 
 ---
 
-## 4. Os kits como estoque
+## 4. A montagem e as etiquetas
 
-Kit de comando e kit de envio são montados em lote e **viram componentes com estoque
-próprio**. A ficha técnica da persiana referencia o kit, não os parafusos dentro dele.
-
-```
-ficha técnica da persiana 4471
-  ├─ tecido cortado      1
-  ├─ tubo + base         1
-  └─ kit de comando      1   ◀── que por sua vez tem ficha própria
-                                   ├─ acionamento   1
-                                   ├─ suporte       2
-                                   └─ corrente      1
-```
-
-Um nível de aninhamento resolve o caso real. Não vale construir BOM recursiva
-infinita para uma fábrica de persianas.
+- **A montagem bipa as duas etiquetas** (tecido e tubo) de cada persiana. **Sem as
+  duas, não monta** (o dono, 12/11/2026). A etiqueta bipada sai da pré-fabricação, e
+  o sistema sabe **quem cortou o tecido e quem cortou o tubo** de cada persiana.
+- **Etiqueta já usada é recusada**, dizendo quando e por quem foi montada. A que não
+  serve àquele SKU também (*"este tecido é 157 × 155; o BK160140BEGE pede 157 ×
+  145"*; *"este tubo é 177; o SKU pede 157"*).
+- **Etiqueta perdida ou estragada depois de colada:** reimprime-se pela 108, com o
+  mesmo número (como a do sob medida, R-SMT-04).
+- **A embalagem bipa a etiqueta do kit de comando e a do kit de instalação** para
+  fechar a persiana (o dono, 12/11/2026), no lugar do código fixo do kit que se bipa
+  hoje (R-EMB-01). Entra na fase 4, e **nasce DESLIGADA** (`config.embalagem_bipa_kits
+  = 0`): até ligar, a embalagem fica exatamente como está. **Quem liga é o Admin
+  Geral**, por um botão na 108 (o dono: *"coloque algo para ativar quando for
+  funcionar dessa forma"*), como a ordem pela falta da 401 (§3 do CLAUDE.md).
+  Ligada, sem as duas etiquetas de kit a embalagem não fecha.
 
 ---
 
-## 5. Onde o estoque baixa — decisão pendente
+## 5. As telas
 
-Você definiu: *"só dar baixa em tudo quando a persiana for embalada, não só
-montada."* Isso funciona, mas tem uma nuance que precisa de decisão explícita.
+**107 Montagem** (tablet), **dos dois jeitos** (Q1): **em lote** — bipa o SKU,
+monta N, bipa as duas etiquetas de cada uma e o fim — ou **uma por vez**. Grava
+quem, quando, o tempo e as etiquetas (`quem.js`). Rota `/montagem-persiana`: a
+`/montagem` é a Embalagem (102) e não muda.
 
-### O que acontece fisicamente em cada etapa
+**108 Preparo** (tablet), com as etapas que a pessoa tem chave: corte de tecido,
+corte de tubo e base, kit de comando, kit de instalação. **Iniciar**, assinalar os
+itens e as quantidades, **Terminei** (com a faixa de etiquetas). E **imprimir um maço
+de etiquetas** de cada tipo, quando estiver acabando.
 
-| Etapa | O insumo... | É reversível? |
+**A 108 trabalha pelo planejamento** (o dono: *"é por lá que vemos o que temos que
+fazer, por lá nos baseamos as nossas prioridades"*). A lista do que cortar e montar
+é a da aba **Corte e separação da 401**, **na mesma ordem e com a mesma data da
+falta** (a falta por dia do `demanda_dominio`), **menos o que já está na
+pré-fabricação**. Nada de conta nova nem prioridade própria (#12): mudou o
+planejamento, mudou a lista da bancada. A 401 mostra, ao lado de cada item, quanto
+já está cortado.
+
+---
+
+## 6. Que a pré-fabricação não fique largada nem bagunçada (Q6 — ok do dono)
+
+O dono: *"quero algo que funcione mas que não seja largado e nem bagunçado. E também
+não quero nada engessado."* Como cada peça tem etiqueta:
+
+1. **Conferência pelo bipe, na 108** (Supervisor, quando quiser; sugestão: semanal):
+   bipa as etiquetas que estão na bancada. A que o sistema tinha e **não foi bipada**
+   aparece numa lista; quem confere marca **"perdida / refugo"** com motivo, ou acha
+   a peça. Sem contagem cega nem aprovação em duas pessoas.
+2. **Idade:** peça esperando há mais de N dias (`config`, sugestão 15) aparece na
+   central de Pendências (204).
+3. ⚠️ **A peça perdida ou refugada não mexe em saldo** (o material só baixa na
+   embalagem): o material dela continua no saldo, e quem confere é avisado de que o
+   material daquela peça **está no saldo sem existir** — o caminho é a contagem do
+   material na 504, como para qualquer perda de corte.
+
+---
+
+## 7. Rejeição com dono
+
+O motivo da peça com problema na revisão (101) **aponta a etapa**: tecido → corte de
+tecido, tubo → corte de tubo, montagem → montagem. Pelas etiquetas bipadas na
+montagem, o sistema sabe **a pessoa** de cada etapa daquela persiana. A 104 mostra
+por etapa e por pessoa.
+
+---
+
+## 8. O tempo e o cartão de ponto (Q4)
+
+O tempo de cada lote é do bipe de início ao de fim. A pausa (almoço) sai pelo
+**sistema de ponto da empresa** (feito pela Deccorar): ele tem API, roda no mesmo
+servidor e as batidas chegam na hora. O PCP lê as batidas de saída e volta da pessoa
+e desconta do lote aberto.
+
+- **Quem é quem:** o cadastro da pessoa no PCP (901) ganha o **número do colaborador
+  no ponto**; nunca se casa pelo nome (#10).
+- **Até o ponto ligar** (e se ele estiver fora do ar): o lote muito acima do normal
+  fica marcado como suspeito e sai da média de tempo (a régua do sob medida,
+  R-SMI-01). A quantidade conta sempre. Ligado o ponto, o tempo é recalculado.
+
+---
+
+## 9. O que ainda espera o dono
+
+| # | Pergunta |
+|---|---|
+| A | ✅ **O bipe da etiqueta de cima do maço no Iniciar** (§2): aprovado com a spec (12/11/2026) |
+
+---
+
+## 10. Respostas do dono (12/11/2026)
+
+| # | Pergunta | Resposta |
 |---|---|---|
-| Corte de tecido | o rolo vira retalho cortado | **não** — tecido cortado não volta a ser rolo |
-| Corte de tubo | a barra vira peça no tamanho | **não** |
-| Kit de comando | os parafusos viram kit | sim, dá para desmontar |
-| Montagem | tecido + tubo + kit viram persiana | sim, dá para desmontar |
-| Embalagem | a persiana vira volume | sim |
-
-### Os dois modelos
-
-**Modelo A — baixa só na embalagem** *(o que você descreveu)*
-Todo o resto é reserva. Simples de explicar: nada sai do estoque até a peça estar
-pronta para vender. O risco é que o rolo de tecido continue aparecendo como estoque
-depois de já ter sido cortado — e compras pode achar que tem material que não tem.
-
-**Modelo B — baixa na transformação irreversível, custo fechado na embalagem**
-O rolo baixa no corte, porque o rolo deixou de existir. O tecido cortado passa a ser
-estoque próprio. A embalagem fecha o custo da peça. Mais fiel ao chão de fábrica,
-exige um cadastro de estoque a mais por etapa.
-
-> **Sugestão: Modelo B**, porque a razão de existir do módulo de compras é saber o
-> que comprar. Se o rolo cortado ainda conta como rolo, compras vai errar para menos
-> exatamente no insumo que mais gira. Mas é a sua decisão — o Modelo A é mais simples
-> e você conhece o giro da sua operação melhor que o desenho.
+| Q1 | Montagem em lote ou uma por vez? | **Dos dois jeitos** |
+| Q2 | Tecido cortado por SKU ou cor + medida? | Quem corta **escolhe o SKU com a cor**; agrupa por **cor + medida**; tubo e base só pela medida |
+| Q3 | Kit de comando é um só? | **Varia pela altura** |
+| Q4 | Pausa no lote | **Pelo cartão de ponto**, por API; até lá, o lote suspeito |
+| Q5 | Faltou na pré-fabricação | **Etiqueta sequencial** em cada peça; a montagem **recusa** sem as duas etiquetas |
+| Q7 | Etiqueta agora ou depois | **Agora**, junto com o corte |
+| Q8 | O rolo cortado continua no saldo? | **Sim, a baixa continua na embalagem**; a compra vê o cortado separado do fechado (§3) |
+| — | Kits | **Etiqueta sequencial também**, com início e fim do lote, para a produtividade e para montar antes de acabar |
+| — | O que é cada kit | **Kit de comando** = o comando com a corrente montada, varia pela medida da corrente; **kit de instalação** = único, um por persiana |
+| — | A saída do kit | **A embalagem bipa as etiquetas** do kit de comando e do de instalação para fechar a persiana (fase 4) |
+| — | As etiquetas | **Impressas antes, em maço**, na mesa do tecido e na bancada da serralheria; imprime-se mais quando acabar |
+| Q6 | A pré-fabricação largada | **Ok** ao desenho do §6 |
+| — | Como a etiqueta se liga | **A tela mostra a próxima etiqueta disponível**, e o lote fica com as N a partir dela; **lote só de peças iguais** |
+| — | O bipe dos kits na embalagem | **Com chave para ligar** quando a fábrica estiver pronta |
+| — | A prioridade da bancada | **É a do planejamento** (a 401) |
 
 ---
 
-## 6. Modelo de dados do motor
+## 11. Fases
 
-```sql
--- ─── CADASTRO DE ETAPAS ────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS etapa (
-  chave            TEXT PRIMARY KEY,
-  nome             TEXT,
-  ordem            INTEGER,
-  permite_lote     INTEGER DEFAULT 1,
-  gera_etiqueta    INTEGER DEFAULT 0,
-  prefixo_etiqueta TEXT,
-  produz           TEXT,             -- tipo de unidade produzida
-  permissao        TEXT,
-  ativa            INTEGER DEFAULT 1
-);
-
-CREATE TABLE IF NOT EXISTS etapa_entrada (
-  etapa_chave  TEXT REFERENCES etapa(chave),
-  tipo         TEXT,                 -- tecido_cortado | tubo_base | kit_comando | insumo
-  bipada       INTEGER DEFAULT 0,    -- 1 = o operador bipa a etiqueta
-  PRIMARY KEY (etapa_chave, tipo)
-);
-
--- ─── SESSÃO (serve para TODAS as etapas) ───────────────────────
-CREATE TABLE IF NOT EXISTS sessao_producao (
-  id                INTEGER PRIMARY KEY AUTOINCREMENT,
-  etapa_chave       TEXT REFERENCES etapa(chave),
-  sku               TEXT,            -- nulo quando a etapa não é por SKU
-  qtd_prevista      INTEGER,
-  qtd_real          INTEGER,
-  usuario_id        INTEGER,
-  usuario_nome      TEXT,
-  inicio            TEXT DEFAULT (datetime('now','localtime')),
-  fim               TEXT,
-  segundos_total    INTEGER,
-  segundos_por_unid REAL,
-  status            TEXT DEFAULT 'aberta',   -- aberta|concluida|anulada
-  corrigida_por     TEXT,
-  corrigida_em      TEXT,
-  data              TEXT DEFAULT (date('now','localtime'))
-);
-CREATE INDEX IF NOT EXISTS idx_sessao_etapa  ON sessao_producao(etapa_chave, data);
-CREATE INDEX IF NOT EXISTS idx_sessao_aberta ON sessao_producao(status, usuario_id);
-
--- ─── UNIDADE PRODUZIDA (tecido, tubo, kit, peça — tudo aqui) ───
-CREATE TABLE IF NOT EXISTS unidade (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  tipo          TEXT,              -- tecido_cortado|tubo_base|kit_comando|kit_envio|peca
-  etiqueta      TEXT UNIQUE,       -- T-000184 · nulo enquanto não houver impressora
-  sku           TEXT,
-  sessao_id     INTEGER REFERENCES sessao_producao(id),
-  operador_id   INTEGER,
-  operador_nome TEXT,
-  status        TEXT,              -- disponivel|consumida|aguardando_revisao|...
-  criado_em     TEXT DEFAULT (datetime('now','localtime'))
-);
-CREATE INDEX IF NOT EXISTS idx_unidade_fila ON unidade(tipo, sku, status, criado_em);
-CREATE INDEX IF NOT EXISTS idx_unidade_etiq ON unidade(etiqueta);
-
--- ─── CONSUMO: quem entrou em quem (a árvore de rastreabilidade) ─
-CREATE TABLE IF NOT EXISTS unidade_consumo (
-  unidade_pai    INTEGER REFERENCES unidade(id),   -- a peça
-  unidade_filha  INTEGER REFERENCES unidade(id),   -- o tecido que entrou nela
-  PRIMARY KEY (unidade_pai, unidade_filha)
-);
-```
-
-**A tabela `unidade` é o coração.** Tecido, tubo, kit e persiana são todos unidades —
-mudam de tipo, não de estrutura. `unidade_consumo` é a árvore: dado uma peça
-rejeitada, uma consulta devolve quem cortou o tecido, quem cortou o tubo e quem
-montou.
-
-```sql
--- Quem participou desta peça?
-SELECT f.tipo, f.etiqueta, f.operador_nome
-FROM unidade_consumo c
-JOIN unidade f ON f.id = c.unidade_filha
-WHERE c.unidade_pai = ?;
-```
-
----
-
-## 7. Permissões novas
-
-```js
-// ─── PRODUÇÃO ───────────────────────────────────────────────
-{ chave:'corte_tecido.executar',  grupo:'Produção', nivel:'operacao',
-  rotulo:'Cortar tecido',         desc:'Bipar início e fim do corte de tecido' },
-{ chave:'corte_tubo.executar',    grupo:'Produção', nivel:'operacao',
-  rotulo:'Cortar tubo e base',    desc:'Bipar início e fim do corte de tubo' },
-{ chave:'kit_comando.executar',   grupo:'Produção', nivel:'operacao',
-  rotulo:'Montar kit de comando', desc:'Bipar início e fim da montagem do kit' },
-{ chave:'kit_envio.executar',     grupo:'Produção', nivel:'operacao',
-  rotulo:'Montar kit de envio',   desc:'Bipar início e fim da montagem do kit' },
-{ chave:'montagem.executar',      grupo:'Produção', nivel:'operacao',
-  rotulo:'Montar persianas',      desc:'Bipar início e fim da montagem' },
-{ chave:'producao.corrigir',      grupo:'Produção', nivel:'admin',
-  rotulo:'Corrigir sessão de produção',
-  desc:'Ajustar sessão ou quantidade de qualquer etapa', sensivel:true },
-
-// ─── CONFIGURAÇÃO ───────────────────────────────────────────
-{ chave:'etapa.gerenciar',        grupo:'Configuração', nivel:'admin',
-  rotulo:'Configurar etapas de produção',
-  desc:'Criar e editar as etapas do processo', sensivel:true },
-```
-
-### Setores novos
-
-| Setor | Nível | Permissões |
+| Fase | O quê | Risco |
 |---|---|---|
-| **Operador / Corte** | operação | corte_tecido, corte_tubo, painel, produção própria |
-| **Operador / Kits** | operação | kit_comando, kit_envio, painel, produção própria |
-| **Operador / Montagem** | operação | montagem.executar, painel, produção própria |
-
-> **Migração resolvida.** A área antiga `montagem` **é** a atual embalagem/expedição
-> e continua migrando para *Operador / Embalagem*, como está na tabela do controle de
-> acesso. O setor *Operador / Montagem* é novo e nasce vazio — ninguém migra para
-> ele automaticamente. Você atribui à mão as pessoas que hoje montam persiana.
+| **1** | **O roteiro na ficha**: a etapa de cada linha da 404 e as etapas de cada modelo | 🟡 |
+| **2** | **108 Preparo — corte** de tecido e de tubo e base: o maço de etiquetas, o lote (iniciar, assinalar, terminei), a pré-fabricação e o "já cortado" na 1101 e na 501 | 🔴 (schema, etiqueta) |
+| **3** | **107 Montagem**: em lote e uma por vez, bipando as duas etiquetas; a fila da revisão com origem | 🔴 |
+| **4** | **108 — kits** de comando e de instalação, com etiqueta; **a embalagem bipa as duas etiquetas de kit** no lugar do código fixo; a conferência da pré-fabricação (§6) | 🔴 (mexe no bipe da embalagem) |
+| **5** | **Rejeição com etapa e pessoa** (101, 104) | 🟡 |
+| **6** | **O cartão de ponto** (a pausa) e os indicadores: tempo por unidade por etapa na 904 e na 905 | 🟡 |
 
 ---
 
-## 8. Ordem de implementação
+## 12. Onde mora
 
-| Fase | O quê | Entrega valor sozinha? |
-|---|---|---|
-| **1** | Motor de etapas + cadastro + a montagem da persiana como primeira etapa | **Sim** — mede o montador, que é o buraco de hoje |
-| **2** | Produtividade por etapa (própria, equipe, nominal) | Sim |
-| **3** | Corte de tecido e corte de tubo como etapas (sem etiqueta ainda) | Sim — mede o corte |
-| **4** | Kit de comando e kit de envio, com estoque de kit pronto | Sim |
-| **5** | Etiquetas de tecido e tubo: impressão, bipe na montagem, árvore de consumo | **Sim** — é aqui que a rejeição ganha dono |
-| **6** | Ficha técnica e baixa de estoque (Modelo A ou B) | Sim |
-| **7** | Integração com compras | Depende do módulo de compras |
+| Tela | Nº | Módulo | Bloco | Liga-se a |
+|---|---|---|---|---|
+| Montagem | 107 | Produção | Medida padrão | 101 Revisão, 108 Preparo, 404 |
+| Preparo | 108 | Produção | Medida padrão | 401 (Corte e separação), 404, 107, 102, 1101, 501 |
 
-**A Fase 1 é o MVP.** Ela custa um pouco mais que fazer a montagem sozinha, e as
-fases 3 e 4 passam a ser quase só cadastro.
+Nenhuma aba nova; nenhum módulo novo. A caixinha da etapa (fase 1) é um campo na
+linha da 404; o "já cortado" é uma coluna na 1101 e uma linha na lista de compras
+da 501 (mesmo assunto: o saldo do material); o número do ponto é um campo no
+cadastro da pessoa (901).
 
-**A Fase 5 é a que você já anunciou.** Construir as fases 1 a 4 sabendo que ela vem
-significa deixar os campos `etiqueta` e `unidade_consumo` prontos e vazios desde
-o começo — o dia da impressora não vira migração.
+## 13. Alçada
 
----
+| O quê | Chave | Nível | Tela | Sensível |
+|---|---|---|---|---|
+| Montar persianas | `producao.montar` | Operação | 107 | não |
+| Cortar tecido | `producao.cortar_tecido` | Operação | 108 | não |
+| Cortar tubo e base | `producao.cortar_tubo` | Operação | 108 | não |
+| Montar kit de comando | `producao.kit_comando` | Operação | 108 | não |
+| Montar kit de instalação | `producao.kit_instalacao` | Operação | 108 | não |
+| Imprimir maço de etiquetas | `producao.etiqueta` | Operação | 108 | não |
+| Conferir a pré-fabricação, marcar perdida, corrigir lote | `producao.corrigir` | Supervisor | 107 / 108 | **sim** |
 
-## 9. Regras que não podem ser quebradas
-
-1. **Toda etapa nasce no cadastro de etapas** — não existe etapa escrita à mão numa tela
-2. **Sessão fica aberta até a pessoa dar baixa** — em qualquer etapa, igual à revisão
-3. **Uma sessão aberta por pessoa** — em qualquer etapa
-4. **A quantidade que vale é a real**, informada no fim
-5. **A etiqueta é a identidade da unidade** — quando existir, ela substitui o FIFO
-6. **A árvore de consumo nunca é apagada** — é ela que responde de quem foi o erro
-7. **Revisão é sempre uma peça por vez** — é a única etapa sem lote
-8. **Comparação de tempo só dentro do mesmo SKU e da mesma etapa**
-
----
-
-## 10. O que ainda precisa ser decidido
-
-| # | Pergunta | Trava qual fase |
-|---|---|---|
-| 1 | Modelo A ou B para a baixa de estoque? | 6 |
-| 2 | Existe pausa dentro da sessão (almoço, banheiro)? | 1 |
-| 3 | Peça rejeitada volta para o montador original ou para quem estiver livre? | 1 |
-| 4 | Limite máximo de quantidade por sessão? | 1 |
-| 5 | O operador escolhe o que fazer, ou o sistema indica pela necessidade (ABC)? | 3 |
-| 6 | Embalagem trabalha em lote ou uma peça por vez? | 4 |
-| 7 | Tubo e base saem numa etiqueta só ou em duas? | 5 |
-| 8 | Que impressora de etiqueta, e a etiqueta sai da peça na embalagem? | 5 |
+Nenhuma chave mexe em saldo (o material baixa na embalagem, como hoje). Setores
+sugeridos (nascem vazios): Operador / Corte, Operador / Kits, Operador / Montagem.
+Tudo novo nasce **só para o Admin Geral** (R-ALC-06), até o dono marcar.
