@@ -161,6 +161,28 @@ caso('a linha desativada não entra no roteiro', () => {
   igual(ETAPAS.roteiro(db, 1).etapas.map(e => e.chave), ['corte_tubo','montagem','revisao','embalagem']);
   db.prepare("UPDATE ficha_formula SET ativo=1 WHERE id=?").run(F_KIT);
 });
+caso('modelo sem nenhuma linha ativa NÃO ganha roteiro (não se inventa montagem)', () => {
+  db.prepare("INSERT INTO modelo (id,codigo,nome,exige_medida,sob_medida) VALUES (2,'ACESSORIO','Acessório',0,0)").run();
+  const r = ETAPAS.roteiro(db, 2);
+  igual(r.etapas, []);
+  igual(r.motivo, 'sem_ficha');
+});
+caso('modelo sob medida fica fora: a spec é da medida padrão', () => {
+  db.prepare("INSERT INTO modelo (id,codigo,nome,exige_medida,sob_medida) VALUES (3,'SOBMEDIDA','Sob medida',0,1)").run();
+  db.prepare("INSERT INTO ficha_formula (modelo_id,componente_id,expressao,ordem,etapa) VALUES (3,?,'1',1,'embalagem')").run(CX);
+  const r = ETAPAS.roteiro(db, 3);
+  igual(r.etapas, []);
+  igual(r.motivo, 'sob_medida');
+});
+caso('modelo que não existe: roteiro null, e a rota responde 404', () => {
+  igual(ETAPAS.roteiro(db, 999), null);
+  const r = chamar(R.get['/api/formulas/roteiro/:modelo_id'], null, { modelo_id:'999' });
+  igual(r.st, 404);
+});
+caso('a tela diz por que não há roteiro', () => {
+  const h = fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8');
+  verdade(/sem_ficha/.test(h) && /sob_medida'/.test(h), 'a tela trata os dois motivos');
+});
 caso('GET /api/formulas/roteiro/:modelo_id devolve o roteiro e as opções', () => {
   const h = R.get['/api/formulas/roteiro/:modelo_id'];
   verdade(h, 'a rota existe');

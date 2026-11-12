@@ -245,7 +245,8 @@ module.exports = function(app, db){
      cai na regra das leituras da ficha (as chaves da 404). */
   app.get('/api/formulas/roteiro/:modelo_id',(req,res)=>{
     const r = ETAPAS.roteiro(db, +req.params.modelo_id);
-    res.json({ etapas:r.etapas, sem_etapa:r.sem_etapa, opcoes:ETAPAS.DE_LINHA });
+    if(!r) return res.status(404).json({erro:'modelo não encontrado'});
+    res.json({ etapas:r.etapas, sem_etapa:r.sem_etapa, motivo:r.motivo||null, opcoes:ETAPAS.DE_LINHA });
   });
 
   app.get('/api/formulas/medidas/:modelo_id',(req,res)=>{

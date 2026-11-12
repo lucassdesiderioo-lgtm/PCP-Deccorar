@@ -34,9 +34,20 @@ const nomeDe = c => { const e = DE_LINHA.find(x => x.chave === c); return e ? e.
 
 /* O roteiro de um modelo: as etapas de preparo que alguma linha ATIVA marca,
    na ordem da fabrica, e depois montagem, revisao e embalagem. `sem_etapa` diz
-   quantas linhas ativas ainda nao foram marcadas. */
+   quantas linhas ativas ainda nao foram marcadas.
+
+   Nao se inventa roteiro (③ REVISAO, 12/11/2026): o modelo SEM linha ativa
+   (o acessorio, a ficha ainda vazia) volta sem etapas, motivo `sem_ficha` —
+   sem isso a tela dizia "Montagem → Revisão → Embalagem" do KIT32, e a fase
+   que ler o roteiro poria o kit na fila da montagem. O modelo SOB MEDIDA fica
+   fora (`sob_medida`): esta producao e a da medida padrao, e o sob medida tem
+   a bancada dele (§19). Modelo que nao existe: null. */
 function roteiro(db, modelo_id){
+  const m = db.prepare('SELECT id, sob_medida FROM modelo WHERE id=?').get(modelo_id);
+  if(!m) return null;
+  if(m.sob_medida) return { etapas:[], sem_etapa:0, motivo:'sob_medida' };
   const linhas = db.prepare('SELECT etapa FROM ficha_formula WHERE modelo_id=? AND ativo=1').all(modelo_id);
+  if(!linhas.length) return { etapas:[], sem_etapa:0, motivo:'sem_ficha' };
   const marcadas = new Set(linhas.map(l => l.etapa).filter(Boolean));
   return {
     etapas: PREPARO.filter(e => marcadas.has(e.chave)).concat(SEMPRE),
