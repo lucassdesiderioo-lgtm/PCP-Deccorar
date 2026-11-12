@@ -94,6 +94,15 @@ module.exports=[
   igual(P.contar('baixa_boleto',QUALQUER).n,antes-1,'cancelado o boleto, a baixa dele sai da bolinha');
  }},
 
+{nome:'pendencias_pcp — cancelado o boleto, a baixa dele sai tambem do total da 204 (sem pessoa)',
+ executar({igual}){
+  const b=novoBoleto();
+  aprovacao.pedirBaixa(b.id,{},LUCAS);
+  const antes=P.contar('baixa_boleto').n;
+  boleto.cancelar(b.id,'lancado em dobro',LUCAS);
+  igual(P.contar('baixa_boleto').n,antes-1,'o numero da central desce — nao vira paisagem');
+ }},
+
 {nome:'pendencias_pcp — o descarte de sobra conta o que a 603 lista, e quem pediu nao o ve',
  executar({igual}){
   aprovacao.pedirDescarte(novaSobra().id,'rasgou',LUCAS);
