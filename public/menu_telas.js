@@ -117,6 +117,8 @@
     PEND.ligado = true;
     pedirPendencias();
     setInterval(pedirPendencias, 60000);
+    /* o tablet que dormiu pergunta logo ao acordar, sem esperar o minuto */
+    if(typeof document !== 'undefined') document.addEventListener('visibilitychange', function(){ if(!document.hidden) pedirPendencias(); });
   }
   raiz.MENU_TELAS = { html:html, avisoValor:avisoValor, marcarSemValor:marcarSemValor, FRASE_SEM_VALOR:FRASE_SEM_VALOR,
                       etiquetas:etiquetas, pendencias:pendencias };

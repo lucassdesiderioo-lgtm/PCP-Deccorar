@@ -12,6 +12,7 @@
  * A conta de cada linha é da tela dona; ver o pendencias_dominio.js.
  */
 const PEND = require('./pendencias_dominio');
+const QUEM = require('./quem');
 const DIA = require('./pendencias_dia');   // o retrato de cada dia, para o relatório (R7)
 
 module.exports = function(app, db){
@@ -27,9 +28,13 @@ module.exports = function(app, db){
     const u = req.usuario, ac = app.locals.acesso;
     if(!u || !ac) return res.status(401).json({ erro:'faça login' });
     try{
+      const q = QUEM.quem(req);
       const pode = {
         tem: c => { try{ return !!ac.podePermissao(u, c); }catch(e){ return false; } },
-        abre: r => { try{ return !!ac.decidir(u, r, 'GET').ok; }catch(e){ return false; } }
+        abre: r => { try{ return !!ac.decidir(u, r, 'GET').ok; }catch(e){ return false; } },
+        /* quem é, para a régua de cada dono ("quem pediu não aprova") */
+        quem: q ? { id:q.usuario_id, nome:q.usuario_nome || '' } : { id:null, nome:'' },
+        temChave: app.locals.inventarioTemChave || null
       };
       res.json(PEND.minhas(db, pode));
     }catch(e){ console.log('[pendencias] minhas: ' + (e && e.stack || e)); res.status(500).json({ erro:'não consegui contar' }); }

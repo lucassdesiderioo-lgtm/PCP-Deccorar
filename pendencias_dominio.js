@@ -69,13 +69,30 @@ const LINHAS = [
     contar(db){
       const r = require('./ajuste_dominio').contarPendentes(db);
       return { n:r.n, desde:r.desde };
+    },
+    /* só o que ESTA pessoa pode aprovar: quem pediu não aprova (R-EST-20) */
+    minha(db, p){
+      const l = require('./ajuste_dominio').pendentes(db, { quem:p.quem }).filter(x => x.pode_aprovar);
+      return { n:l.length, desde:maisAntiga(l.map(x => x.pedido_em)) };
     } },
-  { chave:'inventario_aprovar', tela:303, frase:['SKU não teve acordo nem na 3ª contagem e espera decisão','SKUs não tiveram acordo nem na 3ª contagem e esperam decisão'], nome:'Inventário — sem acordo', perm:['contagem.resolver'], onde:{ url:'/inventario' },
+  { chave:'inventario_aprovar', tela:302, frase:['SKU não teve acordo nem na 3ª contagem e espera decisão','SKUs não tiveram acordo nem na 3ª contagem e esperam decisão'], nome:'Inventário — sem acordo', perm:['contagem.resolver'], onde:{ aba:'ct' },
     ajuda:'SKUs em que nem a 3ª contagem bateu (e os que já esperavam aprovação antes de 04/11/2026)',
-    contar(db){ const r = require('./inventario_dominio').pendencias(db).aprovar; return { n:r.n, desde:r.desde }; } },
+    contar(db){ const r = require('./inventario_dominio').pendencias(db).aprovar; return { n:r.n, desde:r.desde }; },
+    /* quem contou o SKU não decide (R-EST-18): a régua é a da fila do admin */
+    minha(db, p){
+      const l = require('./inventario_dominio').aprovacao(db, { quem:p.quem }).filter(x => x.pode_aprovar);
+      return { n:l.length, desde:maisAntiga(l.map(x => (x.contagens[0] || {}).em)) };
+    } },
   { chave:'inventario_recontar', tela:303, nome:'Inventário — 2ª e 3ª contagem', perm:['contagem.contar','contagem.desempatar'], onde:{ url:'/inventario' },
     ajuda:'SKUs que esperam a contagem de outra pessoa (a 2ª, ou a 3ª porque as duas não bateram)',
-    contar(db){ const r = require('./inventario_dominio').pendencias(db).recontar; return { n:r.n, desde:r.desde }; } },
+    contar(db){ const r = require('./inventario_dominio').pendencias(db).recontar; return { n:r.n, desde:r.desde }; },
+    /* só o que ESTA pessoa pode contar agora (a 2ª é de outra pessoa, R-EST-18;
+       o rodízio do dia): a lista dela, pela régua da própria tela */
+    minha(db, p){
+      if(!p.temChave) return this.contar(db);
+      const l = require('./inventario_dominio').hoje(db, { quem:p.quem, pode:p.tem, temChave:p.temChave }).itens.filter(i => i.rodada >= 2);
+      return { n:l.length, desde:null };
+    } },
   /* Os ajustes antigos se dividem por tela desde 11/11/2026 (ARRUMAR-O-LUGAR
      fase 2): os de peça ficam na 302, e os de material moram na 504 — cada linha
      conta o que a tela dela mostra (#12). */
@@ -98,6 +115,16 @@ const LINHAS = [
     ajuda:'caixas separadas como venda cancelada esperando confirmação no ML, e canceladas no ML ainda na fábrica esperando ser separadas',
     contar(db){
       const l = require('./carreg_route').sobrasEsperando(db);
+      return { n:l.length, desde:maisAntiga(l.map(x => x.cancelada_em)),
+               canceladas:l.filter(x => x.de === 'cancelada').map(x => x.id) };
+    },
+    /* a separar: quem confere; aguardando confirmação: quem confirma, e nunca
+       quem marcou (R-REC-06, pela régua do cancel_conf) */
+    minha(db, p){
+      const CONF = require('./cancel_conf');
+      const l = require('./carreg_route').sobrasEsperando(db).filter(x => x.de === 'cancelada'
+        ? p.tem('carregamento.executar') || p.tem('cancelamento.confirmar')
+        : p.tem('cancelamento.confirmar') && CONF.podeDecidir(db, Object.assign({ situacao:'aguardando' }, x), p.quem));
       return { n:l.length, desde:maisAntiga(l.map(x => x.cancelada_em)),
                canceladas:l.filter(x => x.de === 'cancelada').map(x => x.id) };
     } },
@@ -214,10 +241,21 @@ function total(db, pronto){
 function minhas(db, pode){
   const M = require('./telas');
   const rotaDe = n => { const t = M.TELAS.find(x => x.n === n); return t ? t.rota : null; };
-  const linhas = contarTudo(db).filter(l => {
-    const L = LINHAS.find(x => x.chave === l.chave), rota = rotaDe(L.tela);
+  /* o portão ANTES da conta: a linha que a pessoa não resolve nem é contada
+     (③ REVISÃO — cada aparelho pergunta a cada minuto) */
+  const linhas = LINHAS.filter(L => {
+    const rota = rotaDe(L.tela);
     if(!rota || !pode.abre(rota)) return false;
     return !L.perm.length || L.perm.some(c => pode.tem(c));
+  }).map(L => {
+    const base = { chave:L.chave, tela:L.tela };
+    try{
+      const r = L.minha ? L.minha(db, pode) : L.contar(db);
+      return Object.assign(base, { n:r.n, desde:r.desde, _canc:r.canceladas || [] });
+    }catch(e){
+      console.log('[pendencias] minhas ' + L.chave + ': ' + (e && e.message));
+      return Object.assign(base, { n:null, desde:null, _canc:[] });
+    }
   });
   const por_tela = {};
   linhas.forEach(l => {

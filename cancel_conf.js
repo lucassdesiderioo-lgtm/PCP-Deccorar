@@ -139,4 +139,9 @@ function aguardando(db){
       return Object.assign(x, { pecas:pc, baixou: !!x.baixado_em }); });
 }
 
-module.exports = { garantir, marcar, confirmar, recusar, aguardando, aberto, pegar };
+/* Esta pessoa pode decidir (confirmar ou recusar) este pedido? A mesma régua
+   das duas rotas — quem marcou não decide (R-REC-06). A etiqueta do ☰ Menu
+   pergunta aqui, para não ter uma segunda régua (#12). */
+function podeDecidir(db, p, quem){ return !recusaComum(db, p, quem); }
+
+module.exports = { garantir, marcar, confirmar, recusar, aguardando, aberto, pegar, podeDecidir };
