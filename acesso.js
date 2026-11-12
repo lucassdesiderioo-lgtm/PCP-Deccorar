@@ -919,7 +919,9 @@ module.exports = function(app, db){
     // ── acoes/admin por API ──
     // A tarja do modo teste aparece para todos (§11): so o booleano, so leitura.
     if(M === 'GET' && eq('/api/teste/ativo')) return '@logado';
-    if(pre('/api/teste')) return 'teste.operar';
+    // O modo teste foi APOSENTADO (11/11/2026): ligar e recusado (410); o resto
+    // so serve para encerrar um que ainda estivesse ligado, e e do Admin Geral.
+    if(pre('/api/teste')) return '@ag';
     if(pre('/api/usuarios')) return 'pessoas.gerenciar';
     if(pre('/api/acesso/setores')) return 'setores.gerenciar';
     if(eq('/api/acesso/divergencias')) return 'auditoria.ver';
@@ -933,6 +935,7 @@ module.exports = function(app, db){
        desfaria revisao sem operar a bancada. */
     if(eq('/api/revisao/cancelar') || eq('/api/revisao/desfazer') || eq('/api/revisao/ultima')) return 'revisao.executar';
     if(M !== 'GET' && eq('/api/rejeicao')) return 'revisao.rejeitar';
+    if(pre('/api/material-extra')) return 'material.extra';   // a 106 (FICHAS-NO-CADASTRO-UNICO)
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';
     if(M !== 'GET' && eq('/api/embalar')) return 'etiqueta.emitir';
     if(M !== 'GET' && eq('/api/carregar')) return 'carregamento.executar';
@@ -1084,6 +1087,11 @@ module.exports = function(app, db){
        inteira — via a tela e não via a ficha. Agora a leitura sai sem o custo
        (a poda é do ficha_route.js), e gravar a ficha continua pedindo custo.ver. */
     if(M === 'GET' && /^\/api\/ficha\/[^/]+$/.test(p)) return ['modelo.cadastrar','custo.ver','compras.ver'];
+    /* O catalogo unico (FICHAS-NO-CADASTRO-UNICO fase 5): os produtos do sob
+       medida listados na 404, pelas chaves que abrem a 404. So nome e se esta
+       ativo — nenhum preco. */
+    if(M === 'GET' && eq('/api/catalogo/sobmedida')) return ['modelo.cadastrar','custo.ver','compras.ver'];
+    if(M === 'GET' && /^\/api\/catalogo\/sobmedida\/\d+\/medida$/.test(p)) return ['modelo.cadastrar','custo.ver','compras.ver'];
     if(pre('/api/ficha')) return 'custo.ver';
     // Quem mexe numa formula mexe no consumo de material de toda a linha.
     if(M !== 'GET' && pre('/api/formulas')) return 'modelo.cadastrar';
@@ -1465,6 +1473,18 @@ module.exports = function(app, db){
       })();
     }
   }catch(e){ console.log('[acesso] limpeza do minimo.definir falhou: ' + e.message); }
+
+  /* ── 3-G2. `teste.operar` SAI DO BANCO (o modo teste foi aposentado,
+     11/11/2026): a mesma limpeza do minimo.definir, uma vez so. */
+  try{
+    if(!db.prepare("SELECT 1 FROM config WHERE chave='acesso_teste_operar'").get()){
+      db.transaction(() => {
+        db.prepare("DELETE FROM setor_permissao WHERE chave='teste.operar'").run();
+        db.prepare("DELETE FROM usuario_excecao WHERE chave='teste.operar'").run();
+        db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('acesso_teste_operar','1')").run();
+      })();
+    }
+  }catch(e){ console.log('[acesso] limpeza do teste.operar falhou: ' + e.message); }
 
   /* ── 3-F. UMA LISTA SO (fase 2 da ACESSOS-UNIFICADOS, 26/10/2026) ──
      As tres chaves velhas do sob medida (`sobmedida.cortar`, `.cadastrar`,

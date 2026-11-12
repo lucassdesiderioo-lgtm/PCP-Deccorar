@@ -48,4 +48,32 @@ function consumo(){
   }
 }
 
-module.exports = { ligar, ligada, consumo };
+/* ── A FICHA DO SOB MEDIDA NO CADASTRO UNICO (FICHAS-NO-CADASTRO-UNICO) ────
+   O caminho de volta da lista de material da ficha do sob medida: as linhas
+   (para o "usado em" da 1101) e o material das pecas embaladas num periodo
+   (para o "consumido por operacao"). Mesma regra de cima: SEM A PORTA, NAO
+   CALA — devolve vazio com `fora`, e quem le diz que o sob medida ficou de fora;
+   e nunca estoura. */
+let ficha = null;
+const ligarFicha = p => { ficha = (p && typeof p.linhas === 'function') ? p : null; };
+function linhasDaFicha(){
+  if(!ficha) return null;
+  try{ return ficha.linhas() || []; }catch(e){ console.error('[sobmedida_material] linhas da ficha:', e.message); return null; }
+}
+function consumoEmbalado(desde, ate){
+  if(!ficha || typeof ficha.embalado !== 'function') return { fora:true, itens:[] };
+  try{ return { fora:false, itens:ficha.embalado(desde, ate) || [] }; }
+  catch(e){ return { fora:true, itens:[], motivo:e.message }; }
+}
+function produtos(){
+  if(!ficha || typeof ficha.produtos !== 'function') return { fora:true, produtos:[] };
+  try{ return { fora:false, produtos:(ficha.produtos() || []).map(p => ({ id:p.id, nome:p.nome, ativo:p.ativo ? 1 : 0, materiais:p.materiais || 0 })) }; }
+  catch(e){ return { fora:true, produtos:[], motivo:e.message }; }
+}
+/* A lista de material de um produto do sob medida numa medida (mm), com o
+   custo pela conta da 404 (item 1, 11/11/2026). Quem poda o custo e a rota. */
+function naMedida(id, largura_mm, altura_mm){
+  if(!ficha || typeof ficha.naMedida !== 'function') return { fora:true, linhas:[] };
+  return Object.assign({ fora:false }, ficha.naMedida(id, largura_mm, altura_mm));
+}
+module.exports = { ligar, ligada, consumo, ligarFicha, linhasDaFicha, consumoEmbalado, produtos, naMedida };

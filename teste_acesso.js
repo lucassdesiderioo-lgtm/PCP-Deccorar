@@ -79,6 +79,8 @@ eq('POST /api/pacote/resolver exige pacote.assinar',
   AC.permDaRota('/api/pacote/resolver', 'POST'), 'pacote.assinar');
 eq('GET /api/pacote/pendentes e leitura da aba Bloqueados (@admin)',
   AC.permDaRota('/api/pacote/pendentes', 'GET'), '@admin');
+eq('GET o custo do sob medida numa medida pede as chaves da 404 (item 1, 11/11/2026)',
+  JSON.stringify(AC.permDaRota('/api/catalogo/sobmedida/3/medida', 'GET')), JSON.stringify(['modelo.cadastrar','custo.ver','compras.ver']));
 /* O bipe das pecas acontece na BANCADA da Etiqueta de Venda, e sem ele a
    impressao e recusada. Se ele cair no `pre('/api/lote')` -> 'pdf.subir', quem
    tem so 'etiqueta.emitir' nao confere NEM imprime: a trava tranca a propria

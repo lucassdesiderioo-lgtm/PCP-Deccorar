@@ -108,9 +108,9 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
   <div class="tab" data-t="rel">Relatórios</div>
   <div class="tab" data-t="acs">Acessos &amp; Permissões</div>
   <div class="tab" data-t="pend" id="tabPend">SKU incompleto</div>
-  <div class="tab" data-t="ficha">Ficha técnica</div>
+  <div class="tab" data-t="ficha">Catálogo e ficha técnica</div>
   <div class="tab" data-t="compras">Compras</div>
-  <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="cor" id="tabCor">Correções</div><div class="tab" data-t="blq" id="tabBlq">Pendências</div><div class="tab" data-t="tst">Modo teste</div>
+  <div class="tab" data-t="cd">Cadastros</div><div class="tab" data-t="dv">Devolucoes</div><div class="tab" data-t="pb">Problemas</div><div class="tab" data-t="ct">Contagem</div><div class="tab" data-t="cor" id="tabCor">Correções</div><div class="tab" data-t="blq" id="tabBlq">Pendências</div>
 </div>
 <div class="wrap">
   <!-- PRODUÇÃO -->
@@ -204,6 +204,12 @@ a.corLink{color:#58a6ff;text-decoration:none} a.corLink:hover{text-decoration:un
       </div>
       <div id="fxEscopo" style="margin-top:12px"></div>
     </div>
+    <!-- O CATÁLOGO ÚNICO (FICHAS-NO-CADASTRO-UNICO fase 5, decisão do dono:
+         "catálogo e ficha técnica são a mesma coisa"). Os modelos da medida
+         padrão são o seletor de cima; os produtos do sob medida vêm aqui, com o
+         caminho para a ficha deles (608). A CONTA continua diferente em cada
+         operação: o que se junta é o lugar. -->
+    <div class="card" id="fxCatalogo" style="display:none"></div>
 
     <div class="card">
       <div id="fxLinhas"></div>
@@ -861,7 +867,77 @@ function analisarForma(expr){
   return {id:'livre'};
 }
 
+/* O catálogo único: os produtos do sob medida, com o caminho para a ficha
+   deles quando a pessoa abre a 608 (pela lista de telas dela). Falhou, some. */
+async function catalogoSobMedida(){
+  const box=$('#fxCatalogo'); if(!box) return;
+  let r=null, telas=null;
+  try{ r=await (await fetch('/api/catalogo/sobmedida')).json(); }catch(e){ r=null; }
+  try{ telas=await (await fetch('/api/telas/minhas')).json(); }catch(e){ telas=null; }
+  if(!r||!Array.isArray(r.produtos)){ box.style.display='none'; return; }
+  const abre=!!(telas&&(telas.telas||[]).some(t=>+t.n===608));
+  box.style.display='';
+  box.innerHTML='<b>Produtos do sob medida</b> <span class="sub">— a ficha deles (peças e lista de material) mora no Catálogo do sob medida</span>'
+    +(r.fora?'<div class="sub" style="margin-top:6px">O sob medida não está ligado neste servidor.</div>'
+      :(r.produtos.length?'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">'
+        +r.produtos.map(p=>'<span class="chip" style="padding:4px 10px;border:1px solid var(--borda,#2a3140);border-radius:99px">'
+          +(abre?'<a href="/sobmedida/catalogo?modelo='+p.id+'">'+esc(p.nome)+'</a>':esc(p.nome))
+          +(p.ativo?'':' <span class="sub">(inativo)</span>')
+          +' <span class="sub">· '+p.materiais+' material(is)</span></span>').join('')+'</div>'
+          +'<div id="fxSmConf" style="margin-top:10px"></div>'
+        :'<div class="sub" style="margin-top:6px">Nenhum produto cadastrado.</div>'));
+  desenharSmConf(r.produtos);
+}
+
+/* CONFERIR NUMA MEDIDA (item 1, 11/11/2026): a lista de material de um
+   produto do sob medida e o custo dela, como a ficha de um SKU. O R$ so vem a
+   quem tem "ver custo" (o servidor poda). O que foi digitado e guardado: o
+   catalogoSobMedida roda de novo a cada abertura da aba (§12). */
+const SMCONF={produto:'',largura:'',altura:''};
+function desenharSmConf(produtos){
+  const box=$('#fxSmConf'); if(!box) return;
+  const lista=(produtos||[]).filter(p=>p.materiais>0);
+  if(!lista.length){ box.innerHTML='<div class="sub">Nenhum produto com lista de material para conferir.</div>'; return; }
+  box.innerHTML='<div class="sub" style="margin-bottom:4px">Conferir numa medida:</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">'
+    +'<select id="smcP" style="width:auto;max-width:320px">'+lista.map(p=>'<option value="'+p.id+'"'+(String(p.id)===SMCONF.produto?' selected':'')+'>'+esc(p.nome)+'</option>').join('')+'</select>'
+    +'<label>largura <input id="smcL" inputmode="decimal" placeholder="cm" style="width:80px" value="'+esc(SMCONF.largura)+'"> cm</label>'
+    +'<span>×</span><label>altura <input id="smcA" inputmode="decimal" placeholder="cm" style="width:80px" value="'+esc(SMCONF.altura)+'"> cm</label>'
+    +'<button class="btn" id="smcB">Conferir</button></div><div id="smcR" style="margin-top:8px"></div>';
+  const guarda=()=>{ SMCONF.produto=$('#smcP').value; SMCONF.largura=$('#smcL').value; SMCONF.altura=$('#smcA').value; };
+  ['#smcP','#smcL','#smcA'].forEach(q=>$(q).addEventListener('input',guarda));
+  $('#smcP').addEventListener('change',guarda);
+  $('#smcB').onclick=conferirSm;
+  [$('#smcL'),$('#smcA')].forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter') conferirSm(); }));
+}
+const QUANDO_TXT={sempre:'sempre',bando:'com bandô',barra:'com barra',sem_adicional:'sem adicional',reducao:'com redução',
+  com_comando:'com comando',sem_comando:'sem comando',abertura_lateral:'abertura lateral',abertura_central:'abertura central'};
+async function conferirSm(){
+  const out=$('#smcR'); if(!out) return;
+  out.innerHTML='<span class="sub">calculando…</span>';
+  let r=null, st=0;
+  try{ const x=await fetch('/api/catalogo/sobmedida/'+encodeURIComponent($('#smcP').value)+'/medida?largura='
+      +encodeURIComponent($('#smcL').value)+'&altura='+encodeURIComponent($('#smcA').value)); st=x.status; r=await x.json(); }
+  catch(e){ out.innerHTML='<span style="color:var(--verm,#e5484d)">Não deu para calcular agora. Tente de novo.</span>'; return; }
+  if(st!==200||!r){ out.innerHTML='<span style="color:var(--verm,#e5484d)">'+esc((r&&r.erro)||'Não deu para calcular.')+'</span>'; return; }
+  if(r.fora){ out.innerHTML='<span class="sub">O sob medida não está ligado neste servidor.</span>'; return; }
+  const ve=('custo_sempre_centavos' in r);
+  const rs=c=>c==null?'—':'R$ '+(c/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const num=v=>v==null?'—':(+v).toLocaleString('pt-BR',{maximumFractionDigits:3});
+  out.innerHTML='<div style="overflow-x:auto"><table><thead><tr><th>Material</th><th>Quando entra</th><th>Quantidade</th>'
+    +(ve?'<th>Custo</th>':'')+'</tr></thead><tbody>'
+    +r.linhas.map(x=>'<tr><td>'+esc(x.nome||'')+'</td><td>'+esc(QUANDO_TXT[x.quando]||x.quando)+'</td><td>'
+      +(x.erro?'<span style="color:var(--ambar,#f5a524)">'+esc(x.erro)+'</span>':num(x.quantidade)+' '+esc(x.unidade||''))+'</td>'
+      +(ve?'<td>'+rs(x.custo_centavos)+'</td>':'')+'</tr>').join('')+'</tbody></table></div>'
+    +(ve?'<div style="margin-top:6px"><b>Custo de material, o que entra sempre: '+(r.nada_sempre?'nenhum material entra sempre':rs(r.custo_sempre_centavos))+'</b></div>'
+      +((r.por_escolha||[]).length?'<div class="sub" style="margin-top:2px">Mais, conforme a escolha: '
+        +r.por_escolha.map(g=>esc(QUANDO_TXT[g.quando]||g.quando)+' '+(g.custo_centavos==null?'sem preço':'+'+rs(g.custo_centavos))).join(' · ')+'</div>':'')
+      +(r.sem_custo&&r.sem_custo.length?'<div style="color:var(--ambar,#f5a524);margin-top:4px">Sem preço: '+esc(r.sem_custo.join(', '))+' — o custo fica indefinido.</div>':'')
+      :'<div class="sub" style="margin-top:6px">Os valores em R$ não aparecem para o seu acesso.</div>');
+}
+
 async function carregarFicha(){
+  catalogoSobMedida();
   try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){ COMPS=[]; }
   if(!Array.isArray(COMPS)) COMPS=[];   // sem compras.ver a rota responde {erro}: lista vazia, e nao estouro (rodada 2)
   /* A aba pode abrir antes do carregar() geral preencher os SKUS (③ REVISÃO,
@@ -1090,7 +1166,7 @@ function prepararEditor(){
        simplesmente não roda. Tecido se aponta pela FAMÍLIA, e a cor do SKU mais
        a largura da bobina decidem qual item de estoque sai. */
     c.innerHTML='<option value="">— escolha —</option>'
-      +COMPS.filter(x=>x.ativo && !x.familia && x.vai_ficha!==0).map(x=>'<option value="'+x.id+'">'+esc(x.nome)
+      +COMPS.filter(x=>x.ativo && !x.familia && x.vai_ficha!==0).map(x=>'<option value="'+x.id+'">'+esc((x.codigo_cadastro?x.codigo_cadastro+' · ':'')+x.nome)
         +(x.unidade?' ('+esc(x.unidade)+')':'')+'</option>').join('')
       +[...new Set(COMPS.filter(x=>x.familia && x.ativo && x.vai_ficha!==0).map(x=>x.familia))]
         .map(fam=>'<option value="fam:'+esc(fam)+'">Tecido da família '+esc(fam)

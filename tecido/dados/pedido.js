@@ -87,6 +87,7 @@ function atualizarItem(id,d){
 const apagarItem=id=>{
   db.prepare('DELETE FROM sm_pedido_item_preco WHERE item_id=?').run(id);
   db.prepare('DELETE FROM sm_pedido_componente WHERE item_id=?').run(id);
+  db.prepare('DELETE FROM sm_pedido_material WHERE item_id=?').run(id);
   db.prepare('DELETE FROM sm_pedido_item WHERE id=?').run(id);
 };
 

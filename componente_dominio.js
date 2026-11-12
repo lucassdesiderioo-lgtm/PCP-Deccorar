@@ -37,7 +37,7 @@ function saldo(db, componente_id){
 /* Movimento generico. `custo_unit` so faz sentido na ENTRADA — e ele que
    alimenta o custo medio. */
 function movimentar(db, args){
-  const { componente_id, motivo, referencia, custo_unit, usuario_id, usuario_nome, teste } = args;
+  const { componente_id, motivo, referencia, custo_unit, usuario_id, usuario_nome, teste, operacao } = args;
   if(!componente_id) throw new Error('movimento sem componente');
   if(!Number.isFinite(args.delta)) throw new Error('movimento com delta inválido');
   /* Arredonda ANTES de conferir o zero: 0,0004 m nao e movimento de material, e
@@ -62,12 +62,14 @@ function movimentar(db, args){
 
   db.prepare('UPDATE componente SET estoque=?, custo_medio=? WHERE id=?')
     .run(novo, custoMedio, componente_id);
+  /* `operacao` (padrao | sobmedida) so vem na saida pela ficha e no material
+     extra (FICHAS-NO-CADASTRO-UNICO): e o que o "consumido por operacao" le. */
   db.prepare(`INSERT INTO movimento_componente
-      (componente_id,delta,saldo_apos,motivo,referencia,custo_unit,usuario_id,usuario_nome,teste)
-      VALUES (?,?,?,?,?,?,?,?,?)`)
+      (componente_id,delta,saldo_apos,motivo,referencia,custo_unit,usuario_id,usuario_nome,teste,operacao)
+      VALUES (?,?,?,?,?,?,?,?,?,?)`)
     .run(componente_id, delta, novo, motivo || 'ajuste', referencia || null,
          (delta > 0 && custo_unit != null) ? custo_unit : null,
-         usuario_id || null, usuario_nome || null, teste ? 1 : 0);
+         usuario_id || null, usuario_nome || null, teste ? 1 : 0, operacao || null);
 
   return { saldo_apos:novo, custo_medio:custoMedio };
 }

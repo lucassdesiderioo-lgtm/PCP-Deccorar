@@ -44,7 +44,7 @@ Tipo: NOVIDADE
   zera quando qualquer um resolve, e Bloqueados é o que mais custa esperar.
   Separar por card seria uma segunda conta ao lado da tela (#12); fica para se
   alguém reclamar.
-- `teste_pendencias_menu.js` (43).
+- `teste_pendencias_menu.js` (44).
 
 ### Fase 1 — a caixinha "Abrir em Pendências" (12/11/2026, no ar, PR #346)
 
@@ -72,7 +72,7 @@ Tipo: NOVIDADE
   linha em `docs/DECISOES.md`): a §3.2 a listava, mas toda peça recebida nasce
   esperando a baixa, e a caixa apareceria em toda devolução bipada, sem botão.
   Quem dá a baixa a vê pela 253 e, na fase 2, pela etiqueta do ☰ Menu.
-- `teste_pendencias_caminho.js` (65).
+- `teste_pendencias_caminho.js` (66).
 
 ## 1. O problema, nas palavras do dono (12/11/2026)
 

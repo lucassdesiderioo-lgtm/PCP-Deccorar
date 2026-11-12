@@ -170,6 +170,9 @@ require('./st_route')(app, db);
 /* Os horarios de saida do dia e a tela 206 (spec HORARIOS-DE-COLETA, 05/11/2026). */
 require('./coleta_horario_route')(app, db);
 app.get('/coleta-horarios',(req,res)=> res.sendFile(path.join(__dirname,'public','coleta-horarios.html')));
+/* A 106 Material extra (FICHAS-NO-CADASTRO-UNICO §3-G, 11/11/2026). */
+require('./material_extra_route')(app, db);
+app.get('/material-extra',(req,res)=> res.sendFile(path.join(__dirname,'public','material-extra.html')));
 app.get('/parametros',(req,res)=> res.sendFile(path.join(__dirname,'public','parametros.html')));   // 906 Parâmetros (ARRUMAR-O-LUGAR fase 3)
 // A central de pendencias (fase 1): so le, e pergunta a funcao de cada tela
 // dona — por isso depois de todas elas.
@@ -228,7 +231,12 @@ try{
   const sm = require('./tecido/montar').montar(app, null, {
     permissoes: uid => [...app.locals.acesso.permissoesDe(uid)],
     pessoas: () => db.prepare('SELECT id,nome FROM usuarios WHERE ativo=1 ORDER BY nome').all(),
-    materiais: () => db.prepare('SELECT id,nome,unidade,marca,modelo FROM componente WHERE ativo=1 ORDER BY nome').all(),
+    materiais: () => db.prepare('SELECT id,nome,unidade,marca,modelo,vai_ficha FROM componente WHERE ativo=1 ORDER BY nome').all()
+      .map(m => Object.assign(m, { codigo_cadastro:require('./material_dominio').codigoCadastro(m.id) })),
+    /* FICHAS-NO-CADASTRO-UNICO (11/11/2026): o custo, a baixa pela ficha e o
+       material extra do sob medida — as tres portas moram no porta_material_sm.js
+       (com o modo teste do PCP, a baixa da peca de verdade de la e adiada). */
+    ...require('./porta_material_sm')(db),
     /* COMPRAS-E-RECEBIMENTO fase 10 (R-CMP-50): o PCP e dono do ENDERECO; o sob
        medida le a arvore, cria o buraco novo da bancada e pergunta se um volume
        do PCP ocupa o nivel — tudo por aqui. */
@@ -237,6 +245,7 @@ try{
                  ocupado: id => require('./almox_dominio').ocupadoPorVolume(db, id) }
   });
   require('./sobmedida_material').ligar(sm && sm.consumoDeMaterial);
+  require('./sobmedida_material').ligarFicha(sm && { linhas:sm.fichaMaterial, embalado:sm.materialEmbalado, produtos:sm.produtosParaPcp, naMedida:sm.materialNaMedida });
   /* A PORTA DO ROLO (COMPRAS-E-RECEBIMENTO fase 9): o recebimento do tecido do
      sob medida cria o rolo la, e o cadastro de material do PCP aponta o tecido. */
   require('./sobmedida_rolo').ligar(sm && { criarRolos:sm.criarRolosDoRecebimento, tecidos:sm.tecidosParaCompras });

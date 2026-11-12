@@ -343,6 +343,18 @@ function desenhar(r){
   (r.avisos||[]).filter(a=>!/^INATIVO/.test(a)).forEach(a=>s.appendChild(el('div',{class:'aviso'},[a])));
 }
 
+function desenharMaterial(r){
+  const box=el('div',{class:'cartao'},[el('h2',{},['Material da ficha'])]);
+  const t=el('table',{class:'lista'});
+  t.appendChild(el('thead',{},[el('tr',{},[el('th',{},['Material']),el('th',{class:'n'},['Quantidade'])])]));
+  const tb=el('tbody');
+  (r.materiais||[]).forEach(l=>tb.appendChild(el('tr',{},[el('td',{},[l.nome||'']),
+    el('td',{class:'n'},[l.quantidade==null?(l.erro||'—'):String(l.quantidade).replace('.',',')+' '+(l.unidade||'')])])));
+  t.appendChild(tb);
+  box.appendChild(rolaH(t));
+  $('#saida').appendChild(box);
+}
+
 let pendente=null;
 function simular(){
   desenharEscolhas();
@@ -370,6 +382,13 @@ async function rodar(){
     if(r.reducao.automatica) estado.reducao='nao';
     desenharEscolhas();
     desenhar(r);
+    /* A LISTA DE MATERIAL (FICHAS-NO-CADASTRO-UNICO): quanto desta persiana sai
+       do cadastro de material do PCP — SO A QUANTIDADE, que ja vem no calculo.
+       ⚠️ O CUSTO NAO APARECE AQUI (③ REVISAO): o simulador e do lado do preco
+       de venda (R-VAL-05), e o vendedor tem a custo.ver do sob medida — veria o
+       preco de compra do PCP. E sem segunda chamada nao ha corrida de resposta
+       velha por cima da medida nova. */
+    if((r.materiais||[]).length) desenharMaterial(r);
     if(estado.recado){
       $('#saida').insertBefore(el('div',{class:'aviso'},[estado.recado]),$('#saida').firstChild);
       estado.recado=null;

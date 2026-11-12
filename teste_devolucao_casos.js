@@ -347,7 +347,7 @@ let t = chamarT('GET','/api/teste');
 const nc = (t.naoCobertas || []).map(x => x.tabela);
 ok('devolucao_caso e devolucao_evento NÃO estão em naoCobertas', !nc.includes('devolucao_caso') && !nc.includes('devolucao_evento'), JSON.stringify(t.naoCobertas));
 ok('   e aparecem na contagem do modo teste', 'devolucao_caso' in t.itens && 'devolucao_evento' in t.itens, JSON.stringify(t.itens));
-chamarT('POST','/api/teste/ligar');
+require('./util_modo_teste_antigo')(db);   // aposentado: simula o ligado no deploy
 r = chamar('POST','/api/devolucao-casos',{ tipo:'ml', venda:'TESTE-555' }, 3);
 const ct = r.body.id;
 eq('o caso lançado em teste nasce marcado', caso(ct).teste, 1);
@@ -2273,7 +2273,7 @@ secao('20. lancar_casos_iniciais.js — os 6 casos de 29/10/2026');
     eq('skus, componente, fila e montagem iguais depois das escritas da fase 1', contaEstoque(), estoque0);
 
     secao('envio [17] — modo teste');
-    chamarT('POST','/api/teste/ligar');
+    require('./util_modo_teste_antigo')(db);   // aposentado: simula o ligado no deploy
     r = env({ venda:'TESTE-ENV-1', origem:'fora_ml' });
     const et = r.body.id;
     eq('o envio lançado em teste nasce marcado', caso(et) && caso(et).teste, 1);

@@ -216,7 +216,7 @@ function bipar(codigo,usuario){
     throw new ErroDeRegra('faltou_kit','⚠ FALTOU O KIT. Bipe o kit desta peça antes de fechar: '+
       descreveKits(kitsQueFaltam(irmaos))+'.');
 
-  return db.transaction(()=>{
+  const fim=db.transaction(()=>{
     d.marcar(c.id,{terminado_em:dia.agora(), terminado_por:nome(usuario)});
     const r={acao:'terminado', codigo:c.codigo_etiqueta, pronto:false};
     /* ⚠️ O PRONTO E `pronto_em`, E NAO UM VALOR NOVO EM `marco`. Tres lugares
@@ -232,6 +232,15 @@ function bipar(codigo,usuario){
     }
     return r;
   })();
+  /* ⚠️ O MATERIAL SAI NA EMBALAGEM (FICHAS-NO-CADASTRO-UNICO fase 4), DEPOIS da
+     transacao da bancada: o saldo e do outro banco, e a peca embalada nao se
+     desfaz porque o PCP tropecou (#6). Uma vez por peca; falhou, vira
+     "material extra a decidir". Nada aqui muda a etapa nem o bipe. */
+  if(c.setor==='embalagem'){
+    try{ fim.material=require('./ficha_material').baixarDaEmbalagem(c.item_id,usuario); }
+    catch(e){ console.error('[producao] baixa de material da peca '+c.codigo_etiqueta+':',e.message); }
+  }
+  return fim;
 }
 
 /* ── A PENDENCIA ──────────────────────────────────────────────────────────
@@ -407,7 +416,7 @@ function recusar(codigo,dados,usuario){
                         :'Ele nem começou na '+nomeDoSetor(culpado.setor)+'.'));
 
   const volta=posteriores(culpado,irmaos);
-  return db.transaction(()=>{
+  const volta_r=db.transaction(()=>{
     d.reabrir(volta.map(x=>x.id));
     d.contarRefeita(culpado.id);
     /* O pedido que estava pronto deixa de estar: ha peca voltando para a
@@ -439,6 +448,12 @@ function recusar(codigo,dados,usuario){
       motivo:m.nome,
       reabertos:volta.map(x=>x.codigo_etiqueta||x.chave)};
   })();
+  /* A PECA RECUSADA NAO BAIXA MATERIAL SOZINHA (FICHAS-NO-CADASTRO-UNICO
+     §3-G): vira "material extra a decidir", e o Supervisor diz se usou. O
+     caminho da recusa nao muda. */
+  require('./ficha_material').registrarRecusa(c.item_id,
+    (culpado.nome||culpado.chave)+' · '+m.nome+' · recusado na '+nomeDoSetor(c.setor),usuario);
+  return volta_r;
 }
 
 /* O que a bancada ve na hora de recusar. Ela le por AQUI e nao por

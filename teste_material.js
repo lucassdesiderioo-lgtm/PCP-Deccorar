@@ -104,12 +104,16 @@ const SO_LER = { id:7, nome:'Leitor', permissoes:['compras.ver'] };
   r = await post('/api/componentes', { nome:'Caixa de comando', unidade:'un', modo_saldo:'volume' }, ADM);
   ok('o volume que nao e tecido nasce sem "um por nivel"', db.prepare('SELECT um_por_nivel FROM componente WHERE id=?').get(r.corpo.id).um_por_nivel === 0);
 
-  secao('como sai do estoque: "ficha" esta esperando a montagem (R-CMP-09)');
+  /* ⚠️ A R-CMP-09 MUDOU EM 11/11/2026 (spec FICHAS-NO-CADASTRO-UNICO, decisao do
+     dono em DECISOES.md): a saida pela ficha existe, material por material, e
+     so com uma contagem resolvida na 504. O caso de antes ("recusada dizendo
+     que depende da montagem") virou este. */
+  secao('como sai do estoque: "ficha" so depois de uma contagem na 504 (R-CMP-09, 11/11/2026)');
   r = await post('/api/componentes', { id:tubo.id, como_sai:'ficha' }, ADM);
-  ok('"ficha" e recusada dizendo que depende da montagem', r.status === 400 && /montagem/i.test(r.corpo.erro), () => JSON.stringify(r.corpo));
+  ok('"ficha" sem contagem e recusada dizendo que falta contar na 504', r.status === 400 && /504/.test(r.corpo.erro), () => JSON.stringify(r.corpo));
   ok('e nada mudou', db.prepare('SELECT como_sai FROM componente WHERE id=?').get(tubo.id).como_sai === 'contagem');
   const opc = (await get('/api/componentes/opcoes', ADM)).corpo;
-  ok('as opcoes dizem que "ficha" esta desligada, com o motivo', opc.como_sai && opc.como_sai.some(o => o.valor === 'ficha' && o.desligada && /montagem/i.test(o.motivo)), () => JSON.stringify(opc));
+  ok('as opcoes oferecem "ficha", dizendo que precisa da contagem', opc.como_sai && opc.como_sai.some(o => o.valor === 'ficha' && !o.desligada && /504/.test(o.nome)), () => JSON.stringify(opc));
 
   secao('as regras da #33 nas colunas novas');
   db.prepare("UPDATE componente SET ncm='39169090', peso_padrao_kg=0.66, categoria='Matéria-prima' WHERE id=?").run(tubo.id);

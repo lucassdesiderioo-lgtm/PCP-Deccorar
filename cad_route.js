@@ -73,8 +73,23 @@ module.exports=function(app,db){
     const b=req.body||{};
     const cod=(b.codigo||'').trim().toUpperCase();
     if(!cod||!b.motivo) return res.status(400).json({erro:'faltam dados'});
-    db.prepare('INSERT INTO rejeicao (codigo,motivo,obs,segundos,modo,usuario,usuario_id) VALUES (?,?,?,?,?,?,?)')
-      .run(cod,b.motivo,b.obs||null,Math.round(+b.segundos||0),b.modo||null,q.usuario_nome,q.usuario_id);
+    /* A PECA COM PROBLEMA VIRA "MATERIAL EXTRA A DECIDIR" (FICHAS-NO-CADASTRO-UNICO
+       §3-G): ela volta para a producao e nao baixa material sozinha; o
+       Supervisor diz no fim do dia se precisou de material (tela 106). Na
+       mesma transacao: problema registrado sem a linha seria a decisao que
+       nunca chega. A peca sob medida do PCP (sem ficha aqui) nao entra. */
+    db.transaction(()=>{
+      const rid=db.prepare('INSERT INTO rejeicao (codigo,motivo,obs,segundos,modo,usuario,usuario_id) VALUES (?,?,?,?,?,?,?)')
+        .run(cod,b.motivo,b.obs||null,Math.round(+b.segundos||0),b.modo||null,q.usuario_nome,q.usuario_id).lastInsertRowid;
+      let sm=false;
+      try{ const m=db.prepare('SELECT COALESCE(m.sob_medida,0) s FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=?').get(cod); sm=!!(m&&m.s); }catch(e){ sm=false; }
+      /* ⚠️ O MATERIAL EXTRA NAO TRAVA A BANCADA (#6): num ponto de salvamento
+         proprio; falhou (banco sem a tabela, ficha que estoura), vai ao log e a
+         peca com problema fica registrada do mesmo jeito. */
+      if(!sm) try{ db.transaction(()=>require('./material_extra_dominio').registrarRevisao(db,{sku:cod, referencia:'rejeicao:'+rid,
+        motivo:b.motivo+(b.obs?' — '+b.obs:''), quem:{id:q.usuario_id, nome:q.usuario_nome}}))(); }
+      catch(e){ console.error('[rejeicao] o material extra de '+cod+' nao gravou (a peca com problema ficou registrada):', e.message); }
+    })();
     res.json({ok:true});
   });
 

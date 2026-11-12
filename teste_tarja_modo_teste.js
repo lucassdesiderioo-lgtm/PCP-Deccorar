@@ -90,9 +90,11 @@ async function req(quem, metodo, url, corpo){
   ok('o operador pergunta e recebe 200', r.st === 200, r);
   ok('e a resposta diz que esta desligado', r.d && r.d.ativo === false, r.d);
 
-  console.log('\n── o Admin Geral liga o modo teste ──');
+  console.log('\n── o modo teste foi aposentado: ligar e recusado; o que chegou ligado ao deploy ainda acende a tarja ──');
   r = await req('Lucas', 'POST', '/api/teste/ligar', {});
-  ok('ligou', r.st === 200, r);
+  ok('ligar e recusado (410), ate para o Admin Geral', r.st === 410, r);
+  ok('   e o modo continua desligado', !(await req('Op', 'GET', '/api/teste/ativo')).d.ativo);
+  require('./util_modo_teste_antigo')(db);
 
   for(const n of ['Op', 'Sup', 'Lucas']){
     r = await req(n, 'GET', '/api/teste/ativo');
