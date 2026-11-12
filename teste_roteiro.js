@@ -99,6 +99,12 @@ caso('banco antigo sem a coluna ganha a coluna no boot, no fim (§17)', () => {
     estoque INTEGER DEFAULT 0, alvo INTEGER DEFAULT 0, modelo_id INTEGER, largura_cm INTEGER, altura_cm INTEGER,
     cor_codigo TEXT, tecido_codigo TEXT);`);
   require('./sku_schema').garantirSchema(d2);
+  /* A ficha_formula de ANTES desta fase (até `planejamento`): sem ela criada
+     antes, quem faria a coluna seria o CREATE, e o ALTER nunca seria testado. */
+  d2.exec(`CREATE TABLE ficha_formula (id INTEGER PRIMARY KEY AUTOINCREMENT,
+    modelo_id INTEGER NOT NULL, componente_id INTEGER, familia TEXT, expressao TEXT NOT NULL,
+    observacao TEXT, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1,
+    corte_largura TEXT, corte_altura TEXT, corte_unidade TEXT, planejamento INTEGER DEFAULT 0)`);
   require('./compras_schema').garantirSchemaCompras(d2);
   const cols = d2.prepare("SELECT name FROM pragma_table_info('ficha_formula')").all().map(c => c.name);
   igual(cols[cols.length - 1], 'etapa', 'a etapa é a última coluna');
