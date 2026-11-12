@@ -82,7 +82,13 @@ module.exports = function(app, db){
     if(req.method !== 'POST' || !req.usuario) return next();
     const chaves = vigiaDe(req.path);
     if(!chaves) return next();
-    const antes = medir(db, chaves);
+    let antes = medir(db, chaves);
+    /* A ROTA ASSÍNCRONA RECOMEÇA A CONTA quando para de esperar (③ REVISÃO):
+       o upload lê o PDF por segundos, e nesse meio outra pessoa pode reter uma
+       caixa ou resolver um card — a caixinha somaria o que não é desta ação.
+       Do recomeço até a resposta é tudo síncrono (better-sqlite3), e aí a
+       diferença é só desta ação. */
+    req.recontarPendencias = () => { try{ antes = medir(db, chaves); }catch(e){} };
     const json = res.json.bind(res);
     res.json = function(corpo){
       try{

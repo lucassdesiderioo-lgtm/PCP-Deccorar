@@ -244,6 +244,10 @@ module.exports=function(app,db){
       const marcar=saida?db.prepare('UPDATE lote SET horario_id=? WHERE id=?'):null;
       const buf=Buffer.from(b64,'base64');
       const orders=await parsePdf(new Uint8Array(buf));
+      /* a caixinha "Abrir em Pendências" (pendencias_vigia.js) conta daqui:
+         do fim da leitura até a resposta tudo é síncrono, e o que outra pessoa
+         fez enquanto o PDF era lido não entra na conta deste upload */
+      if(req.recontarPendencias) req.recontarPendencias();
       const fname=require('path').join(LOTES,Date.now()+'.pdf'); fs.writeFileSync(fname,buf);
       /* A DEDUPLICACAO OLHA O HISTORICO INTEIRO, NAO SO O DIA.
          Pack ID e Venda sao numeros do Mercado Livre: cada volume tem o seu, e

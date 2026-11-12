@@ -64,8 +64,13 @@
       document.body.appendChild(el);
       el.addEventListener('click', function(e){ if(e.target && e.target.getAttribute('data-pendfechar') != null) el.remove(); });
     }
-    var h = '<button type="button" data-pendfechar aria-label="Fechar" style="position:absolute;top:6px;right:8px;border:0;background:none;'
-      + 'color:#8e1b1b;font-size:22px;line-height:1;cursor:pointer;padding:4px">✕</button>';
+    /* A NOVA SE SOMA À QUE ESTÁ NA TELA (③ REVISÃO): a 103 sobe vários PDFs
+       seguidos, e o terceiro apagava o aviso do primeiro — pendência que some
+       sem ninguém fechar é a que ninguém viu. A mais nova fica em cima; o ✕
+       fecha todas. */
+    if(!el.querySelector('[data-pendfechar]')) el.innerHTML = '<button type="button" data-pendfechar aria-label="Fechar" style="position:absolute;top:6px;right:8px;border:0;background:none;'
+      + 'color:#8e1b1b;font-size:22px;line-height:1;cursor:pointer;padding:4px">✕</button><div class="pendCaixaLista" style="max-height:40vh;overflow:auto"></div>';
+    var h = '';
     lista.forEach(function(p){
       h += '<div class="pendCaixaLinha" style="margin:2px 0 8px">⚠ ' + esc(p.frase);
       if(aqui(p.rota)) h += ' — <span style="font-weight:400">está nesta tela.</span>';
@@ -74,7 +79,7 @@
       else h += '<div style="font-weight:400;margin-top:4px">Quem resolve: quem tem ' + esc(p.quem) + '.</div>';
       h += '</div>';
     });
-    el.innerHTML = h;
+    el.querySelector('.pendCaixaLista').insertAdjacentHTML('afterbegin', h);
   }
   window.mostrarPendencias = mostrar;
   var original = window.fetch;

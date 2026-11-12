@@ -65,11 +65,21 @@ function montar(){
   const app = express(); app.use(express.json());
   app.use((req,res,next) => { req.usuario = quemVe; next(); });
   VIG(app, db);
-  /* um upload de mentira, ASSÍNCRONO, que retém uma caixa como o de verdade */
-  app.post('/api/lote/upload', (req,res) => setTimeout(() => {
-    db.prepare("INSERT INTO lote (codigo, estagio, buyer) VALUES ('NAOEXISTE1','bloqueado','Cliente Secreto')").run();
-    res.json({ novos:1, bloqueados:1 });
-  }, 30));
+  /* um upload de mentira, ASSÍNCRONO como o de verdade: no meio da espera
+     (a leitura do PDF) OUTRA PESSOA retém uma caixa; depois da leitura ele
+     recomeça a conta (`req.recontarPendencias`, o que o exp_route faz) e
+     retém a dele. Só a dele pode aparecer. `?modo=` testa as recusas. */
+  app.post('/api/lote/upload', (req,res) => {
+    db.prepare("INSERT INTO lote (codigo, estagio, buyer) VALUES ('NAOEXISTE0','bloqueado','Cliente Secreto')").run();
+    setTimeout(() => {
+      if(req.recontarPendencias) req.recontarPendencias();
+      db.prepare("INSERT INTO lote (codigo, estagio, buyer) VALUES ('NAOEXISTE1','bloqueado','Cliente Secreto')").run();
+      if(req.query.modo === 'erro') return res.status(409).json({ erro:'recusado' });
+      if(req.query.modo === 'okfalse') return res.json({ ok:false, motivo:'recusado' });
+      if(req.query.modo === 'status') return res.status(422).json({ motivo:'recusado' });
+      res.json({ novos:1, bloqueados:1 });
+    }, 30);
+  });
   ['sku_cad_route','exp_route','mont_route','carreg_route','est_route','ajuste_route','dev_route','cad_route','sku_route','compras_route']
     .forEach(m => { try{ require('./' + m)(app, db); }catch(e){ console.log('  (módulo ' + m + ': ' + e.message + ')'); } });
   require('./acesso')(app, db);
@@ -119,7 +129,12 @@ db.prepare("INSERT OR IGNORE INTO skus (codigo, estoque, descricao) VALUES ('BKC
 
   r = await post('/api/lote/upload', {});
   const u = (r.corpo.pendencias || [])[0] || {};
-  ok('o upload (assíncrono) aponta Bloqueados (204)', u.chave === 'bloqueados' && u.n === 1 && u.rota === '/admin/pendencias', JSON.stringify(r.corpo));
+  ok('o upload (assíncrono) aponta Bloqueados (204), sem somar a caixa que outra pessoa reteve no meio', u.chave === 'bloqueados' && u.n === 1 && u.rota === '/admin/pendencias', JSON.stringify(r.corpo));
+
+  for(const modo of ['erro','okfalse','status']){
+    r = await post('/api/lote/upload?modo=' + modo, {});
+    ok('resposta recusada (' + modo + ') não ganha caixinha, mesmo com pendência criada', !r.corpo.pendencias, JSON.stringify(r.corpo));
+  }
 
   const tudo = JSON.stringify(r.corpo.pendencias) + JSON.stringify(d) + JSON.stringify(p);
   ok('nada de SKU, cliente ou saldo na caixinha', !/BKCAMINHO|NAOEXISTE|Cliente Secreto|"estoque":|"saldo/.test(tudo), tudo);
@@ -143,6 +158,10 @@ db.prepare("INSERT OR IGNORE INTO skus (codigo, estoque, descricao) VALUES ('BKC
   const av = fs.readFileSync(path.join(__dirname, 'public', 'pendencias_aviso.js'), 'utf8');
   ok('a caixinha só olha POST e lê uma cópia da resposta', /metodo !== 'POST'/.test(av) && /r\.clone\(\)/.test(av));
   ok('a caixinha não fecha sozinha', !/setTimeout\([^)]*remove/.test(av));
+  ok('a caixinha nova se SOMA à que já está na tela (não apaga a anterior)', /insertAdjacentHTML\('afterbegin'/.test(av) && !/el\.innerHTML = h;/.test(av));
+  const ex = fs.readFileSync(path.join(__dirname, 'exp_route.js'), 'utf8');
+  const iP = ex.indexOf('await parsePdf('), iC = ex.indexOf('req.recontarPendencias');
+  ok('o upload de verdade recomeça a conta logo depois de ler o PDF', iP >= 0 && iC > iP && iC - iP < 400);
 
   console.log('\n' + (falhas ? falhas + ' FALHA(S) em ' : 'tudo certo: ') + casos + ' casos');
   try{ fs.rmSync(tmp, { recursive:true, force:true }); }catch(e){}
