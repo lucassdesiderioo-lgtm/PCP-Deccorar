@@ -5664,7 +5664,10 @@ O que parece bug e não é:
 embalagem (`mont_route.js`), na peça com problema (`cad_route.js`), na bancada
 ou na recusa do sob medida, ou na 1101, 404, 106 e 608.**
 
-> ⚠️ **AINDA NÃO NO AR, E NADA PROVADO COM DADO REAL.** A baixa só começa a
-> valer quando o dono marcar um material como "pela ficha" depois de contado na
-> 504 — até lá nenhum saldo muda. Prova que não foi feita se escreve como não
-> feita.
+> ✅ **NO AR DESDE 12/11/2026** (PR #337, junto com o custo do sob medida na
+> 404 e o modo teste aposentado): o dono fez o backup e o deploy e disse *"deu
+> tudo certo no deploy"*. ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** a primeira
+> embalagem baixando um material marcado "pela ficha" (só depois de contado na
+> 504), a primeira linha decidida na 106 e a primeira lista de material de um
+> produto do sob medida conferida na 404. Prova que não foi feita se escreve
+> como não feita.

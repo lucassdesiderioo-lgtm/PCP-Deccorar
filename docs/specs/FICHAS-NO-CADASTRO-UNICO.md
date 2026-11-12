@@ -2,11 +2,11 @@
 
 ```
 STATUS
-Situação: EM CÓDIGO (11/11/2026), falta subir · aprovada pelo dono em 11/11/2026 ("spec aprovada")
+Situação: NO AR desde 12/11/2026 (PR #337), falta a prova com dado real · aprovada pelo dono em 11/11/2026 ("spec aprovada")
 Criada em: 11/11/2026
 Última atualização: 11/11/2026
 Fase atual: as cinco em código, numa entrega só (pedido do dono: "para por último fazer um teste só")
-Fases: 1 ◐  2 ◐  3 ◐  4 ◐  5 ◐  (◐ = em código, falta subir)
+Fases: 1 ✅  2 ✅  3 ✅  4 ✅  5 ✅  (no ar; falta a prova com dado real)
 Risco: 🔴 (schema nos dois bancos, cadastro de material, e a fase 4 mexe em saldo)
 Depende de: ORGANIZACAO-DO-SISTEMA (R-ORG-09 a 12), ARRUMAR-O-LUGAR fase 2 (a 1101 Materiais)
              a fase 4 depende também de PRODUCAO-MONTAGEM (a baixa pela ficha, R-CMP-09)
