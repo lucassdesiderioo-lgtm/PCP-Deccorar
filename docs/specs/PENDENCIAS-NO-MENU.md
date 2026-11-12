@@ -2,7 +2,7 @@
 
 ```
 STATUS
-Situação: RASCUNHO · espera a aprovação do dono — nada construído
+Situação: APROVADA pelo dono em 12/11/2026 · nada construído · próxima: fase 1
 Criada em: 12/11/2026
 Última atualização: 12/11/2026
 Fases: 1 ☐  2 ☐  3 ☐
@@ -36,11 +36,14 @@ texto, sem link.
 
 | # | Pergunta | Decisão |
 |---|---|---|
-| D1 | Que número cada pessoa vê na etiqueta? | **Só o que ela pode resolver.** (Recomendação aceita? — ver §7, P1) |
+| D1 | Que número cada pessoa vê na etiqueta? | **Só o que ela pode resolver**; a 204 continua mostrando tudo |
 | D2 | Onde fica a etiqueta? | **Na tela dona da pendência, dentro do ☰ Menu, e no próprio botão ☰ Menu com o total** |
 | D3 | Cor | **Sempre vermelho** (aparece só quando o número é maior que zero) |
 | D4 | O sob medida | **Entra junto** — o sistema é um só |
 | D5 | O caminho direto | **Toda tela que gera pendência mostra, na hora, uma caixinha para clicar e ir à pendência** |
+| D6 | A TV e a linha da bancada | **Ficam como estão** |
+| D7 | O sob medida, além de boleto, descarte e correção de corte | **Entram também** o pedido de revenda esperando aprovação, o cadastro a conferir e a pendência de produção |
+| D8 | Quem vê a etiqueta | **Todo mundo, desde o deploy** — é o que a pessoa já pode resolver, não acesso novo |
 
 **Por que D1 (a recomendação):** uma etiqueta vermelha que a pessoa não pode
 resolver nunca zera para ela, e número que não zera vira paisagem — a equipe
@@ -121,7 +124,7 @@ bancos (a central lê, não escreve no `tecido.db`):
 - baixa de boleto esperando aprovação (`aprovacao.pendentes('baixa_boleto')`) → 616;
 - descarte de sobra esperando aprovação (`aprovacao.pendentes('descarte_sobra')`) → 603;
 - correção de corte esperando aprovação → a tela onde se aprova;
-- **a confirmar com o dono (§7, P3):** pedido de revenda esperando aprovação
+- **e também (D7):** pedido de revenda esperando aprovação
   (611), cadastro de largura e endereço marcado para conferir (606), pendência
   de produção aberta (612/613).
 
@@ -143,8 +146,9 @@ bancos (a central lê, não escreve no `tecido.db`):
 - **Rota nova:** `GET /api/pendencias/minhas` — leitura, `@logado` no
   `permDaRota`, devolve só o que a pessoa resolve, só números.
 - **Setores novos:** nenhum.
-- Quem recebe: todo mundo vê a etiqueta **do que já pode resolver hoje** — não é
-  acesso novo, é o mesmo acesso mostrado. (Confirmar — §7, P4.)
+- Quem recebe: **todo mundo**, desde o deploy (D8), vê a etiqueta **do que já
+  pode resolver hoje** — não é acesso novo, é o mesmo acesso mostrado. Exceção ao
+  R-ALC-06 decidida pelo dono (linha em `docs/DECISOES.md`).
 
 ## 6. Onde mora
 
@@ -154,16 +158,9 @@ bancos (a central lê, não escreve no `tecido.db`):
   Comum), que passa a cobrir o sob medida.
 - Liga-se a: 204 (de onde sai o número) e a cada tela dona da tabela da §3.2.
 
-## 7. Perguntas ao dono antes de aprovar
+## 7. Perguntas ao dono
 
-- **P1** — Confirma o D1: no menu, só o que a pessoa pode resolver (e a 204
-  continua mostrando tudo)?
-- **P2** — Na TV (`/painel`) e na linha da bancada, nada muda — certo?
-- **P3** — No sob medida, além da baixa de boleto, do descarte de sobra e da
-  correção de corte: entram também o pedido de revenda esperando aprovação, o
-  cadastro a conferir e a pendência de produção?
-- **P4** — A etiqueta vale para todo mundo desde o deploy (é o acesso que a
-  pessoa já tem), ou nasce só para o Admin Geral até você liberar?
+Respondidas em 12/11/2026 — viraram D1, D6, D7 e D8 (§2).
 
 ## 8. Fica de fora
 
