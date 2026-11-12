@@ -1,4 +1,4 @@
-> **STATUS · 12/11/2026 — RASCUNHO v5, espera a aprovação do dono** · nada construído
+> **STATUS · 12/11/2026 — RASCUNHO v6, espera a aprovação do dono** · nada construído
 > Reescrita sobre o processo que o dono descreveu em 11/11/2026 e as respostas de
 > 12/11/2026 (§10). A versão de 17/08/2026 está em
 > `docs/arquivo/PRODUCAO-MAPA-E-MOTOR-v1.md` (histórico, não é regra). Absorve a
@@ -71,18 +71,28 @@ item**: o item se liga à etiqueta quando ela é usada. Etiqueta impressa e não
 
 **Cada pessoa abre e fecha o lote** (o dono: *"ela coloca que iniciou e assinala as
 quantidades e os SKUs que ela está cortando, e quando terminar diz que terminou —
-assim fecha"*):
+assim fecha"*). **Um lote é de peças iguais** (o dono: *"só pode cortar em lote se
+as peças forem iguais"*): um SKU de tecido, ou uma medida de tubo.
 
 ```
-INICIAR ─▶ assinala os itens e as quantidades ─▶ cola as etiquetas do maço ─▶ TERMINEI
-           "BK160140BEGE · 10"                    TC 000041 … 000050
-           "tubo 177 · 10 · tubo 157 · 5"         TB 000301 … 000315
+ A TELA DIZ:  "Próxima etiqueta disponível: TC 000041"   ← a pessoa confere com o maço
+ INICIAR ─▶ escolhe o item e a quantidade ─▶ cola as etiquetas ─▶ TERMINEI
+            "BK160140BEGE · 10"               TC 000041 … 000050 (o sistema liga sozinho)
 ```
 
-- **No "terminei", a pessoa bipa a primeira e a última etiqueta de cada item** (a
-  proposta, §9-A): o sistema liga a faixa ao item e confere que ela tem **o mesmo
-  número de etiquetas que a quantidade** e que nenhuma já foi usada. Não bateu, não
-  fecha, e a tela diz o porquê.
+- **A tela mostra a próxima etiqueta disponível** de cada tipo, e o lote fica com as
+  N etiquetas a partir dela (o dono, 12/11/2026: *"na tela do PCP já vai ter ali
+  falando que a etiqueta próxima disponível é a 10 e ele confere"*). Ninguém digita
+  número.
+- ⚠️ **No Iniciar, a pessoa bipa a etiqueta de cima do maço** (um bipe só, a
+  proposta): bateu com a da tela, segue; não bateu (o maço de outra bancada, uma
+  etiqueta estragada e jogada fora, duas pessoas no mesmo tipo), o sistema usa **a
+  bipada**, se não estiver usada, e diz quantas ficaram para trás. Sem esse bipe, um
+  maço fora de ordem ligaria as etiquetas aos itens errados, e a montagem recusaria a
+  peça certa.
+- **O tempo** é do início ao fim do lote, e por unidade é o tempo ÷ a quantidade —
+  é daí que sai *"o que cada pessoa está fazendo na fábrica"* e quantas peças faz no
+  dia.
 - **O tempo** é do início ao fim do lote, e por unidade é o tempo ÷ a quantidade —
   é daí que sai *"o que cada pessoa está fazendo na fábrica"* e quantas peças faz no
   dia.
@@ -138,8 +148,11 @@ Tubo 38 (barra 6 m) ....... saldo  60 m  =  45 m em barra +  15 m já cortados (
   mesmo número (como a do sob medida, R-SMT-04).
 - **A embalagem bipa a etiqueta do kit de comando e a do kit de instalação** para
   fechar a persiana (o dono, 12/11/2026), no lugar do código fixo do kit que se bipa
-  hoje (R-EMB-01). Entra na fase 4, quando os kits já tiverem etiqueta: até lá a
-  embalagem fica como está.
+  hoje (R-EMB-01). Entra na fase 4, e **nasce DESLIGADA** (`config.embalagem_bipa_kits
+  = 0`): até ligar, a embalagem fica exatamente como está. **Quem liga é o Admin
+  Geral**, por um botão na 108 (o dono: *"coloque algo para ativar quando for
+  funcionar dessa forma"*), como a ordem pela falta da 401 (§3 do CLAUDE.md).
+  Ligada, sem as duas etiquetas de kit a embalagem não fecha.
 
 ---
 
@@ -153,9 +166,15 @@ quem, quando, o tempo e as etiquetas (`quem.js`). Rota `/montagem-persiana`: a
 **108 Preparo** (tablet), com as etapas que a pessoa tem chave: corte de tecido,
 corte de tubo e base, kit de comando, kit de instalação. **Iniciar**, assinalar os
 itens e as quantidades, **Terminei** (com a faixa de etiquetas). E **imprimir um maço
-de etiquetas** de cada tipo, quando estiver acabando. A lista do que fazer é a da
-aba Corte e separação **menos o que já está na pré-fabricação** (nada de conta nova,
-#12).
+de etiquetas** de cada tipo, quando estiver acabando.
+
+**A 108 trabalha pelo planejamento** (o dono: *"é por lá que vemos o que temos que
+fazer, por lá nos baseamos as nossas prioridades"*). A lista do que cortar e montar
+é a da aba **Corte e separação da 401**, **na mesma ordem e com a mesma data da
+falta** (a falta por dia do `demanda_dominio`), **menos o que já está na
+pré-fabricação**. Nada de conta nova nem prioridade própria (#12): mudou o
+planejamento, mudou a lista da bancada. A 401 mostra, ao lado de cada item, quanto
+já está cortado.
 
 ---
 
@@ -205,7 +224,7 @@ e desconta do lote aberto.
 
 | # | Pergunta |
 |---|---|
-| A | **Como a etiqueta do maço se liga ao lote:** no "terminei", a pessoa bipa **a primeira e a última** etiqueta de cada item (a proposta), ou **bipa cada etiqueta** ao colar (mais exato, mais bipe)? |
+| A | **O bipe da etiqueta de cima do maço no Iniciar** (§2) — um bipe, para o maço fora de ordem não ligar as etiquetas aos itens errados. Ok? |
 
 ---
 
@@ -225,6 +244,9 @@ e desconta do lote aberto.
 | — | A saída do kit | **A embalagem bipa as etiquetas** do kit de comando e do de instalação para fechar a persiana (fase 4) |
 | — | As etiquetas | **Impressas antes, em maço**, na mesa do tecido e na bancada da serralheria; imprime-se mais quando acabar |
 | Q6 | A pré-fabricação largada | **Ok** ao desenho do §6 |
+| — | Como a etiqueta se liga | **A tela mostra a próxima etiqueta disponível**, e o lote fica com as N a partir dela; **lote só de peças iguais** |
+| — | O bipe dos kits na embalagem | **Com chave para ligar** quando a fábrica estiver pronta |
+| — | A prioridade da bancada | **É a do planejamento** (a 401) |
 
 ---
 
