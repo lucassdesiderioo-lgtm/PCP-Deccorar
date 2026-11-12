@@ -803,6 +803,7 @@ const med=(l,a)=>(l/100).toFixed(2).replace('.',',')+' × '+(a/100).toFixed(2).r
 const bob=cm=>(cm/100).toFixed(2).replace('.',',');
 
 let FXLINHAS=[];    // as fórmulas do modelo
+let FXROTEIRO=null; // o roteiro do modelo (PRODUCAO-MAPA-E-MOTOR fase 1): sai das linhas, pelo etapas.js
 let FXFICHA=null;   // o resultado do dono único, na medida escolhida
 let FXEDIT=null;    // id da linha aberta, ou 'novo', ou null
 let FXDEB=null;
@@ -1022,9 +1023,10 @@ function escopoFicha(lista){
 
 async function recarregar(){
   const mid=$('#fxModelo').value;
-  FXLINHAS=[]; FXFICHA=null;
+  FXLINHAS=[]; FXFICHA=null; FXROTEIRO=null;
   /* só vale como LISTA: a recusa (403) é um objeto, e o render estourava nele */
-  if(mid){ try{ const fl=await (await fetch('/api/formulas?modelo_id='+mid)).json(); FXLINHAS=Array.isArray(fl)?fl:[]; }catch(e){} }
+  if(mid){ try{ const fl=await (await fetch('/api/formulas?modelo_id='+mid)).json(); FXLINHAS=Array.isArray(fl)?fl:[]; }catch(e){}
+    try{ const ro=await (await fetch('/api/formulas/roteiro/'+mid)).json(); FXROTEIRO=(ro&&Array.isArray(ro.etapas))?ro:null; }catch(e){} }
   const sku=$('#fxSku')&&$('#fxSku').value;
   if(sku){ try{ FXFICHA=await (await fetch('/api/ficha/'+encodeURIComponent(sku))).json(); }catch(e){} }
   FXALERTA=sku?null:await alertasDoModelo(+mid);
@@ -1056,7 +1058,16 @@ function render(){
   const porId={};
   if(f&&f.linhas) f.linhas.forEach(l=>{ porId[l.formula_id]=l; });
 
-  let h=(f?'':'<div class="sub" style="margin-bottom:8px">Mostrando as <b>fórmulas</b>, que valem para todas as medidas. '
+  /* O ROTEIRO DO MODELO (PRODUCAO-MAPA-E-MOTOR fase 1): sai das etapas das
+     linhas, e não se digita. */
+  let h='';
+  if(FXROTEIRO){
+    h+='<div style="margin-bottom:10px;font-size:14px"><b>Roteiro do modelo:</b> '
+      +FXROTEIRO.etapas.map(e=>esc(e.nome)).join(' → ')
+      +(FXROTEIRO.sem_etapa?' <span class="sub" style="color:var(--amber)">· '+FXROTEIRO.sem_etapa
+        +' linha'+(FXROTEIRO.sem_etapa===1?'':'s')+' sem etapa</span>':'')+'</div>';
+  }
+  h+=(f?'':'<div class="sub" style="margin-bottom:8px">Mostrando as <b>fórmulas</b>, que valem para todas as medidas. '
       +'Para ver os números e o custo de uma medida, escolha-a em "Conferir numa medida".</div>')
     +'<table><thead><tr><th>Material</th><th class="n">Consome</th>'
     +'<th class="n">Corta a</th><th class="n">R$</th><th></th></tr></thead><tbody>';
@@ -1077,6 +1088,7 @@ function render(){
       +'<td><b>'+nome+'</b>'
         +(l.observacao?'<div class="sub">'+esc(l.observacao)+'</div>':'')
         +(l.planejamento?'<div class="sub" style="color:var(--blue,#4493f8)">📋 vai para o planejamento da produção</div>':'')
+        +(l.etapa?'<div class="sub">⚙ '+esc(nomeEtapa(l.etapa))+'</div>':'')
         +(cego?'<div class="sub" style="color:var(--amber)">⚠ não olha a bobina</div>':'')+'</td>'
       +(f ? ('<td class="n">'+(r.erro?'<span style="color:var(--amber)">⚠</span>':qtd(r.quantidade))
         +(r.unidade&&!r.erro?' <span class="sub">'+esc(r.unidade)+'</span>':'')
@@ -1142,6 +1154,13 @@ function editorHTML(l){
       +'<label style="display:flex;gap:8px;align-items:center;margin-top:12px;cursor:pointer;text-transform:none;font-size:14px;color:var(--txt,#e6edf3)">'
         +'<input type="checkbox" id="edPlan" style="width:20px;height:20px"'+(!novo&&l.planejamento?' checked':'')+'>'
         +'<span>Vai para o planejamento da produção <span class="sub">— entra na aba Corte e separação do Planejamento</span></span></label>'
+      /* A ETAPA (PRODUCAO-MAPA-E-MOTOR fase 1): em que etapa da fábrica o
+         material é preparado. Não muda o custo. */
+      +'<div style="margin-top:12px"><label>Etapa — onde este material é preparado</label>'
+        +'<select id="edEtapa"><option value="">— sem etapa —</option>'
+        +((FXROTEIRO&&FXROTEIRO.opcoes)||[]).map(o=>'<option value="'+esc(o.chave)+'"'
+          +(!novo&&l.etapa===o.chave?' selected':'')+'>'+esc(o.nome)+'</option>').join('')
+        +'</select></div>'
       +'<div style="margin-top:12px"><label>Por quê — fica no cadastro</label>'
         +'<input id="edObs" placeholder="a folga de 20 cm é bainha + volta no tubo" value="'+esc(novo?'':l.observacao)+'"></div>'
       +'<div id="edPrev" style="margin-top:10px;font-size:13px;min-height:18px"></div>'
@@ -1310,12 +1329,20 @@ async function previewEditor(){
   el.innerHTML=h;
 }
 
+function nomeEtapa(c){
+  const o=((FXROTEIRO&&FXROTEIRO.opcoes)||[]).find(x=>x.chave===c);
+  return o?o.nome:c;
+}
+
 async function salvarEditor(){
   const novo=FXEDIT==='novo';
   const l=novo?null:FXLINHAS.find(x=>x.id==FXEDIT);
   const corpo={ modelo_id:+$('#fxModelo').value, expressao:$('#edExpr').value.trim(),
     observacao:$('#edObs').value.trim(), corte_largura:$('#edCL').value.trim(),
     corte_altura:$('#edCA').value.trim(), planejamento: $('#edPlan').checked };
+  /* Sem a lista de etapas (o roteiro não carregou), não manda o campo: ausente
+     preserva a etapa gravada, e o select vazio a apagaria. */
+  if(FXROTEIRO&&FXROTEIRO.opcoes) corpo.etapa=$('#edEtapa').value;
   if(novo){
     const v=$('#edComp').value;
     if(!v){ aviso('#edMsg','Escolha o material','var(--red)'); return; }

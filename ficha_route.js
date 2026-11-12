@@ -11,6 +11,7 @@
 const F = require('./formula');
 const FICHA = require('./ficha_dominio');
 const CUSTO = require('./custo_dominio');
+const ETAPAS = require('./etapas');
 
 const QUEM = require('./quem');
 module.exports = function(app, db){
@@ -197,6 +198,18 @@ module.exports = function(app, db){
       else return res.status(400).json({erro:'"vai para o planejamento da produção" tem que ser sim ou não'});
     }
 
+    /* A ETAPA DA LINHA (PRODUCAO-MAPA-E-MOTOR fase 1, 12/11/2026). Ausente
+       preserva (o tablet sem refresh nao apaga a marca); vazio de proposito
+       tira; etapa que nao esta no etapas.js e recusada, e nada do envio grava.
+       Nao muda custo. */
+    let etapa;
+    if(b.etapa !== undefined && b.etapa !== null){
+      const e = String(b.etapa).trim();
+      if(e === '') etapa = '';
+      else if(ETAPAS.valida(e)) etapa = e;
+      else return res.status(400).json({erro:'etapa "'+e+'" não existe — escolha uma da lista'});
+    }
+
     const campos={ modelo_id:modelo, componente_id:comp, familia, expressao:expr,
       observacao:txt(b.observacao), ordem:(b.ordem!=null?+b.ordem:0),
       corte_largura:cl, corte_altura:ca, corte_unidade:txt(b.corte_unidade)||'cm' };
@@ -204,8 +217,10 @@ module.exports = function(app, db){
       db.prepare(`UPDATE ficha_formula SET modelo_id=@modelo_id,componente_id=@componente_id,
         familia=@familia,expressao=@expressao,observacao=@observacao,ordem=@ordem,ativo=1,
         corte_largura=@corte_largura,corte_altura=@corte_altura,corte_unidade=@corte_unidade,
-        planejamento=COALESCE(@planejamento, planejamento)
-        WHERE id=@id`).run(Object.assign({id:+b.id, planejamento: plan===undefined ? null : plan},campos));
+        planejamento=COALESCE(@planejamento, planejamento),
+        etapa=CASE WHEN @etapa IS NULL THEN etapa WHEN @etapa='' THEN NULL ELSE @etapa END
+        WHERE id=@id`).run(Object.assign({id:+b.id, planejamento: plan===undefined ? null : plan,
+          etapa: etapa===undefined ? null : etapa},campos));
       /* O recalculo de custo continua sendo disparado pela linha inteira, e nao
          so pela `expressao`: mexer no corte nao muda centavo, mas o carimbo de
          "quando esta ficha foi tocada" tem que valer para a linha toda. */
@@ -213,9 +228,10 @@ module.exports = function(app, db){
       return res.json({ok:true,id:+b.id,testes:v.testes});
     }
     const r=db.prepare(`INSERT INTO ficha_formula (modelo_id,componente_id,familia,expressao,observacao,ordem,
-        corte_largura,corte_altura,corte_unidade,planejamento)
+        corte_largura,corte_altura,corte_unidade,planejamento,etapa)
       VALUES (@modelo_id,@componente_id,@familia,@expressao,@observacao,@ordem,
-        @corte_largura,@corte_altura,@corte_unidade,@planejamento)`).run(Object.assign({planejamento: plan||0}, campos));
+        @corte_largura,@corte_altura,@corte_unidade,@planejamento,@etapa)`).run(Object.assign({planejamento: plan||0,
+        etapa: etapa ? etapa : null}, campos));
     historico(modelo, 'linha acrescentada à ficha', req);
     res.json({ok:true,id:r.lastInsertRowid,testes:v.testes});
   });
@@ -224,6 +240,14 @@ module.exports = function(app, db){
      mostrava `1,80 × 1,50` fixo na coluna de previa — a persiana critica e a
      1,80 (unica que nao encaixa duas na bobina) e a mais vendida e a 1,60, e a
      tela mostrava uma e escondia a outra. */
+  /* O ROTEIRO de um modelo (PRODUCAO-MAPA-E-MOTOR fase 1): sai das linhas,
+     pelo etapas.js, e vem com as opcoes para o campo Etapa da 404. Leitura:
+     cai na regra das leituras da ficha (as chaves da 404). */
+  app.get('/api/formulas/roteiro/:modelo_id',(req,res)=>{
+    const r = ETAPAS.roteiro(db, +req.params.modelo_id);
+    res.json({ etapas:r.etapas, sem_etapa:r.sem_etapa, opcoes:ETAPAS.DE_LINHA });
+  });
+
   app.get('/api/formulas/medidas/:modelo_id',(req,res)=>{
     const m=+req.params.modelo_id;
     const todas=db.prepare(`SELECT largura_cm largura, altura_cm altura, COUNT(*) skus

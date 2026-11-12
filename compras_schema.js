@@ -641,6 +641,7 @@ function garantirSchemaCompras(db){
       corte_altura  TEXT,
       corte_unidade TEXT,
       planejamento  INTEGER DEFAULT 0,   -- "vai para o planejamento da producao" (PLANEJAMENTO-CORTE-E-SEPARACAO): so a aba Corte e separacao da 401 le; NAO entra em custo nem compra
+      etapa         TEXT,                -- em que etapa o material e preparado (PRODUCAO-MAPA-E-MOTOR fase 1); a lista e do etapas.js; vazio = nao marcada
       CHECK ( (componente_id IS NULL) <> (familia IS NULL) )
     );
     CREATE INDEX IF NOT EXISTS idx_formula_modelo ON ficha_formula(modelo_id, ordem);
@@ -726,7 +727,11 @@ function garantirSchemaCompras(db){
     /* A caixinha "vai para o planejamento da producao" (10/11/2026), no fim,
        na mesma ordem do CREATE (§17). Nasce 0: nenhuma linha vai para a aba
        ate uma pessoa marcar na 404. */
-    ['planejamento','INTEGER DEFAULT 0']
+    ['planejamento','INTEGER DEFAULT 0'],
+    /* A etapa da linha (PRODUCAO-MAPA-E-MOTOR fase 1, 12/11/2026), no fim, na
+       mesma ordem do CREATE (§17). Nasce vazia: nenhuma linha tem etapa ate
+       uma pessoa marcar na 404. */
+    ['etapa','TEXT']
   ]);
   /* §8: a contagem de componente usa O MESMO fluxo que ja existe — o operador
      conta, o ajuste fica pendente, o admin aprova. Uma mecanica so no sistema
