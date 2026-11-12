@@ -830,7 +830,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 | R-PDF-03 | O título do anúncio sai da estrutura da folha, não de uma palavra (#24) |
 | R-PDF-04 | A nota impressa é a PRIMEIRA folha da NF (#22) |
 | R-PDF-05 | NF repetida não é duplicidade: a nota é do pedido |
-| R-PDF-06 | O upload recusa Pack ID ou Venda que já existe no histórico inteiro (#5) |
+| R-PDF-06 | O upload recusa Pack ID, Venda ou o número do envio que já existe no histórico inteiro (#5; o envio desde 12/11/2026) |
 | R-PDF-07 | A venda repetida cujo PDF sumiu volta a ter PDF — e só isso (27/10/2026) |
 | R-PDF-08 | A busca do "Já impressos" olha o histórico inteiro; a lista não corta calada (27/10/2026) |
 | R-PDF-09 | A venda da folha sem etiqueta fica em Admin → Pendências até o PDF dela chegar ou alguém resolver (NF 8301) |
@@ -943,7 +943,8 @@ em saldo. **As vendas que não entraram** entram subindo o mesmo PDF de novo pel
 > como não feita.
 
 **Rode `node teste_casos_reais.js` e `node teste_parse.js`** ao mexer na leitura
-do envio, na folha inteira ou na duplicidade do upload.
+do envio ou na folha inteira, **e `node teste_upload.js`** na duplicidade do
+upload.
 
 ### ⚠️ A ETIQUETA "Etiqueta válida para envíos" — sem "Despachar:", sem rota, sem endereço (04/11/2026)
 
