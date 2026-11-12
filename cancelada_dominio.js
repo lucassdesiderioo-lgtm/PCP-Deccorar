@@ -282,7 +282,7 @@ function aguardandoSobra(db){
   const cols = colunas(db);
   if(cols.indexOf('cancelada_resolvida_em') < 0) return [];
   return db.prepare(`SELECT id, codigo, buyer, nf, modalidade, despachar_em, cancelada_motivo, cancelada_origem,
-      cancelada_em, conferido_por, (SELECT SUM(qtd) FROM lote_item i WHERE i.lote_id=lote.id) pecas
+      cancelada_em, conferido_por${cols.indexOf('conferido_por_id') >= 0 ? ', conferido_por_id' : ''}, (SELECT SUM(qtd) FROM lote_item i WHERE i.lote_id=lote.id) pecas
     FROM lote
     WHERE COALESCE(teste,0)=0 AND estagio='${ESTAGIO}' AND cancelada_estagio IN ('embalado','carregado')
       AND cancelada_resolvida_em IS NULL AND COALESCE(cancelada_varias,0)=0${semPedidoAberto(db)}

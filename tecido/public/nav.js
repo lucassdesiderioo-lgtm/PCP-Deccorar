@@ -39,13 +39,16 @@ var FONTE=(function(){
 })();
 
 // ── O ☰ Menu ──────────────────────────────────────────────────────────────
-var MENU={telas:null, painel:null};
+var MENU={telas:null, painel:null, botao:null};
 function desenharMenu(){
   if(MENU.painel && MENU.telas && typeof MENU_TELAS!=='undefined')
     MENU.painel.innerHTML=MENU_TELAS.html(MENU.telas, aqui);
   // R-VAL: a tela com dinheiro que a pessoa não vê diz isso uma vez, debaixo do menu
   if(MENU.painel && MENU.telas && typeof MENU_TELAS!=='undefined' && MENU_TELAS.marcarSemValor)
     MENU_TELAS.marcarSemValor(MENU.telas, aqui, MENU.painel);
+  // a etiqueta vermelha das pendências (PENDENCIAS-NO-MENU fase 2): o desenho mora no menu_telas.js
+  if(MENU.painel && MENU.telas && typeof MENU_TELAS!=='undefined' && MENU_TELAS.pendencias)
+    MENU_TELAS.pendencias(MENU.painel, MENU.botao);
 }
 function carregarMenu(){
   if(typeof MENU_TELAS==='undefined'){
@@ -121,7 +124,7 @@ function sessao(eu,dest){
   pn.id='menuTelas'; pn.className='menuTelas'; pn.setAttribute('aria-label','Telas');
   pn.style.display='none'; pn.innerHTML='<div class="mnVazio">carregando…</div>';
   document.body.insertBefore(pn,b.nextSibling||null);
-  MENU.painel=pn;
+  MENU.painel=pn; MENU.botao=bm;
   bm.onclick=function(){ var ab=pn.style.display==='none'; pn.style.display=ab?'flex':'none'; bm.setAttribute('aria-expanded',ab?'true':'false'); };
   desenharMenu();
 }

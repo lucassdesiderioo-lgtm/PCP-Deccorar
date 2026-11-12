@@ -74,6 +74,8 @@ module.exports = function(app, db){
     }
   }
   const tx = fn => db.transaction(fn)();
+  /* a etiqueta do ☰ Menu (pendencias_route) pergunta a lista do dia pela mesma régua */
+  app.locals.inventarioTemChave = temChaveRodizio;
   const ctx = { temChave: temChaveRodizio };
 
   // ── quem conta (as tres rodadas) ──────────────────────────────────────────

@@ -69,13 +69,30 @@ const LINHAS = [
     contar(db){
       const r = require('./ajuste_dominio').contarPendentes(db);
       return { n:r.n, desde:r.desde };
+    },
+    /* só o que ESTA pessoa pode aprovar: quem pediu não aprova (R-EST-20) */
+    minha(db, p){
+      const l = require('./ajuste_dominio').pendentes(db, { quem:p.quem }).filter(x => x.pode_aprovar);
+      return { n:l.length, desde:maisAntiga(l.map(x => x.pedido_em)) };
     } },
-  { chave:'inventario_aprovar', tela:303, frase:['SKU não teve acordo nem na 3ª contagem e espera decisão','SKUs não tiveram acordo nem na 3ª contagem e esperam decisão'], nome:'Inventário — sem acordo', perm:['contagem.resolver'], onde:{ url:'/inventario' },
+  { chave:'inventario_aprovar', tela:302, frase:['SKU não teve acordo nem na 3ª contagem e espera decisão','SKUs não tiveram acordo nem na 3ª contagem e esperam decisão'], nome:'Inventário — sem acordo', perm:['contagem.resolver'], onde:{ aba:'ct' },
     ajuda:'SKUs em que nem a 3ª contagem bateu (e os que já esperavam aprovação antes de 04/11/2026)',
-    contar(db){ const r = require('./inventario_dominio').pendencias(db).aprovar; return { n:r.n, desde:r.desde }; } },
+    contar(db){ const r = require('./inventario_dominio').pendencias(db).aprovar; return { n:r.n, desde:r.desde }; },
+    /* quem contou o SKU não decide (R-EST-18): a régua é a da fila do admin */
+    minha(db, p){
+      const l = require('./inventario_dominio').aprovacao(db, { quem:p.quem }).filter(x => x.pode_aprovar);
+      return { n:l.length, desde:maisAntiga(l.map(x => (x.contagens[0] || {}).em)) };
+    } },
   { chave:'inventario_recontar', tela:303, nome:'Inventário — 2ª e 3ª contagem', perm:['contagem.contar','contagem.desempatar'], onde:{ url:'/inventario' },
     ajuda:'SKUs que esperam a contagem de outra pessoa (a 2ª, ou a 3ª porque as duas não bateram)',
-    contar(db){ const r = require('./inventario_dominio').pendencias(db).recontar; return { n:r.n, desde:r.desde }; } },
+    contar(db){ const r = require('./inventario_dominio').pendencias(db).recontar; return { n:r.n, desde:r.desde }; },
+    /* só o que ESTA pessoa pode contar agora (a 2ª é de outra pessoa, R-EST-18;
+       o rodízio do dia): a lista dela, pela régua da própria tela */
+    minha(db, p){
+      if(!p.temChave) return this.contar(db);
+      const l = require('./inventario_dominio').hoje(db, { quem:p.quem, pode:p.tem, temChave:p.temChave }).itens.filter(i => i.rodada >= 2);
+      return { n:l.length, desde:null };
+    } },
   /* Os ajustes antigos se dividem por tela desde 11/11/2026 (ARRUMAR-O-LUGAR
      fase 2): os de peça ficam na 302, e os de material moram na 504 — cada linha
      conta o que a tela dela mostra (#12). */
@@ -98,6 +115,18 @@ const LINHAS = [
     ajuda:'caixas separadas como venda cancelada esperando confirmação no ML, e canceladas no ML ainda na fábrica esperando ser separadas',
     contar(db){
       const l = require('./carreg_route').sobrasEsperando(db);
+      return { n:l.length, desde:maisAntiga(l.map(x => x.cancelada_em)),
+               canceladas:l.filter(x => x.de === 'cancelada').map(x => x.id) };
+    },
+    /* a separar: só quem confere (a rota é carregamento.executar), e nunca quem
+       conferiu a caixa (D8, pela régua da rota: QUEM.mesmaPessoa, pelo id);
+       aguardando confirmação: quem confirma, e nunca quem marcou (R-REC-06,
+       pela régua do cancel_conf sobre o pedido inteiro — com o id) */
+    minha(db, p){
+      const CONF = require('./cancel_conf'), QUEM = require('./quem');
+      const l = require('./carreg_route').sobrasEsperando(db).filter(x => x.de === 'cancelada'
+        ? p.tem('carregamento.executar') && !QUEM.mesmaPessoa({ id:x.conferido_por_id, nome:x.conferido_por }, p.quem)
+        : p.tem('cancelamento.confirmar') && CONF.podeDecidir(db, CONF.pegar(db, x.id), p.quem));
       return { n:l.length, desde:maisAntiga(l.map(x => x.cancelada_em)),
                canceladas:l.filter(x => x.de === 'cancelada').map(x => x.id) };
     } },
@@ -143,8 +172,10 @@ const LINHAS = [
     } }
 ];
 
-function resumo(db){
-  const linhas = LINHAS.map(L => {
+/* Conta cada linha pela tela dona; devolve as linhas com os ponteiros internos
+   (`_canc`, `_sem`) ainda dentro — quem chama tira antes de mandar pelo fio. */
+function contarTudo(db){
+  return LINHAS.map(L => {
     const base = { chave:L.chave, nome:L.nome, ajuda:L.ajuda, onde:L.onde, tela:L.tela,
                    quem:quem(L) };
     if(L.aqui) base.aqui = true;
@@ -157,12 +188,29 @@ function resumo(db){
       return Object.assign(base, { n:null, desde:null, erro:'não consegui contar', _canc:[] });
     }
   });
+}
+
+/* As caixas canceladas que estão nas DUAS linhas (Mesa e Conferência). */
+function emDuas(linhas){
+  const a = new Set((linhas.find(l => l.chave === 'correcoes') || {})._canc || []);
+  return ((linhas.find(l => l.chave === 'sobras') || {})._canc || []).filter(id => a.has(id)).length;
+}
+
+function diasDesde(desde){
+  if(!desde) return null;
+  const t = new Date(), z = n => String(n).padStart(2, '0');
+  const hoje = Date.parse(t.getFullYear() + '-' + z(t.getMonth() + 1) + '-' + z(t.getDate()) + 'T00:00:00');
+  const d = Math.round((hoje - Date.parse(String(desde).slice(0, 10) + 'T00:00:00')) / 86400000);
+  return isFinite(d) ? Math.max(0, d) : null;
+}
+
+function resumo(db){
+  const linhas = contarTudo(db);
   /* A CANCELADA QUE AINDA ESTÁ NA FÁBRICA aparece em DUAS linhas, e é certo:
      ela volta pelo ↩ Sobrou da Conferência, e a Mesa registra a que não
      voltou. As duas portas resolvem a mesma caixa, então o total a conta uma
      vez só, e diz quantas estão nas duas. */
-  const a = new Set((linhas.find(l => l.chave === 'correcoes') || {})._canc || []);
-  const duas = ((linhas.find(l => l.chave === 'sobras') || {})._canc || []).filter(id => a.has(id)).length;
+  const duas = emDuas(linhas);
   const total = linhas.reduce((s, l) => s + (l.n || 0), 0) - duas;
   const sem = (linhas.find(l => l.chave === 'bloqueados') || {})._sem || 0;
   linhas.forEach(l => { delete l._canc; delete l._sem; });
@@ -188,6 +236,48 @@ function total(db, pronto){
   return { total:r.total, dias, sem_etiqueta:r.sem_etiqueta };
 }
 
+/* O QUE ESTA PESSOA RESOLVE (spec PENDENCIAS-NO-MENU, fase 2, 12/11/2026): a
+   etiqueta vermelha do ☰ Menu. Só entra a linha em que a pessoa tem uma das
+   chaves de quem resolve (`perm`) E abre a tela dona — etiqueta que a pessoa
+   não pode resolver nunca zera para ela, e vira paisagem (D1). A linha sem
+   chave própria (Bloqueados) vale para quem abre a tela dona. É o mesmo
+   `contar` da central: nenhuma conta nova (#12).
+
+   `pode` = { tem(chave) -> bool, abre(rota) -> bool }, de quem chama (a rota,
+   pela conta do portão). Devolve só números: nada de SKU, cliente ou saldo. */
+function minhas(db, pode){
+  const M = require('./telas');
+  const rotaDe = n => { const t = M.TELAS.find(x => x.n === n); return t ? t.rota : null; };
+  /* o portão ANTES da conta: a linha que a pessoa não resolve nem é contada
+     (③ REVISÃO — cada aparelho pergunta a cada minuto) */
+  const linhas = LINHAS.filter(L => {
+    const rota = rotaDe(L.tela);
+    if(!rota || !pode.abre(rota)) return false;
+    return !L.perm.length || L.perm.some(c => pode.tem(c));
+  }).map(L => {
+    const base = { chave:L.chave, tela:L.tela };
+    try{
+      const r = L.minha ? L.minha(db, pode) : L.contar(db);
+      return Object.assign(base, { n:r.n, desde:r.desde, _canc:r.canceladas || [] });
+    }catch(e){
+      console.log('[pendencias] minhas ' + L.chave + ': ' + (e && e.message));
+      return Object.assign(base, { n:null, desde:null, _canc:[] });
+    }
+  });
+  const por_tela = {};
+  linhas.forEach(l => {
+    const t = por_tela[l.tela] = por_tela[l.tela] || { n:0, dias:null, erro:false };
+    if(l.n == null){ t.erro = true; return; }
+    t.n += l.n;
+    const d = l.n ? diasDesde(l.desde) : null;
+    if(d != null && (t.dias == null || d > t.dias)) t.dias = d;
+  });
+  /* a cancelada nas duas linhas conta uma vez no total, se a pessoa vê as duas */
+  const duas = emDuas(linhas);
+  const total = linhas.reduce((s, l) => s + (l.n || 0), 0) - duas;
+  return { total, erro:linhas.some(l => l.n == null), por_tela };
+}
+
 /* Quem resolve a linha, em palavras (a mesma frase da central). */
 function quem(L){ return L.quemTexto || L.perm.map(rotulo).join(' ou '); }
 /* Na caixinha, fora da 204, "os cards logo abaixo" não diz nada: diz o nível. */
@@ -200,4 +290,4 @@ function frase(L, n){
   return n + ' ' + (n === 1 ? 'pendência nova' : 'pendências novas') + ': ' + L.nome;
 }
 
-module.exports = { LINHAS, resumo, total, quem, quemFora, frase };
+module.exports = { LINHAS, resumo, total, minhas, quem, quemFora, frase };

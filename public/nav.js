@@ -72,6 +72,8 @@ function desenharMenu(){
   if(m && MENU.telas && typeof MENU_TELAS!=='undefined') m.innerHTML=MENU_TELAS.html(MENU.telas, location.pathname.replace(/\/$/,'')||'/');
   /* R-VAL: a tela com dinheiro que a pessoa não vê diz isso uma vez, debaixo do menu. */
   if(MENU.telas && typeof MENU_TELAS!=='undefined' && MENU_TELAS.marcarSemValor) MENU_TELAS.marcarSemValor(MENU.telas, location.pathname.replace(/\/$/,'')||'/', m);
+  /* a etiqueta vermelha das pendências (PENDENCIAS-NO-MENU fase 2): o desenho mora no menu_telas.js */
+  if(m && MENU.telas && typeof MENU_TELAS!=='undefined' && MENU_TELAS.pendencias) MENU_TELAS.pendencias(m, document.getElementById('sessMenu'));
 }
 (function(){
   if(location.pathname.indexOf('/login')===0 || typeof MENU_TELAS!=='undefined') return;

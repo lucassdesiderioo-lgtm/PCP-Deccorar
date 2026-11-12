@@ -2,15 +2,49 @@
 
 ```
 STATUS
-Situação: EM CONSTRUÇÃO · aprovada pelo dono em 12/11/2026 · fase 1 no ar desde 12/11/2026 (PR #346; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: o primeiro PDF que retém uma caixa mostrando a caixinha na 103 · próxima: fase 2
+Situação: EM CONSTRUÇÃO · aprovada pelo dono em 12/11/2026 · fase 1 no ar desde 12/11/2026 (PR #346; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: o primeiro PDF que retém uma caixa mostrando a caixinha na 103 · fase 2 construída e revisada, falta subir · próxima: fase 3
 Criada em: 12/11/2026
 Última atualização: 12/11/2026
-Fases: 1 ☑  2 ☐  3 ☐
+Fases: 1 ☑  2 ☑  3 ☐
 Risco: 🟡 (comportamento de tela e uma rota de leitura nova; não mexe em estoque, permissão, schema do PCP)
 Depende de: a central de Pendências (docs/arquivo/CENTRAL-DE-PENDENCIAS.md, a 204)
             o menu único (ORGANIZACAO-DO-SISTEMA, public/menu_telas.js)
 Tipo: NOVIDADE
 ```
+
+### Fase 2 — a etiqueta vermelha no ☰ Menu (12/11/2026, construída, falta subir)
+
+- `pendencias_dominio.minhas` + `GET /api/pendencias/minhas` (`@logado`, quem é
+  vem do login): por tela e o total, só números. A forma do fio mudou da §3.1:
+  `{ total, erro, por_tela: { 204: { n, dias, erro } } }` — os dias e o erro de
+  cada tela vão junto, para o título da bolinha e o "?". O desenho é o
+  `public/menu_telas.js`, chamado pelos dois `nav.js`; pergunta a cada 60 s, ao
+  tocar no ☰ Menu e ao voltar para a aba.
+- **Divergência D12 — "pode resolver" é a régua de cada DONO, pessoa a pessoa**,
+  e não só a lista `perm` como a §3.1 escrevia (③ REVISÃO): quem pediu o ajuste
+  não o aprova, quem contou o SKU não o decide nem faz a 2ª contagem, quem
+  marcou a venda cancelada não a confirma, e quem só confere não vê a que espera
+  confirmação. A linha da central ganhou `minha(db, pessoa)`, que pergunta ao
+  dono (`ajuste_dominio.pendentes`, `inventario_dominio.aprovacao` e `hoje`,
+  `cancel_conf.podeDecidir`). Sem isso, a etiqueta nunca zeraria para essa
+  pessoa — o motivo do D1.
+- **"Inventário — sem acordo" aponta a 302**, onde a decisão mora (a 303 só abre
+  com contar/desempatar, e quem tem `contagem.resolver` não via). Vale também
+  para a caixinha da fase 1 e para o caminho da central.
+- **O portão vem antes da conta**: a linha que a pessoa não resolve nem é contada.
+- **③ REVISÃO, 2ª rodada:** a caixa "a separar" conta só para quem tem
+  `carregamento.executar` e não a conferiu (R-REC-04, a D8 da CONFERENCIA-EXPEDICAO); "quem marcou não confirma" e
+  "quem conferiu não separa" comparam pelo id, como as rotas; o "voltar para a
+  aba" pergunta no máximo a cada 15 s. Fica escrito (não é defeito): a etiqueta
+  do Inventário pode criar a lista do dia, como a tarja já faz.
+- ⚠️ **Bloqueados dá bolinha a todo nível Admin que abre a 204** (D13, decisão do
+  dono, 12/11/2026, opção "a"): quatro dos seis cards se resolvem com `@admin`
+  (modalidade, venda sem etiqueta, PDF cuja conta não fecha, canceladas), só o de
+  SKU/divergência pede `sku.cadastrar` e o de pacote `pacote.assinar`. A bolinha
+  zera quando qualquer um resolve, e Bloqueados é o que mais custa esperar.
+  Separar por card seria uma segunda conta ao lado da tela (#12); fica para se
+  alguém reclamar.
+- `teste_pendencias_menu.js` (44).
 
 ### Fase 1 — a caixinha "Abrir em Pendências" (12/11/2026, no ar, PR #346)
 
@@ -38,7 +72,7 @@ Tipo: NOVIDADE
   linha em `docs/DECISOES.md`): a §3.2 a listava, mas toda peça recebida nasce
   esperando a baixa, e a caixa apareceria em toda devolução bipada, sem botão.
   Quem dá a baixa a vê pela 253 e, na fase 2, pela etiqueta do ☰ Menu.
-- `teste_pendencias_caminho.js` (65).
+- `teste_pendencias_caminho.js` (66).
 
 ## 1. O problema, nas palavras do dono (12/11/2026)
 

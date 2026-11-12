@@ -33,7 +33,7 @@
       var corpo = usados.map(function(b){
         var linhas = porBloco[b].slice().sort(function(x, y){ return x.n - y.n; }).map(function(t){
           var on = (t.rota === atual);
-          return '<a class="mnTela' + (on ? ' on' : '') + '" href="' + esc(t.rota) + '"' + (on ? ' aria-current="page"' : '') + '><b>' + esc(t.n) + '</b> ' + esc(t.nome) + '</a>';
+          return '<a class="mnTela' + (on ? ' on' : '') + '" data-n="' + esc(t.n) + '" href="' + esc(t.rota) + '"' + (on ? ' aria-current="page"' : '') + '><b>' + esc(t.n) + '</b> ' + esc(t.nome) + '</a>';
         }).join('');
         return (usados.length > 1 ? '<div class="mnBloco">' + esc(blocos[b] || b) + '</div>' : '') + linhas;
       }).join('');
@@ -61,5 +61,68 @@
     // só depois do menu: antes dele a barra ainda não existe, e a linha iria parar acima dela
     if(antes && antes.parentNode) antes.parentNode.insertBefore(el, antes.nextSibling);
   }
-  raiz.MENU_TELAS = { html:html, avisoValor:avisoValor, marcarSemValor:marcarSemValor, FRASE_SEM_VALOR:FRASE_SEM_VALOR };
+  /* A ETIQUETA VERMELHA DAS PENDÊNCIAS (spec PENDENCIAS-NO-MENU, fase 2): ao
+     lado de cada tela, o número do que ESTA pessoa resolve ali, e no botão
+     ☰ Menu o total — só o que ela pode resolver (D1), sempre vermelha (D3),
+     e nada quando é zero. Quem conta é o servidor (`/api/pendencias/minhas`,
+     a mesma conta da 204); aqui só se desenha. Linha que o servidor não
+     conseguiu contar vira "?", nunca zero.
+     Pergunta a cada 60 s e ao abrir o menu — fora de qualquer redesenho de
+     tela (§12) — e não pergunta com a aba escondida. */
+  function pl(n, um, muitos){ return n === 1 ? um : muitos; }
+  function bolinha(txt, titulo){
+    return '<span class="mnPend" title="' + esc(titulo) + '" aria-label="' + esc(titulo) + '" style="display:inline-block;min-width:20px;'
+      + 'height:20px;line-height:20px;padding:0 6px;margin-left:8px;border-radius:10px;background:#c62828;color:#fff;font:700 12px/20px system-ui,sans-serif;'
+      + 'text-align:center;vertical-align:middle;box-sizing:border-box">' + esc(txt) + '</span>';
+  }
+  function tituloTela(t){
+    if(!t.n && t.erro) return 'Não deu para contar as pendências desta tela';
+    return t.n + ' ' + pl(t.n, 'pendência esperando você', 'pendências esperando você')
+      + (t.dias == null ? '' : ' — a mais antiga ' + (t.dias === 0 ? 'é de hoje' : 'há ' + t.dias + ' ' + pl(t.dias, 'dia', 'dias')))
+      + (t.erro ? ' (e uma linha não deu para contar)' : '');
+  }
+  function etiquetas(painel, botao, p){
+    if(typeof document === 'undefined') return;
+    p = p || {};
+    var por = p.por_tela || {};
+    if(painel) Array.prototype.forEach.call(painel.querySelectorAll('a.mnTela[data-n]'), function(a){
+      var velha = a.querySelector('.mnPend'); if(velha) velha.remove();
+      var t = por[a.getAttribute('data-n')];
+      if(!t || (!t.n && !t.erro)) return;
+      a.insertAdjacentHTML('beforeend', bolinha(t.n ? String(t.n) : '?', tituloTela(t)));
+    });
+    if(botao){
+      var vb = botao.querySelector('.mnPend'); if(vb) vb.remove();
+      if(p.total) botao.insertAdjacentHTML('beforeend', bolinha(String(p.total), p.total + ' ' + pl(p.total, 'pendência esperando você', 'pendências esperando você') + (p.erro ? ' (e uma linha não deu para contar)' : '')));
+      else if(p.erro) botao.insertAdjacentHTML('beforeend', bolinha('?', 'Não deu para contar as pendências'));
+    }
+  }
+  var PEND = { painel:null, botao:null, dados:null, ligado:false, ultima:0 };
+  function pedirPendencias(){
+    if(typeof fetch === 'undefined' || (typeof document !== 'undefined' && document.hidden)) return;
+    PEND.ultima = Date.now();
+    fetch('/api/pendencias/minhas', { credentials:'same-origin' })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){ if(d){ PEND.dados = d; etiquetas(PEND.painel, PEND.botao, d); } })
+      .catch(function(){});
+  }
+  /* Os dois nav.js chamam depois de desenhar o menu: guarda onde desenhar,
+     redesenha com o último número (o menu acabou de ser refeito) e, na
+     primeira vez, liga a pergunta de 60 s e a do clique no botão. */
+  function pendencias(painel, botao){
+    PEND.painel = painel || PEND.painel;
+    /* o botão pode chegar depois do painel (a barra nasce quando o login responde) */
+    if(botao && botao !== PEND.botao){ PEND.botao = botao; botao.addEventListener('click', pedirPendencias); }
+    if(PEND.dados) etiquetas(PEND.painel, PEND.botao, PEND.dados);
+    if(PEND.ligado) return;
+    PEND.ligado = true;
+    pedirPendencias();
+    setInterval(pedirPendencias, 60000);
+    /* o tablet que dormiu pergunta logo ao acordar, sem esperar o minuto */
+    /* …no máximo a cada 15 s: quem troca de aba toda hora não refaz a conta toda hora */
+    if(typeof document !== 'undefined') document.addEventListener('visibilitychange', function(){
+      if(document.hidden || Date.now() - PEND.ultima < 15000) return; pedirPendencias(); });
+  }
+  raiz.MENU_TELAS = { html:html, avisoValor:avisoValor, marcarSemValor:marcarSemValor, FRASE_SEM_VALOR:FRASE_SEM_VALOR,
+                      etiquetas:etiquetas, pendencias:pendencias };
 })(typeof window !== 'undefined' ? window : this);
