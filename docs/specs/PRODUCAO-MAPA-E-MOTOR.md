@@ -1,4 +1,4 @@
-> **STATUS · 12/11/2026 — APROVADA pelo dono (v6)** · nada construído · próxima: fase 1
+> **STATUS · 12/11/2026 — APROVADA pelo dono (v6)** · **fase 1 construída, falta subir** (o roteiro na ficha: `etapas.js`, `ficha_formula.etapa`, a 404; `teste_roteiro.js`, 21; ③ REVISÃO: modelo sem ficha e sob medida ficam sem roteiro, decisão de construção) · próxima: fase 2
 > Reescrita sobre o processo que o dono descreveu em 11/11/2026 e as respostas de
 > 12/11/2026 (§10). A versão de 17/08/2026 está em
 > `docs/arquivo/PRODUCAO-MAPA-E-MOTOR-v1.md` (histórico, não é regra). Absorve a
