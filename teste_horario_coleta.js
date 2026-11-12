@@ -54,7 +54,7 @@ function eq(desc, achado, esperado){
 }
 
 const db = new Database(path.join(tmp, 't.db'));
-db.exec(`CREATE TABLE skus (codigo TEXT PRIMARY KEY, largura_cm INT, altura_cm INT,
+db.exec(`CREATE TABLE skus (codigo TEXT PRIMARY KEY, descricao TEXT, largura_cm INT, altura_cm INT,
     cor_codigo TEXT, cor TEXT, tecido_codigo TEXT, modelo_id INT, estoque INT DEFAULT 0);
   INSERT INTO skus (codigo,estoque) VALUES ('BK160140BEGE',30);
   CREATE TABLE config (chave TEXT PRIMARY KEY, valor TEXT);
@@ -62,7 +62,8 @@ db.exec(`CREATE TABLE skus (codigo TEXT PRIMARY KEY, largura_cm INT, altura_cm I
   CREATE TABLE modelo (id INTEGER PRIMARY KEY, sob_medida INTEGER DEFAULT 0);
   CREATE TABLE producao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, qtd INTEGER,
     produzido INTEGER DEFAULT 0, data TEXT DEFAULT (date('now','localtime')),
-    origem TEXT, urgente INTEGER DEFAULT 0, teste INTEGER DEFAULT 0);`);
+    origem TEXT, urgente INTEGER DEFAULT 0, teste INTEGER DEFAULT 0);
+  CREATE TABLE revisao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, data TEXT, modo TEXT);`);
 
 /* Quem está logado e o que pode: o teste troca a cada caso. */
 let usuario = { id:1, nome:'Expedição' };
@@ -471,6 +472,52 @@ async function main(){
     ok('o botão "Lançar N urgentes" saiu (a urgência entra sozinha)', !/btAplicar/.test(idx10) && !/cruzamento\/aplicar/.test(idx10));
     const t103 = require('./telas').porNumero(103);
     ok('a 103 se chama "Subir PDF de vendas", mesmo endereço e nível Operação', t103 && t103.nome === 'Subir PDF de vendas' && t103.rota === '/admin/producao' && t103.nivel === 'operacao');
+
+    console.log('\n── 11. HORARIOS-E-FERIADOS fase 1: a Revisão lê o corte da 206 (D1 a D3) ──');
+    db.prepare("INSERT OR REPLACE INTO config (chave,valor) VALUES ('corte_ter','10:30'),('corte_qua','10:30')").run();
+    const stRev = async () => (await req("GET", "/api/revisao/status")).body;
+    RELOGIO.fixar('2026-12-08 08:00');   // terça, nada lançado
+    let s11 = await stRev();
+    eq('sem coleta lançada: "não lançado" (D2)', s11.coleta_corte && s11.coleta_corte.situacao, 'nao_lancado');
+    ok('e o padrão da semana (10:30) NÃO aparece como corte', s11.corte == null && s11.passouCorte === false, JSON.stringify(s11));
+    r = await lancar({ data:'2026-12-08', origem:'tela', coletas:[
+      { inicio:'09:00', fim:'11:00', corte:'07:00' }, { inicio:'12:00', fim:'14:00', corte:'10:00' }, { inicio:'15:00', fim:'17:00' } ] });
+    eq('lançar 3 coletas na terça', r.status, 200);
+    s11 = await stRev();
+    eq('cada coleta vem com o seu corte (D1)', s11.coleta_corte.coletas.map(c => c.inicio + ' ' + c.corte + ' ' + c.estado),
+      ['09:00 07:00 passou', '12:00 10:00 antes', '15:00 null sem_corte']);
+    eq('às 08:00 o corte que vale é o da próxima (10:00)', [s11.corte, s11.passouCorte, s11.coleta_corte.proxima && s11.coleta_corte.proxima.inicio], ['10:00', false, '12:00']);
+    eq('e a situação é "lançado"', s11.coleta_corte.situacao, 'lancado');
+    RELOGIO.fixar('2026-12-08 11:00');
+    s11 = await stRev();
+    ok('às 11:00, com a última coleta sem corte, a lista não se dá por fechada', s11.passouCorte === false && s11.coleta_corte.encerrada === false && s11.corte == null, JSON.stringify(s11.coleta_corte));
+    const ids = (await dia('2026-12-08')).body.coletas.map(c => c.id);
+    r = await lancar({ data:'2026-12-08', origem:'tela', coletas:[
+      { id:ids[0], inicio:'09:00', fim:'11:00', corte:'07:00' }, { id:ids[1], inicio:'12:00', fim:'14:00', corte:'10:00' }, { id:ids[2], inicio:'15:00', fim:'17:00', corte:'13:00' } ] });
+    RELOGIO.fixar('2026-12-08 13:30');
+    s11 = await stRev();
+    eq('todos os cortes passaram: "Lista fechada às 13:00"', [s11.coleta_corte.encerrada, s11.coleta_corte.ultimo, s11.corte, s11.passouCorte], [true, '13:00', '13:00', true]);
+    r = await lancar({ data:'2026-12-08', origem:'tela', coletas:[
+      { id:ids[0], inicio:'09:00', fim:'11:00' }, { id:ids[1], inicio:'12:00', fim:'14:00' }, { id:ids[2], inicio:'15:30', fim:'17:30' } ] });
+    RELOGIO.fixar('2026-12-08 12:00');
+    s11 = await stRev();
+    eq('a janela mudou sem corte novo: o corte da coleta fica "a conferir" e não vale', s11.coleta_corte.coletas[2].estado, 'a_conferir');
+    ok('e com ele "a conferir" a lista não fecha', s11.coleta_corte.encerrada === false && s11.passouCorte === false, JSON.stringify(s11.coleta_corte));
+    r = await lancar({ data:'2026-12-09', origem:'tela', sem_coleta:true, motivo:'feriado', motivo_texto:'Dia de teste' });
+    eq('a quarta "sem coleta — feriado"', r.status, 200);
+    RELOGIO.fixar('2026-12-09 08:00');
+    s11 = await stRev();
+    eq('dia sem coleta: a situação e o motivo (D3)', [s11.coleta_corte.situacao, s11.coleta_corte.motivo, s11.coleta_corte.motivo_texto, s11.corte], ['sem_coleta', 'feriado', 'Dia de teste', null]);
+    RELOGIO.fixar('2026-12-15 08:00');   // terça seguinte: a semana nasce copiada (rascunho)
+    s11 = await stRev();
+    ok('o rascunho da semana copiada conta como "não lançado" (D2, R-HCO-13)', s11.coleta_corte.situacao === 'nao_lancado' && s11.coleta_corte.rascunho === true && s11.corte == null, JSON.stringify(s11.coleta_corte));
+    const op11 = fs.readFileSync(path.join(__dirname, 'public', 'operador.html'), 'utf8');
+    ok('a Revisão escreve "não foi lançado na 206"', /não foi lançado na 206/.test(op11));
+    ok('a Revisão escreve "Hoje não tem coleta" e o motivo', /Hoje não tem coleta/.test(op11) && /motivo_texto/.test(op11));
+    ok('a Revisão escreve o corte de cada coleta e o "não foi confirmado"', /coleta_corte/.test(op11) && /cc\.coletas\.map/.test(op11) && /não foi confirmado/.test(op11));
+    const stTxt = fs.readFileSync(path.join(__dirname, 'st_route.js'), 'utf8');
+    ok('o status da Revisão não lê mais o corte do padrão (config corte_<dia>)', !/\/api\/revisao\/status[\s\S]{0,200}cfg\('corte_'/.test(stTxt));
+    RELOGIO.fixar(null);
   }catch(e){
     falhas++; console.log('  ESTOUROU — ' + (e.stack || e));
   }finally{

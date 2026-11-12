@@ -447,5 +447,37 @@ function proximaColeta(db, data, hora){
   return { data: mais(data, 1), confirmar:1 };
 }
 
-module.exports = { garantirSchema, dia, lancar, semana, infoSemana, historia, saidaDeHoje, motivoSemMarca, rotulo,
+/* O CORTE DA REVISÃO (HORARIOS-E-FERIADOS fase 1, decisões D1 a D3 do dono,
+   12/11/2026). A tela 101 lia o corte do horário PADRÃO (config corte_<dia>);
+   agora lê o lançado aqui. Cada coleta tem o seu corte (D1). O dia sem coleta
+   lançada, ou só com o rascunho da semana copiada, é "não lançado" (D2, R-HCO-13)
+   — e o padrão NUNCA entra no lugar. O corte vazio ou "a conferir" não vale:
+   enquanto houver um, a lista não se dá por fechada. O dia "sem coleta" diz o
+   motivo (D3). */
+const comSchema = new WeakSet();
+function corteDoDia(db){
+  /* A Revisão pergunta a cada poucos segundos: o esquema se garante uma vez
+     por banco (o st_route pode subir sem o coleta_horario_route num teste). */
+  if(!comSchema.has(db)){ garantirSchema(db); comSchema.add(db); }
+  garantirSemana(db);
+  const hoje = R.hoje(), agora = min(R.hora());
+  const d = dia(db, hoje);
+  const base = { data:hoje, rascunho:d.rascunho, coletas:[], proxima:null, ultimo:null, encerrada:false,
+    motivo:null, motivo_texto:null };
+  if(d.sem_coleta && !d.rascunho)
+    return Object.assign(base, { situacao:'sem_coleta', motivo:d.motivo, motivo_texto:d.motivo_texto });
+  if(d.rascunho || !d.coletas.length) return Object.assign(base, { situacao:'nao_lancado' });
+  const coletas = d.coletas.map(c => {
+    const estado = c.corte == null ? 'sem_corte' : c.corte_conferir ? 'a_conferir'
+      : agora >= min(c.corte) ? 'passou' : 'antes';
+    return { inicio:c.inicio, fim:c.fim, corte:c.corte, estado };
+  });
+  const valem = coletas.filter(c => c.estado === 'antes' || c.estado === 'passou');
+  const proxima = coletas.find(c => c.estado === 'antes') || null;
+  const encerrada = valem.length === coletas.length && !proxima;
+  const ultimo = encerrada ? valem.map(c => c.corte).sort().pop() : null;
+  return Object.assign(base, { situacao:'lancado', coletas, proxima, encerrada, ultimo });
+}
+
+module.exports = { corteDoDia, garantirSchema, dia, lancar, semana, infoSemana, historia, saidaDeHoje, motivoSemMarca, rotulo,
   status, agenciaDeHoje, garantirSemana, confirmarSemana, conferir, tarefas, proximaColeta, MAX_COLETAS };

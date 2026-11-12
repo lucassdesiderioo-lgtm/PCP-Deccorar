@@ -18,13 +18,17 @@ module.exports=function(app,db){
   }
   app.get('/api/revisao/status',(req,res)=>{
     const h=hoje();
-    const corte=cfg('corte_'+h.d,'10:30');
+    /* O CORTE VEM DA 206 (HORARIOS-E-FERIADOS fase 1, 12/11/2026): o da próxima
+       coleta lançada, ou o último quando todos passaram. Sem coleta lançada, ou
+       com o corte a conferir, é null — o padrão da semana não entra no lugar (D2). */
+    const cc=require('./coleta_horario').corteDoDia(db);
+    const corte=cc.proxima?cc.proxima.corte:(cc.encerrada?cc.ultimo:null);
     /* Mesma régua do tile da tela vermelha (ordem_dia.js). `urgentesFalta` é o
        que a bancada ainda tem que PRODUZIR; `atendidas` é a ordem que ficou
        aberta com a venda já fora do estoque — peça revisada na tela azul e
        embalada como estoque não abate ordem (§4), mas atende o cliente igual. */
     const r=require('./ordem_dia').resumo(db);
-    res.json({corte, agora:h.hm, passouCorte:h.hm>=corte, dia:h.d,
+    res.json({corte, agora:h.hm, passouCorte:!!cc.encerrada, dia:h.d, coleta_corte:cc,
       lancado: (r.urgentes+r.reposicao)>0, urgentes:r.urgentes, reposicao:r.reposicao,
       urgentesFalta: r.urgentesFalta, atendidas: r.atendidas});
   });

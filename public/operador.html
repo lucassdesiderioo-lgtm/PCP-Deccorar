@@ -384,6 +384,28 @@ document.addEventListener('click',function(e){
 });
 
 var AVANT=0;
+/* O CORTE DE HOJE VEM DA 206 (HORARIOS-E-FERIADOS fase 1, decisões D1 a D3 do
+   dono, 12/11/2026): cada coleta com o seu corte; sem nada lançado, a frase diz
+   isso — o horário padrão da semana não entra no lugar; dia sem coleta diz o
+   motivo. A página antiga (sem coleta_corte) cai no corte de antes. */
+function fraseCorte(s){
+  var cc=s.coleta_corte;
+  if(!cc) return s.corte?('Corte às '+escH(s.corte)+'.'):'';
+  if(cc.situacao==='sem_coleta'){
+    var m=cc.motivo==='feriado'?('feriado'+(cc.motivo_texto?': '+cc.motivo_texto:'')):(cc.motivo_texto||'');
+    return '<b>Hoje não tem coleta'+(m?' — '+escH(m):'')+'.</b>';
+  }
+  if(cc.situacao!=='lancado') return '<b style="color:#b26a00">O horário de corte de hoje não foi lançado na 206.</b>';
+  if(cc.encerrada) return 'Lista fechada às '+escH(cc.ultimo)+'.';
+  var partes=cc.coletas.map(function(c){
+    var j='coleta das '+escH(c.inicio);
+    if(c.estado==='sem_corte') return '<span style="color:#b26a00">o corte da '+j+' não foi lançado</span>';
+    if(c.estado==='a_conferir') return '<span style="color:#b26a00">o corte da '+j+' não foi confirmado</span>';
+    var t=j+': corte às '+escH(c.corte)+(c.estado==='passou'?' (passou)':'');
+    return (cc.proxima&&c.inicio===cc.proxima.inicio)?'<b>'+t+'</b>':t;
+  });
+  return partes.join(' · ')+'.'+(cc.proxima?' Ainda pode entrar venda.':'');
+}
 async function avisoStatus(){
   var s=null;
   try{ s=await (await fetch('/api/revisao/status')).json(); }catch(e){ return; }
@@ -397,10 +419,10 @@ async function avisoStatus(){
   }
   var txt='', cor='#f4f6f8', bd='#d8dee6';
   if(!s.lancado){
-    txt='<b>Nenhuma venda lançada ainda hoje.</b><br><span style="color:#5a6472">O corte de hoje é às '+s.corte+'. Assim que a lista sair, ela aparece aqui.</span>';
+    txt='<b>Nenhuma venda lançada ainda hoje.</b><br><span style="color:#5a6472">'+fraseCorte(s)+' Assim que a lista sair, ela aparece aqui.</span>';
   } else if(s.urgentes===0){
     txt='<b style="color:#1565c0">Todas as vendas de hoje já estão em estoque.</b><br><span style="color:#5a6472">'+
-        (s.passouCorte?('Lista fechada às '+s.corte+'. '):('Corte às '+s.corte+' — ainda pode entrar venda. '))+
+        fraseCorte(s)+' '+
         'Trabalhe na reposição (tela azul).</span>';
   } else if(s.urgentesFalta>0){
     txt='<b style="color:#c62828">'+s.urgentesFalta+' peça(s) URGENTE(S) para hoje</b><br><span style="color:#5a6472">Cliente esperando. Priorize a tela vermelha.'
