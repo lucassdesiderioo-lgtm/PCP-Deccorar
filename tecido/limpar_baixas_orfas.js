@@ -42,14 +42,17 @@ async function fazerBackup(){
 }
 
 function aplicar(){
-  const lista=levantar();
+  /* levantar DENTRO da transacao, e conta o que de fato fechou: um pedido
+     recusado pela 616 entre a listagem e a gravacao nao entra no numero. */
+  let lista=[], fechados=0;
   db.transaction(()=>{
-    lista.forEach(o=>aprovacao.fecharPorCancelamento('baixa_boleto',o.boleto_id,
+    lista=levantar();
+    lista.forEach(o=>{ if(aprovacao.fecharPorCancelamento('baixa_boleto',o.boleto_id,
       'Boleto cancelado'+(o.cancelado_motivo?': '+o.cancelado_motivo:'')+
       ' (pedido fechado depois, pelo limpar_baixas_orfas.js)',
-      {nome:o.cancelado_por||null},o.cancelado_em));
+      {nome:o.cancelado_por||null},o.cancelado_em)) fechados++; });
   })();
-  return {fechados:lista.length, lista};
+  return {fechados, lista};
 }
 
 async function main(){
