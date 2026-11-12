@@ -181,7 +181,10 @@ caso('modelo que não existe: roteiro null, e a rota responde 404', () => {
 });
 caso('a tela diz por que não há roteiro', () => {
   const h = fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8');
-  verdade(/sem_ficha/.test(h) && /sob_medida'/.test(h), 'a tela trata os dois motivos');
+  verdade(/motivo==='sem_ficha'\?'este modelo não tem linha ativa na ficha\.'/.test(h), 'a frase do sem ficha');
+  verdade(/motivo==='sob_medida'\?'o sob medida tem a produção dele/.test(h), 'a frase do sob medida');
+  verdade(h.indexOf("FXROTEIRO.motivo==='sob_medida'") < h.indexOf("<b>Roteiro do modelo:</b>"),
+    'o motivo é tratado antes de desenhar as etapas');
 });
 caso('GET /api/formulas/roteiro/:modelo_id devolve o roteiro e as opções', () => {
   const h = R.get['/api/formulas/roteiro/:modelo_id'];

@@ -1064,7 +1064,7 @@ function render(){
   if(FXROTEIRO&&FXROTEIRO.motivo){
     h+='<div class="sub" style="margin-bottom:10px">Sem roteiro: '
       +(FXROTEIRO.motivo==='sob_medida'?'o sob medida tem a produção dele, e este roteiro é o da medida padrão.'
-        :FXROTEIRO.motivo==='sem_ficha'?'este modelo ainda não tem linha na ficha.'
+        :FXROTEIRO.motivo==='sem_ficha'?'este modelo não tem linha ativa na ficha.'
         :'—')+'</div>';
   }else if(FXROTEIRO){
     h+='<div style="margin-bottom:10px;font-size:14px"><b>Roteiro do modelo:</b> '

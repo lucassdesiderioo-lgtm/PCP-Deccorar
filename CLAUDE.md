@@ -5694,7 +5694,7 @@ não é:
   uma segunda verdade sobre a mesma ficha.
 - ⚠️ **NÃO SE INVENTA ROTEIRO** (③ REVISÃO): o modelo **sem linha ativa** (o
   acessório, a ficha vazia) volta sem etapas e a 404 diz *"Sem roteiro: este
-  modelo ainda não tem linha na ficha"*; o modelo **sob medida** fica de fora
+  modelo não tem linha ativa na ficha"*; o modelo **sob medida** fica de fora
   (tem a bancada dele, §19); o modelo que não existe é 404. Sem isso, o KIT32
   aparecia com "Montagem → Revisão → Embalagem", e a fase que ler o roteiro o
   poria na fila da montagem.
