@@ -4875,6 +4875,17 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 > boleto na 616 e na 204 desce, e a segunda rodada diz "nenhum". Prova que não foi
 > feita se escreve como não feita.
 
+> ⚠️ **O `detalhe` DA AUDITORIA RODA SOBRE O DADO JÁ PODADO, E DEPOIS DA ESCRITA**
+> (CONSERTO de 12/11/2026). O vendedor sem `preco.ver` (§23) clicava "Enviar" na
+> 611 e levava 500: o `detalhe` lia `d.preco.valor_total`, e o `preco` não viaja
+> para ele. O pedido já estava enviado, com número, mas a tela dizia erro e a
+> auditoria não gravava quem enviou. Duas coisas: o `detalhe` do enviar só
+> escreve o total se ele veio; e o `tecido/nucleo/registro.js` roda **todo**
+> `detalhe` num `try` próprio — se estourar, vai ao log, a linha da auditoria grava
+> quem fez com *"(detalhe falhou)"*, e a escrita que gravou responde 200.
+> **`detalhe` novo lê o resultado com guarda** (`d&&d.x`), lembrando que campo de
+> dinheiro pode ter sido podado. `pedido_enviar_sem_preco.test.js` (3).
+
 ### ⚠️ O CADASTRO DE PRODUTO — o que parece bug e não é (28/10/2026)
 
 Spec `docs/specs/SOBMEDIDA-CADASTRO-DE-PRODUTO.md`, as seis fases numa entrega
@@ -4945,7 +4956,7 @@ de material do PCP (marca e modelo): `node teste_componentes.js`. Todos os
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 903 casos
+cd tecido && npm test          # 906 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
