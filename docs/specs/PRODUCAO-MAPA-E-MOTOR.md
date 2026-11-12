@@ -1,4 +1,4 @@
-> **STATUS · 12/11/2026 — RASCUNHO v6, espera a aprovação do dono** · nada construído
+> **STATUS · 12/11/2026 — APROVADA pelo dono (v6)** · nada construído · próxima: fase 1
 > Reescrita sobre o processo que o dono descreveu em 11/11/2026 e as respostas de
 > 12/11/2026 (§10). A versão de 17/08/2026 está em
 > `docs/arquivo/PRODUCAO-MAPA-E-MOTOR-v1.md` (histórico, não é regra). Absorve a
@@ -224,7 +224,7 @@ e desconta do lote aberto.
 
 | # | Pergunta |
 |---|---|
-| A | **O bipe da etiqueta de cima do maço no Iniciar** (§2) — um bipe, para o maço fora de ordem não ligar as etiquetas aos itens errados. Ok? |
+| A | ✅ **O bipe da etiqueta de cima do maço no Iniciar** (§2): aprovado com a spec (12/11/2026) |
 
 ---
 
