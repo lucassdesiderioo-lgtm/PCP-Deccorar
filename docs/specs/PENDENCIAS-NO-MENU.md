@@ -33,8 +33,10 @@ Tipo: NOVIDADE
   um pedido esperando — o motivo da D11); a entrada de rolo de lá (aposentada)
   saiu da lista; a frase do cadastro a conferir diz "do sob medida" (ela aparece
   também na 502 do PCP).
-- ⚠️ **O total da TV e da linha da Etiqueta de Venda passa a contar o sob
-  medida** (é o mesmo número da 204). O jeito delas não mudou (D6).
+- **D14 (decisão do dono, 12/11/2026): a TV e a linha da Etiqueta de Venda
+  contam só a medida padrão.** O `total()` é o resumo da 204 sem as linhas do
+  sob medida; a 204 e a bolinha mostram tudo. Antes o número da bancada era
+  sempre o mesmo da 204; agora a diferença é o sob medida.
 - `teste_pendencias_sobmedida.js` (67) e `tecido/teste/pendencias_pcp.test.js` (8).
 
 ### Fase 2 — a etiqueta vermelha no ☰ Menu (12/11/2026, no ar desde 12/11/2026, PR #348)

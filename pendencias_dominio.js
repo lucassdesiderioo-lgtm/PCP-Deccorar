@@ -29,7 +29,7 @@ const PERM = require('./permissoes');
 /* Uma linha do sob medida: a conta é da porta, nunca daqui (#12). */
 function smLinha(o){
   const SMP = require('./sobmedida_pendencias');
-  return Object.assign({}, o, {
+  return Object.assign({}, o, { sobmedida:true,
     contar(){ return SMP.contar(o.tipo); },
     minha(db, p){ return SMP.contar(o.tipo, p.sm || null); }
   });
@@ -256,17 +256,27 @@ function resumo(db){
    da folha estao sem etiqueta (a que pode atrasar no ML). Quem opera a
    Etiqueta de Venda ou a Conferencia nao abre o admin, e sem isto a central
    so existia para quem ja estava la. */
+/* ⚠️ A TV E A BANCADA CONTAM SÓ A MEDIDA PADRÃO (D14, decisão do dono,
+   12/11/2026): as linhas do sob medida ficam na 204 e na bolinha do ☰ Menu de
+   quem resolve, e saem deste número — o pedido da revenda esperando aprovação é
+   fluxo de todo dia, e o vermelho da TV viraria paisagem para quem não tem o
+   que fazer com ele. É o mesmo resumo, sem as linhas `sobmedida` (nenhuma conta
+   nova, #12); a cancelada nas duas linhas é toda da medida padrão. */
+const doSobMedida = chave => { const L = LINHAS.find(x => x.chave === chave); return !!(L && L.sobmedida); };
+
 function total(db, pronto){
   const r = pronto || resumo(db);   // a rota já tem o resumo (gravou o retrato do dia com ele)
   const t = new Date(), z = n => String(n).padStart(2, '0');
   const hoje = Date.parse(t.getFullYear() + '-' + z(t.getMonth() + 1) + '-' + z(t.getDate()) + 'T00:00:00');
+  const linhas = r.linhas.filter(l => !doSobMedida(l.chave));
+  const totalPadrao = r.total - r.linhas.filter(l => doSobMedida(l.chave)).reduce((s, l) => s + (l.n || 0), 0);
   let dias = null;
-  r.linhas.forEach(l => {
+  linhas.forEach(l => {
     if(!l.n || !l.desde) return;
     const d = Math.round((hoje - Date.parse(String(l.desde).slice(0, 10) + 'T00:00:00')) / 86400000);
     if(isFinite(d) && (dias == null || d > dias)) dias = Math.max(0, d);
   });
-  return { total:r.total, dias, sem_etiqueta:r.sem_etiqueta };
+  return { total:totalPadrao, dias, sem_etiqueta:r.sem_etiqueta };
 }
 
 /* O QUE ESTA PESSOA RESOLVE (spec PENDENCIAS-NO-MENU, fase 2, 12/11/2026): a
