@@ -1,5 +1,5 @@
 /* abre_tela.js — "esta pessoa abre esta tela?", para as DUAS operações (spec
- * docs/specs/PENDENCIAS-NO-MENU.md, fase 3, 12/11/2026).
+ * docs/arquivo/PENDENCIAS-NO-MENU.md, fase 3, 12/11/2026).
  *
  * A medida padrão responde pelo portão do PCP (`acesso.decidir`). O sob medida
  * tem PORTÃO PRÓPRIO (tecido/montar.js), que o `decidir` não conhece: a resposta

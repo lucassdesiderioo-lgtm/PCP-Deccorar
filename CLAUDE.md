@@ -1202,7 +1202,7 @@ frase é texto montado.
 
 ### ⚠️ A AÇÃO QUE CRIA PENDÊNCIA MOSTRA A CAIXINHA "ABRIR EM PENDÊNCIAS" (12/11/2026)
 
-Spec `docs/specs/PENDENCIAS-NO-MENU.md`, fase 1; linha em `docs/DECISOES.md`. O
+Spec `docs/arquivo/PENDENCIAS-NO-MENU.md` (concluída em 12/11/2026), fase 1; linha em `docs/DECISOES.md`. O
 dono: *"quando fizer alguma coisa em uma tela e gerar pendências, colocar uma
 caixinha para clicar e ir para a tela de pendência — em todas as telas"*.
 
@@ -1331,7 +1331,7 @@ ou fornecedor criado na bancada (606).
   bolinha do ☰ Menu. O retrato diário (`pendencias_dia`) grava o total da 204.
 - **O `pendencias_aviso.js` passou a ser carregado também pelo `tecido/public/nav.js`.**
 
-⚠️ **Construído, falta subir** (12/11/2026).
+✅ **No ar desde 12/11/2026** (PR #350): o dono fez o deploy e disse *"tudo certo"*. ⚠️ **Ainda não provado com dado real:** as filas do sob medida aparecendo e sumindo com pendência de verdade, e a TV parada no número da medida padrão. Prova que não foi feita se escreve como não feita.
 
 **Rode `node teste_pendencias_sobmedida.js` (67) e `cd tecido && npm test`
 (`pendencias_pcp.test.js`) ao mexer no `pendencias_pcp.js`, na porta, nas linhas

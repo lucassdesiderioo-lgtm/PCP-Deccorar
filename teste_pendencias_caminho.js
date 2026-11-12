@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* teste_pendencias_caminho.js — a caixinha "Abrir em Pendências" (spec
- * docs/specs/PENDENCIAS-NO-MENU.md, fase 1, 12/11/2026).
+ * docs/arquivo/PENDENCIAS-NO-MENU.md, fase 1, 12/11/2026).
  *
  *   node teste_pendencias_caminho.js
  *

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* teste_pendencias_menu.js — a etiqueta vermelha das pendências no ☰ Menu
- * (spec docs/specs/PENDENCIAS-NO-MENU.md, fase 2, 12/11/2026).
+ * (spec docs/arquivo/PENDENCIAS-NO-MENU.md, fase 2, 12/11/2026).
  *
  *   node teste_pendencias_menu.js
  *

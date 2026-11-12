@@ -1,5 +1,5 @@
 /* dominio/pendencias_pcp.js — o que espera uma pessoa decidir no sob medida,
- * para a central de Pendências do PCP (spec docs/specs/PENDENCIAS-NO-MENU.md,
+ * para a central de Pendências do PCP (spec docs/arquivo/PENDENCIAS-NO-MENU.md,
  * fase 3, 12/11/2026).
  *
  * ⚠️ NENHUMA CONTA MORA AQUI (#12): cada fila é a MESMA função que a tela dona
