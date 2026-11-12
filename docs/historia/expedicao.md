@@ -1551,3 +1551,31 @@ O PDF real está no caderno (`casos/2026-11-12-nf-9738.json`), com a conta
 exigindo 48 = 48, 46 volumes e o segundo upload sem gravar nada. Cartão
 R-PDF-11.
 
+---
+
+### ⚠️ A NOTA DA ETIQUETA SEM "NF:" — conferida pelo número e pela UF (12/11/2026)
+
+A etiqueta de rota JADLOG não traz a linha "NF:". Desde sempre a nota dela
+era a **página seguinte** do PDF, sem conferir nada — o que funciona enquanto o
+ML mantém a ordem etiqueta, nota, etiqueta, nota. O dono perguntou o que
+impedia a caixa de sair com a nota de outro cliente: nada.
+
+**O que a nota traz para comparar** é pouco: o nome do destinatário e a UF.
+Medido nos dois PDFs de 12/11 (85 notas, todas as ligadas, inclusive as
+ligadas pelo número):
+
+| Critério | Resultado |
+|---|---|
+| nome do destinatário × comprador da etiqueta | **27 de 85 diferentes** — parente, empresa ("SERV FESTAS JNS LTDA"), condomínio, nome abreviado — e todas legítimas |
+| UF da nota × estado da "Cidade de destino" | **85 de 85 lidas, 0 diferentes** |
+
+Reter pelo nome pararia uma caixa em cada três: a armadilha #6. Ficaram as duas
+conferências que não acusam inocente: a nota não pode ser a NF que outra
+etiqueta diz, e a UF tem que bater. Retida, a nota **não** fica ligada — nota
+errada na caixa é pior que nota faltando. Passando, o volume ganha a NF, e a
+devolução passa a achá-lo por ela (antes, as três vendas JADLOG de cada PDF
+ficavam com a NF vazia).
+
+O que continua aberto: a troca de nota **dentro do mesmo estado**. Só o
+relatório do ML ou a integração fecham isso. Cartão R-CONF-07.
+

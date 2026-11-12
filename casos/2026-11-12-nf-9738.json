@@ -1683,6 +1683,30 @@
         "3xBK140140CINZA"
       ],
       "nota": "NF 9658: a única caixa de várias do PDF"
+    },
+    {
+      "chave": "48495189692",
+      "pecas": [
+        "1xBK150150BRANCO"
+      ],
+      "nf": "9719",
+      "nota": "etiqueta JADLOG sem 'NF:': a NF vem da nota da página seguinte, conferida (R-CONF-07)"
+    },
+    {
+      "chave": "48493069950",
+      "pecas": [
+        "1xBK180150BEGE"
+      ],
+      "nf": "9744",
+      "nota": "idem; a nota está em nome de empresa, e nome não retém"
+    },
+    {
+      "chave": "48490199401",
+      "pecas": [
+        "1xBK100100BRANCO"
+      ],
+      "nf": "9732",
+      "nota": "idem; a nota está em nome de outra pessoa da família"
     }
   ],
   "conta": {

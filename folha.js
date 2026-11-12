@@ -73,6 +73,36 @@ function nfDaNota(texto){
   return m?m[1].replace(/\D/g,'')||null:null;
 }
 
+/* A UF DO DESTINATARIO NA NOTA E O ESTADO DE DESTINO NA ETIQUETA (12/11/2026,
+   R-CONF-07). Servem a uma conferencia so: a da nota da etiqueta SEM "NF:"
+   (rota JADLOG), que e ligada pela ordem das paginas. O nome do destinatario
+   NAO serve: em 85 notas reais, 27 estavam em nome de parente, empresa ou
+   condominio. A UF bateu nas 85. Ilegivel devolve null e nao vota (#10). */
+function ufDaNota(texto){
+  const m=String(texto||'').match(/DESTINAT[AÁ]RIO[\s\S]*?\bUF:\s*([A-Z]{2})\b/i);
+  return m?m[1].toUpperCase():null;
+}
+const ESTADOS={'acre':'AC','alagoas':'AL','amapa':'AP','amazonas':'AM','bahia':'BA','ceara':'CE',
+  'distrito federal':'DF','espirito santo':'ES','goias':'GO','maranhao':'MA','mato grosso do sul':'MS',
+  'mato grosso':'MT','minas gerais':'MG','paraiba':'PB','parana':'PR','para':'PA','pernambuco':'PE',
+  'piaui':'PI','rio de janeiro':'RJ','rio grande do norte':'RN','rio grande do sul':'RS','rondonia':'RO',
+  'roraima':'RR','santa catarina':'SC','sao paulo':'SP','sergipe':'SE','tocantins':'TO'};
+/* "Cidade de destino: Niterói, Rio de" + "Janeiro" na linha de baixo: o
+   estado vem depois da ULTIMA virgula e pode quebrar de linha, entao a linha
+   seguinte entra junto — e o estado e o nome mais LONGO que casa no comeco
+   (Mato Grosso do Sul antes de Mato Grosso, Paraná e Paraíba antes de Pará). */
+function ufDaEtiqueta(lines){
+  const ls=(lines||[]).map(l=>String(l||''));
+  const k=ls.findIndex(l=>/Cidade de destino\s*:/i.test(l)); if(k<0) return null;
+  const linha=ls[k].replace(/^.*?Cidade de destino\s*:\s*/i,'');
+  const i=linha.lastIndexOf(','); if(i<0) return null;
+  const resto=(linha.slice(i+1)+' '+(ls[k+1]||'')).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/\s+/g,' ').trim();
+  const nome=Object.keys(ESTADOS).sort((a,b)=>b.length-a.length)
+    .find(e=>resto===e || resto.startsWith(e+' '));
+  return nome?ESTADOS[nome]:null;
+}
+
 /* Devolve {paginas, etiquetas:[{pagina,packId,venda,nf}], notas:[{pagina,nf}],
    blocos:[{packId,venda,sku}]}.
    Os blocos saem pelo tokenizer item a item — o mesmo criterio que o parse.js usa
@@ -643,4 +673,4 @@ function travasAtivas(volume, item, coresConhecidas){
 module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines,
                 pecasCruas,pecasDaFolhaInteira,
                 tipoDaPagina,nfDaNota,irmaosDoPacote,irmaosDe,tituloDoAnuncio,medidaDoTitulo,
-                etiquetasSemItem,pdfFecha,pecasDaCaixa,envioDaEtiqueta};
+                etiquetasSemItem,pdfFecha,pecasDaCaixa,envioDaEtiqueta,ufDaNota,ufDaEtiqueta};
