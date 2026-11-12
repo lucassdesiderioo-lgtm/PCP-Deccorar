@@ -4870,10 +4870,11 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 > boleto. ⚠️ **O descarte de sobra não ganhou o mesmo**: sobra usada no corte
 > continua esperando quem recuse com motivo, como sempre foi.
 >
-> ⚠️ **AINDA NÃO NO AR, E O SCRIPT AINDA NÃO RODOU NO SERVIDOR.** A prova: a
-> simulação lista os pedidos órfãos, o `--aplicar` os fecha, a linha da baixa de
-> boleto na 616 e na 204 desce, e a segunda rodada diz "nenhum". Prova que não foi
-> feita se escreve como não feita.
+> ✅ **NO AR DESDE 12/11/2026** (PR #352): o dono fez o deploy (`/login` 200) e
+> rodou o script — a simulação e o `--aplicar` acharam **0** pedidos órfãos, e
+> não havia nada a fechar. ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** o primeiro
+> boleto cancelado com uma baixa esperando, a baixa saindo da 616 e da 204 na
+> hora. Prova que não foi feita se escreve como não feita.
 
 ### ⚠️ O CADASTRO DE PRODUTO — o que parece bug e não é (28/10/2026)
 
