@@ -1,4 +1,5 @@
 > **STATUS · 12/11/2026 — RASCUNHO v2, espera a aprovação do dono** · nada construído
+> Q1, Q2, Q3 e Q7 respondidos pelo dono em 12/11/2026; Q4, Q5, Q6 e Q8 explicados, esperando a resposta.
 > Reescrita sobre o processo que o dono descreveu em 11/11/2026. A versão de
 > 17/08/2026 está em `docs/arquivo/PRODUCAO-MAPA-E-MOTOR-v1.md` (histórico, não é
 > regra). Absorve a `PRODUCAO-MONTAGEM.md` (a montagem é a fase 1 daqui).
@@ -83,17 +84,25 @@ Hoje ele mora na bancada e na cabeça de quem corta. A spec o põe no sistema co
 - **não é saldo de material** (o material continua saindo na embalagem, pela ficha):
   é só "quantas peças preparadas estão esperando".
 
-> **A pergunta que decide o desenho (Q2):** o tecido cortado conta por **SKU**
-> (tecido do BK160140BEGE) ou pela **cor e medida de corte**? O tubo e a base
-> servem a qualquer cor da mesma largura. A sugestão é a régua que a aba Corte e
-> separação já usa — **material + medida de corte** —, uma régua só.
+**Como cada item conta (Q2 e Q3, o dono em 12/11/2026):**
+
+| Item preparado | Conta por | Por quê |
+|---|---|---|
+| Tecido cortado | **cor + medida de corte** | a régua da aba Corte e separação (uma régua só, #12) |
+| Tubo e base | **medida de corte**, sem cor | *"tubo e base serve para qualquer cor"* |
+| Kit de comando | **pela altura** da persiana (o comprimento da corrente) | *"varia por medida da altura"* |
+| Kit de instalação | um só | é o kit que a embalagem já confere |
+
+Assim o tubo+base de 157 cortado para uma persiana bege serve à cinza da mesma
+largura, e a montagem desce o contador certo.
 
 ---
 
 ## 4. A montagem (etapa 5) — a primeira, e a que mais falta
 
-Tela nova **107 Montagem** (tablet), no jeito da revisão: bipa o SKU, monta N
-peças, bipa o fim com a quantidade. Grava quem, quando, o tempo e a quantidade
+Tela nova **107 Montagem** (tablet), no jeito da revisão, **dos dois jeitos**
+(Q1, o dono): **em lote** — bipa o SKU, monta N peças, bipa o fim com a
+quantidade — ou **uma peça por vez** (o lote de 1, sem digitar quantidade). Grava quem, quando, o tempo e a quantidade
 (`quem.js`). Fecha consumindo o tecido cortado e o tubo+base do contador.
 
 **O que ela entrega sozinha:** o tempo de montagem por SKU e por pessoa (hoje
@@ -123,7 +132,7 @@ A revisão (101) já registra a peça com problema. Com o motor, o motivo **apon
 etapa**: tecido → corte de tecido, tubo → corte de tubo, montagem → montagem. Sem
 etiqueta por peça, o sistema sabe **a etapa e o lote mais provável** (a última
 sessão daquele SKU), **não a pessoa certa** — e diz isso. Com etiqueta de lote
-(fase 5), ele sabe a pessoa.
+(fase 2), ele sabe a pessoa.
 
 ---
 
@@ -131,12 +140,11 @@ sessão daquele SKU), **não a pessoa certa** — e diz isso. Com etiqueta de lo
 
 | Fase | O quê | Risco |
 |---|---|---|
-| **1** | Motor + **107 Montagem**: sessão, quantidade, tempo, quem; a fila da revisão passa a ter origem | 🟡 |
-| **2** | **108 Preparo** (etapas 1 a 4) e o **contador do intermediário**, ligado à aba Corte e separação; a montagem e a embalagem descem o contador | 🔴 (schema) |
+| **1** | Motor + **107 Montagem** (em lote e uma por vez): sessão, quantidade, tempo, quem; a fila da revisão passa a ter origem | 🟡 |
+| **2** | **108 Preparo** (etapas 1 a 4), o **contador do intermediário** (pela régua do §3) e a **etiqueta de lote** (Zebra, como a do kit) no tecido cortado e no tubo+base — Q7, o dono: *"faz sentido entrar já"*; a montagem bipa a etiqueta e desce o contador | 🔴 (schema) |
 | **3** | **O roteiro na ficha**: a etapa de cada linha da 404 e as etapas de cada modelo | 🟡 |
 | **4** | **Rejeição com etapa**: o motivo da revisão aponta a etapa; a 104 mostra por etapa | 🟡 |
-| **5** | **Etiqueta de lote** (Zebra, como a do kit) no tecido cortado e no tubo+base: a montagem bipa, e a rejeição ganha a pessoa | 🔴 |
-| **6** | Indicadores: tempo por unidade por etapa na 904 (Por pessoa) e na 905 | 🟡 |
+| **5** | Indicadores: tempo por unidade por etapa na 904 (Por pessoa) e na 905 | 🟡 |
 
 Cada fase entrega valor sozinha. A fase 1 mede o buraco de hoje (a montagem).
 
@@ -146,13 +154,13 @@ Cada fase entrega valor sozinha. A fase 1 mede o buraco de hoje (a montagem).
 
 | # | Pergunta | Trava |
 |---|---|---|
-| Q1 | A montagem é **em lote do mesmo SKU** (bipa o SKU, monta 6, bipa o fim) ou uma peça por vez? | 1 |
-| Q2 | O tecido cortado conta por **SKU** ou por **cor + medida de corte**? (sugestão: a régua da aba Corte e separação) | 2 |
-| Q3 | Kit de comando: é **um só** ou varia (corrente pela altura, lado)? E o kit de instalação é sempre o mesmo? | 2 |
+| Q1 | ✅ **Dos dois jeitos** (12/11/2026) | 1 |
+| Q2 | ✅ Tecido por **cor + medida de corte**; tubo e base só pela medida, servem a qualquer cor (12/11/2026) | 2 |
+| Q3 | ✅ Kit de comando **varia pela altura** da persiana (12/11/2026) | 2 |
 | Q4 | Pausa dentro da sessão (almoço)? Ou vale o limite de bipe suspeito do sob medida (R-SMI-01)? | 1 |
 | Q5 | Faltou no contador: **avisa e passa** (sugestão, #6) ou trava? | 2 |
 | Q6 | Quem conta o estoque intermediário quando ele não bater? Entra no Inventário, ou basta corrigir na tela com motivo? | 2 |
-| Q7 | Etiqueta de lote: agora (fase 5) ou só depois de as fases 1 a 4 rodarem um tempo? | 5 |
+| Q7 | ✅ **Entra já**, junto com o preparo (fase 2) (12/11/2026) | 2 |
 | Q8 | O material continua saindo **só na embalagem** (decidido em 11/11). Consequência: o rolo cortado e ainda não montado continua contando no saldo de tecido. Fica assim? | — |
 
 ---
