@@ -972,6 +972,13 @@ upload.
 > conferência; e a de PDF já apagado aparece em "ficam sem NF". **Leia a
 > simulação antes do `--aplicar`.** Pasta errada é recusada (não cria banco
 > vazio). `node teste_gravar_nf_da_nota.js` (28).
+>
+> ✅ **APLICADO NO SERVIDOR EM 12/11/2026**: a simulação propôs **35** caixas (as
+> 6 de cima e 29 dos últimos 7 dias, todas `carregado`, cada uma com a nota
+> conferida — a #4066 é a NF 9124 do formato "Etiqueta válida para envíos"), e
+> o dono gravou as 35 com backup. Nenhuma ficou de fora por nota que não
+> confere. A rodada seguinte deu **"O QUE VOU GRAVAR (0)"**; as **216** que
+> sobram são de PDF já apagado de `lotes/`, e ficam sem NF de propósito.
 
 ### ⚠️ A ETIQUETA "Etiqueta válida para envíos" — sem "Despachar:", sem rota, sem endereço (04/11/2026)
 
