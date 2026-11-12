@@ -80,10 +80,8 @@ caso('traz o material com "vai para a ficha" desmarcado e o inativo marcados com
   igual(r.out.find(x => x.id === CAFE).vai_ficha, 0);
   igual(r.out.find(x => x.id === VELHO).ativo, 0);
 });
-caso('a ficha continua recusando no servidor o material com "vai para a ficha" desmarcado (R-CMP-02)', () => {
-  const src = fs.readFileSync(path.join(__dirname, 'ficha_route.js'), 'utf8');
-  verdade(/vai_ficha/.test(src), 'a trava continua na rota da fórmula');
-});
+/* A recusa do material com "vai para a ficha" desmarcado (R-CMP-02) é travada
+   de verdade no teste_material.js e no teste_fichas_material.js. */
 
 /* ── A PERMISSÃO ─────────────────────────────────────────────────────────── */
 const ac = { locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} };
