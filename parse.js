@@ -3,7 +3,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.js';
 /* A leitura crua do PDF mora toda no folha.js — inclusive "que pagina e esta" e
    "qual o numero desta nota". Aqui elas gravam; na auditoria elas conferem. */
 const {tipoDaPagina,nfDaNota,itensDaFolha,irmaosDe,irmaosDoPacote,etiquetasSemItem,
-       pecasDaCaixa,pecasCruas,pecasDaFolhaInteira} = require('./folha');
+       pecasDaCaixa,pecasCruas,pecasDaFolhaInteira,envioDaEtiqueta} = require('./folha');
 /* "Estes dois nomes sao a mesma pessoa?" e do nome.js, dono unico: a conferencia
    de NF faz a MESMA pergunta, e duas reguas discordariam sobre o mesmo cliente. */
 const {mesmoCliente} = require('./nome');
@@ -155,20 +155,9 @@ function nfDaEtiqueta(texto){
   const m=t.match(/NF:\s*(\d+)/) || t.match(/Nota\s+fi+scal\s*#\s*(\d+)/i);
   return m?m[1]:null;
 }
-/* O NUMERO DO CODIGO DE BARRAS DA ETIQUETA: a linha so de digitos, de 10 a 12
-   (o pdf.js a parte em dois: "484058 80346"). Pack e venda tem 16 e ficam de
-   fora. A etiqueta de sempre tambem tem essa linha; o que muda e que so a folha
-   nova a repete (no MEL), entao so ali ela vota. */
-function envioDaEtiqueta(lines){
-  for(const l of (lines||[])){
-    const t=String(l||'').trim();
-    if(!/^\d[\d ]*\d$/.test(t)) continue;
-    const d=t.replace(/\s+/g,'');
-    if(d.length>=10 && d.length<=12) return d;
-  }
-  return null;
-}
-
+/* O numero do codigo de barras da etiqueta (`envioDaEtiqueta`) mora no
+   folha.js desde 12/11/2026: a auditoria (lerFolha) tambem precisa dele, e o
+   folha.js nao pode depender deste arquivo. Ele continua exportado daqui. */
 function pageLines(tc){
   const items=tc.items.filter(it=>it.str&&it.str.trim()!=='');
   const rows={};
@@ -318,8 +307,12 @@ async function parsePdf(uint8){
     const despachoLinha=linhaDespacho(t);   // o texto cru, pro bloqueio dizer o que o ML escreveu
     const city=((t.match(/Cidade de destino\s*:\s*(.+)/)||[])[1]||'').trim();
     const buyer=nomeDaEtiqueta(lines);
-    if((packId&&seen.has('p:'+packId))||(venda&&seen.has('v:'+venda))) continue;
-    if(packId)seen.add('p:'+packId); if(venda)seen.add('v:'+venda);
+    /* A etiqueta so com "Envio:" (12/11/2026) nao tem pack nem venda: a
+       chave dela e o numero do envio. So ela usa essa chave — a etiqueta de
+       sempre continua sendo reconhecida pelo pack e pela venda. */
+    const chaveEnvio=(!packId && !venda && envio) ? envio : null;
+    if((packId&&seen.has('p:'+packId))||(venda&&seen.has('v:'+venda))||(chaveEnvio&&seen.has('e:'+chaveEnvio))) continue;
+    if(packId)seen.add('p:'+packId); if(venda)seen.add('v:'+venda); if(chaveEnvio)seen.add('e:'+chaveEnvio);
     const codes=new Set(); if(packId)codes.add(packId); if(venda)codes.add(venda);
     for(const ln of lines){ const c=ln.replace(/\s+/g,'');
       if(/^[0-9]{8,}$/.test(c)) codes.add(c);
@@ -551,7 +544,7 @@ async function parsePdf(uint8){
          a MESMA conta para medir a cobertura de cada uma e para achar caixa ja
          gravada com menos pecas do que a folha diz (rastrear.js --auditar). */
       leituras:{ bloco: r1?lido:null, item: (r2&&r2.qtd)?r2.qtd:null, crua: crua?crua.total:null },
-      buyer:buyer||'(sem nome)',city,nf,packId,venda,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
+      buyer:buyer||'(sem nome)',city,nf,packId,venda,envio,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
   }
   /* A CONTA DO PDF (leitura L4): quantas persianas a folha declara contra
      quantas o sistema decidiu gravar. Etiqueta sem item conta 1 — e o que ela

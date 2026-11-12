@@ -66,9 +66,10 @@ async function rodar(caso){
   const srv=app.listen(0); await new Promise(r=>srv.once('listening',r));
   try{
     const buf=await montarPdf(caso.paginas);
-    const r=await fetch('http://127.0.0.1:'+srv.address().port+'/api/lote/upload',{method:'POST',
+    const subir=()=>fetch('http://127.0.0.1:'+srv.address().port+'/api/lote/upload',{method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({pdf:'data:application/pdf;base64,'+buf.toString('base64')})});
+    const r=await subir();
     const corpo=await r.json();
     ok(caso.id+': o upload aceitou o PDF', r.status===200 && corpo.ok, JSON.stringify(corpo));
     /* A conta do PDF inteiro (opcional no caso): quais vendas a folha traz SEM
@@ -80,8 +81,32 @@ async function rodar(caso){
          JSON.stringify(vendas)===JSON.stringify((caso.conta.semEtiqueta||[]).slice().sort()), 'veio '+JSON.stringify(vendas));
       if(caso.conta.resto!=null) ok(caso.id+': sobram '+caso.conta.resto+' persiana(s) sem explicação', c.resto===caso.conta.resto, 'veio '+c.resto);
     }
+    /* O PDF inteiro (opcional no caso): quantos volumes entraram e quais
+       caixas levam mais de uma persiana (pela chave: pack, venda ou envio). */
+    const chaveDe=v=>v.packId||v.venda||v.envio||('#'+v.id);
+    if(caso.volumes!=null){
+      const n=db.prepare('SELECT COUNT(*) n FROM lote').get().n;
+      ok(caso.id+': entraram '+caso.volumes+' volume(s)', n===caso.volumes, 'entraram '+n);
+    }
+    if(caso.caixas_de_varias){
+      const varias=db.prepare(`SELECT l.* FROM lote l WHERE (SELECT COALESCE(SUM(qtd),0) FROM lote_item i WHERE i.lote_id=l.id)>1`).all()
+        .map(chaveDe).sort();
+      ok(caso.id+': as caixas de várias são só '+caso.caixas_de_varias.join(', '),
+         JSON.stringify(varias)===JSON.stringify(caso.caixas_de_varias.slice().sort()), 'veio '+JSON.stringify(varias));
+    }
+    /* Subir o MESMO PDF de novo não grava nada (R-PDF-06) — inclusive a venda
+       que só tem o número do envio. */
+    if(caso.repetir_upload){
+      const antes=db.prepare('SELECT COUNT(*) n FROM lote').get().n;
+      const r2=await subir(); const c2=await r2.json();
+      const depois=db.prepare('SELECT COUNT(*) n FROM lote').get().n;
+      ok(caso.id+': subir o mesmo PDF de novo não grava volume nenhum', r2.status===200 && depois===antes && c2.novos===0,
+         'antes '+antes+', depois '+depois+' · '+JSON.stringify({novos:c2.novos,repetidas:c2.repetidas}));
+    }
     for(const e of caso.esperado){
-      const v=db.prepare('SELECT * FROM lote WHERE packId=? OR venda=?').get(e.chave,e.chave);
+      /* Pela venda, pelo pack ou pelo número do envio (que entra nos `codes`
+         de toda etiqueta, e é a única chave da etiqueta só com "Envio:"). */
+      const v=db.prepare('SELECT * FROM lote WHERE packId=? OR venda=? OR codes LIKE ?').get(e.chave,e.chave,'%"'+e.chave+'"%');
       ok(caso.id+': a venda '+e.chave+' entrou', !!v);
       if(!v) continue;
       const itens=db.prepare('SELECT codigo,qtd FROM lote_item WHERE lote_id=? ORDER BY id').all(v.id);

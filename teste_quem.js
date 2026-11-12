@@ -145,7 +145,7 @@ const escritas = rotas.filter(r => /^(POST|PUT|PATCH|DELETE)$/.test(r.metodo));
     .forEach(([t,cs]) => ok('banco antigo: ' + t + ' termina em ' + cs.join(','), cv(t).slice(-cs.length).join(',') === cs.join(','), cv(t).slice(-3).join(',')));
   /* e a ordem do banco novo é a mesma (o id no fim de cada uma) */
   [['oferta',['atualizado_por_id']],['pedido_compra',['criado_por_id','pago_por_id','canal','loja','numero_externo','comprado_em','comprado_por','comprado_por_id','aprovacao','aprovado_por','aprovado_por_id','aprovado_em','motivo_aprovacao','rapida']],['recebimento',['recebido_por_id']],['correcao',['desfeita_por_id']],
-   ['lote',['resolvido_por_id','horario_id']],['venda_sem_etiqueta',['resolvida_por_id']],['pdf_conta_aberta',['resolvida_por_id']]]
+   ['lote',['resolvido_por_id','horario_id','envio']],['venda_sem_etiqueta',['resolvida_por_id']],['pdf_conta_aberta',['resolvida_por_id']]]
     .forEach(([t,cs]) => ok('banco novo: ' + t + ' termina em ' + cs.join(',') + ' (a mesma ordem do ALTER)', cols(t).slice(-cs.length).join(',') === cs.join(','), cols(t).slice(-3).join(',')));
   velho.close();
   const velho2 = new Database(path.join(tmp, 'velho2.db'));
@@ -157,15 +157,16 @@ const escritas = rotas.filter(r => /^(POST|PUT|PATCH|DELETE)$/.test(r.metodo));
       visto_em TEXT, ultimo_visto_em TEXT, resolvida_em TEXT, resolucao TEXT, resolvida_por TEXT, motivo TEXT, teste INTEGER DEFAULT 0);`);
   /* o lote de antes da fase 7: o CREATE de hoje sem a coluna nova */
   const createLote = (fs.readFileSync(path.join(__dirname, 'exp_route.js'), 'utf8').match(/db\.exec\("(CREATE TABLE IF NOT EXISTS lote \([^"]+)"\)/) || [])[1] || '';
-  /* desde 05/11/2026 o lote termina no horario_id (HORARIOS-DE-COLETA), que entra
-     por ALTER depois do resolvido_por_id: o banco antigo ganha os dois, nesta ordem */
-  ok('achei o CREATE do lote no exp_route.js', /resolvido_por_id INTEGER, horario_id INTEGER\)/.test(createLote));
-  velho2.exec(createLote.replace(', resolvido_por_id INTEGER, horario_id INTEGER)', ')'));
+  /* desde 05/11/2026 o lote termina no horario_id (HORARIOS-DE-COLETA), e desde
+     12/11/2026 no envio (a etiqueta so com "Envio:"), que entram por ALTER depois
+     do resolvido_por_id: o banco antigo ganha os tres, nesta ordem */
+  ok('achei o CREATE do lote no exp_route.js', /resolvido_por_id INTEGER, horario_id INTEGER, envio TEXT\)/.test(createLote));
+  velho2.exec(createLote.replace(', resolvido_por_id INTEGER, horario_id INTEGER, envio TEXT)', ')'));
   require('./estoque_dominio').garantirSchema(velho2);
   require('./exp_route')({ locals:{}, use(){}, get(){}, post(){}, put(){}, patch(){}, delete(){} }, velho2);
   const cv2 = t => velho2.prepare(`SELECT name FROM pragma_table_info('${t}')`).all().map(c => c.name);
   ['venda_sem_etiqueta','pdf_conta_aberta'].forEach(t => ok('banco antigo: ' + t + ' termina em resolvida_por_id', cv2(t).slice(-1)[0] === 'resolvida_por_id', cv2(t).slice(-2).join(',')));
-  ok('banco antigo: lote ganha o resolvido_por_id (e depois o horario_id) no fim', cv2('lote').slice(-2).join(',') === 'resolvido_por_id,horario_id', cv2('lote').slice(-2).join(','));
+  ok('banco antigo: lote ganha o resolvido_por_id (e depois o horario_id e o envio) no fim', cv2('lote').slice(-3).join(',') === 'resolvido_por_id,horario_id,envio', cv2('lote').slice(-3).join(','));
   velho2.close();
 
   /* ── 2. ESTÁTICA ─────────────────────────────────────────────────────── */
