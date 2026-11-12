@@ -1265,6 +1265,7 @@ module.exports = function(app, db){
     if(eq('/api/bloqueados')) return '@admin';
     // A central de pendencias (fase 1): so numeros, no topo da aba Pendencias.
     if(eq('/api/pendencias/resumo')) return '@admin';
+    if(eq('/api/pendencias/minhas')) return '@logado';   // só o que a própria pessoa resolve (PENDENCIAS-NO-MENU fase 2)
     if(eq('/api/pendencias/total')) return ['etiqueta.emitir','carregamento.executar','painel.ver','@admin'];
     // A bancada da Etiqueta de Venda: o que falta imprimir, o que vem depois,
     // o relógio do despacho e o bipe do SKU.
