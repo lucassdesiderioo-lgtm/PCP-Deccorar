@@ -1278,7 +1278,7 @@ total. Some quando zera; o título diz há quantos dias espera a mais antiga.
 - ⚠️ **O "QUEM CONFERIU NÃO SEPARA" E O "QUEM MARCOU NÃO CONFIRMA" SÃO PELO ID**,
   como nas rotas (`QUEM.mesmaPessoa` e `cancel_conf.podeDecidir` sobre o pedido
   inteiro): pelo nome, o homônimo sumia e o nome trocado enganava.
-  ⚠️ **Construído, falta subir** (12/11/2026). A TV e a linha da bancada não mudaram (D6).
+  ✅ **No ar desde 12/11/2026** (PR #348): o dono fez o deploy e disse *"deu tudo certo no deploy"*. ⚠️ **Ainda não provado com dado real:** a bolinha aparecendo e sumindo com pendência de verdade. A TV e a linha da bancada não mudaram (D6).
 
 **Rode `node teste_pendencias_caminho.js` (66) ao mexer no `pendencias_vigia.js`, no
 `tela`/`frase` das linhas da central, na caixinha do `pendencias_aviso.js` ou na

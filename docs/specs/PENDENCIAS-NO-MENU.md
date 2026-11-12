@@ -2,7 +2,7 @@
 
 ```
 STATUS
-Situação: EM CONSTRUÇÃO · aprovada pelo dono em 12/11/2026 · fase 1 no ar desde 12/11/2026 (PR #346; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: o primeiro PDF que retém uma caixa mostrando a caixinha na 103 · fase 2 construída e revisada, falta subir · próxima: fase 3
+Situação: EM CONSTRUÇÃO · aprovada pelo dono em 12/11/2026 · fase 1 no ar desde 12/11/2026 (PR #346; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: o primeiro PDF que retém uma caixa mostrando a caixinha na 103 · fase 2 no ar desde 12/11/2026 (PR #348; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: a bolinha aparecendo e sumindo com pendência de verdade, e quem pediu o ajuste não a vendo · próxima: fase 3
 Criada em: 12/11/2026
 Última atualização: 12/11/2026
 Fases: 1 ☑  2 ☑  3 ☐
@@ -12,7 +12,7 @@ Depende de: a central de Pendências (docs/arquivo/CENTRAL-DE-PENDENCIAS.md, a 2
 Tipo: NOVIDADE
 ```
 
-### Fase 2 — a etiqueta vermelha no ☰ Menu (12/11/2026, construída, falta subir)
+### Fase 2 — a etiqueta vermelha no ☰ Menu (12/11/2026, no ar desde 12/11/2026, PR #348)
 
 - `pendencias_dominio.minhas` + `GET /api/pendencias/minhas` (`@logado`, quem é
   vem do login): por tela e o total, só números. A forma do fio mudou da §3.1:
