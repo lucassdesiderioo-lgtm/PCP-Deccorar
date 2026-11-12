@@ -158,7 +158,7 @@ Cada fase entrega valor sozinha. A fase 1 mede o buraco de hoje (a montagem).
 | Q2 | ✅ Tecido por **cor + medida de corte**; tubo e base só pela medida, servem a qualquer cor (12/11/2026) | 2 |
 | Q3 | ✅ Kit de comando **varia pela altura** da persiana (12/11/2026) | 2 |
 | Q4 | Pausa dentro da sessão (almoço)? Ou vale o limite de bipe suspeito do sob medida (R-SMI-01)? | 1 |
-| Q5 | Faltou no contador: **avisa e passa** (sugestão, #6) ou trava? | 2 |
+| Q5 | ✅ **Avisa e passa**: o contador fica negativo com aviso (12/11/2026) | 2 |
 | Q6 | Quem conta o estoque intermediário quando ele não bater? Entra no Inventário, ou basta corrigir na tela com motivo? | 2 |
 | Q7 | ✅ **Entra já**, junto com o preparo (fase 2) (12/11/2026) | 2 |
 | Q8 | O material continua saindo **só na embalagem** (decidido em 11/11). Consequência: o rolo cortado e ainda não montado continua contando no saldo de tecido. Fica assim? | — |
