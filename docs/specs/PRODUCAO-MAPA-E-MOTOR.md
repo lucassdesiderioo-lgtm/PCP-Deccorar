@@ -1,4 +1,4 @@
-> **STATUS · 12/11/2026 — RASCUNHO v4, espera a aprovação do dono** · nada construído
+> **STATUS · 12/11/2026 — RASCUNHO v5, espera a aprovação do dono** · nada construído
 > Reescrita sobre o processo que o dono descreveu em 11/11/2026 e as respostas de
 > 12/11/2026 (§10). A versão de 17/08/2026 está em
 > `docs/arquivo/PRODUCAO-MAPA-E-MOTOR-v1.md` (histórico, não é regra). Absorve a
@@ -58,13 +58,34 @@ da etiqueta, porque quem corta tubo tem que cortar base também."*
 |---|---|---|---|
 | 1 Corte de tecido | o SKU (a cor e a medida saem dele) e quantas cortou | N tecidos cortados | **uma por peça**, sequencial (TC) |
 | 2 Corte de tubo e base | a medida e quantas: *"10 de 177, 5 de 157"* | N tubos + N bases | **uma por tubo**, sequencial (TB); a base vai junto, sem etiqueta |
-| 3 Kit de comando | a altura e quantos: *"100 kits de 1,60"* | N kits | **uma por kit**, sequencial (KC) |
-| 4 Kit de instalação | quantos | N kits | **uma por kit**, sequencial (KI) |
+| 3 Kit de comando (o comando com a corrente montada) | a medida da corrente e quantos: *"100 kits de 1,60"* | N kits | **uma por kit**, sequencial (KC) |
+| 4 Kit de instalação (único, um por persiana) | quantos | N kits | **uma por kit**, sequencial (KI) |
 | 5 Montagem | bipa o tecido e o tubo de cada persiana | a persiana | — (vai para a revisão) |
 
-**Cada etapa abre e fecha o lote** (bipe de início e de fim): é daí que sai a
-produtividade — *"quantas peças uma pessoa faz no dia"*. A etiqueta leva o número, o
-item, a data e quem fez.
+**As etiquetas são impressas ANTES, em maço** (o dono: *"deixar uma pancada de
+etiqueta impressa na mesa do tecido, na bancada da serralheria, e quando tiver
+acabando a gente vai imprimindo mais"*). Cada maço é uma faixa sequencial de um
+tipo (TC 000001 a 000500, por exemplo), com o número e o código de barras, **sem o
+item**: o item se liga à etiqueta quando ela é usada. Etiqueta impressa e não usada
+**não é** pré-fabricação.
+
+**Cada pessoa abre e fecha o lote** (o dono: *"ela coloca que iniciou e assinala as
+quantidades e os SKUs que ela está cortando, e quando terminar diz que terminou —
+assim fecha"*):
+
+```
+INICIAR ─▶ assinala os itens e as quantidades ─▶ cola as etiquetas do maço ─▶ TERMINEI
+           "BK160140BEGE · 10"                    TC 000041 … 000050
+           "tubo 177 · 10 · tubo 157 · 5"         TB 000301 … 000315
+```
+
+- **No "terminei", a pessoa bipa a primeira e a última etiqueta de cada item** (a
+  proposta, §9-A): o sistema liga a faixa ao item e confere que ela tem **o mesmo
+  número de etiquetas que a quantidade** e que nenhuma já foi usada. Não bateu, não
+  fecha, e a tela diz o porquê.
+- **O tempo** é do início ao fim do lote, e por unidade é o tempo ÷ a quantidade —
+  é daí que sai *"o que cada pessoa está fazendo na fábrica"* e quantas peças faz no
+  dia.
 
 **O roteiro é da ficha:** cada linha da 404 diz em que etapa o material é preparado
 (uma caixinha a mais, como a "vai para o planejamento" de 10/11).
@@ -113,8 +134,12 @@ Tubo 38 (barra 6 m) ....... saldo  60 m  =  45 m em barra +  15 m já cortados (
 - **Etiqueta já usada é recusada**, dizendo quando e por quem foi montada. A que não
   serve àquele SKU também (*"este tecido é 157 × 155; o BK160140BEGE pede 157 ×
   145"*; *"este tubo é 177; o SKU pede 157"*).
-- **Etiqueta perdida:** reimprime-se pela 108, com o mesmo número (como a do sob
-  medida, R-SMT-04).
+- **Etiqueta perdida ou estragada depois de colada:** reimprime-se pela 108, com o
+  mesmo número (como a do sob medida, R-SMT-04).
+- **A embalagem bipa a etiqueta do kit de comando e a do kit de instalação** para
+  fechar a persiana (o dono, 12/11/2026), no lugar do código fixo do kit que se bipa
+  hoje (R-EMB-01). Entra na fase 4, quando os kits já tiverem etiqueta: até lá a
+  embalagem fica como está.
 
 ---
 
@@ -126,14 +151,15 @@ quem, quando, o tempo e as etiquetas (`quem.js`). Rota `/montagem-persiana`: a
 `/montagem` é a Embalagem (102) e não muda.
 
 **108 Preparo** (tablet), com as etapas que a pessoa tem chave: corte de tecido,
-corte de tubo e base, kit de comando, kit de instalação. Abre o lote, diz o item e
-a quantidade, fecha e **imprime as etiquetas do lote**. A lista do que fazer é a da
+corte de tubo e base, kit de comando, kit de instalação. **Iniciar**, assinalar os
+itens e as quantidades, **Terminei** (com a faixa de etiquetas). E **imprimir um maço
+de etiquetas** de cada tipo, quando estiver acabando. A lista do que fazer é a da
 aba Corte e separação **menos o que já está na pré-fabricação** (nada de conta nova,
 #12).
 
 ---
 
-## 6. Que a pré-fabricação não fique largada nem bagunçada (Q6 — a confirmar)
+## 6. Que a pré-fabricação não fique largada nem bagunçada (Q6 — ok do dono)
 
 O dono: *"quero algo que funcione mas que não seja largado e nem bagunçado. E também
 não quero nada engessado."* Como cada peça tem etiqueta:
@@ -179,9 +205,7 @@ e desconta do lote aberto.
 
 | # | Pergunta |
 |---|---|
-| A | O **"comando montado"** é um item separado do **kit de comando**? (Se for, ganha etiqueta própria e uma linha na tabela do §2.) |
-| B | Onde o kit sai da pré-fabricação: **a embalagem bipa a etiqueta do kit** (KI e KC) no lugar do código fixo do kit de hoje (R-EMB-01), ou o kit de comando entra já na **montagem**? |
-| C | O desenho do §6 (conferência pelo bipe, a idade em Pendências) serve? |
+| A | **Como a etiqueta do maço se liga ao lote:** no "terminei", a pessoa bipa **a primeira e a última** etiqueta de cada item (a proposta), ou **bipa cada etiqueta** ao colar (mais exato, mais bipe)? |
 
 ---
 
@@ -197,6 +221,10 @@ e desconta do lote aberto.
 | Q7 | Etiqueta agora ou depois | **Agora**, junto com o corte |
 | Q8 | O rolo cortado continua no saldo? | **Sim, a baixa continua na embalagem**; a compra vê o cortado separado do fechado (§3) |
 | — | Kits | **Etiqueta sequencial também**, com início e fim do lote, para a produtividade e para montar antes de acabar |
+| — | O que é cada kit | **Kit de comando** = o comando com a corrente montada, varia pela medida da corrente; **kit de instalação** = único, um por persiana |
+| — | A saída do kit | **A embalagem bipa as etiquetas** do kit de comando e do de instalação para fechar a persiana (fase 4) |
+| — | As etiquetas | **Impressas antes, em maço**, na mesa do tecido e na bancada da serralheria; imprime-se mais quando acabar |
+| Q6 | A pré-fabricação largada | **Ok** ao desenho do §6 |
 
 ---
 
@@ -205,9 +233,9 @@ e desconta do lote aberto.
 | Fase | O quê | Risco |
 |---|---|---|
 | **1** | **O roteiro na ficha**: a etapa de cada linha da 404 e as etapas de cada modelo | 🟡 |
-| **2** | **108 Preparo — corte** de tecido e de tubo e base: o lote, a etiqueta sequencial, a pré-fabricação e o "já cortado" na 1101 e na 501 | 🔴 (schema, etiqueta) |
+| **2** | **108 Preparo — corte** de tecido e de tubo e base: o maço de etiquetas, o lote (iniciar, assinalar, terminei), a pré-fabricação e o "já cortado" na 1101 e na 501 | 🔴 (schema, etiqueta) |
 | **3** | **107 Montagem**: em lote e uma por vez, bipando as duas etiquetas; a fila da revisão com origem | 🔴 |
-| **4** | **108 — kits** de comando e de instalação, com etiqueta; a saída do kit (resposta B); a conferência da pré-fabricação (§6) | 🔴 (mexe no bipe da embalagem, se B) |
+| **4** | **108 — kits** de comando e de instalação, com etiqueta; **a embalagem bipa as duas etiquetas de kit** no lugar do código fixo; a conferência da pré-fabricação (§6) | 🔴 (mexe no bipe da embalagem) |
 | **5** | **Rejeição com etapa e pessoa** (101, 104) | 🟡 |
 | **6** | **O cartão de ponto** (a pausa) e os indicadores: tempo por unidade por etapa na 904 e na 905 | 🟡 |
 
@@ -234,6 +262,7 @@ cadastro da pessoa (901).
 | Cortar tubo e base | `producao.cortar_tubo` | Operação | 108 | não |
 | Montar kit de comando | `producao.kit_comando` | Operação | 108 | não |
 | Montar kit de instalação | `producao.kit_instalacao` | Operação | 108 | não |
+| Imprimir maço de etiquetas | `producao.etiqueta` | Operação | 108 | não |
 | Conferir a pré-fabricação, marcar perdida, corrigir lote | `producao.corrigir` | Supervisor | 107 / 108 | **sim** |
 
 Nenhuma chave mexe em saldo (o material baixa na embalagem, como hoje). Setores
