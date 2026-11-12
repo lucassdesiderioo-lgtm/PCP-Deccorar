@@ -33,3 +33,69 @@
     desenhar(el); setInterval(function(){ desenhar(el); }, 60000);
   };
 })();
+
+/* A CAIXINHA "ABRIR EM PENDÊNCIAS" (spec PENDENCIAS-NO-MENU, fase 1,
+ * 12/11/2026). O dono: "quando fizer alguma coisa em uma tela e gerar
+ * pendências, colocar uma caixinha para clicar e ir para a tela de pendência
+ * — em todas as telas".
+ *
+ * Quem sabe que a ação criou pendência é o SERVIDOR (pendencias_vigia.js): a
+ * resposta traz `pendencias`. Aqui só se desenha — e por isso vale para toda
+ * tela que carrega o nav.js, sem cada uma lembrar de chamar nada: o `fetch`
+ * da página é embrulhado, e a resposta de um POST com `pendencias` abre a
+ * caixinha. A resposta que a tela recebe é a mesma (é lida uma cópia).
+ *
+ * Fica até a pessoa fechar no ✕: pendência que some sozinha é a que ninguém
+ * viu. O botão só aparece para quem abre a tela dona; quem não abre lê a frase
+ * e quem resolve. Na própria tela dona, a frase diz "está nesta tela".
+ */
+(function(){
+  if(window.__pendCaixa || !window.fetch) return;
+  window.__pendCaixa = true;
+  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function aqui(rota){ return rota && (location.pathname.replace(/\/$/, '') || '/') === rota; }
+  function mostrar(lista){
+    var el = document.getElementById('pendCaixa');
+    if(!el){
+      el = document.createElement('div'); el.id = 'pendCaixa'; el.setAttribute('role', 'alert');
+      el.style.cssText = 'position:fixed;right:16px;bottom:64px;z-index:9998;max-width:min(460px,calc(100vw - 32px));'
+        + 'box-sizing:border-box;padding:12px 40px 12px 14px;border-radius:10px;border:2px solid #c62828;background:#fdecea;'
+        + 'color:#8e1b1b;font:600 15px/1.35 system-ui,sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.25)';
+      document.body.appendChild(el);
+      el.addEventListener('click', function(e){ if(e.target && e.target.getAttribute('data-pendfechar') != null) el.remove(); });
+    }
+    /* A NOVA SE SOMA À QUE ESTÁ NA TELA (③ REVISÃO): a 103 sobe vários PDFs
+       seguidos, e o terceiro apagava o aviso do primeiro — pendência que some
+       sem ninguém fechar é a que ninguém viu. A mais nova fica em cima; o ✕
+       fecha todas. */
+    if(!el.querySelector('[data-pendfechar]')) el.innerHTML = '<button type="button" data-pendfechar aria-label="Fechar" style="position:absolute;top:6px;right:8px;border:0;background:none;'
+      + 'color:#8e1b1b;font-size:22px;line-height:1;cursor:pointer;padding:4px">✕</button><div class="pendCaixaLista" style="max-height:40vh;overflow:auto"></div>';
+    var h = '';
+    lista.forEach(function(p){
+      h += '<div class="pendCaixaLinha" style="margin:2px 0 8px">⚠ ' + esc(p.frase);
+      if(aqui(p.rota)) h += ' — <span style="font-weight:400">está nesta tela.</span>';
+      else if(p.pode && p.rota) h += '<div style="margin-top:6px"><a href="' + esc(p.rota) + '" style="display:inline-block;padding:8px 12px;'
+        + 'border-radius:8px;background:#c62828;color:#fff;text-decoration:none;font-weight:700">Abrir em ' + esc((p.tela ? p.tela + ' ' : '') + (p.nome_tela || 'Pendências')) + ' →</a></div>';
+      else h += '<div style="font-weight:400;margin-top:4px">Quem resolve: ' + (/^nível /.test(p.quem || '') ? 'quem é de ' + esc(p.quem) : 'quem tem a permissão “' + esc(p.quem) + '”') + '.</div>';
+      h += '</div>';
+    });
+    el.querySelector('.pendCaixaLista').insertAdjacentHTML('afterbegin', h);
+  }
+  window.mostrarPendencias = mostrar;
+  var original = window.fetch;
+  window.fetch = function(entrada, op){
+    var p = original.apply(this, arguments);
+    var metodo = String((op && op.method) || (entrada && entrada.method) || 'GET').toUpperCase();
+    if(metodo !== 'POST') return p;
+    return p.then(function(r){
+      try{
+        var tipo = r.headers && r.headers.get && r.headers.get('content-type') || '';
+        if(/json/i.test(tipo)) r.clone().json().then(function(j){
+          if(j && j.pendencias && j.pendencias.length) mostrar(j.pendencias);
+        }).catch(function(){});
+      }catch(e){}
+      return r;
+    });
+  };
+})();
+

@@ -80,6 +80,12 @@ function desenharMenu(){
   sc.onerror=function(){ var m=document.getElementById('menuTelas'); if(m) m.innerHTML='<div class="mnVazio">Não deu para carregar o menu. Recarregue a página.</div>'; };
   document.head.appendChild(sc);
 })();
+/* A caixinha "Abrir em Pendências" (spec PENDENCIAS-NO-MENU, fase 1) mora no
+   pendencias_aviso.js: toda tela com o nav.js a recebe, sem lembrar de nada. */
+(function(){
+  if(location.pathname.indexOf('/login')===0 || (typeof window!=='undefined' && window.__pendCaixa)) return;
+  var sc=document.createElement('script'); sc.src='/pendencias_aviso.js'; document.head.appendChild(sc);
+})();
 /* SÓ ESCONDE, NUNCA FORÇA A APARECER: a regra pega o botão cuja marca não
    tem NENHUMA chave da pessoa. O que ela tem segue a tela — se a própria tela
    esconde o botão (`display:none` no estilo), ele continua escondido. Um
