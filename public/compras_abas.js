@@ -139,13 +139,21 @@
       var filtro = '';
       function linhas(){
         var f = filtro.toLowerCase();
-        return comps.filter(function(c){ return !f || (c.nome + ' ' + (c.categoria || '') + ' ' + (c.almoxarifado_nome || '')).toLowerCase().indexOf(f) >= 0; })
+        return comps.filter(function(c){ return !f || (c.nome + ' ' + (c.codigo_cadastro || '') + ' ' + (c.codigo || '') + ' ' + (c.categoria || '') + ' ' + (c.almoxarifado_nome || '')).toLowerCase().indexOf(f) >= 0; })
           .map(function(c){
-            return '<tr' + (c.ativo ? '' : ' style="opacity:.55"') + '><td><b>' + esc(c.nome) + '</b>' + (c.codigo ? '<div class="sub">' + esc(c.codigo) + '</div>' : '') + '</td>'
+            /* O codigo de cadastro (MAT-0001), o "usado em" das duas fichas e o
+               consumido no mes por operacao (FICHAS-NO-CADASTRO-UNICO). */
+            var us = (c.usado_em || []);
+            var usado = us.length ? us.map(function(u){ return '<div class="sub">' + (u.operacao === 'sobmedida' ? 'Sob medida' : 'Medida padrão') + ' · ' + esc(u.modelo) + ' · <code>' + esc(u.expressao) + '</code></div>'; }).join('')
+              : '<div class="sub">em ficha nenhuma</div>';
+            var cm = c.consumo_mes || {};
+            var est = c.como_sai === 'ficha' ? '' : ' <span class="cmpChip">estimado</span>';
+            var consumo = (cm.padrao || cm.sobmedida) ? '<div class="sub">no mês: padrão ' + n3(cm.padrao || 0) + ' · <span style="white-space:nowrap">sob medida ' + n3(cm.sobmedida || 0) + ' ' + esc(c.unidade || '') + '</span>' + est + '</div>' : '';
+            return '<tr' + (c.ativo ? '' : ' style="opacity:.55"') + '><td><b>' + esc(c.nome) + '</b><div class="sub"><code>' + esc(c.codigo_cadastro || '') + '</code>' + (c.codigo ? ' · ' + esc(c.codigo) : '') + '</div>' + usado + '</td>'
               + '<td>' + esc(c.categoria || '—') + '</td><td>' + esc((OPC.modos.find(function(m){ return m.valor === c.modo_saldo; }) || {}).nome || '—') + '</td>'
               + '<td>' + (c.almoxarifado_nome ? esc(c.almoxarifado_nome) : '<span class="cmpChip am">sem almoxarifado</span>') + '</td>'
               + '<td>' + (c.vai_ficha === 0 ? '<span class="cmpChip">fora da ficha</span>' : '<span class="cmpChip vd">vai para a ficha</span>') + '</td>'
-              + '<td>' + n3(c.estoque) + ' ' + esc(c.unidade || '') + '</td>'
+              + '<td>' + n3(c.estoque) + ' ' + esc(c.unidade || '') + (c.como_sai === 'ficha' ? '<div class="sub">sai pela ficha</div>' : '') + consumo + '</td>'
               + '<td><button class="ghost" data-mat-edit="' + c.id + '">Editar</button></td></tr>';
           }).join('');
       }
@@ -154,7 +162,7 @@
         + 'O <b>modo de saldo</b> decide como o material é recebido e contado: <b>sem saldo</b> (café, detergente — um toque "chegou tudo"), <b>por quantidade</b> (tubo, comando — contagem cega) '
         + 'ou <b>por volume</b> (rolo de tecido — um registro por volume, com etiqueta e endereço).</div>'
         + (pend && pend.sem_almoxarifado && pend.sem_almoxarifado.n ? '<div class="cmpAvi">' + pend.sem_almoxarifado.n + ' material(is) sem almoxarifado: o Recebimento não sabe para onde levar e a contagem não os acha.</div>' : '')
-        + '<input id="matFiltro" placeholder="filtrar por nome, categoria ou almoxarifado" style="width:100%;max-width:420px;margin:6px 0 10px">'
+        + '<input id="matFiltro" placeholder="nome, código MAT-0001, categoria ou almoxarifado" style="width:100%;max-width:460px;margin:6px 0 10px">'
         + '<div class="cmpRola"><table class="cmpTab"><thead><tr><th>Material</th><th>Categoria</th><th>Saldo</th><th>Almoxarifado</th><th>Ficha</th><th>Estoque</th><th></th></tr></thead><tbody id="matLinhas">' + linhas() + '</tbody></table></div>'
         + '<div class="row-actions" style="margin-top:12px"><button class="primary" data-perm="componente.cadastrar" data-mat-edit="novo">+ Material novo</button></div></div>'
         + '<div id="matForm"></div>';

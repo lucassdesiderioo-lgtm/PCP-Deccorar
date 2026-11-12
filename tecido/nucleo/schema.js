@@ -2027,6 +2027,7 @@ ALTER TABLE sm_faixa_suporte_nova RENAME TO sm_faixa_suporte;
 ALTER TABLE auditoria ADD COLUMN usuario_id INTEGER;
 CREATE INDEX idx_auditoria_usuario ON auditoria(usuario_id);
 `}
+
 ];
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -2118,6 +2119,53 @@ CREATE TRIGGER sobra_nivel_pcp_upd AFTER UPDATE OF nivel_id ON sobra BEGIN
       JOIN haste h ON h.id=a.haste_id JOIN armazem ar ON ar.chave=h.armazem_chave WHERE n.id=NEW.nivel_id AND n.pcp_id IS NOT NULL)
   WHERE id=NEW.id;
 END;
+`});
+
+// FICHAS-NO-CADASTRO-UNICO (11/11/2026), depois das 40 e 41 da COMPRAS-E-RECEBIMENTO.
+MIGRACOES.push({n:42, nome:'a lista de material da ficha aponta o cadastro de material do PCP', sql:`
+/* === A LISTA DE MATERIAL DA FICHA ===========================================
+   Spec FICHAS-NO-CADASTRO-UNICO (11/11/2026, decisao do dono): as duas fichas
+   tecnicas puxam do MESMO cadastro de material, o do PCP (tela 1101). A ficha
+   deste modulo tem as PECAS (sm_ficha_linha: o setor, a etiqueta, o preco do
+   adicional), e ganha ao lado a lista de MATERIAL: o parafuso, a corrente, o
+   que nao e peca de producao.
+
+   componente_pcp_id e o id do componente do dados.db (o banco e outro: nao ha
+   chave estrangeira). nome e unidade sao o RETRATO do cadastro quando a linha
+   foi gravada, para a tela nao ficar muda se a porta cair.
+
+   expressao: a mesma linguagem da ficha da 404 (formula.js do PCP, a unica
+   porta que avalia formula), com largura e altura em CENTIMETROS. O resultado
+   e na unidade do material. quando: a mesma regua das pecas. */
+CREATE TABLE sm_ficha_material (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  modelo_id INTEGER NOT NULL REFERENCES sm_modelo(id),
+  componente_pcp_id INTEGER NOT NULL,
+  nome TEXT, unidade TEXT,
+  expressao TEXT NOT NULL,
+  quando TEXT NOT NULL DEFAULT 'sempre',
+  ordem INTEGER NOT NULL DEFAULT 0,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX idx_sm_ficha_material ON sm_ficha_material(modelo_id);
+
+/* A LISTA CONGELADA NA APROVACAO, como a ficha explodida (secao 4.11): mudar a
+   formula amanha nao mexe na persiana aprovada hoje. E dela que a embalagem
+   baixa o material (fase 4), uma vez por peca: baixado_em marca que ja foi.
+   A peca embalada de novo depois de uma recusa NAO baixa outra vez. */
+CREATE TABLE sm_pedido_material (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL REFERENCES sm_pedido_item(id),
+  componente_pcp_id INTEGER NOT NULL,
+  nome TEXT, unidade TEXT,
+  quantidade REAL NOT NULL,
+  baixado_em TEXT, baixa_resultado TEXT,
+  -- quem embalou e quando: a baixa que esperou (modo teste do PCP) sai em nome
+  -- de quem embalou, na data da embalagem, e nao de quem embalou a seguinte
+  embalado_por TEXT, embalado_por_id INTEGER, embalado_em TEXT
+);
+CREATE INDEX idx_sm_pedido_material ON sm_pedido_material(item_id);
 `});
 
 function aplicar(db){

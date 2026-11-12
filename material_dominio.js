@@ -20,12 +20,37 @@ class Recusa extends Error{ constructor(status, msg){ super(msg); this.status = 
 
 const MODOS = ['sem', 'quantidade', 'volume'];
 const NOME_MODO = { sem:'sem saldo (não se conta)', quantidade:'por quantidade', volume:'por volume etiquetado' };
-const COMO_SAI_FICHA_LIGADA = false;
+/* ⚠️ DESDE 11/11/2026 A SAIDA PELA FICHA EXISTE (spec FICHAS-NO-CADASTRO-UNICO,
+   fase 4; decisao do dono em DECISOES.md — muda a R-CMP-09). Ela nao espera mais
+   a montagem: o momento e a EMBALAGEM, nas duas operacoes. E vale MATERIAL POR
+   MATERIAL, com duas condicoes (podeSairPelaFicha):
+     - por QUANTIDADE: o material por volume (o rolo) tem o saldo pela soma dos
+       volumes (R-CMP-39), e uma baixa pela ficha o desmancharia; o "sem saldo"
+       nao tem saldo para baixar;
+     - com UMA CONTAGEM RESOLVIDA na 504: e ela que da o saldo de partida. Sem
+       ela, a ficha baixaria de um numero que ninguem conferiu. */
+const COMO_SAI_FICHA_LIGADA = true;
 const COMO_SAI = [
   { valor:'contagem', nome:'pela contagem' },
-  { valor:'ficha', nome:'pela ficha técnica, na embalagem',
-    desligada:!COMO_SAI_FICHA_LIGADA, motivo:'depende da montagem (PRODUCAO-MONTAGEM.md), que ainda não existe' }
+  { valor:'ficha', nome:'pela ficha técnica, na embalagem (precisa de uma contagem na 504)' }
 ];
+const CONTAGEM_RESOLVIDA = ['igual','aplicado','aprovado','ciente'];
+
+function podeSairPelaFicha(db, comp, modoFinal){
+  const modo = modoFinal || (comp && comp.modo_saldo);
+  if(modo !== 'quantidade') return { ok:false, motivo:'só material "por quantidade" sai pela ficha. ' +
+    (modo === 'volume' ? 'O material por volume (o rolo) tem o saldo pela soma dos volumes, e sai pelo "Abri" da 503.'
+                       : 'O material sem saldo não tem o que baixar.') };
+  if(!comp || !comp.id) return { ok:false, motivo:'o material precisa de uma contagem na 504 antes de sair pela ficha — ela é o saldo de partida. Cadastre, conte e depois mude.' };
+  let r = null;
+  try{
+    r = db.prepare("SELECT 1 FROM contagem_material_item WHERE componente_id=? AND situacao IN ('" +
+      CONTAGEM_RESOLVIDA.join("','") + "') LIMIT 1").get(comp.id);
+  }catch(e){ r = null; }
+  if(!r) return { ok:false, motivo:'"' + comp.nome + '" ainda não tem contagem resolvida na 504. Conte todo o material primeiro: ' +
+    'a contagem é o saldo de partida da saída pela ficha.' };
+  return { ok:true };
+}
 const CATEGORIAS = ['Matéria-prima','Tecido','Embalagem','Ferramenta','Limpeza','Copa','Escritório','Manutenção'];
 
 const PADRAO = { tol_aviso_pct:2, tol_retem_pct:5, contagem_dias:30, margem_dias:5 };
@@ -57,6 +82,8 @@ function lerCampos(db, b, atual){
       throw new Recusa(400, 'este material tem saldo: o modo não muda pelo cadastro. ' + (m === 'volume'
         ? 'Para passar a "por volume", etiquete os rolos na 504 (Contagem de material).'
         : 'Zere o saldo pela contagem antes de trocar o modo.'));
+    if(!nascer && atual.como_sai === 'ficha' && m !== 'quantidade' && !(tem('como_sai') && txt(b.como_sai) === 'contagem'))
+      throw new Recusa(400, 'este material sai pela ficha, que só vale para "por quantidade". Passe "como sai do estoque" para a contagem antes.');
     c.modo_saldo = m;
   }else if(nascer){
     throw new Recusa(400, 'escolha o modo de saldo do material: sem saldo, por quantidade ou por volume');
@@ -119,7 +146,10 @@ function lerCampos(db, b, atual){
     const v = txt(b.como_sai) || 'contagem';
     const o = COMO_SAI.find(x => x.valor === v);
     if(!o) throw new Recusa(400, 'como sai do estoque tem que ser "contagem" ou "ficha" — veio "' + v + '"');
-    if(o.desligada) throw new Recusa(400, 'sair pela ficha técnica ' + o.motivo + '. Por enquanto, o material sai pela contagem.');
+    if(v === 'ficha' && !(atual && atual.como_sai === 'ficha')){
+      const p = podeSairPelaFicha(db, atual, c.modo_saldo || (atual && atual.modo_saldo) || null);
+      if(!p.ok) throw new Recusa(400, 'Ainda não dá para sair pela ficha: ' + p.motivo);
+    }
     c.como_sai = v;
   }
 
@@ -197,5 +227,49 @@ function pendencias(db){
   return { sem_almoxarifado:{ n:itens.length, desde:datas[0] || null, itens } };
 }
 
+
+/* ── O CODIGO DE CADASTRO (spec FICHAS-NO-CADASTRO-UNICO, fase 1) ─────────
+   Todo material tem um: MAT-0001. Ele SAI DO ID, e nao de uma coluna: o
+   `componente` e AUTOINCREMENT, entao o numero nunca se repete, nunca se
+   reaproveita (desativar nao apaga) e nunca muda numa edicao. Uma coluna seria
+   uma segunda afirmacao sobre o mesmo fato — e o material de antes ganha o
+   dele na hora, sem backfill. Dono unico: quem escreve o codigo e esta funcao. */
+function codigoCadastro(id){
+  const n = parseInt(id, 10);
+  return Number.isFinite(n) && n > 0 ? 'MAT-' + String(n).padStart(4, '0') : null;
+}
+
+/* ── ONDE O MATERIAL E USADO (fase 1; a fase 2 junta as fichas do sob medida) ─
+   Le as linhas ATIVAS da ficha da medida padrao: o material apontado direto, ou
+   o tecido pela FAMILIA (a ficha aponta a familia, e a cor do SKU escolhe a
+   bobina — §7-B). Devolve um mapa id -> [{operacao, modelo, expressao}].
+   NADA EM REAIS: o "usado em" vai a quem so le o cadastro. `sobmedida` e a
+   lista que a porta do sob medida devolve (ou null, sem a porta). */
+function usadoEm(db, sobmedida){
+  const mapa = {};
+  const por = (id, x) => { (mapa[id] = mapa[id] || []).push(x); };
+  let linhas = [];
+  try{
+    linhas = db.prepare(`SELECT f.componente_id, f.familia, f.expressao, f.ordem, m.nome modelo, m.id modelo_id
+      FROM ficha_formula f JOIN modelo m ON m.id=f.modelo_id
+      WHERE f.ativo=1 ORDER BY m.nome, f.ordem, f.id`).all();
+  }catch(e){ linhas = []; }
+  let familias = {};
+  try{
+    for(const c of db.prepare('SELECT id, familia FROM componente WHERE familia IS NOT NULL').all())
+      (familias[c.familia] = familias[c.familia] || []).push(c.id);
+  }catch(e){ familias = {}; }
+  for(const l of linhas){
+    const x = { operacao:'padrao', modelo:l.modelo, modelo_id:l.modelo_id, expressao:l.expressao };
+    if(l.componente_id) por(l.componente_id, x);
+    else if(l.familia) for(const id of (familias[l.familia] || [])) por(id, Object.assign({ familia:l.familia }, x));
+  }
+  for(const l of (sobmedida || [])){
+    if(!l || !l.componente_id) continue;
+    por(l.componente_id, { operacao:'sobmedida', modelo:l.produto, modelo_id:l.produto_id, expressao:l.expressao, quando:l.quando || 'sempre' });
+  }
+  return mapa;
+}
+
 module.exports = { Recusa, MODOS, NOME_MODO, COMO_SAI, COMO_SAI_FICHA_LIGADA, CATEGORIAS,
-  lerCampos, modelosQueUsam, podeIrParaFicha, listarAlmox, salvarAlmox, desativarAlmox, pendencias };
+  lerCampos, modelosQueUsam, podeIrParaFicha, codigoCadastro, usadoEm, podeSairPelaFicha, CONTAGEM_RESOLVIDA, listarAlmox, salvarAlmox, desativarAlmox, pendencias };

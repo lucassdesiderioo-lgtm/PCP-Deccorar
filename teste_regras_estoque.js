@@ -296,7 +296,8 @@ async function entrar(nome, id, pin){
   await post('Gil', '/api/carregar', { code: vsm.pack, sku:'SOBMEDTESTE' });
   eq('sob medida não gera movimento (embalar, imprimir, conferir)', movSm(), 0);
   const sK = saldo(SK.K);
-  ok('liga o modo teste', (await post('Lucas', '/api/teste/ligar')).__st === 200);
+  ok('LIGAR o modo teste e recusado (410): ele foi aposentado', (await post('Lucas', '/api/teste/ligar')).__st === 410);
+  require('./util_modo_teste_antigo')(db);   // simula o banco que chegou LIGADO ao deploy
   await post('Fabi', '/api/montagem', { codigo:SK.K, kit_ok:1 });
   eq('(em modo teste a embalagem soma)', saldo(SK.K), sK + 1);
   const ap = await post('Lucas', '/api/teste/limpar', { confirmar:true });

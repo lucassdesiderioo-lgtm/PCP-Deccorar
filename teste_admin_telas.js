@@ -44,7 +44,7 @@ function abrir(rota, u){
 const ADMIN = M.TELAS.filter(t => t.rota.indexOf('/admin/') === 0);
 
 console.log('\n── 1. cada aba é uma tela com endereço próprio ──');
-eq('são 13 telas novas em /admin/ (Planejamento, Relatórios e Acessos já tinham endereço)', ADMIN.filter(t => t.aba).length, 13);
+eq('são 12 telas novas em /admin/ (Planejamento, Relatórios e Acessos já tinham endereço; a 903 saiu em 11/11/2026)', ADMIN.filter(t => t.aba).length, 12);
 /* ARRUMAR-O-LUGAR fase 2 (11/11/2026): seis abas da 501 viraram telas /admin/
    com o `cmp` delas — o mesmo index.html, abrindo o painel de Compras só com a
    aba (teste_501_so_compra.js). */
@@ -80,8 +80,9 @@ for(const r of ['/', '/admin', '/index.html']){
   ok(r + ' responde com a porta (não com as 16 abas)', !!o && /PORTA_ADMIN/.test(o.body) && o.body.indexOf('<div class="tabs"') < 0);
 }
 const porta = (abrir('/admin', sessao('Ana')) || { body:'' }).body;
-const abas = ['prod','pb','blq','cor','dv','est','ct','plan','cad','pend','ficha','compras','acs','cd','tst','rel'];
-ok('a porta conhece o link antigo de cada uma das 16 abas', abas.every(a => porta.indexOf('"' + a + '"') >= 0), abas.filter(a => porta.indexOf('"' + a + '"') < 0).join(','));
+const abas = ['prod','pb','blq','cor','dv','est','ct','plan','cad','pend','ficha','compras','acs','cd','rel'];
+ok('a porta conhece o link antigo de cada uma das 15 abas (a do modo teste saiu em 11/11/2026)', abas.every(a => porta.indexOf('"' + a + '"') >= 0), abas.filter(a => porta.indexOf('"' + a + '"') < 0).join(','));
+ok('   e não leva mais o #tst a lugar nenhum', porta.indexOf('"tst"') < 0);
 const minhas = abrir('/api/telas/minhas', sessao('Ana'));
 ok('/api/telas/minhas diz as telas que a pessoa abre', !!minhas && Array.isArray(minhas.json && minhas.json.telas));
 const nAna = ((minhas && minhas.json && minhas.json.telas) || []).map(t => t.n);

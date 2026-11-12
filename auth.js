@@ -68,6 +68,7 @@ const TELAS={
   '/inventario':'inventario','/inventario.html':'inventario',
   '/devolucao-casos':'devolucao_casos','/devolucao-casos.html':'devolucao_casos',
   '/coleta-horarios':'coleta_horarios','/coleta-horarios.html':'coleta_horarios',
+  '/material-extra':'material_extra','/material-extra.html':'material_extra',   // a 106 (FICHAS-NO-CADASTRO-UNICO)
   /* A 906 Parâmetros (ARRUMAR-O-LUGAR fase 3, 11/11/2026): tela fora do /admin/,
      então entra aqui, senão sem sessão ela seria servida do disco (#3). */
   '/parametros':'parametros','/parametros.html':'parametros',

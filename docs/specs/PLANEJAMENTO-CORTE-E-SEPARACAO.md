@@ -13,6 +13,11 @@
 > com o mesmo tubo somam). **Falta:** lançar na 404 as medidas de
 > corte e marcar as linhas; e a prova com dado real — a lista batendo com o que
 > a bancada corta. `NOVIDADE` · risco 🔴 (uma coluna nova na ficha).
+>
+> **11/11/2026 — PROVADO COM DADO REAL NO ROLO BK ML.** O dono lançou as
+> medidas de corte e as caixinhas na 404 e validou a aba contra o que a bancada
+> corta. Falta a ficha dos outros modelos (Screen, sob medida, acessório), que
+> continuam em "ficou fora" — é cadastro, não código.
 ---
 
 ## 1. O problema

@@ -18,6 +18,13 @@ module.exports = [
     rotulo:'Devolver peça à produção', desc:'Registrar peça com problema' },
   { chave:'embalagem.executar',   grupo:'Produção',   tela:102, nivel:'operacao',
     rotulo:'Embalar peças',       desc:'Bipar SKU, kit e finalizar' },
+  /* O MATERIAL EXTRA (FICHAS-NO-CADASTRO-UNICO §3-G, 11/11/2026): a peca com
+     problema e a refeita nao baixam material sozinhas; quem tem esta chave
+     decide no fim do dia se usou e qual. Sensivel: mexe em saldo de material.
+     Nasce so para o Admin Geral (R-ALC-06); o dono a da aos Supervisores. */
+  { chave:'material.extra',       grupo:'Produção',   tela:106, nivel:'supervisor',
+    rotulo:'Decidir material extra', desc:'Dizer se a peça refeita usou material, e baixar',
+    sensivel:true },
 
   // ─── EXPEDIÇÃO ──────────────────────────────────────────────
   { chave:'pdf.subir',            grupo:'Expedição',  tela:103, nivel:'operacao',
@@ -353,9 +360,9 @@ module.exports = [
   { chave:'setores.gerenciar',    grupo:'Sistema',    tela:901, nivel:'admin_geral',
     rotulo:'Criar e editar setores', desc:'Estrutura de cargos da empresa',
     sensivel:true, intransferivel:true },
-  { chave:'teste.operar',         grupo:'Sistema',    tela:903, nivel:'admin',
-    rotulo:'Operar modo teste',   desc:'Ligar, desligar e apagar testes',
-    sensivel:true },
+  /* `teste.operar` SAIU em 11/11/2026: o modo teste foi aposentado (decisao do
+     dono, DECISOES.md), e a 903 saiu do mapa. O que sobrou de /api/teste e do
+     Admin Geral (@ag), so para encerrar um modo teste que estivesse ligado. */
   { chave:'auditoria.ver',        grupo:'Sistema',    tela:901, nivel:'admin_geral',
     rotulo:'Ver auditoria',       desc:'Histórico de ações e cobertura',
     sensivel:true, intransferivel:true },

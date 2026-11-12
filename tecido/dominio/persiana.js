@@ -664,7 +664,12 @@ function calcular(escolha,opcoes){
        POR QUE, em vez de esconder o botao calado (secao 4.6). */
     opcoes:{bando:podeBando, barra:podeBarra,
             reducao:{pode_pedir:reducao.pode_pedir, automatica:reducao.automatica}},
-    componentes, kit, kits, reducao, preco, avisos, resumo
+    componentes, kit, kits, reducao, preco, avisos, resumo,
+    /* A LISTA DE MATERIAL (FICHAS-NO-CADASTRO-UNICO): o material do cadastro
+       do PCP que esta persiana gasta, pela mesma regua do `quando`. So
+       QUANTIDADE — o custo dela e outra rota, podada por custo.ver. Produto
+       sem lista devolve lista vazia, e nada mais muda. */
+    materiais:require('./ficha_material').calcular(modelo.id,largura_mm,altura_mm,entra)
   };
 }
 

@@ -105,6 +105,9 @@ function montar(app, prefixo, opcoes){
   /* COMPRAS-E-RECEBIMENTO fase 10: a porta dos ENDERECOS do PCP (o dono deles);
      sem ela, o endereco migrado fica como estava e a tela diz "sem atualizacao". */
   require('./nucleo/enderecos_pcp').ligar(opcoes&&opcoes.enderecos);
+  /* FICHAS-NO-CADASTRO-UNICO (11/11/2026): o custo, a baixa pela ficha e o
+     material extra do material do PCP (nucleo/material_pcp.js). */
+  require('./nucleo/material_pcp').ligar(opcoes);
   /* `opcoes.permissoes(uid)` e a PORTA do acesso: devolve as chaves do PCP que
      a pessoa tem (o mesmo `permissoesDe` que decide as telas de la). Sem ela
      — num teste — vale a lista que vier em `req.usuario.permissoes`; sem as
@@ -185,7 +188,17 @@ function montar(app, prefixo, opcoes){
     criarRolosDoRecebimento: a=>require('./dominio/recebimento_pcp').criarRolos(a),
     tecidosParaCompras: ()=>require('./dominio/recebimento_pcp').tecidos(),
     /* fase 10: o que este modulo guarda em cada endereco do PCP */
-    estoqueParaPcp: ()=>require('./dominio/estoque_pcp').estoque() };
+    estoqueParaPcp: ()=>require('./dominio/estoque_pcp').estoque(),
+    /* FICHAS-NO-CADASTRO-UNICO: as linhas da lista de material (o "usado em"
+       da 1101) e o material das pecas embaladas num periodo (o consumido por
+       operacao). Nada em reais. */
+    fichaMaterial: ()=>require('./dominio/ficha_material').linhasParaPcp(),
+    materialEmbalado: (desde,ate)=>require('./dominio/ficha_material').embaladoNoPeriodo(desde,ate),
+    /* fase 5: os produtos para o catalogo unico da 404 (so nome e ativo) */
+    produtosParaPcp: ()=>require('./dominio/ficha_material').produtosParaPcp(),
+    /* item 1 (11/11/2026): a lista de um produto numa medida, com o custo,
+       para a 404 do PCP (quem poda o custo e a rota de la) */
+    materialNaMedida: (id,l,a)=>require('./dominio/ficha_material').naMedida(id,l,a) };
 }
 
 module.exports={montar, MODULOS, PREFIXO:'/sobmedida'};

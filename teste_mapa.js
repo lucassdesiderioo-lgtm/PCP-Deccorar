@@ -45,8 +45,9 @@ const abaixo = M.TELAS.filter(t => {
   return niv.length && Math.min.apply(null, niv) > M.ordemNivel(t.nivel);
 }).map(t => t.n);
 ok('o nível da tela nunca é menor que a permissão mais baixa que a abre', !abaixo.length, abaixo.join(','));
-ok('as telas 101 a 904 da spec estão todas no mapa (a 203 saiu em 05/11/2026)',
-  [101,102,103,104,105,201,202,204,205,251,252,253,301,302,303,401,402,403,404,501,502,901,902,903,904].every(x => M.porNumero(x)));
+ok('as telas 101 a 904 da spec estão todas no mapa (a 203 saiu em 05/11/2026, a 903 em 11/11/2026)',
+  [101,102,103,104,105,201,202,204,205,251,252,253,301,302,303,401,402,403,404,501,502,901,902,904].every(x => M.porNumero(x)));
+ok('a 903 Modo teste saiu (aposentado, 11/11/2026), e o número ficou vago', !M.porNumero(903) && !M.porRota('/admin/teste'));
 ok('a 203 Subir PDF saiu, e o número ficou vago (D2, 05/11/2026)', !M.porNumero(203) && !M.porRota('/expedicao'));
 ok('subir o PDF é só na 103: ela abre com pdf.subir e é de nível Operação',
   M.porNumero(103).perms.indexOf('pdf.subir') >= 0 && M.porNumero(103).nivel === 'operacao');
@@ -61,7 +62,7 @@ const html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8
 const abasHtml = Array.from(new Set((html.match(/class="tab[^"]*" data-t="([a-z]+)"/g) || []).map(s => s.replace(/.*data-t="/, '').slice(0, -1))));
 const abasMapa = M.TELAS.filter(t => t.aba).map(t => t.aba);
 const semLinha = abasHtml.filter(a => abasMapa.indexOf(a) < 0);
-ok('as ' + abasHtml.length + ' abas do Admin são todas linhas do mapa', abasHtml.length === 16 && !semLinha.length, semLinha.join(','));
+ok('as ' + abasHtml.length + ' abas do Admin são todas linhas do mapa', abasHtml.length === 15 && !semLinha.length, semLinha.join(','));
 
 console.log('\n── 3. toda permissão tem nível e a tela onde é usada (R-ALC-03) ──');
 const semTela = PERMISSOES.filter(p => !p.tela).map(p => p.chave);

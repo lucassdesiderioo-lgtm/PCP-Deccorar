@@ -566,9 +566,34 @@ function garantirSchemaCompras(db){
       usuario_nome  TEXT,
       criado_em     TEXT DEFAULT (datetime('now','localtime')),
       data          TEXT DEFAULT (date('now','localtime')),
-      teste         INTEGER DEFAULT 0
+      teste         INTEGER DEFAULT 0,
+      operacao      TEXT    -- padrao | sobmedida (FICHAS-NO-CADASTRO-UNICO): de que operacao veio a saida
     );
     CREATE INDEX IF NOT EXISTS idx_mov_comp ON movimento_componente(componente_id, data);
+
+    /* ── O MATERIAL EXTRA A DECIDIR (spec FICHAS-NO-CADASTRO-UNICO §3-G) ─────
+       A peca com problema na revisao, a peca recusada no sob medida e a baixa
+       pela ficha que falhou nao baixam material sozinhas: viram uma linha aqui,
+       e o Supervisor decide (tela 106). sugestao e o JSON da ficha daquela
+       peca ([{componente_id, nome, unidade, quantidade}]); itens e o que foi
+       decidido e baixado. Dono unico: material_extra_dominio.js. */
+    CREATE TABLE IF NOT EXISTS material_extra (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      origem        TEXT NOT NULL,          -- revisao | sobmedida_recusa | falha_baixa
+      operacao      TEXT NOT NULL,          -- padrao | sobmedida
+      referencia    TEXT,                   -- rejeicao:12 · sm_recusa:5 · montagem:9
+      descricao     TEXT,                   -- o SKU, ou o pedido e a peca
+      motivo        TEXT,                   -- o motivo do problema, como foi registrado
+      sugestao      TEXT,
+      registrado_por TEXT, registrado_por_id INTEGER,
+      registrado_em TEXT DEFAULT (datetime('now','localtime')),
+      decisao       TEXT,                   -- nao_usou | usou
+      itens         TEXT,
+      obs           TEXT,
+      decidido_por  TEXT, decidido_por_id INTEGER, decidido_em TEXT,
+      teste         INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_material_extra ON material_extra(decisao, registrado_em);
 
     /* ── FICHA POR FORMULA (§3) ───────────────────────────────────────────────
        A decisao que reduz o projeto: a ficha nao e uma lista digitada por SKU, e
@@ -670,6 +695,7 @@ function garantirSchemaCompras(db){
     ['esperado_cadastro_kg','REAL'],['desvio_pct','REAL'],['faixa','TEXT'],['decisao','TEXT'],['decidido_por','TEXT'],
     ['decidido_por_id','INTEGER'],['decidido_em','TEXT'],['motivo_decisao','TEXT'],['fator_real','REAL'],['almoxarifado_id','INTEGER'],['custo_unit','REAL'],['volumes_json','TEXT']]);
   colunas('dfe_controle', [['ultimo_cstat','TEXT']]);
+  colunas('movimento_componente', [['operacao','TEXT']]);   // FICHAS-NO-CADASTRO-UNICO fase 4, no fim (§17)
   colunas('dfe_documento', [['erro','TEXT'],['ciente_motivo','TEXT'],['ciente_por','TEXT'],['ciente_por_id','INTEGER'],['ciente_em','TEXT'],['bruto','TEXT'],['schema_doc','TEXT'],['tentativas','INTEGER']]);
   colunas('pedido_item', [['unidade_compra','TEXT'],['qtd_compra','REAL'],['preco_unid_compra','REAL'],['qtd_declarada','REAL']]);
   /* R-CMP-25: o Simples Nacional nao aproveita credito — a tabela nasce com

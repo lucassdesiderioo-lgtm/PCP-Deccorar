@@ -197,10 +197,10 @@ jobs:
           for tela in / /admin /index.html /painel /operador /setor \
                       /admin/producao /admin/problemas /admin/pendencias /admin/correcoes \
                       /admin/devolucoes /admin/estoque /admin/contagem /admin/skus \
-                      /admin/sku-incompleto /admin/ficha /admin/compras /admin/cadastros /admin/teste \
+                      /admin/sku-incompleto /admin/ficha /admin/compras /admin/cadastros \
                       /admin/materiais /admin/fornecedores /admin/almoxarifados \
                       /admin/recebimento-retido /admin/notas /admin/certificado /contagem-material \
-                      /coleta-horarios /minha-producao /relatorios /parametros /parametros.html \
+                      /coleta-horarios /minha-producao /relatorios /material-extra /material-extra.html /parametros /parametros.html \
                       /sobmedida /sobmedida/corte /sobmedida/cadastros \
                       /sobmedida/telas/corte.html; do
             confere "$tela" 302

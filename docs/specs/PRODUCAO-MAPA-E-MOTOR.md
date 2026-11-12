@@ -4,6 +4,14 @@
 > a rota `/montagem` hoje serve a tela de **Embalagem**; e o **SKU não tem mais formato**
 > (`CLAUDE.md` §7) — os exemplos com `BK…` são só ilustração.
 > Movido do Projeto "PCP - Deccorar" para o repositório em 17/09/2026.
+>
+> **11/11/2026 — o processo como funciona hoje, nas palavras do dono** (para a
+> revisão desta spec, que vem depois da `FICHAS-NO-CADASTRO-UNICO`):
+> 1 corte de tecido · 2 corte de tubo e base (preparados em lote, com etiqueta) ·
+> 3 kit de comando (em lote, vira estoque) · **4 kit de instalação (em lote, vira
+> estoque)** → 5 **montagem consome 1 + 2** → 6 revisão → **7 embalagem consome 3
+> e 4** → 8 estoque. Diverge do desenho abaixo: lá a montagem consome o kit de
+> comando e o kit de envio é o 4; vale a frase do dono.
 
 ---
 

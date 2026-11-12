@@ -254,6 +254,48 @@ module.exports = function(app, db){
     for(const k of Object.keys(o)) if(!CUSTO_DA_FICHA.test(k)) n[k] = semCusto(o[k]);
     return n;
   }
+  /* O CATALOGO UNICO (FICHAS-NO-CADASTRO-UNICO fase 5, decisao do dono): a 404
+     lista tambem os produtos do sob medida, com o caminho para a ficha deles
+     (608). So nome e ativo atravessam; sem a porta, a lista vem vazia com
+     `fora`, e a tela diz. */
+  app.get('/api/catalogo/sobmedida',(req,res)=>res.json(require('./sobmedida_material').produtos()));
+
+  /* O CUSTO DA PERSIANA SOB MEDIDA NUMA MEDIDA (item 1, 11/11/2026): a 404
+     confere a lista de material de um produto do sob medida, como confere a
+     ficha de um SKU. Medida em centimetros (a da 404). O total separa o que
+     entra SEMPRE do que depende de escolha (bando, comando...): somar tudo
+     seria o custo de uma persiana que ninguem vende. Sem custo.ver, nenhum
+     campo de custo viaja (a regra do valor, §23). */
+  app.get('/api/catalogo/sobmedida/:id/medida',(req,res)=>{
+    const num = v => (/^\d+([.,]\d+)?$/.test(String(v==null?'':v).trim()) ? +String(v).replace(',','.') : null);
+    const l = num(req.query.largura), a = num(req.query.altura);
+    if(!l || !a || Math.round(l*10) < 1 || Math.round(a*10) < 1) return res.status(400).json({ erro:'Digite a largura e a altura em centímetros.' });
+    let r;
+    try{ r = require('./sobmedida_material').naMedida(+req.params.id, Math.round(l*10), Math.round(a*10)); }
+    catch(e){ return res.status(400).json({ erro:e.message }); }
+    if(r.fora) return res.json({ fora:true, linhas:[] });
+    let ve = false; try{ ve = !!app.locals.acesso.podePermissao(req.usuario, 'custo.ver'); }catch(e){}
+    const linhas = (r.linhas || []).map(x => ({ nome:x.nome, unidade:x.unidade, quando:x.quando || 'sempre',
+      quantidade:x.quantidade, erro:x.erro || null, custo_unitario:x.custo_unitario, custo_centavos:x.custo_centavos }));
+    const soma = f => { let t = 0; for(const x of linhas.filter(f)){ if(x.custo_centavos == null) return null; t += x.custo_centavos; } return t; };
+    /* ③ REVISAO: o que depende de escolha sai POR ESCOLHA (com comando e sem
+       comando nao andam juntos; somar os dois seria uma persiana que ninguem
+       vende), e a linha de escolha sem preco nao torna indefinido o que entra
+       sempre. O "sem preco" do topo e so do que entra sempre. */
+    const sempre = linhas.filter(x => x.quando === 'sempre');
+    const grupos = [];
+    for(const x of linhas) if(x.quando !== 'sempre' && grupos.indexOf(x.quando) < 0) grupos.push(x.quando);
+    const out = { fora:false, largura_cm:l, altura_cm:a, linhas,
+      custo_sempre_centavos:sempre.length ? soma(x => x.quando === 'sempre') : null,
+      nada_sempre:!sempre.length,
+      por_escolha:grupos.map(q => ({ quando:q, custo_centavos:soma(x => x.quando === q) })),
+      sem_custo:sempre.filter(x => x.custo_centavos == null).map(x => x.nome) };
+    if(!ve){ for(const x of linhas){ delete x.custo_unitario; delete x.custo_centavos; }
+      delete out.custo_sempre_centavos; delete out.sem_custo;
+      for(const g of out.por_escolha) delete g.custo_centavos; }
+    res.json(out);
+  });
+
   app.get('/api/ficha/:sku',(req,res)=>{
     const f = calcular(req.params.sku);
     let ve = false; try{ ve = !!app.locals.acesso.podePermissao(req.usuario, 'custo.ver'); }catch(e){}

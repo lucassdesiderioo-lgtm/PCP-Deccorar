@@ -124,9 +124,22 @@ module.exports = function(app, db){
   /* ── COMPONENTE ─────────────────────────────────────────────────────────── */
   /* O nome do almoxarifado vai junto (fase 1 da COMPRAS-E-RECEBIMENTO): e o
      "levar para" do Recebimento e o filtro da Contagem. */
-  app.get('/api/componentes',(req,res)=>
-    res.json(db.prepare(`SELECT c.*, a.nome almoxarifado_nome FROM componente c
-      LEFT JOIN almoxarifado a ON a.id=c.almoxarifado_id ORDER BY c.ativo DESC, c.nome`).all()));
+  /* O codigo de cadastro (MAT-0001) e o "usado em" vao junto (spec
+     FICHAS-NO-CADASTRO-UNICO): as duas fichas, lidas do dono de cada uma — a da
+     medida padrao aqui, a do sob medida pela porta (sem a porta, so a de ca). */
+  app.get('/api/componentes',(req,res)=>{
+    const lista = db.prepare(`SELECT c.*, a.nome almoxarifado_nome FROM componente c
+      LEFT JOIN almoxarifado a ON a.id=c.almoxarifado_id ORDER BY c.ativo DESC, c.nome`).all();
+    const SMM = require('./sobmedida_material');
+    const usado = MAT.usadoEm(db, SMM.linhasDaFicha());
+    /* O CONSUMIDO NO MES POR OPERACAO (fase 3): embalagens x ficha. Para o
+       material que sai pela contagem, e estimativa — a tela diz. */
+    const hoje = db.prepare("SELECT date('now','localtime') d").get().d, desde = hoje.slice(0, 8) + '01';
+    const sm = SMM.consumoEmbalado(desde, hoje);
+    const consumo = require('./baixa_material_dominio').consumoPorOperacao(db, desde, hoje, sm.itens);
+    res.json(lista.map(c => Object.assign(c, { codigo_cadastro:MAT.codigoCadastro(c.id), usado_em:usado[c.id] || [],
+      consumo_mes:Object.assign({ desde, ate:hoje, sobmedida_fora:!!sm.fora }, consumo[c.id] || { padrao:0, sobmedida:0 }) })));
+  });
 
   /* ── O CADASTRO DE MATERIAL ────────────────────────────────────────────
      Cria (sem `id`) e edita (com `id`). Ate 24/09/2026 a rota CRIAVA e nenhuma
