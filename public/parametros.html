@@ -1,0 +1,206 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parâmetros</title>
+<!-- 906 PARÂMETROS (spec ARRUMAR-O-LUGAR, fase 3, 11/11/2026): os ajustes que
+     governam a fábrica, num lugar só. Cada parte usa a rota de sempre, e só
+     aparece para quem tem a chave dela; quem tranca continua sendo a rota. -->
+<style>
+  :root{--bg:#0e1217;--card:#161b22;--borda:#262d37;--txt:#e6edf3;--sub:#8b97a5;--amb:#ffb800;--verm:#f85149;--ok:#3fb950}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:16px 22px;border-bottom:1px solid var(--borda);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .mark{width:32px;height:32px;border-radius:8px;background:var(--amb);display:grid;place-items:center;color:#1a1300;font-weight:800}
+  .wrap{max-width:1100px;margin:0 auto;padding:18px 16px}
+  .card{background:var(--card);border:1px solid var(--borda);border-radius:12px;padding:14px 16px;margin-bottom:14px;min-width:0}
+  .card h2{margin:0 0 4px;font-size:16px}
+  .ajuda{color:var(--sub);font-size:13px;margin:0 0 12px;line-height:1.45}
+  .rola{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--borda);vertical-align:top}
+  th{color:var(--sub);font-weight:600;font-size:12px}
+  input{font:inherit;font-size:14px;padding:5px 7px;border-radius:6px;border:1px solid var(--borda);background:#0b0f14;color:var(--txt);color-scheme:dark}
+  input[type=time]{width:7.4em}
+  input.num{width:7em}
+  input:disabled{opacity:.7}
+  input.erro{border-color:var(--verm)}
+  button.p{font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:0;background:var(--amb);color:#1a1300;font-weight:700;cursor:pointer}
+  button.g{font:inherit;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--borda);background:transparent;color:var(--txt);cursor:pointer}
+  .msg{font-size:13px;margin-top:8px}
+  .msg.err{color:var(--verm);font-weight:700}
+  .msg.ok{color:var(--ok)}
+  .nota{color:var(--sub);font-size:12px}
+  .linha{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+  .chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--borda);border-radius:8px;padding:4px 8px;font-size:13px;margin:0 6px 6px 0}
+  .vazio{color:var(--sub);font-size:13px}
+  label.liga{display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer}
+  label.liga input{width:20px;height:20px}
+</style></head><body>
+<header><div class="mark">⚙</div><div><b>906 · Parâmetros</b><div style="font-size:12px;color:var(--sub)">Os ajustes que governam a fábrica, num lugar só</div></div></header>
+<div class="wrap" id="corpo"><div class="vazio">carregando…</div></div>
+<script>
+var esc=function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+var EU={ perms:[], ag:false, admin:false };
+function tem(c){ return EU.ag || EU.perms.indexOf(c)>=0; }
+async function jget(u){ var r=await fetch(u,{credentials:'same-origin'}); var j=null; try{ j=await r.json(); }catch(e){} return { s:r.status, j:j }; }
+async function jsend(u,metodo,corpo){
+  var r=await fetch(u,{method:metodo,credentials:'same-origin',headers:{'Content-Type':'application/json'},body:corpo===undefined?undefined:JSON.stringify(corpo)});
+  var j=null; try{ j=await r.json(); }catch(e){} return { s:r.status, j:j };
+}
+/* O sob medida responde {ok,dados,mensagem}; a medida padrão responde o objeto ou {erro}. */
+function erroDe(x){ return (x.j && (x.j.erro || x.j.mensagem)) || ('não deu para salvar (' + x.s + ')'); }
+/* card(id): o card da parte; se ele já existe (redesenho depois de salvar), é
+   o mesmo lugar — a ordem das partes não muda. */
+function card(id){ var d=document.getElementById(id); if(d){ d.innerHTML=''; return d; }
+  d=document.createElement('div'); d.className='card'; d.id=id; document.getElementById('corpo').appendChild(d); return d; }
+
+/* ── Segundo bipe na Conferência (medida padrão; muda quem é nível Admin) ─── */
+async function partBipe(){
+  var c=card('pBipe'), pode=EU.admin;
+  var x=await jget('/api/config/conferencia'), lig=!!(x.j && x.j.ligada);
+  c.innerHTML='<h2>Segundo bipe na Conferência</h2><p class="ajuda">Com isso ligado, a Conferência pede <b>dois bipes</b>: a etiqueta de venda e, em seguida, o código de barras do produto <b>na mesma caixa</b>. Se a etiqueta estiver colada na caixa errada, os dois não batem e o volume <b>não carrega</b>. O operador não vê qual SKU esperar — a conferência é cega. Custa um bipe a mais por volume.</p>'
+    +'<label class="liga"><input type="checkbox" id="bipeLig" '+(lig?'checked':'')+(pode?'':' disabled')+'> <span>Exigir o bipe do SKU na Conferência</span></label>'
+    +'<div class="msg" id="bipeMsg"></div>'+(pode?'':'<p class="nota">Ligar e desligar é de quem é nível Admin.</p>');
+  if(!pode) return;
+  document.getElementById('bipeLig').onchange=async function(e){
+    var cb=e.target, m=document.getElementById('bipeMsg'), r=await jsend('/api/config/conferencia','POST',{ligada:cb.checked});
+    if(r.s===200 && r.j && r.j.ok){ m.className='msg ok'; m.textContent=r.j.ligada?'Ligado — a Conferência passa a exigir os dois bipes.':'Desligado — a Conferência volta a pedir só a etiqueta de venda.'; }
+    else { m.className='msg err'; m.textContent=erroDe(r); cb.checked=!cb.checked; }
+  };
+}
+
+/* ── Os parâmetros do sob medida: o corte e o prazo (rota de lá) ─────────── */
+function linhaParam(p, pode, extenso){
+  return '<tr><td><b>'+esc(p.rotulo||p.chave)+'</b>'+(p.unidade?' <span class="nota">('+esc(p.unidade)+')</span>':'')+'<br><span class="nota">'+esc(p.ajuda||'')+'</span></td>'
+    +'<td>'+(p.tipo==='numero'
+      ? '<input class="num" inputmode="decimal" data-tipo="numero" data-chave="'+esc(p.chave)+'" value="'+esc(String(p.valor).replace('.',','))+'"'
+      : '<input data-tipo="texto" data-chave="'+esc(p.chave)+'" value="'+esc(p.valor)+'"')+(pode?'':' disabled')+'>'
+    +(extenso?' <span class="nota">'+esc(extenso)+'</span>':'')
+    +(pode?' <button class="g" type="button" data-salvar="'+esc(p.chave)+'">Salvar</button>':'')
+    +'<div class="msg" data-msg="'+esc(p.chave)+'"></div>'
+    +(p.alterado_em?'<div class="nota">alterado em '+esc(p.alterado_em)+(p.alterado_por?' por '+esc(p.alterado_por):'')+'</div>':'')+'</td></tr>';
+}
+function ligarSalvar(c, depois){
+  c.querySelectorAll('button[data-salvar]').forEach(function(b){ b.onclick=async function(){
+    var k=b.dataset.salvar, i=c.querySelector('input[data-chave="'+k+'"]'), m=c.querySelector('[data-msg="'+k+'"]');
+    /* O parâmetro de tipo texto (a hora do corte do prazo, o endereço do PCP) vai
+       como TEXTO: quem diz se ele vale é o servidor (③ REVISÃO — a hora "17:00"
+       virava NaN, e não havia mais tela que a mudasse). */
+    var valor;
+    i.classList.remove('erro');
+    if(i.dataset.tipo==='numero'){
+      valor=Number(String(i.value).trim().replace(',','.'));
+      if(String(i.value).trim()==='' || !isFinite(valor)){ i.classList.add('erro'); m.className='msg err'; m.textContent='Digite um número, com vírgula ou ponto.'; return; }
+    } else {
+      valor=String(i.value).trim();
+      if(valor===''){ i.classList.add('erro'); m.className='msg err'; m.textContent='Não deixe o campo vazio.'; return; }
+    }
+    var r=await jsend('/sobmedida/api/parametros/'+encodeURIComponent(k),'PUT',{valor:valor});
+    if(r.s===200 && r.j && r.j.ok){ if(depois) await depois(k); else { m.className='msg ok'; m.textContent='Salvo.'; } }
+    else { i.classList.add('erro'); m.className='msg err'; m.textContent=erroDe(r); }
+  }; });
+}
+async function partCorte(lista){
+  var c=card('pCorte'), pode=tem('sobmedida.parametro.editar');
+  var corte=lista.filter(function(p){ return String(p.chave).indexOf('prazo')!==0; });
+  var h='<h2>Sob medida — parâmetros</h2><p class="ajuda">Os números do sob medida: o cálculo do corte (mudar muda a bobina que o sistema escolhe para a fábrica inteira), a etiqueta, o rolo, o estoque mínimo, o crédito e o bipe da bancada. Mudar é um campo, não um deploy.</p>';
+  h+= corte.length ? '<div class="rola"><table>'+corte.map(function(p){ return linhaParam(p,pode); }).join('')+'</table></div>' : '<div class="vazio">Nenhum parâmetro.</div>';
+  if(!pode) h+='<p class="nota">Mudar é de quem tem a permissão de editar os parâmetros do cálculo.</p>';
+  c.innerHTML=h; if(pode) ligarSalvar(c, redesenharSm);
+}
+/* Depois de salvar, o card volta com o valor, o extenso e o "alterado em" de
+   agora (③ REVISÃO: o "Salvo." aparecia ao lado do extenso de antes). */
+/* O QUE ESTAVA DIGITADO E NÃO SALVO NAS OUTRAS LINHAS VOLTA (③ REVISÃO r2, §12):
+   o redesenho troca o card, e o campo nasce de novo com o valor do servidor —
+   "0,7" no peso da sobra sumia calado quando se salvava a margem. Guarda-se o
+   que difere do valor com que o campo nasceu (`defaultValue`), menos a linha
+   salva, e devolve-se depois. */
+function guardarDigitado(c, salva){
+  var g={}; if(!c) return g;
+  c.querySelectorAll('input').forEach(function(i){
+    var k=i.dataset.chave || i.id; if(!k || k===salva) return;
+    if(i.value!==i.defaultValue) g[k]=i.value; });
+  return g;
+}
+function devolverDigitado(c, g){
+  if(!c) return;
+  Object.keys(g).forEach(function(k){
+    var i=c.querySelector('input[data-chave="'+k+'"]') || c.querySelector('#'+k);
+    if(!i) return;
+    i.value=g[k];
+    /* volta MARCADO como não salvo (rodada 3): um campo em branco sem aviso
+       parecia salvo, com o banco no valor de antes */
+    if(i.dataset.chave){ i.classList.add('erro'); var m=c.querySelector('[data-msg="'+k+'"]'); if(m){ m.className='msg err'; m.textContent='Não salvo — clique em Salvar.'; } } });
+}
+async function redesenharSm(chave){
+  var px=await jget('/sobmedida/api/parametros'); if(!(px.j && px.j.ok)) return;
+  var l=px.j.dados||[], prazo=String(chave).indexOf('prazo')===0, id=prazo?'pPrazo':'pCorte';
+  var g=guardarDigitado(document.getElementById(id), chave);
+  if(prazo) await partPrazo(l); else await partCorte(l);
+  devolverDigitado(document.getElementById(id), g);
+  var m=document.querySelector('[data-msg="'+chave+'"]'); if(m){ m.className='msg ok'; m.textContent='Salvo.'; }
+}
+async function partPrazo(lista){
+  var c=card('pPrazo'), pode=tem('sobmedida.parametro.editar');
+  var px=await jget('/sobmedida/api/prazo'), pr=(px.j && px.j.ok) ? px.j.dados : null;
+  var ext={}; if(pr) (pr.parametros||[]).forEach(function(p){ if(p.valor_extenso) ext[p.chave]=p.valor_extenso; });
+  var nums=lista.filter(function(p){ return String(p.chave).indexOf('prazo')===0; });
+  var h='<h2>Sob medida — prazo e feriados</h2><p class="ajuda">Os números que dizem quando um pedido enviado fica pronto, e os feriados que empurram o prazo. Feriado errado empurra o prazo de todos os pedidos.</p>';
+  if(pr && pr.prazo) h+='<p><b>Enviando agora: pronto na '+esc(pr.prazo.entrega_extenso)+'</b></p><p class="nota">'+esc(pr.prazo.explicacao||'')+'</p>';
+  h+= nums.length ? '<div class="rola"><table>'+nums.map(function(p){ return linhaParam(p,pode,ext[p.chave]); }).join('')+'</table></div>' : '';
+  h+='<h2 style="margin-top:14px;font-size:15px">Feriados</h2><div id="ferLista"><div class="vazio">carregando…</div></div>';
+  if(pode) h+='<div class="linha"><input type="date" id="ferData"> <input id="ferNome" placeholder="Feriado (ex.: Natal)"> <button class="p" id="ferAdd" type="button">Cadastrar feriado</button></div><div class="msg" id="ferMsg"></div>';
+  c.innerHTML=h;
+  if(pode) ligarSalvar(c, redesenharSm);
+  await desenharFeriados(c, pode);
+  if(!pode) return;
+  document.getElementById('ferAdd').onclick=async function(){
+    var m=document.getElementById('ferMsg');
+    var r=await jsend('/sobmedida/api/feriados','POST',{ data:document.getElementById('ferData').value, nome:document.getElementById('ferNome').value });
+    if(r.s===200 && r.j && r.j.ok){ m.className='msg ok'; m.textContent='Feriado cadastrado.'; document.getElementById('ferData').value=''; document.getElementById('ferNome').value=''; await desenharFeriados(c, pode); recarregarPrazo(); }
+    else { m.className='msg err'; m.textContent=erroDe(r); }
+  };
+}
+async function desenharFeriados(c, pode){
+  var el=c.querySelector('#ferLista'), x=await jget('/sobmedida/api/feriados');
+  if(!(x.j && x.j.ok)){ el.innerHTML='<div class="msg err">'+esc(erroDe(x))+'</div>'; return; }
+  var l=x.j.dados||[];
+  if(!l.length){ el.innerHTML='<div class="vazio">Nenhum cadastrado.</div>'; return; }
+  el.innerHTML=l.map(function(f){ return '<span class="chip">'+esc(f.data)+' · '+esc(f.nome)+(pode?' <button class="g" type="button" data-apagar="'+esc(f.data)+'">apagar</button>':'')+'</span>'; }).join('');
+  el.querySelectorAll('button[data-apagar]').forEach(function(b){ b.onclick=async function(){
+    var m=document.getElementById('ferMsg'), r=await jsend('/sobmedida/api/feriados/'+encodeURIComponent(b.dataset.apagar),'DELETE');
+    if(r.s===200 && r.j && r.j.ok){ if(m){ m.className='msg ok'; m.textContent='Feriado apagado.'; } await desenharFeriados(c, pode); recarregarPrazo(); }
+    else if(m){ m.className='msg err'; m.textContent=erroDe(r); }
+  }; });
+}
+/* A prévia "pronto na …" muda com os números e os feriados: redesenha só o topo. */
+async function recarregarPrazo(){
+  var px=await jget('/sobmedida/api/prazo'), c=document.getElementById('pPrazo');
+  if(!c || !(px.j && px.j.ok) || !px.j.dados.prazo) return;
+  var b=c.querySelector('p b'); if(b) b.textContent='Enviando agora: pronto na '+px.j.dados.prazo.entrega_extenso;
+}
+
+async function iniciar(){
+  var x=await jget('/api/telas/minhas');
+  if(x.s===401){ location.href='/login?r=/parametros'; return; }
+  if(x.j){ EU.perms=x.j.perms||[]; EU.ag=!!x.j.admin_geral; EU.admin=!!x.j.nivel_admin; }
+  document.getElementById('corpo').innerHTML='';
+  var algum=false;
+  /* Os horários de corte e despacho moram na 206 desde 11/11/2026 (AJUSTE): é o
+     assunto dela. Aqui fica só o caminho, para quem os procurar. */
+  if(EU.admin || tem('horarios.editar')){
+    var nh=card('pHor'); nh.innerHTML='<h2>Horários de corte e despacho</h2><p class="ajuda">Moram na tela <b>206 Horários de coleta</b>, no bloco "Horário padrão da semana", ao lado das coletas lançadas. <a href="/coleta-horarios" style="color:var(--amb)">Abrir a 206 →</a></p>';
+  }
+  if(EU.admin){ await partBipe(); }
+  if(tem('sobmedida.parametro.ler') || tem('sobmedida.parametro.editar')){
+    algum=true;
+    var px=await jget('/sobmedida/api/parametros');
+    if(px.j && px.j.ok){
+      await partCorte(px.j.dados||[]);
+      if(tem('sobmedida.parametro.editar')) await partPrazo(px.j.dados||[]);
+    } else { var c=card('pSm'); c.innerHTML='<h2>Sob medida</h2><div class="msg err">'+esc(erroDe(px))+'</div>'; }
+  }
+  if(!algum && !EU.admin) document.getElementById('corpo').innerHTML='<div class="vazio">Nenhum parâmetro alcança o seu acesso.</div>';
+}
+iniciar();
+</script>
+<script src="/nav.js"></script>
+</body></html>

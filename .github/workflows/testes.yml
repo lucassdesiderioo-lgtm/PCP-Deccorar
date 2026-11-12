@@ -200,7 +200,7 @@ jobs:
                       /admin/sku-incompleto /admin/ficha /admin/compras /admin/cadastros \
                       /admin/materiais /admin/fornecedores /admin/almoxarifados \
                       /admin/recebimento-retido /admin/notas /admin/certificado /contagem-material \
-                      /coleta-horarios /minha-producao /relatorios /material-extra /material-extra.html \
+                      /coleta-horarios /minha-producao /relatorios /material-extra /material-extra.html /parametros /parametros.html \
                       /sobmedida /sobmedida/corte /sobmedida/cadastros \
                       /sobmedida/telas/corte.html; do
             confere "$tela" 302

@@ -109,7 +109,7 @@ const TELAS={
    reprova o teste_mapa.js. */
 const TELA_DA_CHAVE={
   'modulo.entrar':601,
-  'cadastro.ler':606, 'cadastro.editar':606, 'parametro.ler':606, 'parametro.editar':606,
+  'cadastro.ler':606, 'cadastro.editar':606, 'parametro.ler':602, 'parametro.editar':906,   // ARRUMAR-O-LUGAR fase 3: a ler é do Corte e das Sobras; editar mora na 906 Parâmetros
   'endereco.criar':604, 'rolo.ler':604, 'rolo.entrada':604, 'rolo.encerrar':604, 'rolo.ajustar':604, 'rolo.nota':604,
   'sobra.ler':603, 'sobra.criar':603, 'sobra.corrigir':603, 'sobra.propor':603, 'sobra.descartar':603, 'sobra.aprovar_descarte':603,
   'etiqueta.imprimir':605,

@@ -246,6 +246,38 @@ async function main(){
     r = await subir([ vol('BK160140BEGE', { packId:'2000014610005001', venda:'2000018016005001', labelPage:0, danfePage:1 }) ]);
     eq('subir uma terceira vez não religa o que já tem PDF', r.body.religadas, 0);
     eq('e a página continua a do segundo upload', linha(velha).labelPage, 2);
+
+    /* ── O NUMERO DO ENVIO E UMA ETIQUETA, NOS DOIS FORMATOS (12/11/2026, R-PDF-06) ──
+       A etiqueta so com "Envio:" nao tem pack nem venda; a de sempre tem, e
+       traz o MESMO numero no codigo de barras. A duplicidade pelo envio vale
+       nos dois sentidos, e tambem contra o volume de antes do deploy, que so
+       tem o numero nos `codes` (lote.envio vazio). */
+    console.log('\n── o envio, nos dois formatos ──');
+    const soEnvio = (sku, envio) => vol(sku, { packId:null, venda:null, envio, codes:[envio] });
+    r = await subir([ soEnvio('BK160140BEGE', '48502318254') ]);
+    eq('a venda só com o envio entra', r.body.novos, 1);
+    eq('e grava o envio no volume', db.prepare("SELECT envio FROM lote WHERE codes LIKE '%48502318254%'").get().envio, '48502318254');
+    r = await subir([ vol('BK160140BEGE', { packId:'2000015974958537', venda:null, envio:'48502318254', codes:['2000015974958537','48502318254'] }) ]);
+    eq('o mesmo envio de volta com Pack ID não entra de novo', r.body.novos, 0);
+    eq('e conta como repetida', r.body.repetidas, 1);
+    eq('um volume só para aquele envio', contar("codes LIKE '%48502318254%'"), 1);
+    db.prepare(`INSERT INTO lote (codigo,packId,venda,codes,estagio) VALUES ('BK140140BEGE','2000015000000077','2000019000000077','["2000015000000077","2000019000000077","48400000077"]','embalado')`).run();
+    r = await subir([ soEnvio('BK140140BEGE', '48400000077') ]);
+    eq('a venda de antes do deploy (envio só nos codes) volta só com o envio e não entra de novo', r.body.novos, 0);
+    r = await subir([ soEnvio('BK140140BEGE', '48400000099') ]);
+    eq('um envio que não existe entra (a guarda não segura venda nova)', r.body.novos, 1);
+    r = await subir([ vol('BK140140BEGE', { envio:'48400000123', codes:['48400000123'] }) ]);
+    eq('a etiqueta com pack e venda novos e envio novo entra', r.body.novos, 1);
+    /* ③ REVISAO r2: o envio igual com pack ou venda DIFERENTES nao e a mesma
+       etiqueta — e a regua do religar (R-PDF-07). Recusar como repetida faria a
+       venda nova sumir calada, so como "+1 repetida" no resumo. */
+    db.prepare(`INSERT INTO lote (codigo,packId,venda,codes,estagio) VALUES ('BK140140BEGE','2000015000000001',null,'["2000015000000001","48500000001"]','embalado')`).run();
+    r = await subir([ vol('BK140140BEGE', { packId:'2000015999999999', venda:null, envio:'48500000001', codes:['2000015999999999','48500000001'] }) ]);
+    eq('envio igual com pack diferente: a venda nova entra (não é repetida)', r.body.novos, 1);
+    r = await subir([ vol('BK140140BEGE', { packId:null, venda:'2000019555555555', envio:'48400000077', codes:['2000019555555555','48400000077'] }) ]);
+    eq('envio igual com venda diferente: a venda nova entra', r.body.novos, 1);
+    r = await subir([ vol('BK140140BEGE', { packId:'2000015000000001', venda:null, envio:'48500000001', codes:['2000015000000001','48500000001'] }) ]);
+    eq('e o mesmo pack com o mesmo envio continua repetido', r.body.novos, 0);
   } finally { srv.close(); }
 }
 

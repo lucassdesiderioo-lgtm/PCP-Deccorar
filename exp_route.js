@@ -24,7 +24,7 @@ module.exports=function(app,db){
      tambem. */
   app = QUEM.portao(app);
 
-  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, cancelada_em TEXT, cancelada_origem TEXT, cancelada_estagio TEXT, cancelada_motivo TEXT, cancelada_varias INTEGER DEFAULT 0, cancelada_aviso_em TEXT, cancelada_resolvida_em TEXT, cancelada_resolvida_por TEXT, cancelada_voltou INTEGER, cancelada_por TEXT, baixado_em TEXT, impresso_por_id INTEGER, conferido_por_id INTEGER, no_carro_por_id INTEGER, resolvido_por_id INTEGER, horario_id INTEGER);");
+  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, cancelada_em TEXT, cancelada_origem TEXT, cancelada_estagio TEXT, cancelada_motivo TEXT, cancelada_varias INTEGER DEFAULT 0, cancelada_aviso_em TEXT, cancelada_resolvida_em TEXT, cancelada_resolvida_por TEXT, cancelada_voltou INTEGER, cancelada_por TEXT, baixado_em TEXT, impresso_por_id INTEGER, conferido_por_id INTEGER, no_carro_por_id INTEGER, resolvido_por_id INTEGER, horario_id INTEGER, envio TEXT);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
   // sao so historia: quantas vezes o volume voltou pra impressora e quando foi a
   // ultima. O ALTER mora aqui, no dono da tabela (§17 do CLAUDE.md), com a
@@ -124,6 +124,12 @@ module.exports=function(app,db){
      agencia) que quem subiu o PDF disse ser a destas vendas. Aponta para
      `saida_horario`; vazia e "sem coleta marcada". No fim e por ALTER (§17). */
   try{ db.exec("ALTER TABLE lote ADD COLUMN horario_id INTEGER"); }catch(e){}
+  /* O NUMERO DO ENVIO (12/11/2026). A etiqueta so com "Envio: 485023 18254"
+     nao traz Pack ID nem Venda: o numero do envio (o do codigo de barras) e a
+     unica chave dela, e e por ele que o upload sabe que a venda ja entrou.
+     Gravado em toda caixa nova que o tiver. No CREATE e aqui, no fim (§17). */
+  try{ db.exec("ALTER TABLE lote ADD COLUMN envio TEXT"); }catch(e){}
+  try{ db.exec("CREATE INDEX IF NOT EXISTS ix_lote_envio ON lote(envio)"); }catch(e){}
   const SAIDAS=require('./coleta_horario'); SAIDAS.garantirSchema(db);
   /* A BAIXA NA CONFERENCIA (spec CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026):
      `baixado_em` diz se a caixa ja saiu do estoque. A coluna e a VIRADA (que
@@ -238,6 +244,10 @@ module.exports=function(app,db){
       const marcar=saida?db.prepare('UPDATE lote SET horario_id=? WHERE id=?'):null;
       const buf=Buffer.from(b64,'base64');
       const orders=await parsePdf(new Uint8Array(buf));
+      /* a caixinha "Abrir em Pendências" (pendencias_vigia.js) conta daqui:
+         do fim da leitura até a resposta tudo é síncrono, e o que outra pessoa
+         fez enquanto o PDF era lido não entra na conta deste upload */
+      if(req.recontarPendencias) req.recontarPendencias();
       const fname=require('path').join(LOTES,Date.now()+'.pdf'); fs.writeFileSync(fname,buf);
       /* A DEDUPLICACAO OLHA O HISTORICO INTEIRO, NAO SO O DIA.
          Pack ID e Venda sao numeros do Mercado Livre: cada volume tem o seu, e
@@ -251,8 +261,34 @@ module.exports=function(app,db){
          montes orfaos de 21, 19 e 18/08 mostram que vinha acontecendo ha
          semanas. Uma fila que mostra o que nao existe e uma fila que a equipe
          aprende a ignorar — e ai o volume que falta de verdade some junto. */
-      const seen=new Set(); db.prepare("SELECT packId,venda FROM lote").all().forEach(r=>{ if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); });
-      const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao,despachar_em,modalidade) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+      /* ⚠️ A ETIQUETA SO COM "Envio:" (12/11/2026) nao tem pack nem venda: a
+         chave dela e o numero do envio. Sem esta terceira chave, cada upload do
+         mesmo PDF gravava essas vendas de novo.
+         ⚠️ E O ENVIO VALE NOS DOIS SENTIDOS (③ REVISAO). O numero e o do codigo
+         de barras, e a etiqueta de sempre tambem o traz: a mesma venda pode
+         subir num formato e voltar no outro. Por isso toda etiqueta com envio
+         confere o `e:`, e o volume de antes do deploy (lote.envio vazio) entra
+         no `seen` pelo numero de 10 a 12 digitos que ja esta nos `codes` dele —
+         a mesma regua do envioDaEtiqueta (pack e venda tem 16).
+         ⚠️ ENVIO IGUAL COM PACK OU VENDA DIFERENTES NAO E A MESMA ETIQUETA (③
+         REVISAO r2): e a regua do religar (R-PDF-07). Recusar faria a venda
+         nova sumir calada, so como "+1 repetida". Por isso cada envio guarda
+         o pack e a venda do volume dono, e so recusa quando nao divergem. */
+      const seen=new Set(), donoEnvio=new Map();
+      const marcaEnvio=(d,dono)=>{ if(!donoEnvio.has(d)) donoEnvio.set(d,{packId:dono.packId||null, venda:dono.venda||null}); };
+      db.prepare("SELECT packId,venda,envio,codes FROM lote").all().forEach(r=>{
+        if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); if(r.envio)marcaEnvio(r.envio,r);
+        else { let cs=[]; try{ cs=JSON.parse(r.codes||'[]'); }catch(e){}
+          (Array.isArray(cs)?cs:[]).forEach(c=>{ const d=String(c||''); if(/^\d{10,12}$/.test(d)) marcaEnvio(d,r); }); }
+      });
+      const chaveEnvio=o=>o.envio||null;
+      const envioRepetido=o=>{
+        const d=o.envio && donoEnvio.get(o.envio); if(!d) return false;
+        if(o.packId && d.packId && o.packId!==d.packId) return false;
+        if(o.venda && d.venda && o.venda!==d.venda) return false;
+        return true;
+      };
+      const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao,despachar_em,modalidade,envio) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
       const existe=db.prepare('SELECT 1 FROM skus WHERE codigo=?');
       const famVista=db.prepare('SELECT prefixo,vezes FROM familia_sku WHERE familia=?');
       const famGrava=db.prepare(`INSERT INTO familia_sku (familia,prefixo,vezes) VALUES (?,?,1)
@@ -269,13 +305,15 @@ module.exports=function(app,db){
          venda com outro pack e outra etiqueta, e religar trocaria o papel da
          caixa. */
       const achaRepetida=db.prepare(`SELECT id,packId,venda,srcfile FROM lote
-        WHERE (? IS NOT NULL AND packId=?) OR (? IS NOT NULL AND venda=?)`);
+        WHERE (? IS NOT NULL AND packId=?) OR (? IS NOT NULL AND venda=?)
+           OR (? IS NOT NULL AND (envio=? OR codes LIKE ?))`);
       const religa=db.prepare('UPDATE lote SET srcfile=?, labelPage=?, danfePage=? WHERE id=?');
       const pdfNoDisco=a=>{ try{ return !!a && fs.existsSync(a); }catch(e){ return false; } };
       function religar(o){
         if(o.labelPage==null) return 0;
         let n=0;
-        for(const v of achaRepetida.all(o.packId||null,o.packId||null,o.venda||null,o.venda||null)){
+        const e=chaveEnvio(o);
+        for(const v of achaRepetida.all(o.packId||null,o.packId||null,o.venda||null,o.venda||null,e,e,e?'%"'+e+'"%':null)){
           if(pdfNoDisco(v.srcfile)) continue;
           if(o.packId && v.packId && o.packId!==v.packId) continue;
           if(o.venda && v.venda && o.venda!==v.venda) continue;
@@ -286,8 +324,8 @@ module.exports=function(app,db){
       let qtdDuvida=0;
       let novos=0,rep=0,religadas=0,semsku=0,bloq=0,divs=0,coleta=0,modal=0,pacotes=0,naoFecha=0,variasPecas=0; const desconhecidos={};
       db.transaction(()=>{ for(const o of orders){
-        if((o.packId&&seen.has('p:'+o.packId))||(o.venda&&seen.has('v:'+o.venda))){ rep++; if(religar(o)) religadas++; continue; }
-        if(o.packId)seen.add('p:'+o.packId); if(o.venda)seen.add('v:'+o.venda);
+        if((o.packId&&seen.has('p:'+o.packId))||(o.venda&&seen.has('v:'+o.venda))||envioRepetido(o)){ rep++; if(religar(o)) religadas++; continue; }
+        if(o.packId)seen.add('p:'+o.packId); if(o.venda)seen.add('v:'+o.venda); if(o.envio)marcaEnvio(o.envio,o);
         const sku=(o.sku||'').trim().toUpperCase();
         const ok = sku && existe.get(sku);
         let est='pendente', motivo=null, conflito=o.conflito;
@@ -395,7 +433,7 @@ module.exports=function(app,db){
         if(!o.sku) semsku++;
         if(o.modalidade==='coleta') coleta++;
         const modGravada=(o.modalidade==='agencia'||o.modalidade==='coleta')?o.modalidade:null;
-        const r=ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null,o.despacharEm||null,modGravada); novos++;
+        const r=ins.run(sku||null,o.cor,o.buyer,o.city,o.nf,o.packId,o.venda,JSON.stringify(o.codes||[]),fname,o.labelPage,o.danfePage,est,motivo,o.descricao||null,o.despacharEm||null,modGravada,o.envio||null); novos++;
         if(saida){
           const m=SAIDAS.motivoSemMarca(saida,{despacharEm:o.despacharEm||null, modalidade:modGravada});
           if(m) marca[m]++; else { marcar.run(saida.id, r.lastInsertRowid); marca.marcadas++; }

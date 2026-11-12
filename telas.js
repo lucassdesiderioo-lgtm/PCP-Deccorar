@@ -85,8 +85,14 @@ const TELAS = [
     modulo:'expedicao', bloco:'comum', liga:[103, 205, 253, 301, 302] },
   { n:205, nome:'Correções',             rota:'/admin/correcoes', nivel:'admin',    onde:'computador', perms:['correcao.executar'],     aba:'cor',
     modulo:'expedicao', bloco:'comum', liga:[201, 202, 204] },
-  { n:206, nome:'Horários de coleta',    rota:'/coleta-horarios', nivel:'supervisor', onde:'computador', perms:['coleta.horario'],
-    modulo:'expedicao', bloco:'comum', liga:[103, 201, 202] },   // Operação não edita horário (05/11/2026)
+  /* A 206 abre também com horarios.editar desde 11/11/2026 (AJUSTE, decisão do
+     dono): o "Horário padrão da semana" (corte e despacho por dia da semana,
+     o que vale quando o dia não tem horário lançado) mora aqui, ao lado das
+     semanas. Quem só tem horarios.editar vê o padrão, e não as semanas. E todo
+     nível Admin a abre para LER o padrão (decisão do dono, ③ REVISÃO): era o
+     que ele lia na 906, e ninguém perde a leitura. */
+  { n:206, nome:'Horários de coleta',    rota:'/coleta-horarios', nivel:'supervisor', onde:'computador', perms:['coleta.horario','horarios.editar','@admin'],
+    modulo:'expedicao', bloco:'comum', liga:[101, 103, 201, 202] },   // Operação não edita horário (05/11/2026)
   // ── 250 · Devoluções (bloco dentro da Expedição; a porta é /devolucoes) ──
   { n:251, nome:'Devoluções — receber',  rota:'/devolucao',     nivel:'operacao',   onde:'tablet',     perms:['devolucao.registrar'],   area:'devolucao',
     modulo:'posvenda', bloco:'mercado_livre', liga:[252, 253, 102] },
@@ -151,9 +157,18 @@ const TELAS = [
   // ── 900 · Sistema ──
   { n:901, nome:'Acessos',               rota:'/acessos',       nivel:'admin_geral', onde:'computador', perms:['pessoas.gerenciar'],    aba:'acs',
     modulo:'administracao', bloco:'comum', liga:['usuarios', 'setores'] },
-  { n:902, nome:'Cadastros',             rota:'/admin/cadastros', nivel:'admin',    onde:'computador', perms:['listas.editar','kit.editar','kit.imprimir','horarios.editar'], aba:'cd',
-    modulo:'cadastros', bloco:'comum', liga:[102, 206, 'listas'],
-    partes:[{ id:'horarios', nome:'Horários de corte e despacho', modulo:'administracao' }] },
+  { n:902, nome:'Cadastros',             rota:'/admin/cadastros', nivel:'admin',    onde:'computador', perms:['listas.editar','kit.editar','kit.imprimir'], aba:'cd',
+    modulo:'cadastros', bloco:'comum', liga:[102, 'listas'] },
+  /* ARRUMAR-O-LUGAR fase 3 (11/11/2026): os ajustes que governam a fábrica, num
+     lugar só — o segundo bipe (era da 902), os horários de corte e despacho
+     (a rota existia sem tela), e os parâmetros do corte, os números do prazo e
+     os feriados do sob medida (eram da 606 e da 610). Nível Supervisor (decisão
+     do dono): as chaves do sob medida são de Supervisor (R-SMA-02). Cada parte
+     aparece para quem tem a chave dela; o segundo bipe muda quem é nível Admin.
+     Os horários de corte e despacho saíram daqui em 11/11/2026 (AJUSTE): moram
+     na 206, que é o assunto deles. */
+  { n:906, nome:'Parâmetros',            rota:'/parametros',    nivel:'supervisor', onde:'computador', perms:['sobmedida.parametro.ler','sobmedida.parametro.editar','@admin'],
+    modulo:'administracao', bloco:'comum', liga:[202, 602, 609, 610, 611] },
   // 903 Modo teste SAIU em 11/11/2026 (aposentado, decisao do dono): o numero
   // fica vago para sempre (R-TEL-02).
   { n:904, nome:'Relatórios',            rota:'/relatorios',    nivel:'supervisor', onde:'computador', perms:['relatorios.ver'],        area:'relatorios', aba:'rel',

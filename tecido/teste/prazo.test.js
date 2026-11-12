@@ -117,6 +117,18 @@ module.exports=[
   igual(config.ler('prazoCorteHora'),'18:00','e nada foi gravado');
 }},
 
+{nome:'o ultimo numero do Decorsoft se grava so como inteiro, ou vazio (ARRUMAR-O-LUGAR fase 3, ③ REVISAO: a 906 manda o texto cru)',
+ executar({recusa,igual,db}){
+  const antes=db.prepare("SELECT valor FROM parametro WHERE chave='pedidoNumeroInicial'").get().valor;
+  recusa(()=>config.gravar('pedidoNumeroInicial','5O01',null),'valor_invalido','letra no meio');
+  recusa(()=>config.gravar('pedidoNumeroInicial','12,5',null),'valor_invalido','fracao');
+  igual(db.prepare("SELECT valor FROM parametro WHERE chave='pedidoNumeroInicial'").get().valor,antes,'e nada foi gravado');
+  config.gravar('pedidoNumeroInicial','5001',null);
+  igual(String(config.ler('pedidoNumeroInicial')),'5001','o inteiro grava');
+  db.prepare("UPDATE parametro SET valor=? WHERE chave='pedidoNumeroInicial'").run(antes);   // volta como estava (o vazio do banco novo)
+  config.gravar('prazoSemanas',String(config.ler('prazoSemanas')),null);   // so para zerar o cache do config depois do UPDATE direto
+}},
+
 {nome:'a data tambem sai POR EXTENSO — a tela nao traduz 2026-10-02 de cabeca',
  executar({igual,db}){
   semFeriados(db);

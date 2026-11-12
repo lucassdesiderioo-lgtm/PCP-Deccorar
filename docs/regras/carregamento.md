@@ -89,10 +89,10 @@ agência de cada data), `saida_dia` ("hoje não tem coleta") e
 `saida_horario_evento` (a história). `lote.horario_id` aponta a saída que o PDF
 disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 "Para qual saída são estas vendas?" no upload — desde 05/11/2026 só na 103 Lançar produção —, com
-`coleta.horario` (Operação). **`node teste_horario_coleta.js`** trava os cartões abaixo.
+`coleta.horario` (nível Supervisor), e desde 11/11/2026 também com `horarios.editar` e para todo nível Admin, pelo horário padrão (D12 da ARRUMAR-O-LUGAR). **`node teste_horario_coleta.js`** trava os cartões abaixo.
 
 ### R-HCO-01 · O horário é da DATA, e não do dia da semana
-- **Regra:** cada data tem as suas coletas e a sua agência; o `corte_<dia>`/`despacho_<dia>` do `config` só vale para a agência sem horário lançado.
+- **Regra:** cada data tem as suas coletas e a sua agência; o `corte_<dia>`/`despacho_<dia>` do `config` só vale para a agência sem horário lançado. Esse padrão por dia da semana se edita na própria 206, no bloco "Horário padrão da semana" (`horarios.editar`, desde 11/11/2026; o corte dele é o que a Revisão mostra).
 - **Por quê:** o ML muda o horário durante a semana (na quinta 05/11 a coleta das 9h sumiu e as outras andaram).
 - **Status:** no ar desde 05/11/2026 (PRs #292 e #293); falta a prova com dado real.
 

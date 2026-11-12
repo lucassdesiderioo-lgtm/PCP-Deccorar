@@ -353,7 +353,7 @@ function desSusp(s){
     (s.horas_descartadas?('Foram '+n2(s.horas_descartadas)+' h descartadas. '):'')+
     (s.abertos?(plural(s.abertos,'bipe continua aberto','bipes continuam abertos')+
       ': alguém precisa ir fechar.'):'')+
-    ' O limite se muda em Cadastros → Parâmetros.';
+    ' O limite se muda na tela 906 Parâmetros.';
   limpar($('#tSusp')).appendChild(tabela(
     [{nome:'Etiqueta'},{nome:'Peça'},{nome:'Bancada'},{nome:'Quem'},
      {nome:'Horas',num:true},{nome:'Situação'}],

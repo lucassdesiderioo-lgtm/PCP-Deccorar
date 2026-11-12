@@ -15,6 +15,10 @@ require('./auth')(app, db);
    as telas `/admin/...` ficam ENTRE o auth e o static (armadilha #3), e o
    static nao entrega mais o index.html no `/` (`index:false`). */
 require('./admin_telas')(app, db);
+/* A caixinha "Abrir em Pendências" (spec PENDENCIAS-NO-MENU, fase 1): conta as
+   linhas da central antes e depois das ações que criam pendência. Tem que vir
+   ANTES de qualquer rota — middleware registrado depois não roda para ela. */
+require('./pendencias_vigia')(app, db);
 app.use(express.static(path.join(__dirname, 'public'), { index:false }));
 
 /* O cadastro de SKU (GET, POST e DELETE /api/skus) mora no
@@ -169,6 +173,7 @@ app.get('/coleta-horarios',(req,res)=> res.sendFile(path.join(__dirname,'public'
 /* A 106 Material extra (FICHAS-NO-CADASTRO-UNICO §3-G, 11/11/2026). */
 require('./material_extra_route')(app, db);
 app.get('/material-extra',(req,res)=> res.sendFile(path.join(__dirname,'public','material-extra.html')));
+app.get('/parametros',(req,res)=> res.sendFile(path.join(__dirname,'public','parametros.html')));   // 906 Parâmetros (ARRUMAR-O-LUGAR fase 3)
 // A central de pendencias (fase 1): so le, e pergunta a funcao de cada tela
 // dona — por isso depois de todas elas.
 require('./pendencias_route')(app, db);

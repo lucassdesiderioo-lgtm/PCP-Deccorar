@@ -388,7 +388,7 @@ async function telaGerencial(pai){
   ct.appendChild(el('p',{class:'nota',texto:
     'O grao e TECIDO × LARGURA DE BOBINA. Estoque minimo = consumo medio diario × '+
     g.parametros.dias_alvo+' dias'+(g.parametros.seguranca?' + '+g.parametros.seguranca+'% de seguranca':'')+
-    ' — os dois em Cadastros → Parametros. Sem consumo, minimo e cobertura sao "—": nao da pra dizer, que nao e zero.'}));
+    ' — os dois na tela 906 Parametros. Sem consumo, minimo e cobertura sao "—": nao da pra dizer, que nao e zero.'}));
 
   const ordem={sem_estoque:0,critico:1,parado:2,atencao:3,normal:4};
   const cab=[{nome:'Colecao'},{nome:'Cor'},{nome:'Bobina',num:true},
@@ -503,7 +503,7 @@ async function telaTempo(pai){
   }
   const notas=[];
   if(r.fora_da_media.length) notas.push((r.fora_da_media.length===1?'1 corte ficou fora':r.fora_da_media.length+' cortes ficaram fora')+
-    ' da média por passar de '+num(r.limite_horas,0)+' h (corte '+r.fora_da_media.map(f=>f.id+', '+num(f.horas,1)+' h').join(' · ')+'). O limite fica em Cadastros → Parâmetros.');
+    ' da média por passar de '+num(r.limite_horas,0)+' h (corte '+r.fora_da_media.map(f=>f.id+', '+num(f.horas,1)+' h').join(' · ')+'). O limite fica na tela 906 Parâmetros.');
   if(r.sem_relogio&&r.linhas.length) notas.push((r.sem_relogio===1?'1 corte do período foi feito':r.sem_relogio+' cortes do período foram feitos')+' antes de o relógio existir: sem tempo medido, ficam fora.');
   notas.forEach(n=>c.appendChild(el('p',{class:'nota',style:'color:var(--alerta)',texto:n})));
 }

@@ -146,9 +146,11 @@ const INV = {   // as 45 telas do §5 da spec, sem faltar nenhuma (③ REVISÃO:
   613:['producao','sob_medida'], 614:['planejamento','sob_medida'], 615:['relatorios','sob_medida'], 616:['financeiro','revenda'],
   /* ARRUMAR-O-LUGAR fase 2 (11/11/2026): o "Onde mora" da spec */
   1101:['cadastros','comum'], 1102:['cadastros','comum'], 1103:['cadastros','comum'], 1201:['almoxarifado','comum'],
-  1301:['fiscal','comum'], 1302:['fiscal','comum'] };
+  1301:['fiscal','comum'], 1302:['fiscal','comum'],
+  /* ARRUMAR-O-LUGAR fase 3 (11/11/2026): a 906 Parâmetros */
+  906:['administracao','comum'] };
 const semInv = TODAS.filter(t => !INV[t.n]).map(t => t.n), semMapa = Object.keys(INV).filter(k => !NUMS.has(+k));
-ok('o inventário tem as telas do mapa, e só elas (as 45 de 10/11/2026, as 6 da fase 2 da ARRUMAR-O-LUGAR e a 106; a 903 saiu em 11/11/2026)', !semInv.length && !semMapa.length,
+ok('o inventário tem as telas do mapa, e só elas (as 45 de 10/11/2026, as 6 da fase 2 e a 906 da fase 3 da ARRUMAR-O-LUGAR, e a 106; a 903 saiu em 11/11/2026)', !semInv.length && !semMapa.length,
   (semInv.length ? 'tela nova fora do inventário: ' + lista(semInv) + ' — declare-a no INV com o módulo e o bloco do "Onde mora" da spec dela. ' : '')
   + (semMapa.length ? 'no inventário e fora do mapa: ' + lista(semMapa) : ''));
 const divergeInv = Object.entries(INV).filter(([num, [mod, bl]]) => {
@@ -159,12 +161,12 @@ const abaEsperada = { lista:'compras', pedidos:'compras', rapida:'compras', prog
   fornecedores:'cadastros', almox:'cadastros', retidos:'almoxarifado', notas:'fiscal', certificado:'fiscal' };
 const abaDiverge = (t501.abas || []).filter(a => abaEsperada[a.id] !== a.modulo).map(a => a.id);
 ok('as abas da 501 batem com o inventário do §5', !abaDiverge.length, lista(abaDiverge));
-const PARTES = { '902/horarios':'administracao' };   // a 302/material foi para a 504 (ARRUMAR-O-LUGAR fase 2)
+const PARTES = {};   // a 302/material foi para a 504 (fase 2) e os 902/horarios para a 906 (fase 3, ARRUMAR-O-LUGAR)
 const partesMapa = {};
 TODAS.forEach(t => (t.partes || []).forEach(p => { partesMapa[t.n + '/' + p.id] = p.modulo; }));
 const parteDiverge = Object.keys(PARTES).filter(k => partesMapa[k] !== PARTES[k])
   .concat(Object.keys(partesMapa).filter(k => !PARTES[k]));
-ok('as partes (902/horarios) batem com o inventário do §5, e não há outra', !parteDiverge.length, lista(parteDiverge));
+ok('nenhuma tela tem parte de outro assunto (a última, 902/horarios, foi para a 906)', !parteDiverge.length, lista(parteDiverge));
 
 console.log('\n' + (n - falhas) + ' ok, ' + falhas + ' falha(s)');
 process.exit(falhas ? 1 : 0);

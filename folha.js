@@ -31,12 +31,38 @@ function pageLines(tc){
  * Com duas copias, a conferencia chamaria de nota uma pagina que o parse nao
  * chamou — e diria com autoridade que a impressao esta certa olhando outro
  * papel. */
+/* ⚠️ A ETIQUETA SO COM "Envio:" (12/11/2026, NFs 9718 a 9744). O ML mandou
+   etiquetas que nao trazem Pack ID nem Venda: no lugar, "Envio: 485023 18254"
+   — o mesmo numero do codigo de barras. Sem esta linha a pagina virava 'other'
+   e a venda nao entrava no sistema: 27 de 46 num PDF so, todas vencendo no dia.
+   A folha traz o mesmo numero no item ("Envio: 48502318254 SKU: ..."). */
 function tipoDaPagina(texto){
   const t=String(texto||'');
   if(/SKU:/.test(t)) return 'control';
   if(/DANFE/.test(t)||/Chave de acesso/i.test(t)) return 'danfe';
-  if(/Pack ID:/.test(t)||/Venda:/.test(t)) return 'label';
+  if(/Pack ID:/.test(t)||/Venda:/.test(t)||/Envio:/.test(t)) return 'label';
   return 'other';
+}
+
+/* O NUMERO DO CODIGO DE BARRAS DA ETIQUETA: a linha so de digitos, de 10 a 12
+   (o pdf.js a parte em dois: "484058 80346"). Pack e venda tem 16 e ficam de
+   fora. A etiqueta de sempre tambem tem essa linha; o que muda e que so a folha
+   nova a repete (no MEL, ou na linha "Envio:"), entao so ali ela vota.
+   Mora aqui (e o parse.js reexporta) porque a auditoria (lerFolha) tambem le a
+   etiqueta, e o parse.js ja depende deste modulo. */
+function envioDaEtiqueta(lines){
+  for(const l of (lines||[])){
+    const t=String(l||'').trim();
+    if(!/^\d[\d ]*\d$/.test(t)) continue;
+    const d=t.replace(/\s+/g,'');
+    if(d.length>=10 && d.length<=12) return d;
+  }
+  /* A etiqueta so com "Envio:" escreve o numero tambem nessa linha. */
+  for(const l of (lines||[])){
+    const m=String(l||'').match(/Envio:\s*(\d[\d ]*\d)/);
+    if(m){ const d=m[1].replace(/\s+/g,''); if(d.length>=10 && d.length<=12) return d; }
+  }
+  return null;
 }
 
 /* O NUMERO DA NOTA dentro de uma pagina de DANFE — a chave que liga a etiqueta
@@ -45,6 +71,48 @@ function tipoDaPagina(texto){
 function nfDaNota(texto){
   const m=String(texto||'').match(/N[úu]mero\s*([\d.,]+)/i);
   return m?m[1].replace(/\D/g,'')||null:null;
+}
+
+/* A UF DO DESTINATARIO NA NOTA E O ESTADO DE DESTINO NA ETIQUETA (12/11/2026,
+   R-CONF-07). Servem a uma conferencia so: a da nota da etiqueta SEM "NF:"
+   (rota JADLOG), que e ligada pela ordem das paginas. O nome do destinatario
+   NAO serve: em 85 notas reais, 27 estavam em nome de parente, empresa ou
+   condominio. A UF bateu nas 85. Ilegivel devolve null e nao vota (#10). */
+/* ③ REVISAO: a sigla e lida na MESMA linha do primeiro "UF:" depois do
+   destinatario, e so vale se for uma UF que existe — "UF:" vazio com "IE: 123"
+   embaixo lia "IE", e retinha caixa legitima (#6). */
+const UFS=new Set(['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR',
+  'PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']);
+function ufDaNota(texto){
+  const ls=String(texto||'').split('\n');
+  const d=ls.findIndex(l=>/DESTINAT[AÁ]RIO/i.test(l)); if(d<0) return null;
+  for(let k=d;k<ls.length;k++){
+    const m=ls[k].match(/\bUF:[ \t]*([A-Za-z]{2})?\b/i);
+    if(!m) continue;
+    const uf=(m[1]||'').toUpperCase();
+    return UFS.has(uf)?uf:null;                     // o primeiro "UF:" decide; ilegivel nao vota
+  }
+  return null;
+}
+const ESTADOS={'acre':'AC','alagoas':'AL','amapa':'AP','amazonas':'AM','bahia':'BA','ceara':'CE',
+  'distrito federal':'DF','espirito santo':'ES','goias':'GO','maranhao':'MA','mato grosso do sul':'MS',
+  'mato grosso':'MT','minas gerais':'MG','paraiba':'PB','parana':'PR','para':'PA','pernambuco':'PE',
+  'piaui':'PI','rio de janeiro':'RJ','rio grande do norte':'RN','rio grande do sul':'RS','rondonia':'RO',
+  'roraima':'RR','santa catarina':'SC','sao paulo':'SP','sergipe':'SE','tocantins':'TO'};
+/* "Cidade de destino: Niterói, Rio de" + "Janeiro" na linha de baixo: o
+   estado vem depois da ULTIMA virgula e pode quebrar de linha, entao a linha
+   seguinte entra junto — e o estado e o nome mais LONGO que casa no comeco
+   (Mato Grosso do Sul antes de Mato Grosso, Paraná e Paraíba antes de Pará). */
+function ufDaEtiqueta(lines){
+  const ls=(lines||[]).map(l=>String(l||''));
+  const k=ls.findIndex(l=>/Cidade de destino\s*:/i.test(l)); if(k<0) return null;
+  const linha=ls[k].replace(/^.*?Cidade de destino\s*:\s*/i,'');
+  const i=linha.lastIndexOf(','); if(i<0) return null;
+  const resto=(linha.slice(i+1)+' '+(ls[k+1]||'')).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/\s+/g,' ').trim();
+  const nome=Object.keys(ESTADOS).sort((a,b)=>b.length-a.length)
+    .find(e=>resto===e || resto.startsWith(e+' '));
+  return nome?ESTADOS[nome]:null;
 }
 
 /* Devolve {paginas, etiquetas:[{pagina,packId,venda,nf}], notas:[{pagina,nf}],
@@ -66,6 +134,7 @@ async function lerFolha(arquivo){
     else if(tipo==='label'){
       const g=re=>{ const m=text.match(re); return m?m[1].replace(/\s+/g,''):null; };
       etiquetas.push({pagina:p,packId:g(/Pack ID:\s*([\d ]+)/),venda:g(/Venda:\s*([\d ]+)/),
+                      envio:envioDaEtiqueta(lines),
                       nf:(text.match(/NF:\s*(\d+)/)||[])[1]||null});
     }
   }
@@ -183,10 +252,15 @@ function tituloDoAnuncio(linha){
  * do `teste_parse.js` e casos/2026-10-29-nf-8828.json.
  */
 function reivindicarAcima(linhas, itens, janelas){
-  const usadas=new Set(), packs=new Set();
-  itens.forEach(it=>{ if(it.venda) usadas.add(it.venda); if(it.packId) packs.add(it.packId); });
+  const usadas=new Set(), packs=new Set(), envios=new Set();
+  itens.forEach(it=>{ if(it.venda) usadas.add(it.venda); if(it.packId) packs.add(it.packId);
+    if(it.envio) envios.add(it.envio); });
   itens.forEach((it,n)=>{
     if(it.packId) return;                             // o pack identifica sozinho
+    /* O item da etiqueta so com "Envio:" (12/11/2026) se identifica pelo
+       numero do envio, e nao tem pack nem venda em lugar nenhum: o que houver
+       na janela acima e do vizinho. */
+    if(it.envioLinha && !it.venda) return;
     const j=janelas[n]; if(!j) return;
     if(it.venda){                                     // tem a venda: falta so o pack
       const livres=[];
@@ -202,12 +276,20 @@ function reivindicarAcima(linhas, itens, janelas){
       const linha=String(linhas[k]||'');
       const v=(linha.match(/Venda:\s*([\d ]+)/)||[])[1];
       const p=(linha.match(/Pack ID:\s*([\d ]+)/)||[])[1];
+      /* ⚠️ E O "Envio:" QUE SOBE (12/11/2026). O titulo longo ("...Bege
+         Claro - Tóquio 002") desfaz o pareamento tambem na etiqueta so com
+         "Envio:": a linha do envio fica acima do `SKU:`. Mesma regra das
+         outras duas — so o numero que nenhum outro item pegou, e so se for o
+         unico livre da janela. */
+      const e=(linha.match(/Envio:\s*(\d[\d ]*\d)/)||[])[1];
       if(v){ const x=v.replace(/\s+/g,''); if(x && !usadas.has(x)) livres.push({venda:x}); }
       if(p){ const x=p.replace(/\s+/g,''); if(x && !packs.has(x)) livres.push({packId:x}); }
+      if(e && !it.envio){ const x=e.replace(/\s+/g,''); if(x && !envios.has(x)) livres.push({envio:x}); }
     }
     if(livres.length!==1) return;                     // zero ou ambiguo: nao mexe
     if(livres[0].venda){ it.venda=livres[0].venda; usadas.add(it.venda); }
-    else { it.packId=livres[0].packId; packs.add(it.packId); }
+    else if(livres[0].packId){ it.packId=livres[0].packId; packs.add(it.packId); }
+    else { it.envio=livres[0].envio; it.envioLinha=true; envios.add(it.envio); }
   });
 }
 
@@ -246,7 +328,7 @@ function itensDaFolha(linhas){
        o mesmo dado que a conferencia 3 ja le e nao envelhece como lista de
        palavras: titulo de persiana traz um ou o outro, cabecalho nao traz
        nenhum. */
-    const ehCampo=x=>/(?:Pack ID|Venda|SKU|Quantidade|Cor|Desenho do tecido)\s*:/.test(x);
+    const ehCampo=x=>/(?:Pack ID|Venda|Envio|SKU|Quantidade|Cor|Desenho do tecido)\s*:/.test(x);
     const ehAnuncio=x=>/Persiana/i.test(x)||MEDIDA_TITULO.test(x);
     /* ⚠️ O TITULO QUE QUEBRA EM DUAS LINHAS (23/09/2026). O anuncio de catalogo
        e longo e o PDF o parte no meio:
@@ -295,7 +377,7 @@ function itensDaFolha(linhas){
     }
     let comprador=''; for(const x of daqui){
       const mm=x.match(/^(.+?)\s+(?:Cor:|Quantidade:)/);
-      if(mm && !/^(Pack ID|Venda|SKU|Desenho)/.test(mm[1]) && !/Persiana/i.test(mm[1])){ comprador=mm[1].trim(); break; }
+      if(mm && !/^(Pack ID|Venda|Envio|SKU|Desenho)/.test(mm[1]) && !/Persiana/i.test(mm[1])){ comprador=mm[1].trim(); break; }
     }
     /* O NOME SOZINHO NA LINHA (23/09/2026). A busca acima depende das duas
        colunas da folha casarem — o nome a esquerda, `Cor:` ou `Quantidade:` a
@@ -333,7 +415,13 @@ function itensDaFolha(linhas){
        ("CLONAPDJ..."), sem o numero: `envio` fica null e nao vota (#10).
        Procura de baixo para cima na janela do item, como o titulo: o MEL mais
        perto do SKU e o dele. */
-    let envio=null;
+    /* ⚠️ E A LINHA "Envio: 48502318254" (12/11/2026): a folha da etiqueta so
+       com "Envio:" escreve o numero com rotulo, no lugar do Pack ID e da
+       Venda. Ele vale como o MEL, e mais: e a IDENTIDADE do item (`envioLinha`)
+       — sem ele o item nao tem pack nem venda, e a folha crua (pecasCruas) o
+       contava dentro da caixa de cima (NF 9700 gravou 7 persianas). */
+    const envioRotulo=(pega(/Envio:\s*(\d[\d ]*\d)/)||'').replace(/\s+/g,'')||null;
+    let envio=envioRotulo;
     for(let k=largo.length-1;k>=0 && !envio;k--){
       const mm=String(largo[k]||'').match(/\bMEL(\d{8,})/);
       if(mm) envio=mm[1];
@@ -341,7 +429,7 @@ function itensDaFolha(linhas){
     itens.push({
       packId:(pega(/Pack ID:\s*([\d ]+)/)||'').replace(/\s+/g,'')||null,
       venda:(pega(/Venda:\s*([\d ]+)/)||'').replace(/\s+/g,'')||null,
-      envio,
+      envio, envioLinha: !!envioRotulo,
       sku:ms[1].trim(), cor:(pega(/Cor:\s*([^\n|]+)/)||'').trim()||null,
       comprador:comprador||null, desc:desc||null,
       /* QUANTIDADE — quantas PECAS aquele item tem.
@@ -396,7 +484,7 @@ function itensDaFolha(linhas){
 function irmaosDoPacote(blocos){
   const grupos=[]; let atual=null;
   (blocos||[]).forEach(b=>{
-    const orfao = !b.packId && !b.venda && !b.comprador;
+    const orfao = !b.packId && !b.venda && !b.envioLinha && !b.comprador;
     if(!orfao){ atual={pai:b, irmaos:[]}; grupos.push(atual); return; }
     /* Orfao antes de qualquer item identificado nao e irmao de ninguem: e folha
        que comeca torta, e isso e outro problema — nao se inventa um pai. */
@@ -455,7 +543,10 @@ function indicesDoSku(linhas){
 function pecasCruas(linhas, itens){
   linhas=linhas||[];
   const idx=indicesDoSku(linhas);
-  const ancoras=(itens||[]).filter(b=>(b.packId||b.venda) && b.linha!=null);
+  /* O item com "Envio:" na linha tambem abre uma venda (12/11/2026): sem ele
+     como ancora, as vendas desse formato eram contadas dentro da caixa de
+     cima, e a caixa ia com o MAIOR numero lido (NF 9700: 7 em vez de 1). */
+  const ancoras=(itens||[]).filter(b=>(b.packId||b.venda||b.envioLinha) && b.linha!=null);
   const mapa=new Map();
   ancoras.forEach((a,n)=>{
     const ate=ancoras[n+1]?ancoras[n+1].linha:linhas.length;
@@ -490,6 +581,8 @@ function mapasDaFolha(blocos){
 function skuDaFolha(volume, mapas){
   return (volume.venda && mapas.porVenda[volume.venda])
       || (volume.packId && mapas.porPack[volume.packId])
+      /* O volume da etiqueta so com "Envio:" (12/11/2026) se acha pelo envio. */
+      || (!volume.venda && !volume.packId && volume.envio && mapas.porEnvio[volume.envio])
       || null;
 }
 
@@ -497,6 +590,7 @@ function skuDaFolha(volume, mapas){
 function itemDaFolha(volume, itens){
   return (volume.venda && (itens||[]).find(i=>i.venda===volume.venda))
       || (volume.packId && (itens||[]).find(i=>i.packId===volume.packId))
+      || (!volume.venda && !volume.packId && volume.envio && (itens||[]).find(i=>i.envio===volume.envio))
       || null;
 }
 
@@ -591,4 +685,4 @@ function travasAtivas(volume, item, coresConhecidas){
 module.exports={lerFolha,mapasDaFolha,skuDaFolha,itemDaFolha,itensDaFolha,travasAtivas,pageLines,
                 pecasCruas,pecasDaFolhaInteira,
                 tipoDaPagina,nfDaNota,irmaosDoPacote,irmaosDe,tituloDoAnuncio,medidaDoTitulo,
-                etiquetasSemItem,pdfFecha,pecasDaCaixa};
+                etiquetasSemItem,pdfFecha,pecasDaCaixa,envioDaEtiqueta,ufDaNota,ufDaEtiqueta};

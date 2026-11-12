@@ -40,12 +40,17 @@ function maisAntiga(datas){
   return d.length ? d[0] : null;
 }
 
+/* `tela` (spec PENDENCIAS-NO-MENU, 12/11/2026): o número, no mapa (`telas.js`),
+   da tela onde a pendência se resolve. É dele que sai o caminho da caixinha
+   "Abrir em Pendências" e, na fase 2, a etiqueta do ☰ Menu. `frase`: o que a
+   caixinha diz quando uma ação cria uma pendência desta linha (um, vários) —
+   escrita aqui, ao lado da linha, para nenhuma tela dizer do seu jeito. */
 const LINHAS = [
-  { chave:'bloqueados', nome:'Bloqueados', perm:[], onde:{ aba:'blq' }, aqui:true,
-    quemTexto:'os cards logo abaixo dizem quem',
+  { chave:'bloqueados', tela:204, frase:['pendência nova em Bloqueados (caixa retida, venda sem etiqueta ou PDF cuja conta não fecha)','pendências novas em Bloqueados (caixas retidas, vendas sem etiqueta ou PDF cuja conta não fecha)'], nome:'Bloqueados', perm:[], onde:{ aba:'blq' }, aqui:true,
+    quemTexto:'os cards logo abaixo dizem quem', quemCaixa:'nível Admin',
     ajuda:'SKU fora do cadastro, dúvida na leitura, pacote, formato novo, venda sem etiqueta e PDF cuja conta não fechou',
     contar(db){ const r = require('./exp_route').bloqueados(db); return { n:r.n, desde:r.desde, sem_etiqueta:r.sem_etiqueta }; } },
-  { chave:'correcoes', nome:'Correções', perm:['correcao.executar'], onde:{ aba:'blq', ancora:'corCard' },
+  { chave:'correcoes', tela:204, nome:'Correções', perm:['correcao.executar'], onde:{ aba:'blq', ancora:'corCard' },
     ajuda:'fantasmas, vencidos, caixas sem conferência, canceladas depois da etiqueta e fila velha',
     contar(db){
       const c = require('./correcoes').contadores(db);
@@ -59,37 +64,37 @@ const LINHAS = [
       });
       return { n, desde:maisAntiga(datas), canceladas:ids };
     } },
-  { chave:'ajuste', nome:'Ajuste de saldo', perm:['estoque.aprovar_ajuste'], onde:{ aba:'est' },
+  { chave:'ajuste', tela:301, frase:['pedido de ajuste de saldo espera outra pessoa aprovar','pedidos de ajuste de saldo esperam outra pessoa aprovar'], nome:'Ajuste de saldo', perm:['estoque.aprovar_ajuste'], onde:{ aba:'est' },
     ajuda:'pedidos de ajuste esperando a segunda pessoa aprovar',
     contar(db){
       const r = require('./ajuste_dominio').contarPendentes(db);
       return { n:r.n, desde:r.desde };
     } },
-  { chave:'inventario_aprovar', nome:'Inventário — sem acordo', perm:['contagem.resolver'], onde:{ url:'/inventario' },
+  { chave:'inventario_aprovar', tela:303, frase:['SKU não teve acordo nem na 3ª contagem e espera decisão','SKUs não tiveram acordo nem na 3ª contagem e esperam decisão'], nome:'Inventário — sem acordo', perm:['contagem.resolver'], onde:{ url:'/inventario' },
     ajuda:'SKUs em que nem a 3ª contagem bateu (e os que já esperavam aprovação antes de 04/11/2026)',
     contar(db){ const r = require('./inventario_dominio').pendencias(db).aprovar; return { n:r.n, desde:r.desde }; } },
-  { chave:'inventario_recontar', nome:'Inventário — 2ª e 3ª contagem', perm:['contagem.contar','contagem.desempatar'], onde:{ url:'/inventario' },
+  { chave:'inventario_recontar', tela:303, nome:'Inventário — 2ª e 3ª contagem', perm:['contagem.contar','contagem.desempatar'], onde:{ url:'/inventario' },
     ajuda:'SKUs que esperam a contagem de outra pessoa (a 2ª, ou a 3ª porque as duas não bateram)',
     contar(db){ const r = require('./inventario_dominio').pendencias(db).recontar; return { n:r.n, desde:r.desde }; } },
   /* Os ajustes antigos se dividem por tela desde 11/11/2026 (ARRUMAR-O-LUGAR
      fase 2): os de peça ficam na 302, e os de material moram na 504 — cada linha
      conta o que a tela dela mostra (#12). */
-  { chave:'contagem', nome:'Contagem — ajustes de peça', perm:['contagem.ajustar'], onde:{ aba:'ct' },
+  { chave:'contagem', tela:302, nome:'Contagem — ajustes de peça', perm:['contagem.ajustar'], onde:{ aba:'ct' },
     ajuda:'contagens esperando aprovação para ir ao estoque',
     contar(db){
       const l = require('./cont_route').pendentes(db).filter(x => x.tipo !== 'componente');
       return { n:l.length, desde:maisAntiga(l.map(x => x.criado_em)) };
     } },
-  { chave:'contagem_material_antiga', nome:'Ajustes antigos de material', perm:['contagem.ajustar'], onde:{ url:'/contagem-material' },
+  { chave:'contagem_material_antiga', tela:504, nome:'Ajustes antigos de material', perm:['contagem.ajustar'], onde:{ url:'/contagem-material' },
     ajuda:'da contagem de material antiga (saiu em 07/11/2026): rejeite e conte de novo na 504',
     contar(db){
       const l = require('./cont_route').pendentes(db).filter(x => x.tipo === 'componente');
       return { n:l.length, desde:maisAntiga(l.map(x => x.criado_em)) };
     } },
-  { chave:'sku', nome:'SKU incompleto', perm:['sku.cadastrar'], onde:{ aba:'pend' },
+  { chave:'sku', tela:403, frase:['SKU ficou incompleto (falta medida, modelo, cor ou custo)','SKUs ficaram incompletos (falta medida, modelo, cor ou custo)'], nome:'SKU incompleto', perm:['sku.cadastrar'], onde:{ aba:'pend' },
     ajuda:'cadastro sem medida, modelo, cor ou custo',
     contar(db){ return { n:require('./sku_route').pendencias(db).total, desde:null }; } },
-  { chave:'sobras', nome:'Canceladas da Conferência', perm:['cancelamento.confirmar','carregamento.executar'], onde:{ url:'/carregamento' },
+  { chave:'sobras', tela:202, frase:['caixa separada como venda cancelada espera a confirmação de outra pessoa','caixas separadas como venda cancelada esperam a confirmação de outra pessoa'], nome:'Canceladas da Conferência', perm:['cancelamento.confirmar','carregamento.executar'], onde:{ url:'/carregamento' },
     ajuda:'caixas separadas como venda cancelada esperando confirmação no ML, e canceladas no ML ainda na fábrica esperando ser separadas',
     contar(db){
       const l = require('./carreg_route').sobrasEsperando(db);
@@ -98,39 +103,39 @@ const LINHAS = [
     } },
   /* COMPRAS-E-RECEBIMENTO fase 1 (R-CMP-05): material sem almoxarifado padrão
      não sabe para onde vai no Recebimento nem em que contagem entra. */
-  { chave:'material_sem_almox', nome:'Material sem almoxarifado', perm:['componente.cadastrar'], onde:{ url:'/admin/materiais' },
+  { chave:'material_sem_almox', tela:1101, frase:['material ficou sem almoxarifado','materiais ficaram sem almoxarifado'], nome:'Material sem almoxarifado', perm:['componente.cadastrar'], onde:{ url:'/admin/materiais' },
     ajuda:'material cadastrado sem o almoxarifado onde ele mora',
     contar(db){ const r = require('./material_dominio').pendencias(db).sem_almoxarifado; return { n:r.n, desde:r.desde }; } },
-  { chave:'pedido_aprovacao', nome:'Pedido de compra aguardando aprovação', perm:['pedido.aprovar'], onde:{ aba:'compras' },
+  { chave:'pedido_aprovacao', tela:501, frase:['pedido de compra passou da alçada e espera aprovação','pedidos de compra passaram da alçada e esperam aprovação'], nome:'Pedido de compra aguardando aprovação', perm:['pedido.aprovar'], onde:{ aba:'compras' },
     ajuda:'pedido acima da alçada de quem o criou (R-CMP-17)',
     contar(db){ const r = require('./compra_dominio').pendencias(db).aguardando_aprovacao; return { n:r.n, desde:r.desde }; } },
   /* COMPRAS-E-RECEBIMENTO fase 3 (R-CMP-32/33): o retido nao entra no saldo
      ate alguem decidir; o aviso entrou e espera a ciencia. */
-  { chave:'recebimento_retido', nome:'Recebimento retido', perm:['recebimento.liberar'], onde:{ url:'/admin/recebimento-retido' },
+  { chave:'recebimento_retido', tela:1201, frase:['recebimento ficou retido e não entrou no saldo até alguém decidir','recebimentos ficaram retidos e não entraram no saldo até alguém decidir'], nome:'Recebimento retido', perm:['recebimento.liberar'], onde:{ url:'/admin/recebimento-retido' },
     ajuda:'entrega que não bateu o peso ou a quantidade declarada: aceitar, aceitar e reclamar, ou devolver',
     contar(db){ const r = require('./recebimento_dominio').pendencias(db).retido; return { n:r.n, desde:r.desde }; } },
-  { chave:'recebimento_aviso', nome:'Recebimento com aviso de peso', perm:['recebimento.liberar'], onde:{ url:'/admin/recebimento-retido' },
+  { chave:'recebimento_aviso', tela:1201, frase:['recebimento entrou com aviso de peso e espera ciência','recebimentos entraram com aviso de peso e esperam ciência'], nome:'Recebimento com aviso de peso', perm:['recebimento.liberar'], onde:{ url:'/admin/recebimento-retido' },
     ajuda:'entrou no saldo com o peso entre as duas tolerâncias: dar ciência',
     contar(db){ const r = require('./recebimento_dominio').pendencias(db).aviso; return { n:r.n, desde:r.desde }; } },
   /* COMPRAS-E-RECEBIMENTO fase 6 (R-CMP-42): a contagem de material que passou
      da tolerancia espera outra pessoa aprovar. */
-  { chave:'contagem_material', nome:'Contagem de material por almoxarifado', perm:['contagem.aprovar'], onde:{ url:'/contagem-material' },
+  { chave:'contagem_material', tela:504, frase:['item da contagem passou da tolerância e espera aprovação','itens da contagem passaram da tolerância e esperam aprovação'], nome:'Contagem de material por almoxarifado', perm:['contagem.aprovar'], onde:{ url:'/contagem-material' },
     ajuda:'diferença acima da tolerância na contagem cega da 504',
     contar(db){ return require('./contagem_material_dominio').pendencias(db); } },
   /* fase 11 (R-CMP-52, R-CMP-55): o certificado vencendo/vencido, e a nota da
      Receita de fornecedor sem pedido (alguem comprou por fora). */
-  { chave:'certificado', nome:'Certificado digital vencendo ou vencido', perm:['certificado.gerenciar'], onde:{ url:'/admin/certificado' },
+  { chave:'certificado', tela:1302, nome:'Certificado digital vencendo ou vencido', perm:['certificado.gerenciar'], onde:{ url:'/admin/certificado' },
     ajuda:'menos de 30 dias para vencer, ou já vencido (a busca da Receita para)',
     contar(db){ return require('./certificado_dominio').pendencias(db); } },
-  { chave:'nota_sem_pedido', nome:'Nota da Receita sem pedido ou que não entrou', perm:['nota.lancar'], onde:{ url:'/admin/notas' },
+  { chave:'nota_sem_pedido', tela:1301, nome:'Nota da Receita sem pedido ou que não entrou', perm:['nota.lancar'], onde:{ url:'/admin/notas' },
     ajuda:'nota emitida contra a Deccorar por fornecedor sem pedido no sistema, ou documento da Receita que não entrou',
     contar(db){ return require('./dfe_dominio').pendencias(db); } },
   /* FICHAS-NO-CADASTRO-UNICO §3-G (11/11/2026): a peca refeita espera alguem
      dizer se usou material. A conta e a da tela dona (material_extra_dominio). */
-  { chave:'material_extra', nome:'Material extra a decidir', perm:['material.extra'], onde:{ url:'/material-extra' },
+  { chave:'material_extra', tela:106, frase:['peça espera decidir o material','peças esperam decidir o material'], nome:'Material extra a decidir', perm:['material.extra'], onde:{ url:'/material-extra' },
     ajuda:'peça com problema ou recusada: dizer se usou material, e baixar',
     contar(db){ return require('./material_extra_dominio').pendentes(db); } },
-  { chave:'devolucoes', nome:'Devoluções', perm:['devolucao.baixar'], onde:{ aba:'dv' },
+  { chave:'devolucoes', tela:253, frase:['devolução espera a baixa','devoluções esperam a baixa'], nome:'Devoluções', perm:['devolucao.baixar'], onde:{ aba:'dv' },
     ajuda:'devoluções esperando a baixa com reputação e motivo',
     contar(db){
       const l = require('./dev_route').pendentes(db);
@@ -140,8 +145,8 @@ const LINHAS = [
 
 function resumo(db){
   const linhas = LINHAS.map(L => {
-    const base = { chave:L.chave, nome:L.nome, ajuda:L.ajuda, onde:L.onde,
-                   quem:L.quemTexto || L.perm.map(rotulo).join(' ou ') };
+    const base = { chave:L.chave, nome:L.nome, ajuda:L.ajuda, onde:L.onde, tela:L.tela,
+                   quem:quem(L) };
     if(L.aqui) base.aqui = true;
     try{
       const r = L.contar(db);
@@ -183,4 +188,16 @@ function total(db, pronto){
   return { total:r.total, dias, sem_etiqueta:r.sem_etiqueta };
 }
 
-module.exports = { LINHAS, resumo, total };
+/* Quem resolve a linha, em palavras (a mesma frase da central). */
+function quem(L){ return L.quemTexto || L.perm.map(rotulo).join(' ou '); }
+/* Na caixinha, fora da 204, "os cards logo abaixo" não diz nada: diz o nível. */
+function quemFora(L){ return L.quemCaixa || quem(L); }
+
+/* O que a caixinha diz: "2 caixas ficaram retidas em Bloqueados". Linha sem
+   frase própria diz o nome dela. */
+function frase(L, n){
+  if(L.frase) return n + ' ' + (n === 1 ? L.frase[0] : L.frase[1]);
+  return n + ' ' + (n === 1 ? 'pendência nova' : 'pendências novas') + ': ' + L.nome;
+}
+
+module.exports = { LINHAS, resumo, total, quem, quemFora, frase };

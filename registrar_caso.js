@@ -19,7 +19,7 @@
  */
 const fs=require('fs'), path=require('path');
 const pdfjs=require('pdfjs-dist/legacy/build/pdf.js');
-const {pageLines,tipoDaPagina,nfDaNota,itensDaFolha,itemDaFolha}=require('./folha');
+const {pageLines,tipoDaPagina,nfDaNota,itensDaFolha,itemDaFolha,envioDaEtiqueta}=require('./folha');
 const {nomeDaEtiqueta,nfDaEtiqueta}=require('./parse');
 const {mesmoCliente}=require('./nome');
 
@@ -28,7 +28,7 @@ const opt=k=>{ const i=args.indexOf('--'+k); return i>=0?args[i+1]:null; };
 const soltos=args.filter((a,i)=>!a.startsWith('--') && !(i>0 && args[i-1].startsWith('--')));
 const [ARQ, CHAVE_BRUTA]=soltos;
 if(!ARQ || !CHAVE_BRUTA || !opt('pecas')){
-  console.log('uso: node registrar_caso.js <pdf> <venda-ou-pack> --pecas "1xSKU,2xSKU"');
+  console.log('uso: node registrar_caso.js <pdf> <venda-pack-ou-envio> --pecas "1xSKU,2xSKU"');
   console.log('        [--estagio bloqueado|pendente] [--card pacote|divergencia] [--nota "..."] [--data AAAA-MM-DD]');
   process.exit(1);
 }
@@ -77,9 +77,11 @@ function limparEtiqueta(linhas, nome){
   });
   return out;
 }
-/* A nota: número, chave e destinatário bastam ao leitor. */
+/* A nota: número, chave, destinatário e a UF dele bastam ao leitor. A linha
+   "UF:" fica (12/11/2026): é ela que a conferência da nota da etiqueta sem
+   "NF:" compara com o estado de destino (R-CONF-07). */
 function limparNota(linhas, nome){
-  return linhas.filter(l=>/Sa[ií]da|Chave|N[úu]mero|Emiss|Protocolo|DANFE|Remetente|CNPJ|^\d{20,}$|DESTINAT/i.test(l))
+  return linhas.filter(l=>/Sa[ií]da|Chave|N[úu]mero|Emiss|Protocolo|DANFE|Remetente|CNPJ|^\d{20,}$|DESTINAT|^UF:\s*[A-Z]{2}\s*$/i.test(l))
     .map(l=>/DESTINAT/i.test(l)?'DESTINATARIO: '+(nome||'Cliente'):l);
 }
 
@@ -105,16 +107,18 @@ function limparNota(linhas, nome){
     const t=x.linhas.join('\n');
     const g=re=>{ const m=t.match(re); return m?m[1].replace(/\s+/g,''):null; };
     const pack=g(/Pack ID:\s*([\d ]+)/), venda=g(/Venda:\s*([\d ]+)/), nf=nfDaEtiqueta(t);
+    /* A etiqueta so com "Envio:" (12/11/2026) se acha pelo numero do envio. */
+    const envio=(!pack && !venda) ? envioDaEtiqueta(x.linhas) : null;
     const nome=nomeDaEtiqueta(x.linhas);
     const a=(nome && alias.get(nome)) || novo();
     if(nome) alias.set(nome,a);
-    const item=itemDaFolha({packId:pack,venda},itens);
+    const item=itemDaFolha({packId:pack,venda,envio},itens);
     if(item && item.comprador && !alias.has(item.comprador))
       alias.set(item.comprador, mesmoCliente(nome,item.comprador)===false ? novo() : a);
     x.nome=a; if(nf) porNf[nf]=a;
-    if(pack===CHAVE || venda===CHAVE) alvo={pack,venda,nf,nome:a};
+    if(pack===CHAVE || venda===CHAVE || envio===CHAVE) alvo={pack,venda,nf,nome:a};
   });
-  if(!alvo){ console.log('Não achei a venda ou o pack '+CHAVE+' nas etiquetas deste PDF.'); process.exit(1); }
+  if(!alvo){ console.log('Não achei a venda, o pack ou o envio '+CHAVE+' nas etiquetas deste PDF.'); process.exit(1); }
   itens.forEach(i=>{ if(i.comprador && !alias.has(i.comprador)) alias.set(i.comprador, novo()); });
   const nomesFolha=[...alias.keys()].sort((a,b)=>b.length-a.length);
 

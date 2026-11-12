@@ -83,7 +83,7 @@ console.log('\n── 3. o Fiscal inaugurado e o que estava fora do lugar ──
 ok('o módulo Fiscal existe (inaugurado pela 1301)', (MO.porChave('fiscal') || {}).situacao === 'existe');
 const fora = MO.FORA_DO_LUGAR.map(f => f.item);
 ok('a lista do que está fora do lugar perdeu os seis itens da 501 e o da 302', !fora.some(i => /^501\//.test(i) || i === '302/material'), fora.join(', '));
-ok('fica só o 902/horarios (é da fase 3)', JSON.stringify(fora) === JSON.stringify(['902/horarios']), fora.join(', '));
+ok('e a lista ficou vazia (os 902/horarios foram para a 906 na fase 3)', fora.length === 0, fora.join(', '));
 ok('nenhum número novo fora da faixa do módulo', NOVAS.every(e => MO.moduloDaFaixa(e.n) === e.modulo));
 
 console.log('\n── 4. a caixinha de cada ação na tela nova (tela de Acessos) ──');

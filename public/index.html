@@ -3310,11 +3310,7 @@ async function carregarCad(){
     h+='<div style="display:flex;gap:8px;margin-top:14px"><input id="cdIn_'+tp.t+'" placeholder="novo item" style="flex:1"><button class="primary cdAdd" data-perm="listas.editar" data-t="'+tp.t+'">Adicionar</button></div>';
     h+='</div>';
   }
-  var cnf=false; try{ cnf=!!(await (await fetch('/api/config/conferencia')).json()).ligada; }catch(e){}
-  h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:6px">Segundo bipe na Conferência</div>';
-  h+='<div class="sub" style="margin-bottom:12px">Com isso ligado, a Conferência pede <b>dois bipes</b>: a etiqueta de venda e, em seguida, o código de barras do produto <b>na mesma caixa</b>. Se a etiqueta estiver colada na caixa errada, os dois não batem e o volume <b>não carrega</b>. O operador não vê qual SKU esperar — a conferência é cega, senão vira só confirmação. Custa um bipe a mais por volume.</div>';
-  h+='<label style="display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer"><input type="checkbox" id="cdConf" '+(cnf?'checked':'')+' style="width:20px;height:20px"> <span>Exigir o bipe do SKU na Conferência</span></label>';
-  h+='<div id="cdConfMsg" style="margin-top:10px;font-size:14px"></div></div>';
+  /* O segundo bipe na Conferência saiu daqui: mora na 906 Parâmetros (ARRUMAR-O-LUGAR fase 3). */
   var kit=''; try{ kit=(await (await fetch('/api/config/kit')).json()).kit||''; }catch(e){}
   h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:6px">Código do kit (o que o operador bipa)</div>';
   h+='<div class="sub" style="margin-bottom:12px">É o código que o operador bipa na embalagem para confirmar o kit. Use um código <b>simples, só com letras/números</b> — ex.: <b>KITENVIO</b>. Imprima esse código de barras na etiqueta (abaixo). A tela da embalagem só confere, não altera.</div>';
@@ -3543,19 +3539,6 @@ document.addEventListener('click',async function(e){
     }
   }catch(err){ msg.innerHTML='<span style="color:#ff6b6b">'+String(err)+'</span>'; }
   bt.disabled=false;
-});
-document.addEventListener('change',async function(e){
-  var c=e.target.closest('#cdConf');
-  if(!c) return;
-  var msg=document.getElementById('cdConfMsg');
-  try{
-    var r=await (await fetch('/api/config/conferencia',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ligada:c.checked})})).json();
-    if(r.erro){ msg.innerHTML='<span style="color:#ff6b6b">'+r.erro+'</span>'; c.checked=!c.checked; return; }
-    msg.innerHTML = r.ligada
-      ? '<span style="color:var(--green)">Ligado — a Conferência passa a exigir os dois bipes.</span>'
-      : '<span style="color:var(--muted)">Desligado — a Conferência volta a pedir só a etiqueta de venda.</span>';
-  }catch(err){ msg.innerHTML='<span style="color:#ff6b6b">'+String(err)+'</span>'; c.checked=!c.checked; }
 });
 document.addEventListener('click',async function(e){
   var a=e.target.closest('.cdAdd');
