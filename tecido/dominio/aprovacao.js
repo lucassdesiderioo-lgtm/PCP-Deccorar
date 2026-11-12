@@ -77,8 +77,9 @@ function pedirDescarte(sobraId,motivo,usuario){
 /* ── DECIDIR ──────────────────────────────────────────────────────────── */
 function pendente(id){
   const a=linha(id);
-  exigir(a.status==='pendente','aprovacao_decidida','Este pedido já foi '+
-    (a.status==='aprovado'?'aprovado':'recusado')+' por '+(a.decidido_por||'alguém')+'.');
+  exigir(a.status==='pendente','aprovacao_decidida',a.status==='cancelado'
+    ? 'Este pedido saiu da fila: o boleto foi cancelado por '+(a.decidido_por||'alguém')+'.'
+    : 'Este pedido já foi '+(a.status==='aprovado'?'aprovado':'recusado')+' por '+(a.decidido_por||'alguém')+'.');
   return a;
 }
 
@@ -117,6 +118,23 @@ function recusar(id,motivo,usuario){
   return porId(a.id);
 }
 
+/* ⚠️ O ALVO SUMIU, E O PEDIDO SAI DA FILA COM RASTRO (CONSERTO de 12/11/2026).
+   Cancelado o boleto, a baixa pedida nunca mais pode ser aprovada (o
+   `boleto.baixar` recusa cancelado), e ficava pendente para sempre na 616 e na
+   central 204 — o numero que nao zera. Quem chama e o `boleto.cancelar`, DENTRO
+   da transacao dele. A linha NAO e apagada: fica com status `cancelado` (nem
+   aprovado nem recusado — ninguem decidiu), quem cancelou, a hora e o motivo.
+   Sem pedido pendente, nao faz nada. `quando` so e passado pelo
+   `limpar_baixas_orfas.js`, que fecha o pedido antigo na data do cancelamento. */
+function fecharPorCancelamento(tipo,alvo,motivo,usuario,quando){
+  const p=pendenteDe(tipo,alvo);
+  if(!p) return null;
+  db.prepare(`UPDATE sm_aprovacao SET status='cancelado', decidido_por=?, decidido_por_id=?, decidido_em=?,
+    decisao_motivo=? WHERE id=? AND status='pendente'`).run((usuario&&usuario.nome)||null,
+    (usuario&&usuario.id!=null)?Number(usuario.id):null,quando||dia.agora(),String(motivo||'').trim()||null,p.id);
+  return porId(p.id);
+}
+
 /* As que esperam decisao, de um tipo, das mais antigas para as novas: quem
    pediu primeiro espera ha mais tempo. */
 const pendentes=tipo=>db.prepare(`SELECT * FROM sm_aprovacao WHERE status='pendente'
@@ -130,4 +148,4 @@ function pendentePorAlvo(tipo){
   return m;
 }
 
-module.exports={pedirBaixa,pedirDescarte,aprovar,recusar,pendentes,pendentePorAlvo,porId,TIPOS,mesmaPessoa};
+module.exports={pedirBaixa,pedirDescarte,aprovar,recusar,fecharPorCancelamento,pendentes,pendentePorAlvo,porId,TIPOS,mesmaPessoa};

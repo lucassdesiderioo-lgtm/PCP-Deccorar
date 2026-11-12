@@ -4858,6 +4858,23 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 | R-SMN-17 | A faixa de suporte serve a cada kit da ficha (o trilho e o bandô, cada um pela sua) |
 | R-SMN-18 | Nada na etiqueta de produção termina em "…": encolhe ou quebra; abreviações num lugar só |
 
+> ⚠️ **CANCELAR O BOLETO FECHA A BAIXA PEDIDA DELE** (CONSERTO de 12/11/2026,
+> R-SMF-12). Na mesma transação do `boleto.cancelar`, o pedido de baixa pendente
+> vira status **`cancelado`** — nem aprovado nem recusado, porque ninguém decidiu
+> —, com quem cancelou, a hora e o motivo, e **a linha fica**. Até ali ele ficava
+> pendente para sempre (o `baixar` recusa boleto cancelado), e a 616 e a 204
+> contavam um número que nunca zerava. O `require('./aprovacao')` mora **dentro**
+> do `cancelar` porque o `aprovacao.js` já faz require do `boleto.js`. Os pedidos
+> de antes: `node tecido/limpar_baixas_orfas.js` (simula) e `--aplicar` (backup do
+> `tecido.db` antes), que fecha cada um na data e com o nome de quem cancelou o
+> boleto. ⚠️ **O descarte de sobra não ganhou o mesmo**: sobra usada no corte
+> continua esperando quem recuse com motivo, como sempre foi.
+>
+> ⚠️ **AINDA NÃO NO AR, E O SCRIPT AINDA NÃO RODOU NO SERVIDOR.** A prova: a
+> simulação lista os pedidos órfãos, o `--aplicar` os fecha, a linha da baixa de
+> boleto na 616 e na 204 desce, e a segunda rodada diz "nenhum". Prova que não foi
+> feita se escreve como não feita.
+
 ### ⚠️ O CADASTRO DE PRODUTO — o que parece bug e não é (28/10/2026)
 
 Spec `docs/specs/SOBMEDIDA-CADASTRO-DE-PRODUTO.md`, as seis fases numa entrega
@@ -4911,7 +4928,7 @@ produção: `etiqueta_producao.test.js`. Em papel e chave do módulo:
 compra: `material_compra.test.js` e `node teste_compras_sobmedida.js`. Na bancada:
 `producao.test.js`. Na recusa: `recusa.test.js`. No quadro: `kanban.test.js`. Nos
 indicadores: `indicadores.test.js`. Nos setores: também `node teste_acesso.js`.
-No boleto e no crédito: `boleto.test.js`. Na baixa pedida e no descarte pedido: `aprovacao.test.js`. No dinheiro de tela: `dinheiro_tela.test.js`.
+No boleto e no crédito: `boleto.test.js`. Na baixa pedida e no descarte pedido: `aprovacao.test.js` (e `limpar_baixas_orfas.test.js`, ao mexer no cancelar do boleto ou no script). No dinheiro de tela: `dinheiro_tela.test.js`.
 Em tabela de tela: `rola_tela.test.js`. No corte: `corte_etapas.test.js`,
 `corte_correcao.test.js`, `historico_corte.test.js`, `tom.test.js`,
 `tempo_corte.test.js`, `plano_claro.test.js` e `barras_ler.test.js`. No cadastro
@@ -4928,7 +4945,7 @@ de material do PCP (marca e modelo): `node teste_componentes.js`. Todos os
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 898 casos
+cd tecido && npm test          # 903 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
