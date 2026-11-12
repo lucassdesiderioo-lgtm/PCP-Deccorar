@@ -479,24 +479,24 @@ async function main(){
     RELOGIO.fixar('2026-12-08 08:00');   // terça, nada lançado
     let s11 = await stRev();
     eq('sem coleta lançada: "não lançado" (D2)', s11.coleta_corte && s11.coleta_corte.situacao, 'nao_lancado');
-    ok('e o padrão da semana (10:30) NÃO aparece como corte', s11.corte == null && s11.passouCorte === false, JSON.stringify(s11));
+    ok('e o padrão da semana (10:30) NÃO aparece como corte', s11.corte_hora == null && s11.corte !== '10:30' && s11.passouCorte === false, JSON.stringify(s11));
     r = await lancar({ data:'2026-12-08', origem:'tela', coletas:[
       { inicio:'09:00', fim:'11:00', corte:'07:00' }, { inicio:'12:00', fim:'14:00', corte:'10:00' }, { inicio:'15:00', fim:'17:00' } ] });
     eq('lançar 3 coletas na terça', r.status, 200);
     s11 = await stRev();
     eq('cada coleta vem com o seu corte (D1)', s11.coleta_corte.coletas.map(c => c.inicio + ' ' + c.corte + ' ' + c.estado),
       ['09:00 07:00 passou', '12:00 10:00 antes', '15:00 null sem_corte']);
-    eq('às 08:00 o corte que vale é o da próxima (10:00)', [s11.corte, s11.passouCorte, s11.coleta_corte.proxima && s11.coleta_corte.proxima.inicio], ['10:00', false, '12:00']);
+    eq('às 08:00 o corte que vale é o da próxima (10:00)', [s11.corte_hora, s11.passouCorte, s11.coleta_corte.proxima && s11.coleta_corte.proxima.inicio], ['10:00', false, '12:00']);
     eq('e a situação é "lançado"', s11.coleta_corte.situacao, 'lancado');
     RELOGIO.fixar('2026-12-08 11:00');
     s11 = await stRev();
-    ok('às 11:00, com a última coleta sem corte, a lista não se dá por fechada', s11.passouCorte === false && s11.coleta_corte.encerrada === false && s11.corte == null, JSON.stringify(s11.coleta_corte));
+    ok('às 11:00, com a última coleta sem corte, a lista não se dá por fechada', s11.passouCorte === false && s11.coleta_corte.encerrada === false && s11.corte_hora == null, JSON.stringify(s11.coleta_corte));
     const ids = (await dia('2026-12-08')).body.coletas.map(c => c.id);
     r = await lancar({ data:'2026-12-08', origem:'tela', coletas:[
       { id:ids[0], inicio:'09:00', fim:'11:00', corte:'07:00' }, { id:ids[1], inicio:'12:00', fim:'14:00', corte:'10:00' }, { id:ids[2], inicio:'15:00', fim:'17:00', corte:'13:00' } ] });
     RELOGIO.fixar('2026-12-08 13:30');
     s11 = await stRev();
-    eq('todos os cortes passaram: "Lista fechada às 13:00"', [s11.coleta_corte.encerrada, s11.coleta_corte.ultimo, s11.corte, s11.passouCorte], [true, '13:00', '13:00', true]);
+    eq('todos os cortes passaram: "Lista fechada às 13:00"', [s11.coleta_corte.encerrada, s11.coleta_corte.ultimo, s11.corte_hora, s11.passouCorte], [true, '13:00', '13:00', true]);
     r = await lancar({ data:'2026-12-08', origem:'tela', coletas:[
       { id:ids[0], inicio:'09:00', fim:'11:00' }, { id:ids[1], inicio:'12:00', fim:'14:00' }, { id:ids[2], inicio:'15:30', fim:'17:30' } ] });
     RELOGIO.fixar('2026-12-08 12:00');
@@ -507,16 +507,61 @@ async function main(){
     eq('a quarta "sem coleta — feriado"', r.status, 200);
     RELOGIO.fixar('2026-12-09 08:00');
     s11 = await stRev();
-    eq('dia sem coleta: a situação e o motivo (D3)', [s11.coleta_corte.situacao, s11.coleta_corte.motivo, s11.coleta_corte.motivo_texto, s11.corte], ['sem_coleta', 'feriado', 'Dia de teste', null]);
+    eq('dia sem coleta: a situação e o motivo (D3)', [s11.coleta_corte.situacao, s11.coleta_corte.motivo, s11.coleta_corte.motivo_texto, s11.corte_hora], ['sem_coleta', 'feriado', 'Dia de teste', null]);
     RELOGIO.fixar('2026-12-15 08:00');   // terça seguinte: a semana nasce copiada (rascunho)
     s11 = await stRev();
-    ok('o rascunho da semana copiada conta como "não lançado" (D2, R-HCO-13)', s11.coleta_corte.situacao === 'nao_lancado' && s11.coleta_corte.rascunho === true && s11.corte == null, JSON.stringify(s11.coleta_corte));
+    ok('o rascunho da semana copiada conta como "não lançado" (D2, R-HCO-13)', s11.coleta_corte.situacao === 'nao_lancado' && s11.coleta_corte.rascunho === true && s11.corte_hora == null, JSON.stringify(s11.coleta_corte));
     const op11 = fs.readFileSync(path.join(__dirname, 'public', 'operador.html'), 'utf8');
     ok('a Revisão escreve "não foi lançado na 206"', /não foi lançado na 206/.test(op11));
     ok('a Revisão escreve "Hoje não tem coleta" e o motivo', /Hoje não tem coleta/.test(op11) && /motivo_texto/.test(op11));
     ok('a Revisão escreve o corte de cada coleta e o "não foi confirmado"', /coleta_corte/.test(op11) && /cc\.coletas\.map/.test(op11) && /não foi confirmado/.test(op11));
     const stTxt = fs.readFileSync(path.join(__dirname, 'st_route.js'), 'utf8');
     ok('o status da Revisão não lê mais o corte do padrão (config corte_<dia>)', !/\/api\/revisao\/status[\s\S]{0,200}cfg\('corte_'/.test(stTxt));
+
+    console.log('\n── 12. ③ REVISÃO da fase 1: mudou, domingo, só agência, a falha, a página antiga e a frase ──');
+    const vm = require('vm');
+    const fonte = (() => { const a = op11.indexOf('function fraseCorte'); let i = op11.indexOf('{', a), n = 0;
+      for(let j = i; j < op11.length; j++){ if(op11[j] === '{') n++; else if(op11[j] === '}' && --n === 0) return op11.slice(a, j + 1); } })();
+    const caixa = { escH: t => String(t == null ? '' : t) }; vm.createContext(caixa); vm.runInContext(fonte, caixa);
+    const frase = x => caixa.fraseCorte(x).replace(/<[^>]+>/g, '');
+    RELOGIO.fixar('2026-12-08 08:00');
+    let x12 = await stRev();
+    ok('a frase executada: o corte de cada coleta, e a próxima em destaque', /^Coleta das 09:00: corte às 07:00 \(passou\) · coleta das 12:00: corte às 10:00/.test(frase(x12)), frase(x12));
+    db.prepare("UPDATE saida_dia SET mudou_em='2026-12-08 07:50', mudou_por='Beto' WHERE data='2026-12-08'").run();
+    if(!db.prepare("SELECT 1 FROM saida_dia WHERE data='2026-12-08'").get()) db.prepare("INSERT INTO saida_dia (data,mudou_em,mudou_por) VALUES ('2026-12-08','2026-12-08 07:50','Beto')").run();
+    x12 = await stRev();
+    eq('o dia avisado como "Mudou" não mostra o corte velho', [x12.coleta_corte.situacao, x12.corte_hora], ['mudou', null]);
+    ok('e a frase diz que mudou no ML', /mudou no ML/.test(frase(x12)), frase(x12));
+    db.prepare("UPDATE saida_dia SET mudou_em=NULL, mudou_por=NULL WHERE data='2026-12-08'").run();
+    RELOGIO.fixar('2026-12-13 08:00');   // domingo
+    x12 = await stRev();
+    eq('domingo: "não tem coleta", e não o alarme de não lançado', x12.coleta_corte.situacao, 'domingo');
+    ok('e a frase diz domingo', /Hoje não tem coleta — domingo/.test(frase(x12)), frase(x12));
+    RELOGIO.fixar('2026-12-10 07:00');
+    r = await lancar({ data:'2026-12-10', origem:'tela', agencia:{ fim:'15:00' } });
+    eq('lançar a quinta só com a agência', r.status, 200);
+    RELOGIO.fixar('2026-12-10 08:00');
+    x12 = await stRev();
+    eq('dia lançado só com agência: "só agência"', x12.coleta_corte.situacao, 'so_agencia');
+    ok('a página antiga (que lê s.corte) não escreve "null"', typeof x12.corte === 'string' && !/null/.test(x12.corte), JSON.stringify(x12.corte));
+    RELOGIO.fixar('2026-12-08 07:00');
+    r = await lancar({ data:'2026-12-08', origem:'tela', coletas:[
+      { id:ids[0], inicio:'09:00', fim:'11:00', corte:'07:00' }, { id:ids[1], inicio:'12:00', fim:'14:00', corte:'10:00' }, { id:ids[2], inicio:'15:30', fim:'17:30', corte:'13:00' } ] });
+    RELOGIO.fixar('2026-12-08 13:30');
+    x12 = await stRev();
+    eq('com todos os cortes passados, o corte da página antiga é a hora do último', [x12.corte, x12.corte_hora, x12.passouCorte], ['13:00', '13:00', true]);
+    const D12 = require('./coleta_horario'), orig = D12.corteDoDia;
+    D12.corteDoDia = () => { throw new Error('quebrou'); };
+    const r12 = await req('GET', '/api/revisao/status');
+    D12.corteDoDia = orig;
+    ok('o corte que falha não derruba o status (o urgente continua chegando)', r12.status === 200 && r12.body.coleta_corte.situacao === 'erro' && typeof r12.body.urgentes === 'number', JSON.stringify(r12));
+    ok('e a frase diz que não deu para ler', /Não deu para ler o horário de corte/.test(frase(r12.body)), frase(r12.body));
+    ok('sem venda e lista fechada: a frase não promete "assim que a lista sair"', /lista não volta|!cc\.encerrada|encerrada\)\?/.test(op11) && !/Lista fechada[^']*' Assim que a lista sair/.test(op11));
+    const cc12 = { situacao:'lancado', encerrada:false, proxima:{inicio:'15:00', corte:'08:30'}, coletas:[
+      { inicio:'12:00', fim:'14:00', corte:'10:00', estado:'antes' }, { inicio:'15:00', fim:'17:00', corte:'08:30', estado:'antes' } ] };
+    ok('o destaque vai para o corte que vence primeiro', /<b>coleta das 15:00/.test(caixa.fraseCorte({ coleta_corte:cc12 })), caixa.fraseCorte({ coleta_corte:cc12 }));
+    const cc13 = { situacao:'lancado', encerrada:false, proxima:null, coletas:[{ inicio:'09:00', fim:'11:00', corte:null, estado:'sem_corte' }] };
+    ok('a frase começa em maiúscula', /^O corte/.test(frase({ coleta_corte:cc13 })), frase({ coleta_corte:cc13 }));
     RELOGIO.fixar(null);
   }catch(e){
     falhas++; console.log('  ESTOUROU — ' + (e.stack || e));

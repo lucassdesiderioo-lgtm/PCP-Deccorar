@@ -464,16 +464,25 @@ function corteDoDia(db){
   const d = dia(db, hoje);
   const base = { data:hoje, rascunho:d.rascunho, coletas:[], proxima:null, ultimo:null, encerrada:false,
     motivo:null, motivo_texto:null };
+  /* A 206 só tem segunda a sábado: no domingo não há o que lançar (③ REVISÃO). */
+  const [ya, mo, da] = hoje.split('-').map(Number);
+  if(new Date(ya, mo - 1, da).getDay() === 0) return Object.assign(base, { situacao:'domingo' });
   if(d.sem_coleta && !d.rascunho)
     return Object.assign(base, { situacao:'sem_coleta', motivo:d.motivo, motivo_texto:d.motivo_texto });
-  if(d.rascunho || !d.coletas.length) return Object.assign(base, { situacao:'nao_lancado' });
+  if(d.rascunho) return Object.assign(base, { situacao:'nao_lancado' });
+  /* O dia avisado como "Mudou" (R-HCO-15): o corte gravado é o que a fábrica já
+     disse estar errado — até alguém corrigir, não vale (D2, "não confirmado"). */
+  if(d.mudou) return Object.assign(base, { situacao:'mudou' });
+  if(!d.coletas.length) return Object.assign(base, { situacao: d.agencia ? 'so_agencia' : 'nao_lancado' });
   const coletas = d.coletas.map(c => {
     const estado = c.corte == null ? 'sem_corte' : c.corte_conferir ? 'a_conferir'
       : agora >= min(c.corte) ? 'passou' : 'antes';
     return { inicio:c.inicio, fim:c.fim, corte:c.corte, estado };
   });
   const valem = coletas.filter(c => c.estado === 'antes' || c.estado === 'passou');
-  const proxima = coletas.find(c => c.estado === 'antes') || null;
+  /* A próxima é a do corte que vence primeiro (o corte só precisa ser antes da
+     própria janela, e uma coleta mais tarde pode ter o corte mais cedo). */
+  const proxima = coletas.filter(c => c.estado === 'antes').sort((a, b) => min(a.corte) - min(b.corte))[0] || null;
   const encerrada = valem.length === coletas.length && !proxima;
   const ultimo = encerrada ? valem.map(c => c.corte).sort().pop() : null;
   return Object.assign(base, { situacao:'lancado', coletas, proxima, encerrada, ultimo });

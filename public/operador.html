@@ -391,11 +391,16 @@ var AVANT=0;
 function fraseCorte(s){
   var cc=s.coleta_corte;
   if(!cc) return s.corte?('Corte às '+escH(s.corte)+'.'):'';
+  var amb=function(t){ return '<b style="color:#b26a00">'+t+'</b>'; };
   if(cc.situacao==='sem_coleta'){
     var m=cc.motivo==='feriado'?('feriado'+(cc.motivo_texto?': '+cc.motivo_texto:'')):(cc.motivo_texto||'');
     return '<b>Hoje não tem coleta'+(m?' — '+escH(m):'')+'.</b>';
   }
-  if(cc.situacao!=='lancado') return '<b style="color:#b26a00">O horário de corte de hoje não foi lançado na 206.</b>';
+  if(cc.situacao==='domingo') return '<b>Hoje não tem coleta — domingo.</b>';
+  if(cc.situacao==='so_agencia') return '<b>Hoje não tem coleta lançada na 206 — só agência.</b>';
+  if(cc.situacao==='mudou') return amb('O horário de hoje mudou no ML e ainda não foi corrigido na 206.');
+  if(cc.situacao==='erro') return amb('Não deu para ler o horário de corte da 206.');
+  if(cc.situacao!=='lancado') return amb('O horário de corte de hoje não foi lançado na 206.');
   if(cc.encerrada) return 'Lista fechada às '+escH(cc.ultimo)+'.';
   var partes=cc.coletas.map(function(c){
     var j='coleta das '+escH(c.inicio);
@@ -404,7 +409,8 @@ function fraseCorte(s){
     var t=j+': corte às '+escH(c.corte)+(c.estado==='passou'?' (passou)':'');
     return (cc.proxima&&c.inicio===cc.proxima.inicio)?'<b>'+t+'</b>':t;
   });
-  return partes.join(' · ')+'.'+(cc.proxima?' Ainda pode entrar venda.':'');
+  var txt=partes.join(' · ')+'.'+(cc.proxima?' Ainda pode entrar venda.':'');
+  return txt.replace(/^((?:<[^>]+>)*)(\S)/,function(m,a,b){ return a+b.toUpperCase(); });
 }
 async function avisoStatus(){
   var s=null;
@@ -419,7 +425,7 @@ async function avisoStatus(){
   }
   var txt='', cor='#f4f6f8', bd='#d8dee6';
   if(!s.lancado){
-    txt='<b>Nenhuma venda lançada ainda hoje.</b><br><span style="color:#5a6472">'+fraseCorte(s)+' Assim que a lista sair, ela aparece aqui.</span>';
+    txt='<b>Nenhuma venda lançada ainda hoje.</b><br><span style="color:#5a6472">'+fraseCorte(s)+((s.coleta_corte&&s.coleta_corte.encerrada)?'':' Assim que a lista sair, ela aparece aqui.')+'</span>';
   } else if(s.urgentes===0){
     txt='<b style="color:#1565c0">Todas as vendas de hoje já estão em estoque.</b><br><span style="color:#5a6472">'+
         fraseCorte(s)+' '+

@@ -21,14 +21,23 @@ module.exports=function(app,db){
     /* O CORTE VEM DA 206 (HORARIOS-E-FERIADOS fase 1, 12/11/2026): o da próxima
        coleta lançada, ou o último quando todos passaram. Sem coleta lançada, ou
        com o corte a conferir, é null — o padrão da semana não entra no lugar (D2). */
-    const cc=require('./coleta_horario').corteDoDia(db);
-    const corte=cc.proxima?cc.proxima.corte:(cc.encerrada?cc.ultimo:null);
+    /* O corte é informação ao lado: se a leitura falhar, o status (e o aviso de
+       urgente) responde do mesmo jeito, dizendo que não deu (③ REVISÃO). */
+    let cc;
+    try{ cc=require('./coleta_horario').corteDoDia(db); }
+    catch(e){ console.error('[revisao/status] corte da 206:', e.message); cc={situacao:'erro', coletas:[], proxima:null, encerrada:false}; }
+    const corteHora=cc.proxima?cc.proxima.corte:(cc.encerrada?cc.ultimo:null);
+    /* `corte` é o que a página ANTIGA (tablet com cache) escreve depois de
+       "às": sem hora, vai uma frase curta, e nunca "null" (③ REVISÃO). */
+    const LEGADO={nao_lancado:'(horário não lançado na 206)', sem_coleta:'(hoje não tem coleta)', domingo:'(hoje não tem coleta)',
+      so_agencia:'(hoje não tem coleta)', mudou:'(o horário mudou no ML — conferir na 206)', erro:'(não deu para ler o horário)'};
+    const corte=corteHora||LEGADO[cc.situacao]||'(corte a conferir na 206)';
     /* Mesma régua do tile da tela vermelha (ordem_dia.js). `urgentesFalta` é o
        que a bancada ainda tem que PRODUZIR; `atendidas` é a ordem que ficou
        aberta com a venda já fora do estoque — peça revisada na tela azul e
        embalada como estoque não abate ordem (§4), mas atende o cliente igual. */
     const r=require('./ordem_dia').resumo(db);
-    res.json({corte, agora:h.hm, passouCorte:!!cc.encerrada, dia:h.d, coleta_corte:cc,
+    res.json({corte, corte_hora:corteHora, agora:h.hm, passouCorte:!!cc.encerrada, dia:h.d, coleta_corte:cc,
       lancado: (r.urgentes+r.reposicao)>0, urgentes:r.urgentes, reposicao:r.reposicao,
       urgentesFalta: r.urgentesFalta, atendidas: r.atendidas});
   });
