@@ -204,16 +204,21 @@ module.exports = function(app, db){
        e nada do envio grava. Ausente numa linha que ja tem etapa preserva (o
        tablet sem refresh nao apaga a marca); a linha antiga sem etapa so salva
        escolhendo uma. Nao muda custo. */
+    /* A regra e da MEDIDA PADRAO (③ REVISAO): o modelo sob medida tem a
+       bancada dele (§19), e a etapa ali seria inventada — o vazio passa. */
+    const mSob = db.prepare('SELECT sob_medida FROM modelo WHERE id=?').get(modelo);
+    const ehSob = !!(mSob && mSob.sob_medida);
     let etapa;
-    if(b.etapa !== undefined && b.etapa !== null){
+    if(b.etapa !== undefined && b.etapa !== null && !(ehSob && String(b.etapa).trim() === '')){
       const e = String(b.etapa).trim();
       if(e === '') return res.status(400).json({erro:'escolha a etapa de preparo da linha: toda linha tem uma'});
       if(!ETAPAS.valida(e)) return res.status(400).json({erro:'etapa "'+e+'" não existe — escolha uma da lista'});
       etapa = e;
     }
-    if(etapa === undefined){
+    /* A etapa gravada que nao existe mais nao se preserva calada: conta como falta. */
+    if(etapa === undefined && !ehSob){
       const antes = b.id ? db.prepare('SELECT etapa FROM ficha_formula WHERE id=?').get(+b.id) : null;
-      if(!antes || !antes.etapa)
+      if(!antes || !ETAPAS.valida(antes.etapa))
         return res.status(400).json({erro:'escolha a etapa de preparo da linha: toda linha tem uma'});
     }
 

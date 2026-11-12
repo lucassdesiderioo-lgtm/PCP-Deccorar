@@ -1093,7 +1093,7 @@ function render(){
       +'<td><b>'+nome+'</b>'
         +(l.observacao?'<div class="sub">'+esc(l.observacao)+'</div>':'')
         +(l.planejamento?'<div class="sub" style="color:var(--blue,#4493f8)">📋 vai para o planejamento da produção</div>':'')
-        +(l.etapa?'<div class="sub">⚙ '+esc(nomeEtapa(l.etapa))+'</div>'
+        +(nomeEtapaValida(l.etapa)?'<div class="sub">⚙ '+esc(nomeEtapaValida(l.etapa))+'</div>'
           :'<div class="sub" style="color:var(--amber)">⚠ falta etapa — toda linha tem uma</div>')
         +(cego?'<div class="sub" style="color:var(--amber)">⚠ não olha a bobina</div>':'')+'</td>'
       +(f ? ('<td class="n">'+(r.erro?'<span style="color:var(--amber)">⚠</span>':qtd(r.quantidade))
@@ -1163,7 +1163,8 @@ function editorHTML(l){
       /* A ETAPA (PRODUCAO-MAPA-E-MOTOR fase 1): em que etapa da fábrica o
          material é preparado. Não muda o custo. */
       +'<div style="margin-top:12px"><label>Etapa — onde este material é preparado</label>'
-        +'<select id="edEtapa">'+((novo||!l.etapa)?'<option value="">— escolha a etapa —</option>':'')
+        +(FXROTEIRO&&FXROTEIRO.opcoes?'':'<div class="sub" style="color:var(--red)">a lista de etapas não carregou — recarregue a tela para salvar</div>')
+        +'<select id="edEtapa">'+((novo||!nomeEtapaValida(l.etapa))?'<option value="">— escolha a etapa —</option>':'')
         +((FXROTEIRO&&FXROTEIRO.opcoes)||[]).map(o=>'<option value="'+esc(o.chave)+'"'
           +(!novo&&l.etapa===o.chave?' selected':'')+'>'+esc(o.nome)+'</option>').join('')
         +'</select></div>'
@@ -1335,9 +1336,11 @@ async function previewEditor(){
   el.innerHTML=h;
 }
 
-function nomeEtapa(c){
+/* O nome da etapa, só se ela existe na lista; a que não existe mais (ou sem a
+   lista carregada) volta null e aparece como "falta etapa". */
+function nomeEtapaValida(c){
   const o=((FXROTEIRO&&FXROTEIRO.opcoes)||[]).find(x=>x.chave===c);
-  return o?o.nome:c;
+  return o?o.nome:null;
 }
 
 async function salvarEditor(){
@@ -1349,6 +1352,8 @@ async function salvarEditor(){
   /* Sem a lista de etapas (o roteiro não carregou), não manda o campo: ausente
      preserva a etapa gravada, e o select vazio a apagaria. */
   if(FXROTEIRO&&FXROTEIRO.opcoes) corpo.etapa=$('#edEtapa').value;
+  else if(!FXROTEIRO||FXROTEIRO.motivo!=='sob_medida'){
+    aviso('#edMsg','A lista de etapas não carregou — recarregue a tela para salvar','var(--red)'); return; }
   if(novo){
     const v=$('#edComp').value;
     if(!v){ aviso('#edMsg','Escolha o material','var(--red)'); return; }

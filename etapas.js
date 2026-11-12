@@ -51,10 +51,11 @@ function roteiro(db, modelo_id){
   if(m.sob_medida) return { etapas:[], sem_etapa:0, motivo:'sob_medida' };
   const linhas = db.prepare('SELECT etapa FROM ficha_formula WHERE modelo_id=? AND ativo=1').all(modelo_id);
   if(!linhas.length) return { etapas:[], sem_etapa:0, motivo:'sem_ficha' };
-  const marcadas = new Set(linhas.map(l => l.etapa).filter(Boolean));
+  /* a etapa gravada que nao existe mais (o "embalagem" de antes) conta como falta */
+  const marcadas = new Set(linhas.map(l => l.etapa).filter(valida));
   return {
     etapas: PREPARO.filter(e => marcadas.has(e.chave)).concat(m.exige_medida === 0 ? SEMPRE_KIT : SEMPRE),
-    sem_etapa: linhas.filter(l => !l.etapa).length
+    sem_etapa: linhas.filter(l => !valida(l.etapa)).length
   };
 }
 

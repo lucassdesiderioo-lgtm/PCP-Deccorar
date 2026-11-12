@@ -194,6 +194,23 @@ caso('modelo sob medida fica fora: a spec é da medida padrão', () => {
   igual(r.etapas, []);
   igual(r.motivo, 'sob_medida');
 });
+caso('o modelo sob medida NÃO é obrigado a ter etapa: a regra é da medida padrão (③ REVISÃO)', () => {
+  const r = chamar(salvar, { modelo_id:3, componente_id:CX, expressao:'2' });
+  igual(r.st, 200, JSON.stringify(r.out));
+  db.prepare('DELETE FROM ficha_formula WHERE id=?').run(r.out.id);
+  const v = chamar(salvar, { modelo_id:3, componente_id:CX, expressao:'2', etapa:'' });
+  igual(v.st, 200, 'a tela do sob medida manda o seletor vazio: ' + JSON.stringify(v.out));
+  igual(etapaDe(v.out.id), null);
+  db.prepare('DELETE FROM ficha_formula WHERE id=?').run(v.out.id);
+});
+caso('a etapa gravada que não existe mais conta como "falta etapa" (③ REVISÃO)', () => {
+  db.prepare("UPDATE ficha_formula SET etapa='embalagem' WHERE id=?").run(F_CX);
+  const ro = ETAPAS.roteiro(db, 1);
+  igual(ro.sem_etapa, 1, 'a linha com etapa velha conta como sem etapa');
+  const r = chamar(salvar, { id:F_CX, modelo_id:1, componente_id:CX, expressao:'1' });
+  igual(r.st, 400, 'ausente não preserva uma etapa que não existe');
+  db.prepare("UPDATE ficha_formula SET etapa='kit_instalacao' WHERE id=?").run(F_CX);
+});
 caso('modelo que não existe: roteiro null, e a rota responde 404', () => {
   igual(ETAPAS.roteiro(db, 999), null);
   const r = chamar(R.get['/api/formulas/roteiro/:modelo_id'], null, { modelo_id:'999' });
@@ -242,6 +259,8 @@ caso('a 404 tem o campo Etapa no editor e manda a etapa ao salvar', () => {
   verdade(/\/api\/formulas\/roteiro\//.test(h), 'a tela pede o roteiro');
   verdade(!/— sem etapa —/.test(h), 'não há opção de linha sem etapa');
   verdade(/falta etapa/.test(h), 'a linha antiga sem etapa aparece marcada');
+  verdade(/a lista de etapas não carregou/.test(h), 'sem a lista, a tela diz que ela não carregou');
+  verdade(/nomeEtapaValida\(l\.etapa\)/.test(h), 'a etapa que não existe mais aparece como falta');
 });
 
 console.log('');
