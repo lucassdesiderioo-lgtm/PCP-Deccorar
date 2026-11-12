@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* teste_pendencias_sobmedida.js — o sob medida na central de Pendências (spec
- * docs/specs/PENDENCIAS-NO-MENU.md, fase 3, 12/11/2026).
+ * docs/arquivo/PENDENCIAS-NO-MENU.md, fase 3, 12/11/2026).
  *
  *   node teste_pendencias_sobmedida.js
  *

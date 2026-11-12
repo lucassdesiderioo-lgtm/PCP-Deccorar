@@ -2,17 +2,17 @@
 
 ```
 STATUS
-Situação: EM CONSTRUÇÃO · aprovada pelo dono em 12/11/2026 · fase 1 no ar desde 12/11/2026 (PR #346; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: o primeiro PDF que retém uma caixa mostrando a caixinha na 103 · fase 2 no ar desde 12/11/2026 (PR #348; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: a bolinha aparecendo e sumindo com pendência de verdade, e quem pediu o ajuste não a vendo · fase 3 construída e revisada, falta subir
+Situação: CONCLUÍDA · aprovada pelo dono em 12/11/2026 · fase 1 no ar desde 12/11/2026 (PR #346; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: o primeiro PDF que retém uma caixa mostrando a caixinha na 103 · fase 2 no ar desde 12/11/2026 (PR #348; o dono fez o deploy e disse "deu tudo certo no deploy") · ⚠️ ainda não provado com dado real: a bolinha aparecendo e sumindo com pendência de verdade, e quem pediu o ajuste não a vendo · fase 3 no ar desde 12/11/2026 (PR #350; o dono fez o deploy e disse "tudo certo") · ⚠️ ainda não provado com dado real: as filas do sob medida aparecendo e sumindo com pendência de verdade, e a TV parada no número da medida padrão · as três fases no ar: a spec foi para docs/arquivo/
 Criada em: 12/11/2026
 Última atualização: 12/11/2026
-Fases: 1 ☑  2 ☑  3 ☑ (falta subir)
+Fases: 1 ☑  2 ☑  3 ☑
 Risco: 🟡 (comportamento de tela e uma rota de leitura nova; não mexe em estoque, permissão, schema do PCP)
 Depende de: a central de Pendências (docs/arquivo/CENTRAL-DE-PENDENCIAS.md, a 204)
             o menu único (ORGANIZACAO-DO-SISTEMA, public/menu_telas.js)
 Tipo: NOVIDADE
 ```
 
-### Fase 3 — o sob medida na central (12/11/2026, construída, falta subir)
+### Fase 3 — o sob medida na central (12/11/2026, no ar, PR #350)
 
 - Cinco linhas `sm_*` na central (616, 603, 602, 611, 606), contadas por
   `tecido/dominio/pendencias_pcp.js` com a MESMA lista da tela dona, pela porta

@@ -1,5 +1,5 @@
 /* pendencias_vigia.js — a caixinha "Abrir em Pendências" (spec
- * docs/specs/PENDENCIAS-NO-MENU.md, fase 1, 12/11/2026).
+ * docs/arquivo/PENDENCIAS-NO-MENU.md, fase 1, 12/11/2026).
  *
  * O dono: "quando fizer alguma coisa em uma tela e gerar pendências, colocar
  * uma caixinha para clicar e ir para a tela de pendência. Isso em todas as

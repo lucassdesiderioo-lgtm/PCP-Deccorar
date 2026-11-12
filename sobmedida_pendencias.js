@@ -1,5 +1,5 @@
 /* sobmedida_pendencias.js — A PORTA por onde as filas do sob medida entram na
- * central de Pendências (spec docs/specs/PENDENCIAS-NO-MENU.md, fase 3).
+ * central de Pendências (spec docs/arquivo/PENDENCIAS-NO-MENU.md, fase 3).
  *
  * O sob medida sobe dentro de um try/catch no server.js para que um tecido.db
  * quebrado não derrube a expedição (CLAUDE.md §19). Por isso a central não faz
