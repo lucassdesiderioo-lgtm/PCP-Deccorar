@@ -1042,6 +1042,94 @@ function conferir(nome, orders, esperado){
     else console.log('ok      a etiqueta so com "Envio:" vira volume, com a sua caixa');
   }
 
+  /* ── A NOTA DA ETIQUETA SEM "NF:" (12/11/2026, R-CONF-07) ─────────────────
+     A etiqueta da rota JADLOG nao traz a linha "NF:", e a nota dela e a pagina
+     seguinte do PDF. Antes, sem conferir nada. Agora: o numero dessa nota nao
+     pode ser a NF lida noutra etiqueta, e a UF da nota tem que bater com o
+     estado da "Cidade de destino". Nome do destinatario NAO retem: em 85 notas
+     reais, 27 estavam em nome de parente, empresa ou condominio. O PDF aqui
+     segue a ordem do real: etiqueta, nota, etiqueta, nota... */
+  casos++;
+  {
+    const etq=(o)=>['lucas desiderio lucas des #136721278','Rua Jussara 1250 Tamboré',
+      'Pack ID: '+o.pack,'Despachar: quinta 12/nov','XSP1','484901 '+o.pack.slice(-5),'JADLOG']
+      .concat(o.nf?['SEX 13/11/2026 NF: '+o.nf]:[])
+      .concat([o.comprador,'(APELIDO)','Endereço: Rua X 1,'])
+      .concat(o.cidade?['Cidade de destino: '+o.cidade]:[]).concat(['Complemento: casa']);
+    const danfe=(o)=>['1 - Saida Chave de acesso','3526114011947700010555002000000'+o.nf+'1',
+      'Número '+o.nf+'/Serie 2','Remetente: LUCAS','CNPJ: 40119477000105 INSCRIÇÃO ESTADUAL: 1 UF: SP',
+      'DESTINATARIO: '+(o.dest||'Cliente Qualquer'),'UF: '+o.uf,'DANFE SIMPLIFICADO'];
+    const V=[
+      {pack:'2000015000000101', sku:'BK160160BEGE', comprador:'Ana Lima', cidade:'Campinas, São Paulo', nota:{nf:'101',uf:'SP',dest:'Empresa Ltda'}},
+      {pack:'2000015000000102', sku:'BK150150BEGE', comprador:'Beto Reis', cidade:'Salvador, Bahia', nota:{nf:'102',uf:'SP'}},
+      {pack:'2000015000000103', sku:'BK140140BEGE', comprador:'Caio Melo', cidade:'Niterói, Rio de', cidade2:'Janeiro', nota:{nf:'104',uf:'RJ'}},
+      {pack:'2000015000000104', sku:'BK130130BEGE', comprador:'Dora Paz', nf:'104', cidade:'Niterói, Rio de Janeiro', nota:{nf:'105',uf:'RJ'}},
+      {pack:'2000015000000105', sku:'BK120120BEGE', comprador:'Eva Luz', cidade:null, nota:{nf:'106',uf:'RJ'}},
+      {pack:'2000015000000106', sku:'BK100100BEGE', comprador:'Fabio Sa', nf:'107', cidade:'Recife, Pernambuco', nota:{nf:'107',uf:'SP'}},
+      {pack:'2000015000000107', sku:'BK180150BEGE', comprador:'Gil Rosa', cidade:'Belém, Pará', nota:{nf:'108',uf:'PA'}}];
+    const d=await PDFDocument.create(), f=await d.embedFont(StandardFonts.Helvetica);
+    const pag=ls=>{ const pg=d.addPage([595,842]); let y=800; for(const l of ls){ pg.drawText(l.replace(/[^\x20-\xff]/g,'?'),{x:30,y,size:9,font:f}); y-=14; } };
+    for(const v of V){
+      const e=etq(v); if(v.cidade2){ const k=e.findIndex(l=>/^Cidade/.test(l)); e.splice(k+1,0,v.cidade2); }
+      pag(e); pag(danfe(v.nota));
+    }
+    pag(['Despachem as suas vendas o quanto antes.','Identifiicação Produtos'].concat(
+      V.map(v=>['X'+v.pack.slice(-3)+'ABC Cortina Rolo Blackout '+v.sku.slice(2,3)+','+v.sku.slice(3,5)+'x'+v.sku.slice(5,6)+','+v.sku.slice(6,8)+' Persiana Bege','Pack ID: '+v.pack+' SKU: '+v.sku,
+        'Venda: 20000190'+v.pack.slice(-8)+' Quantidade: 1',v.comprador+' Cor: Bege','Desenho do tecido: Liso']).reduce((a,b)=>a.concat(b),[])));
+    const os_=await parsePdf(new Uint8Array(await d.save()));
+    const por=k=>os_.find(o=>o.packId===k)||{};
+    const erros=[];
+    const a=por('2000015000000101'), b=por('2000015000000102'), c=por('2000015000000103'),
+          dd=por('2000015000000104'), e=por('2000015000000105'), g=por('2000015000000106'), h=por('2000015000000107');
+    if(a.conflito) erros.push('UF igual com nome diferente reteve: '+a.conflito);
+    if(a.nf!=='101') erros.push('a nota conferida nao gravou a NF: '+JSON.stringify(a.nf));
+    if(a.danfePage==null) erros.push('a nota conferida nao foi ligada a etiqueta');
+    if(!/SP.*BA/.test(b.conflito||'')) erros.push('UF diferente (BA × SP) nao reteve: '+JSON.stringify(b.conflito));
+    if(b.danfePage!=null || b.nf) erros.push('a nota de UF diferente continuou ligada: nf '+b.nf+', pagina '+b.danfePage);
+    if(!/104/.test(c.conflito||'')) erros.push('a nota que e de outra etiqueta (NF 104) nao reteve: '+JSON.stringify(c.conflito));
+    if(c.danfePage!=null || c.nf) erros.push('a nota de outra etiqueta continuou ligada: nf '+c.nf);
+    if(dd.conflito || dd.nf!=='104' || dd.danfePage==null) erros.push('a etiqueta com "NF:" mudou: '+JSON.stringify({c:dd.conflito,nf:dd.nf,p:dd.danfePage}));
+    if(e.conflito) erros.push('estado ilegivel na etiqueta votou: '+e.conflito);
+    if(e.nf!=='106') erros.push('com o estado ilegivel e a nota livre, a NF nao foi gravada: '+JSON.stringify(e.nf));
+    if(g.conflito) erros.push('a etiqueta com "NF:" passou a conferir UF: '+g.conflito);
+    if(h.conflito || h.nf!=='108') erros.push('Pará (o estado curto) nao casou com PA: '+JSON.stringify({c:h.conflito,nf:h.nf}));
+    /* ③ REVISAO: a pagina seguinte que e a CONTINUACAO de uma nota ja ligada a
+       outra etiqueta nao e nota desta caixa (R-PDF-04), nem a nota cujo numero
+       outra etiqueta sem "NF:" ja pegou. */
+    {
+      const d2=await PDFDocument.create(), f2=await d2.embedFont(StandardFonts.Helvetica);
+      const pg2=ls=>{ const pg=d2.addPage([595,842]); let y=800; for(const l of ls){ pg.drawText(l.replace(/[^\x20-\xff]/g,'?'),{x:30,y,size:9,font:f2}); y-=14; } };
+      const A={pack:'2000015000000201', sku:'BK160160BEGE', comprador:'Ana Lima', cidade:'Campinas, São Paulo'};
+      const B={pack:'2000015000000202', sku:'BK150150BEGE', comprador:'Beto Reis', cidade:'Salvador, Bahia'};
+      const C={pack:'2000015000000203', sku:'BK140140BEGE', comprador:'Caio Melo', cidade:'Santos, São Paulo'};
+      pg2(etq(A)); pg2(danfe({nf:'301',uf:'SP'}));
+      pg2(etq(B)); pg2(['DANFE continuação','Número 301/Serie 2','Folha 2']);   // a continuacao da 301, sem destinatario
+      pg2(danfe({nf:'302',uf:'BA'}));
+      pg2(etq(C)); pg2(['1 - Saida Chave de acesso','Número 301/Serie 2','DESTINATARIO: Outro','UF: SP']); // a 301 de novo
+      pg2(['Despachem as suas vendas o quanto antes.','Identifiicação Produtos'].concat(
+        [A,B,C].map(v=>['X'+v.pack.slice(-3)+'ABC Cortina Rolo Blackout '+v.sku.slice(2,3)+','+v.sku.slice(3,5)+'x'+v.sku.slice(5,6)+','+v.sku.slice(6,8)+' Persiana Bege','Pack ID: '+v.pack+' SKU: '+v.sku,
+          'Venda: 20000190'+v.pack.slice(-8)+' Quantidade: 1',v.comprador+' Cor: Bege','Desenho do tecido: Liso']).reduce((x,y)=>x.concat(y),[])));
+      const o2=await parsePdf(new Uint8Array(await d2.save()));
+      const q=k=>o2.find(o=>o.packId===k)||{};
+      if(q(A.pack).nf!=='301' || q(A.pack).conflito) erros.push('a primeira etiqueta perdeu a sua nota: '+JSON.stringify({nf:q(A.pack).nf,c:q(A.pack).conflito}));
+      if(q(B.pack).nf==='301' || q(B.pack).danfePage!=null) erros.push('a continuacao da nota de outra caixa foi ligada: nf '+q(B.pack).nf+', pagina '+q(B.pack).danfePage);
+      if(!q(B.pack).conflito) erros.push('a continuacao da nota de outra caixa nao reteve');
+      /* ③ REVISAO r3: a via repetida da 301 depois da etiqueta de OUTRO cliente
+         do mesmo estado (Caio, de Santos; a 301 e da Ana, de Campinas) nao pode
+         ligar — o nome da nota nao separa os dois. Fica retida, sem a nota. */
+      if(q(C.pack).nf==='301' || !q(C.pack).conflito || q(C.pack).danfePage!=null) erros.push('a via repetida da nota de outro cliente foi ligada: '+JSON.stringify({nf:q(C.pack).nf,c:q(C.pack).conflito}));
+      if(!/outra folha ou outra via da nota 301/.test(q(B.pack).conflito||'')) erros.push('a continuacao nao disse o que e: '+JSON.stringify(q(B.pack).conflito));
+      /* a UF lida tem que ser uma UF, e na mesma linha */
+      const F=require('./folha');
+      if(F.ufDaNota('DESTINATARIO: Fulano\nUF:\nIE: 123')!==null) erros.push('"UF:" vazio leu a linha de baixo: '+F.ufDaNota('DESTINATARIO: Fulano\nUF:\nIE: 123'));
+      if(F.ufDaNota('DESTINATARIO: Fulano\nUF: XX')!==null) erros.push('aceitou uma UF que nao existe');
+      if(F.ufDaNota('DESTINATARIO: Fulano\nUF: go')!=='GO') erros.push('nao leu a UF em minuscula');
+    }
+    if(erros.length){ falhas++; console.log('FALHOU  a nota da etiqueta sem "NF:" e conferida pela UF e pelo numero');
+      erros.forEach(x=>console.log('        '+x)); }
+    else console.log('ok      a nota da etiqueta sem "NF:" e conferida pela UF e pelo numero');
+  }
+
   try{ fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));

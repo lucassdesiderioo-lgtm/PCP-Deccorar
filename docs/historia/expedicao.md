@@ -1551,3 +1551,41 @@ O PDF real está no caderno (`casos/2026-11-12-nf-9738.json`), com a conta
 exigindo 48 = 48, 46 volumes e o segundo upload sem gravar nada. Cartão
 R-PDF-11.
 
+---
+
+### ⚠️ A NOTA DA ETIQUETA SEM "NF:" — conferida pelo número e pela UF (12/11/2026)
+
+A etiqueta de rota JADLOG não traz a linha "NF:". Desde sempre a nota dela
+era a **página seguinte** do PDF, sem conferir nada — o que funciona enquanto o
+ML mantém a ordem etiqueta, nota, etiqueta, nota. O dono perguntou o que
+impedia a caixa de sair com a nota de outro cliente: nada.
+
+**O que a nota traz para comparar** é pouco: o nome do destinatário e a UF.
+Medido nos dois PDFs de 12/11 (85 notas, todas as ligadas, inclusive as
+ligadas pelo número):
+
+| Critério | Resultado |
+|---|---|
+| nome do destinatário × comprador da etiqueta | **27 de 85 diferentes** — parente, empresa ("SERV FESTAS JNS LTDA"), condomínio, nome abreviado — e todas legítimas |
+| UF da nota × estado da "Cidade de destino" | **85 de 85 lidas, 0 diferentes** |
+
+Reter pelo nome pararia uma caixa em cada três: a armadilha #6. Ficaram três
+conferências que não acusam inocente: a nota não pode ser a NF que outra
+etiqueta diz, a página tem que ser a primeira folha daquele número, e a UF tem
+que bater.
+
+A da primeira folha custou três rodadas de revisão. Primeiro, a continuação de
+uma nota de outra caixa passava e gravava a NF errada. Depois, a "via inteira
+repetida" foi liberada para não reter o pedido de várias caixas (R-PDF-05) — e a
+revisão seguinte mostrou que assim a nota de um cliente ia na caixa de outro do
+mesmo estado, que o nome não separa. Ficou o lado seguro: só a primeira folha
+liga. O pedido de várias caixas com a via repetida ficaria retido; isso nunca
+apareceu em mais de 120 notas reais, e separar a via legítima (comprador
+etiqueta × etiqueta, ou chave de acesso) fica como decisão do dono. Retida, a nota **não** fica ligada — nota
+errada na caixa é pior que nota faltando. Passando, o volume ganha a NF, e a
+devolução passa a achá-lo por ela (antes, as três vendas JADLOG de cada PDF
+ficavam com a NF vazia).
+
+O que continua aberto: a troca de nota **dentro do mesmo estado**. Só o
+relatório do ML ou a integração fecham isso. Cartão R-CONF-07.
+

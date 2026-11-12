@@ -3,7 +3,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.js';
 /* A leitura crua do PDF mora toda no folha.js — inclusive "que pagina e esta" e
    "qual o numero desta nota". Aqui elas gravam; na auditoria elas conferem. */
 const {tipoDaPagina,nfDaNota,itensDaFolha,irmaosDe,irmaosDoPacote,etiquetasSemItem,
-       pecasDaCaixa,pecasCruas,pecasDaFolhaInteira,envioDaEtiqueta} = require('./folha');
+       pecasDaCaixa,pecasCruas,pecasDaFolhaInteira,envioDaEtiqueta,ufDaNota,ufDaEtiqueta} = require('./folha');
 /* "Estes dois nomes sao a mesma pessoa?" e do nome.js, dono unico: a conferencia
    de NF faz a MESMA pergunta, e duas reguas discordariam sobre o mesmo cliente. */
 const {mesmoCliente} = require('./nome');
@@ -294,6 +294,10 @@ async function parsePdf(uint8){
   const cruas = pecasCruas(controlLines, itensFolha);
   const pecasNaFolha = controlLines.length ? pecasDaFolhaInteira(controlLines) : null;
 
+  /* As NFs que as etiquetas DIZEM (a linha "NF:"): a nota da pagina seguinte
+     de uma etiqueta sem "NF:" nao pode ser uma delas (R-CONF-07). */
+  const nfsDasEtiquetas=new Set();
+  for(let p=1;p<=N;p++){ if(pages[p].type==='label'){ const x=nfDaEtiqueta(pages[p].text); if(x) nfsDasEtiquetas.add(x); } }
   const orders=[], seen=new Map();
   for(let p=1;p<=N;p++){
     if(pages[p].type!=='label')continue;
@@ -523,10 +527,50 @@ async function parsePdf(uint8){
           motivos.push('anuncio diz cor '+rec.cor+' e o SKU e '+rec.sku);
       }
     }
-    const conflito=motivos.length?motivos.join(' · '):null;
-    let danfePage=null;
+    /* 5. A NOTA DA ETIQUETA SEM "NF:" (12/11/2026, R-CONF-07, decisao do
+       dono). A etiqueta da rota JADLOG nao traz a linha "NF:", e a nota dela e
+       a PAGINA SEGUINTE do PDF — uma ligacao pela ordem, que ate aqui ninguem
+       conferia: se o ML mudasse a ordem, a caixa saia com a nota de outro
+       cliente. Tres conferencias, e qualquer uma retem (a da primeira folha,
+       logo abaixo, veio da ③ REVISAO):
+         a. o numero dessa nota nao pode ser a NF que OUTRA etiqueta do PDF diz;
+         b. a UF do destinatario da nota tem que bater com o estado da "Cidade
+            de destino" da etiqueta (lado ilegivel nao vota, #10).
+       O NOME nao confere: 27 de 85 notas reais estavam em nome de parente,
+       empresa ou condominio — reter por ele seria a armadilha #6.
+       Retida, a nota NAO vai junto (danfePage null): nota errada na caixa e
+       pior que nota faltando, e quem confere no ML imprime a certa de la.
+       Passando, o volume grava o numero da nota, que a etiqueta nao trazia. */
+    let danfePage=null, nfGravada=nf;
     if(nf&&danfeByNf[nf]) danfePage=danfeByNf[nf];
-    else if(pages[p+1]&&pages[p+1].type==='danfe') danfePage=p+1;
+    else if(pages[p+1]&&pages[p+1].type==='danfe'){
+      const nfNota=nf?null:nfDaNota(pages[p+1].text);
+      const ufN=ufDaNota(pages[p+1].text), ufE=ufDaEtiqueta(lines);
+      const motivoNota=[];
+      if(!nf && nfNota && nfsDasEtiquetas.has(nfNota))
+        motivoNota.push('a etiqueta nao traz NF, e a nota da pagina seguinte (NF '+nfNota
+          +') e a de outra etiqueta deste PDF');
+      /* ③ REVISAO: a pagina seguinte tem que ser a PRIMEIRA folha daquele
+         numero. Se nao e, ou e a continuacao da nota de outra caixa (R-PDF-04),
+         ou uma via repetida — e a via repetida pode ser a nota de OUTRO cliente
+         do mesmo estado (a 3a rodada da revisao achou isso, e o nome da nota
+         nao serve para separar). Na duvida, retem: nota faltando e melhor que
+         nota de outro cliente. O pedido de varias caixas com a via repetida
+         (R-PDF-05) ficaria retido — nunca aconteceu em 120+ notas reais. */
+      else if(!nf && nfNota && danfeByNf[nfNota]!==p+1)
+        motivoNota.push('a etiqueta nao traz NF, e a pagina seguinte e outra folha ou outra via da nota '+nfNota
+          +', que ja aparece antes, junto de outra caixa')
+      if(!nf && ufN && ufE && ufN!==ufE)
+        motivoNota.push('a etiqueta nao traz NF, e a nota da pagina seguinte'+(nfNota?' (NF '+nfNota+')':'')
+          +' e de um destinatario de '+ufN+', mas a etiqueta vai para '+ufE);
+      if(motivoNota.length){
+        motivos.push(motivoNota.join(' · ')+' — confira a nota no Mercado Livre: ela nao sai junto na impressao');
+      } else {
+        danfePage=p+1;
+        if(!nf && nfNota) nfGravada=nfNota;
+      }
+    }
+    const conflito=motivos.length?motivos.join(' · '):null;
     orders.push({sku:rec?rec.sku:null,cor:(rec&&rec.cor)||'',conflito,
       /* A descricao do anuncio vai junto: e ela que diz a LINHA do produto
          ("Cortina Rolo Blackout" x "Toucher Rolo Evolux"), a unica dimensao que
@@ -548,7 +592,7 @@ async function parsePdf(uint8){
          a MESMA conta para medir a cobertura de cada uma e para achar caixa ja
          gravada com menos pecas do que a folha diz (rastrear.js --auditar). */
       leituras:{ bloco: r1?lido:null, item: (r2&&r2.qtd)?r2.qtd:null, crua: crua?crua.total:null },
-      buyer:buyer||'(sem nome)',city,nf,packId,venda,envio,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
+      buyer:buyer||'(sem nome)',city,nf:nfGravada,packId,venda,envio,codes:[...codes],labelPage:p-1,danfePage:danfePage!=null?danfePage-1:null});
   }
   /* A CONTA DO PDF (leitura L4): quantas persianas a folha declara contra
      quantas o sistema decidiu gravar. Etiqueta sem item conta 1 — e o que ela

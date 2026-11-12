@@ -115,6 +115,7 @@ async function rodar(caso){
          JSON.stringify(pecas.slice().sort())===JSON.stringify(e.pecas.slice().sort()),
          'gravado: '+pecas.join(' + '));
       if(e.estagio) ok(caso.id+': '+e.chave+' fica '+e.estagio, v.estagio===e.estagio, 'veio '+v.estagio+' · '+(v.bloqueio||''));
+      if(e.nf) ok(caso.id+': '+e.chave+' com a NF '+e.nf, String(v.nf||'')===e.nf, 'veio '+v.nf);
       if(e.card) ok(caso.id+': '+e.chave+' no card '+e.card, String(v.bloqueio||'').startsWith(e.card+':'), v.bloqueio);
     }
   } finally { srv.close(); db.close(); }
