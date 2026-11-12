@@ -1250,7 +1250,7 @@ total. Some quando zera; o título diz há quantos dias espera a mais antiga.
 
 - ⚠️ **SÓ O QUE ELA RESOLVE** (D1): entra a linha da central em que a pessoa tem
   uma das chaves de quem resolve (`perm`) **e** abre a tela dona (o `decidir` do
-  portão) — o portão vem ANTES da conta. A linha sem chave própria (Bloqueados)
+  portão) — o portão vem ANTES da conta. A linha sem chave própria (Bloqueados, D13: decisão do dono)
   vale para quem abre a 204. ⚠️ **E A RÉGUA É A DO DONO, PESSOA A PESSOA**
   (③ REVISÃO): a linha que tem `minha(db, pessoa)` pergunta ao dono — quem pediu
   o ajuste não o aprova, quem contou não decide nem faz a 2ª contagem, quem

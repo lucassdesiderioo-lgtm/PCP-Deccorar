@@ -37,9 +37,13 @@ Tipo: NOVIDADE
   "quem conferiu não separa" comparam pelo id, como as rotas; o "voltar para a
   aba" pergunta no máximo a cada 15 s. Fica escrito (não é defeito): a etiqueta
   do Inventário pode criar a lista do dia, como a tarja já faz.
-- ⚠️ **Em dúvida, para o dono:** Bloqueados (perm vazia) dá bolinha a todo nível
-  Admin que abre a 204, inclusive quem não tem a chave de resolver o card (por
-  exemplo `sku.cadastrar`). Restringir é decidir quem resolve cada card.
+- ⚠️ **Bloqueados dá bolinha a todo nível Admin que abre a 204** (D13, decisão do
+  dono, 12/11/2026, opção "a"): quatro dos seis cards se resolvem com `@admin`
+  (modalidade, venda sem etiqueta, PDF cuja conta não fecha, canceladas), só o de
+  SKU/divergência pede `sku.cadastrar` e o de pacote `pacote.assinar`. A bolinha
+  zera quando qualquer um resolve, e Bloqueados é o que mais custa esperar.
+  Separar por card seria uma segunda conta ao lado da tela (#12); fica para se
+  alguém reclamar.
 - `teste_pendencias_menu.js` (43).
 
 ### Fase 1 — a caixinha "Abrir em Pendências" (12/11/2026, no ar, PR #346)
