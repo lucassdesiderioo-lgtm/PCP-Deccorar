@@ -80,8 +80,9 @@ for(const r of ['/', '/admin', '/index.html']){
   ok(r + ' responde com a porta (não com as 16 abas)', !!o && /PORTA_ADMIN/.test(o.body) && o.body.indexOf('<div class="tabs"') < 0);
 }
 const porta = (abrir('/admin', sessao('Ana')) || { body:'' }).body;
-const abas = ['prod','pb','blq','cor','dv','est','ct','plan','cad','pend','ficha','compras','acs','cd','tst','rel'];
-ok('a porta conhece o link antigo de cada uma das 16 abas', abas.every(a => porta.indexOf('"' + a + '"') >= 0), abas.filter(a => porta.indexOf('"' + a + '"') < 0).join(','));
+const abas = ['prod','pb','blq','cor','dv','est','ct','plan','cad','pend','ficha','compras','acs','cd','rel'];
+ok('a porta conhece o link antigo de cada uma das 15 abas (a do modo teste saiu em 11/11/2026)', abas.every(a => porta.indexOf('"' + a + '"') >= 0), abas.filter(a => porta.indexOf('"' + a + '"') < 0).join(','));
+ok('   e não leva mais o #tst a lugar nenhum', porta.indexOf('"tst"') < 0);
 const minhas = abrir('/api/telas/minhas', sessao('Ana'));
 ok('/api/telas/minhas diz as telas que a pessoa abre', !!minhas && Array.isArray(minhas.json && minhas.json.telas));
 const nAna = ((minhas && minhas.json && minhas.json.telas) || []).map(t => t.n);
