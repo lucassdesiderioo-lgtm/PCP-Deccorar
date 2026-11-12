@@ -127,8 +127,7 @@ module.exports=function(app,db){
   /* O NUMERO DO ENVIO (12/11/2026). A etiqueta so com "Envio: 485023 18254"
      nao traz Pack ID nem Venda: o numero do envio (o do codigo de barras) e a
      unica chave dela, e e por ele que o upload sabe que a venda ja entrou.
-     Gravado em toda caixa nova que o tiver; a duplicidade so o usa quando a
-     etiqueta nao tem pack nem venda. No CREATE e aqui, no fim (§17). */
+     Gravado em toda caixa nova que o tiver. No CREATE e aqui, no fim (§17). */
   try{ db.exec("ALTER TABLE lote ADD COLUMN envio TEXT"); }catch(e){}
   try{ db.exec("CREATE INDEX IF NOT EXISTS ix_lote_envio ON lote(envio)"); }catch(e){}
   const SAIDAS=require('./coleta_horario'); SAIDAS.garantirSchema(db);
@@ -260,9 +259,19 @@ module.exports=function(app,db){
          aprende a ignorar — e ai o volume que falta de verdade some junto. */
       /* ⚠️ A ETIQUETA SO COM "Envio:" (12/11/2026) nao tem pack nem venda: a
          chave dela e o numero do envio. Sem esta terceira chave, cada upload do
-         mesmo PDF gravava essas vendas de novo. */
-      const seen=new Set(); db.prepare("SELECT packId,venda,envio FROM lote").all().forEach(r=>{ if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); if(r.envio)seen.add('e:'+r.envio); });
-      const chaveEnvio=o=>(!o.packId && !o.venda && o.envio) ? o.envio : null;
+         mesmo PDF gravava essas vendas de novo.
+         ⚠️ E O ENVIO VALE NOS DOIS SENTIDOS (③ REVISAO). O numero e o do codigo
+         de barras, e a etiqueta de sempre tambem o traz: a mesma venda pode
+         subir num formato e voltar no outro. Por isso toda etiqueta com envio
+         confere o `e:`, e o volume de antes do deploy (lote.envio vazio) entra
+         no `seen` pelo numero de 10 a 12 digitos que ja esta nos `codes` dele —
+         a mesma regua do envioDaEtiqueta (pack e venda tem 16). */
+      const seen=new Set(); db.prepare("SELECT packId,venda,envio,codes FROM lote").all().forEach(r=>{
+        if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); if(r.envio)seen.add('e:'+r.envio);
+        else { let cs=[]; try{ cs=JSON.parse(r.codes||'[]'); }catch(e){}
+          (Array.isArray(cs)?cs:[]).forEach(c=>{ const d=String(c||''); if(/^\d{10,12}$/.test(d)) seen.add('e:'+d); }); }
+      });
+      const chaveEnvio=o=>o.envio||null;
       const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao,despachar_em,modalidade,envio) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
       const existe=db.prepare('SELECT 1 FROM skus WHERE codigo=?');
       const famVista=db.prepare('SELECT prefixo,vezes FROM familia_sku WHERE familia=?');
@@ -280,14 +289,15 @@ module.exports=function(app,db){
          venda com outro pack e outra etiqueta, e religar trocaria o papel da
          caixa. */
       const achaRepetida=db.prepare(`SELECT id,packId,venda,srcfile FROM lote
-        WHERE (? IS NOT NULL AND packId=?) OR (? IS NOT NULL AND venda=?) OR (? IS NOT NULL AND envio=?)`);
+        WHERE (? IS NOT NULL AND packId=?) OR (? IS NOT NULL AND venda=?)
+           OR (? IS NOT NULL AND (envio=? OR codes LIKE ?))`);
       const religa=db.prepare('UPDATE lote SET srcfile=?, labelPage=?, danfePage=? WHERE id=?');
       const pdfNoDisco=a=>{ try{ return !!a && fs.existsSync(a); }catch(e){ return false; } };
       function religar(o){
         if(o.labelPage==null) return 0;
         let n=0;
         const e=chaveEnvio(o);
-        for(const v of achaRepetida.all(o.packId||null,o.packId||null,o.venda||null,o.venda||null,e,e)){
+        for(const v of achaRepetida.all(o.packId||null,o.packId||null,o.venda||null,o.venda||null,e,e,e?'%"'+e+'"%':null)){
           if(pdfNoDisco(v.srcfile)) continue;
           if(o.packId && v.packId && o.packId!==v.packId) continue;
           if(o.venda && v.venda && o.venda!==v.venda) continue;

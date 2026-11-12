@@ -1530,9 +1530,15 @@ mesma regra do `reivindicarAcima` (R-PDF-02) a recupera: só o número que nenhu
 outro item pegou, e só se for o único livre.
 
 **A duplicidade precisou de uma terceira chave** (`lote.envio`): sem ela, cada
-upload do mesmo PDF gravaria essas vendas de novo. A chave vale só para a
-etiqueta sem pack e sem venda — a de sempre continua sendo reconhecida pelos
-dois de sempre, e um número de envio mal lido nunca a confunde com outra.
+upload do mesmo PDF gravaria essas vendas de novo. A primeira versão a usava
+só na etiqueta sem pack e sem venda, e a ③ REVISÃO achou o furo: a etiqueta de
+sempre traz o MESMO número no código de barras, então a venda que subisse só
+com "Envio:" e voltasse com Pack ID virava dois volumes — e a que já estava no
+banco antes do deploy (número só nos `codes`) entrava de novo. Hoje o envio
+vale para toda etiqueta, nos dois sentidos, e o `seen` do upload lê os `codes`
+dos volumes antigos. O verificador conferiu nos dois PDFs reais: em toda
+etiqueta há uma linha só de dígitos de 10 a 12 posições, e ela é o código de
+barras.
 
 **O que esse formato não tem, e fica de fora:** o relatório do ML não o cancela,
 o planejamento não tira a venda com etiqueta do comprometido, e a devolução o

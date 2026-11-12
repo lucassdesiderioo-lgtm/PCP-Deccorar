@@ -308,9 +308,9 @@ async function parsePdf(uint8){
     const city=((t.match(/Cidade de destino\s*:\s*(.+)/)||[])[1]||'').trim();
     const buyer=nomeDaEtiqueta(lines);
     /* A etiqueta so com "Envio:" (12/11/2026) nao tem pack nem venda: a
-       chave dela e o numero do envio. So ela usa essa chave — a etiqueta de
-       sempre continua sendo reconhecida pelo pack e pela venda. */
-    const chaveEnvio=(!packId && !venda && envio) ? envio : null;
+       chave dela e o numero do envio. E ele e uma etiqueta fisica nos dois
+       formatos (o do codigo de barras), entao vale para toda etiqueta. */
+    const chaveEnvio=envio||null;
     if((packId&&seen.has('p:'+packId))||(venda&&seen.has('v:'+venda))||(chaveEnvio&&seen.has('e:'+chaveEnvio))) continue;
     if(packId)seen.add('p:'+packId); if(venda)seen.add('v:'+venda); if(chaveEnvio)seen.add('e:'+chaveEnvio);
     const codes=new Set(); if(packId)codes.add(packId); if(venda)codes.add(venda);
