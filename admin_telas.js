@@ -57,13 +57,12 @@ module.exports = function(app, db){
        entrada não entra. Com a régua da chave, o menu do bancadista vinha
        vazio — e desde o menu único ele é a navegação do sob medida (③ REVISÃO
        da fase 3, ORGANIZACAO-DO-SISTEMA). */
+    /* a conta mora no abre_tela.js, a mesma da etiqueta das pendências */
     try{
-      const SMA = require('./tecido/nucleo/acesso'), SMP = require('./tecido/nucleo/permissoes');
-      const TSM = require('./tecido/nucleo/telas').TELAS;
-      const sm = SMA.daSessaoDoPcp(u, Array.from(ac.permissoesDe(u.id)));   // ele só copia o id e o nome; aqui ninguém grava autoria
+      const AT = require('./abre_tela');
+      const sm = AT.usuarioSm(ac, u);   // ele só copia o id e o nome; aqui ninguém grava autoria
       if(sm) M.telasSobMedida().forEach(t => {
-        const decl = TSM[t.rota.slice('/sobmedida'.length) || '/'];
-        if(decl && SMP.pode(sm, decl.permissao)) lista.push({ n:t.n, nome:t.nome, rota:t.rota, modulo:t.modulo, bloco:t.bloco, aba:null, valor:t.valor || [] });
+        if(AT.abreSm(sm, t.rota)) lista.push({ n:t.n, nome:t.nome, rota:t.rota, modulo:t.modulo, bloco:t.bloco, aba:null, valor:t.valor || [] });
       });
     }catch(e){}
     return lista;

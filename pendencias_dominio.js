@@ -26,6 +26,15 @@
  */
 const PERM = require('./permissoes');
 
+/* Uma linha do sob medida: a conta é da porta, nunca daqui (#12). */
+function smLinha(o){
+  const SMP = require('./sobmedida_pendencias');
+  return Object.assign({}, o, { sobmedida:true,
+    contar(){ return SMP.contar(o.tipo); },
+    minha(db, p){ return SMP.contar(o.tipo, p.sm || null); }
+  });
+}
+
 function rotulo(chave){
   const p = PERM.find(x => x.chave === chave);
   return p ? p.rotulo : chave;
@@ -164,6 +173,30 @@ const LINHAS = [
   { chave:'material_extra', tela:106, frase:['peça espera decidir o material','peças esperam decidir o material'], nome:'Material extra a decidir', perm:['material.extra'], onde:{ url:'/material-extra' },
     ajuda:'peça com problema ou recusada: dizer se usou material, e baixar',
     contar(db){ return require('./material_extra_dominio').pendentes(db); } },
+  /* O SOB MEDIDA NA CENTRAL (spec PENDENCIAS-NO-MENU, fase 3, 12/11/2026): cada
+     fila é a da tela dona de lá, pela porta (sobmedida_pendencias.js); sem a
+     porta a linha diz que não conseguiu contar. `minha` passa o usuário do sob
+     medida (`p.sm`), e a régua de pessoa é a de lá (dominio/pendencias_pcp.js). */
+  smLinha({ chave:'sm_baixa_boleto', tipo:'baixa_boleto', tela:616, nome:'Sob medida — baixa de boleto',
+    perm:['sobmedida.boleto.aprovar_baixa'], onde:{ url:'/sobmedida/financeiro' },
+    frase:['baixa de boleto espera outra pessoa aprovar','baixas de boleto esperam outra pessoa aprovar'],
+    ajuda:'baixa de boleto pedida, esperando outra pessoa aprovar (quem pediu não aprova)' }),
+  smLinha({ chave:'sm_descarte_sobra', tipo:'descarte_sobra', tela:603, nome:'Sob medida — descarte de sobra',
+    perm:['sobmedida.sobra.aprovar_descarte'], onde:{ url:'/sobmedida/sobras' },
+    frase:['descarte de sobra espera outra pessoa aprovar','descartes de sobra esperam outra pessoa aprovar'],
+    ajuda:'descarte de sobra pedido, esperando outra pessoa aprovar (quem pediu não aprova)' }),
+  smLinha({ chave:'sm_correcao_corte', tipo:'correcao_corte', tela:602, nome:'Sob medida — correção de corte',
+    perm:['sobmedida.corte.aprovar_correcao'], onde:{ url:'/sobmedida/corte' },
+    frase:['correção de corte espera outra pessoa aprovar','correções de corte esperam outra pessoa aprovar'],
+    ajuda:'correção pedida depois do Corte feito, esperando outra pessoa aprovar (quem pediu não aprova)' }),
+  smLinha({ chave:'sm_pedido_aprovar', tipo:'pedido_aprovar', tela:611, nome:'Sob medida — pedido esperando aprovação',
+    perm:['sobmedida.pedido.aprovar','sobmedida.pedido.aprovar_qualquer'], onde:{ url:'/sobmedida/pedidos' },
+    frase:['pedido da revenda espera aprovação','pedidos da revenda esperam aprovação'],
+    ajuda:'pedido enviado pela revenda esperando aprovação (cada vendedor aprova a sua carteira)' }),
+  smLinha({ chave:'sm_conferir', tipo:'conferir', tela:606, nome:'Sob medida — cadastro a conferir',
+    perm:['sobmedida.cadastro.editar'], onde:{ url:'/sobmedida/cadastros' },
+    frase:['cadastro novo do sob medida (largura, endereço ou fornecedor) espera conferência','cadastros novos do sob medida (largura, endereço ou fornecedor) esperam conferência'],
+    ajuda:'largura de bobina, endereço ou fornecedor criado na bancada, marcado para conferir' }),
   { chave:'devolucoes', tela:253, frase:['devolução espera a baixa','devoluções esperam a baixa'], nome:'Devoluções', perm:['devolucao.baixar'], onde:{ aba:'dv' },
     ajuda:'devoluções esperando a baixa com reputação e motivo',
     contar(db){
@@ -223,17 +256,27 @@ function resumo(db){
    da folha estao sem etiqueta (a que pode atrasar no ML). Quem opera a
    Etiqueta de Venda ou a Conferencia nao abre o admin, e sem isto a central
    so existia para quem ja estava la. */
+/* ⚠️ A TV E A BANCADA CONTAM SÓ A MEDIDA PADRÃO (D14, decisão do dono,
+   12/11/2026): as linhas do sob medida ficam na 204 e na bolinha do ☰ Menu de
+   quem resolve, e saem deste número — o pedido da revenda esperando aprovação é
+   fluxo de todo dia, e o vermelho da TV viraria paisagem para quem não tem o
+   que fazer com ele. É o mesmo resumo, sem as linhas `sobmedida` (nenhuma conta
+   nova, #12); a cancelada nas duas linhas é toda da medida padrão. */
+const doSobMedida = chave => { const L = LINHAS.find(x => x.chave === chave); return !!(L && L.sobmedida); };
+
 function total(db, pronto){
   const r = pronto || resumo(db);   // a rota já tem o resumo (gravou o retrato do dia com ele)
   const t = new Date(), z = n => String(n).padStart(2, '0');
   const hoje = Date.parse(t.getFullYear() + '-' + z(t.getMonth() + 1) + '-' + z(t.getDate()) + 'T00:00:00');
+  const linhas = r.linhas.filter(l => !doSobMedida(l.chave));
+  const totalPadrao = r.total - r.linhas.filter(l => doSobMedida(l.chave)).reduce((s, l) => s + (l.n || 0), 0);
   let dias = null;
-  r.linhas.forEach(l => {
+  linhas.forEach(l => {
     if(!l.n || !l.desde) return;
     const d = Math.round((hoje - Date.parse(String(l.desde).slice(0, 10) + 'T00:00:00')) / 86400000);
     if(isFinite(d) && (dias == null || d > dias)) dias = Math.max(0, d);
   });
-  return { total:r.total, dias, sem_etiqueta:r.sem_etiqueta };
+  return { total:totalPadrao, dias, sem_etiqueta:r.sem_etiqueta };
 }
 
 /* O QUE ESTA PESSOA RESOLVE (spec PENDENCIAS-NO-MENU, fase 2, 12/11/2026): a
@@ -246,8 +289,8 @@ function total(db, pronto){
    `pode` = { tem(chave) -> bool, abre(rota) -> bool }, de quem chama (a rota,
    pela conta do portão). Devolve só números: nada de SKU, cliente ou saldo. */
 function minhas(db, pode){
-  const M = require('./telas');
-  const rotaDe = n => { const t = M.TELAS.find(x => x.n === n); return t ? t.rota : null; };
+  /* a tela dona, nas duas operações (as 6xx moram no tecido) */
+  const rotaDe = n => { const t = require('./abre_tela').telaDe(n); return t ? t.rota : null; };
   /* o portão ANTES da conta: a linha que a pessoa não resolve nem é contada
      (③ REVISÃO — cada aparelho pergunta a cada minuto) */
   const linhas = LINHAS.filter(L => {
