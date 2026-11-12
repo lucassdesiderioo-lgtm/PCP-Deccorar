@@ -15,6 +15,10 @@ require('./auth')(app, db);
    as telas `/admin/...` ficam ENTRE o auth e o static (armadilha #3), e o
    static nao entrega mais o index.html no `/` (`index:false`). */
 require('./admin_telas')(app, db);
+/* A caixinha "Abrir em Pendências" (spec PENDENCIAS-NO-MENU, fase 1): conta as
+   linhas da central antes e depois das ações que criam pendência. Tem que vir
+   ANTES de qualquer rota — middleware registrado depois não roda para ela. */
+require('./pendencias_vigia')(app, db);
 app.use(express.static(path.join(__dirname, 'public'), { index:false }));
 
 /* O cadastro de SKU (GET, POST e DELETE /api/skus) mora no
