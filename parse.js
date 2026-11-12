@@ -549,14 +549,16 @@ async function parsePdf(uint8){
       if(!nf && nfNota && nfsDasEtiquetas.has(nfNota))
         motivoNota.push('a etiqueta nao traz NF, e a nota da pagina seguinte (NF '+nfNota
           +') e a de outra etiqueta deste PDF');
-      /* ③ REVISAO: a pagina seguinte nao pode ser a CONTINUACAO de uma nota que
-         comeca antes (R-PDF-04): essa e da caixa de cima. A continuacao se
-         reconhece por nao ser a primeira pagina do numero E nao trazer o
-         destinatario. A VIA INTEIRA repetida da mesma nota (com destinatario)
-         e o pedido de varias caixas — a nota e do pedido (R-PDF-05) —, e liga. */
-      else if(!nf && nfNota && danfeByNf[nfNota]!==p+1 && !/DESTINAT[AÁ]RIO/i.test(pages[p+1].text))
-        motivoNota.push('a etiqueta nao traz NF, e a pagina seguinte e a continuacao da nota '+nfNota
-          +', que comeca antes, em outra caixa');
+      /* ③ REVISAO: a pagina seguinte tem que ser a PRIMEIRA folha daquele
+         numero. Se nao e, ou e a continuacao da nota de outra caixa (R-PDF-04),
+         ou uma via repetida — e a via repetida pode ser a nota de OUTRO cliente
+         do mesmo estado (a 3a rodada da revisao achou isso, e o nome da nota
+         nao serve para separar). Na duvida, retem: nota faltando e melhor que
+         nota de outro cliente. O pedido de varias caixas com a via repetida
+         (R-PDF-05) ficaria retido — nunca aconteceu em 120+ notas reais. */
+      else if(!nf && nfNota && danfeByNf[nfNota]!==p+1)
+        motivoNota.push('a etiqueta nao traz NF, e a pagina seguinte e outra folha ou outra via da nota '+nfNota
+          +', que ja aparece antes, junto de outra caixa')
       if(!nf && ufN && ufE && ufN!==ufE)
         motivoNota.push('a etiqueta nao traz NF, e a nota da pagina seguinte'+(nfNota?' (NF '+nfNota+')':'')
           +' e de um destinatario de '+ufN+', mas a etiqueta vai para '+ufE);

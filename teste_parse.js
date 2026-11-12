@@ -1114,11 +1114,11 @@ function conferir(nome, orders, esperado){
       if(q(A.pack).nf!=='301' || q(A.pack).conflito) erros.push('a primeira etiqueta perdeu a sua nota: '+JSON.stringify({nf:q(A.pack).nf,c:q(A.pack).conflito}));
       if(q(B.pack).nf==='301' || q(B.pack).danfePage!=null) erros.push('a continuacao da nota de outra caixa foi ligada: nf '+q(B.pack).nf+', pagina '+q(B.pack).danfePage);
       if(!q(B.pack).conflito) erros.push('a continuacao da nota de outra caixa nao reteve');
-      /* ③ REVISAO r2: a VIA INTEIRA da mesma nota depois de outra etiqueta e o
-         pedido de varias caixas (R-PDF-05: a nota e do pedido) — liga, e a UF
-         confere. So a continuacao (sem destinatario) e retida. */
-      if(q(C.pack).nf!=='301' || q(C.pack).conflito || q(C.pack).danfePage==null) erros.push('a via inteira da nota do mesmo pedido foi retida: '+JSON.stringify({nf:q(C.pack).nf,c:q(C.pack).conflito}));
-      if(!/continuacao/.test(q(B.pack).conflito||'')) erros.push('a continuacao nao disse que e continuacao: '+JSON.stringify(q(B.pack).conflito));
+      /* ③ REVISAO r3: a via repetida da 301 depois da etiqueta de OUTRO cliente
+         do mesmo estado (Caio, de Santos; a 301 e da Ana, de Campinas) nao pode
+         ligar — o nome da nota nao separa os dois. Fica retida, sem a nota. */
+      if(q(C.pack).nf==='301' || !q(C.pack).conflito || q(C.pack).danfePage!=null) erros.push('a via repetida da nota de outro cliente foi ligada: '+JSON.stringify({nf:q(C.pack).nf,c:q(C.pack).conflito}));
+      if(!/outra folha ou outra via da nota 301/.test(q(B.pack).conflito||'')) erros.push('a continuacao nao disse o que e: '+JSON.stringify(q(B.pack).conflito));
       /* a UF lida tem que ser uma UF, e na mesma linha */
       const F=require('./folha');
       if(F.ufDaNota('DESTINATARIO: Fulano\nUF:\nIE: 123')!==null) erros.push('"UF:" vazio leu a linha de baixo: '+F.ufDaNota('DESTINATARIO: Fulano\nUF:\nIE: 123'));
