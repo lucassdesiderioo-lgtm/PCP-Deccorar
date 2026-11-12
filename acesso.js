@@ -1138,6 +1138,8 @@ module.exports = function(app, db){
        cadastra material, de quem compra, recebe ("levar para") e conta. */
     if(M !== 'GET' && pre('/api/almoxarifados')) return 'almoxarifado.cadastrar';
     if(pre('/api/almoxarifados')) return ['almoxarifado.cadastrar','componente.cadastrar','compras.ver','pedido.receber','contagem.contar','volume.movimentar'];
+    /* a lista de materiais da 404 (sem dinheiro): as chaves que abrem a 404 (AJUSTE de 12/11/2026) */
+    if(M === 'GET' && eq('/api/componentes/para-ficha')) return ['modelo.cadastrar','custo.ver','compras.ver'];
     if(eq('/api/componentes/opcoes') || eq('/api/componentes/pendencias')) return ['componente.cadastrar','compras.ver'];
     if(M !== 'GET' && pre('/api/componentes')) return 'componente.cadastrar';
     if(M !== 'GET' && pre('/api/ofertas')) return 'preco.lancar';
