@@ -22,6 +22,7 @@ const LUCAS={id:1,nome:'Lucas'}, ISA={id:2,nome:'Isabela'};
 const VEND7={id:7,nome:'Renato',permissoes:['pedido.aprovar'],setores:[]};
 const VEND8={id:8,nome:'Paula',permissoes:['pedido.aprovar'],setores:[]};
 const CHEFE={id:9,nome:'Chefe',permissoes:['pedido.aprovar_qualquer'],setores:[]};
+const ISA_T={...ISA,permissoes:['revenda.editar'],setores:[]};   // ve a carteira inteira na 616
 
 let cena=null;
 function montar(){
@@ -68,9 +69,16 @@ module.exports=[
   igual(r.n,antes+1,'o total sobe um');
   igual(r.n,aprovacao.pendentes('baixa_boleto').length,'o total e a lista da tela dona');
   igual(!!r.desde,true,'e diz desde quando espera');
-  igual(P.contar('baixa_boleto',LUCAS).n,r.n-1,'quem pediu nao ve a dele');
-  igual(P.contar('baixa_boleto',ISA).n,r.n,'outra pessoa ve todas');
-  igual(P.contar('baixa_boleto',{id:3,nome:'Lucas'}).n,r.n,'o homonimo e outra pessoa (pelo id)');
+  const LUCAS_T={...LUCAS,permissoes:['revenda.editar'],setores:[]};
+  igual(P.contar('baixa_boleto',LUCAS_T).n,r.n-1,'quem pediu nao ve a dele');
+  igual(P.contar('baixa_boleto',ISA_T).n,r.n,'quem ve a carteira inteira ve todas');
+  igual(P.contar('baixa_boleto',{id:3,nome:'Lucas',permissoes:['revenda.editar'],setores:[]}).n,r.n,'o homonimo e outra pessoa (pelo id)');
+  /* ③ REVISAO: a 616 so mostra a baixa dentro da CARTEIRA da pessoa
+     (boleto.carteira): sem carteira, a tela nao mostra nada, e a bolinha que
+     contasse a baixa nunca zeraria. */
+  igual(P.contar('baixa_boleto',{id:4,nome:'Fina',permissoes:['boleto.aprovar_baixa'],setores:[]}).n,0,'sem carteira (nem a casa inteira), a tela nao mostra: zero');
+  igual(P.contar('baixa_boleto',VEND7).n,r.n,'o vendedor da revenda ve a baixa da carteira dele');
+  igual(P.contar('baixa_boleto',VEND8).n,0,'a vendedora de outra carteira nao ve');
  }},
 
 {nome:'pendencias_pcp — o descarte de sobra conta o que a 603 lista, e quem pediu nao o ve',

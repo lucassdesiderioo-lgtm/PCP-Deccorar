@@ -195,7 +195,7 @@ const LINHAS = [
     ajuda:'pedido enviado pela revenda esperando aprovação (cada vendedor aprova a sua carteira)' }),
   smLinha({ chave:'sm_conferir', tipo:'conferir', tela:606, nome:'Sob medida — cadastro a conferir',
     perm:['sobmedida.cadastro.editar'], onde:{ url:'/sobmedida/cadastros' },
-    frase:['cadastro novo (largura, endereço ou fornecedor) espera conferência','cadastros novos (largura, endereço ou fornecedor) esperam conferência'],
+    frase:['cadastro novo do sob medida (largura, endereço ou fornecedor) espera conferência','cadastros novos do sob medida (largura, endereço ou fornecedor) esperam conferência'],
     ajuda:'largura de bobina, endereço ou fornecedor criado na bancada, marcado para conferir' }),
   { chave:'devolucoes', tela:253, frase:['devolução espera a baixa','devoluções esperam a baixa'], nome:'Devoluções', perm:['devolucao.baixar'], onde:{ aba:'dv' },
     ajuda:'devoluções esperando a baixa com reputação e motivo',

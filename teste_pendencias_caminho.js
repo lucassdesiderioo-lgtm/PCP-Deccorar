@@ -49,7 +49,7 @@ const AMOSTRA = { '/api/lote/upload':1, '/api/carregamento/sobra':1, '/api/estoq
   '/api/inventario/geral/terminar-prateleira':1, '/api/inventario/rejeitar':1, '/api/skus':1, '/api/pedidos/:id/comprar':1,
   '/api/compras/rapida':1, '/api/recebimento':1, '/api/pedidos/:id/fechar':1, '/api/contagem-material/:id/terminar':1,
   '/api/componentes':1, '/sobmedida/api/boletos/:id/baixa':1, '/sobmedida/api/sobras/:id/descartar':1,
-  '/sobmedida/api/planos/:id/correcao':1, '/sobmedida/api/pedidos/:id/enviar':1, '/sobmedida/api/rolos':1 };
+  '/sobmedida/api/planos/:id/correcao':1, '/sobmedida/api/niveis':1 };
 VIG.VIGIA.forEach(([re, chaves]) => {
   chaves.forEach(c => {
     const L = PEND.LINHAS.find(x => x.chave === c);
