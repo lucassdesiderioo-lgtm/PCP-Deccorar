@@ -259,7 +259,10 @@ caso('a 404 tem o campo Etapa no editor e manda a etapa ao salvar', () => {
   verdade(/\/api\/formulas\/roteiro\//.test(h), 'a tela pede o roteiro');
   verdade(!/— sem etapa —/.test(h), 'não há opção de linha sem etapa');
   verdade(/falta etapa/.test(h), 'a linha antiga sem etapa aparece marcada');
-  verdade(/a lista de etapas não carregou/.test(h), 'sem a lista, a tela diz que ela não carregou');
+  verdade(/a lista de etapas não carregou/.test(h), 'sem a lista, o editor diz que ela não carregou');
+  verdade(/aviso\('#edMsg','A lista de etapas não carregou/.test(h), 'e o salvar recusa na tela');
+  verdade(/function cobraEtapa\(\)/.test(h) && /cobraEtapa\(\)&&!nomeEtapaValida\(l\.etapa\)/.test(h),
+    'o "falta etapa" só acende com a lista carregada e fora do sob medida');
   verdade(/nomeEtapaValida\(l\.etapa\)/.test(h), 'a etapa que não existe mais aparece como falta');
 });
 

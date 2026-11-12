@@ -5711,7 +5711,7 @@ não é:
   direto no banco, sem a rota: a linha que ele criar nasce sem etapa e aparece
   em âmbar.
   ⚠️ **O MODELO SOB MEDIDA NÃO É OBRIGADO A TER ETAPA** (③ REVISÃO): a regra é
-  da medida padrão, e ali a etapa seria inventada. ⚠️ **A etapa gravada que não
+  da medida padrão, e ali a etapa seria inventada — nem a 404 o marca em âmbar. ⚠️ **A etapa gravada que não
   existe mais conta como "falta etapa"** — não se preserva calada. E **sem a
   lista de etapas carregada, a 404 diz que ela não carregou** e não salva, em vez
   de mandar escolher sem ter o que escolher.
