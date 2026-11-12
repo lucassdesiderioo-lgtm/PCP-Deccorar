@@ -35,24 +35,30 @@ const M = require('./telas');
 
 console.log('\n1. toda linha da central diz a tela dona');
 PEND.LINHAS.forEach(L => {
-  const t = M.TELAS.find(x => x.n === L.tela);
+  const t = require('./abre_tela').telaDe(L.tela);   // as 6xx moram no tecido
   ok(L.chave + ' → tela ' + L.tela + ' no mapa', !!t, 'sem tela no mapa');
 });
 
 console.log('\n2. as ações vigiadas');
 const codigo = fs.readdirSync(__dirname).filter(f => /\.js$/.test(f) && !/^teste_/.test(f))
   .map(f => fs.readFileSync(path.join(__dirname, f), 'utf8')).join('\n');
+/* as rotas do sob medida moram em tecido/rotas, sem o prefixo /sobmedida */
+const codigoSm = fs.readdirSync(path.join(__dirname, 'tecido', 'rotas')).filter(f => /\.js$/.test(f))
+  .map(f => fs.readFileSync(path.join(__dirname, 'tecido', 'rotas', f), 'utf8')).join('\n');
 const AMOSTRA = { '/api/lote/upload':1, '/api/carregamento/sobra':1, '/api/estoque/ajuste':1, '/api/inventario/terminar':1,
   '/api/inventario/geral/terminar-prateleira':1, '/api/inventario/rejeitar':1, '/api/skus':1, '/api/pedidos/:id/comprar':1,
   '/api/compras/rapida':1, '/api/recebimento':1, '/api/pedidos/:id/fechar':1, '/api/contagem-material/:id/terminar':1,
-  '/api/componentes':1 };
+  '/api/componentes':1, '/sobmedida/api/boletos/:id/baixa':1, '/sobmedida/api/sobras/:id/descartar':1,
+  '/sobmedida/api/planos/:id/correcao':1, '/sobmedida/api/pedidos/:id/enviar':1, '/sobmedida/api/rolos':1 };
 VIG.VIGIA.forEach(([re, chaves]) => {
   chaves.forEach(c => {
     const L = PEND.LINHAS.find(x => x.chave === c);
     ok(re + ' → linha ' + c + ' existe e tem frase', !!(L && L.frase), 'linha ou frase faltando');
   });
   const rota = Object.keys(AMOSTRA).find(r => re.test(r.replace(':id', '7')));
-  ok(re + ' → a rota está registrada no código', !!rota && codigo.indexOf("'" + rota + "'") >= 0, 'rota não achada: ' + rota);
+  const sm = rota && rota.indexOf('/sobmedida') === 0;
+  ok(re + ' → a rota está registrada no código', !!rota && (sm ? codigoSm.indexOf("'" + rota.slice('/sobmedida'.length) + "'") >= 0
+                                                             : codigo.indexOf("'" + rota + "'") >= 0), 'rota não achada: ' + rota);
 });
 ok('ação de outra rota não é vigiada', VIG.vigiaDe('/api/estoque/ajuste/7/aprovar') == null);
 

@@ -250,6 +250,7 @@ try{
      sob medida cria o rolo la, e o cadastro de material do PCP aponta o tecido. */
   require('./sobmedida_rolo').ligar(sm && { criarRolos:sm.criarRolosDoRecebimento, tecidos:sm.tecidosParaCompras });
   require('./sobmedida_almox').ligar(sm && { estoque:sm.estoqueParaPcp });   // o saldo numa lista so (fase 10)
+  require('./sobmedida_pendencias').ligar(sm && sm.pendenciasParaPcp);   // as filas do sob medida na central (PENDENCIAS-NO-MENU fase 3)
 }catch(e){
   console.error('[sobmedida] NAO SUBIU:',e);
   app.use('/sobmedida',(req,res)=>res.status(503).send(

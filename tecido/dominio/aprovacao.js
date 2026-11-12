@@ -130,4 +130,4 @@ function pendentePorAlvo(tipo){
   return m;
 }
 
-module.exports={pedirBaixa,pedirDescarte,aprovar,recusar,pendentes,pendentePorAlvo,porId,TIPOS};
+module.exports={pedirBaixa,pedirDescarte,aprovar,recusar,pendentes,pendentePorAlvo,porId,TIPOS,mesmaPessoa};

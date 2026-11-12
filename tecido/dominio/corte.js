@@ -670,10 +670,15 @@ function correcaoPendente(cid){
   return k;
 }
 
+/* Quem pediu nao aprova, nem o diretor: a regra da casa para mexer em saldo.
+   E pelo NOME: a `plano_correcao` so guarda o nome de quem pediu. A mesma
+   regra e a que a etiqueta do ☰ Menu do PCP usa (dominio/pendencias_pcp.js). */
+const pediuACorrecao=(k,usuarioNome)=>!!(k&&k.pedida_por&&usuarioNome&&
+  k.pedida_por.trim().toUpperCase()===String(usuarioNome).trim().toUpperCase());
+
 function aprovarCorrecao(cid,usuarioNome){
   const k=correcaoPendente(cid);
-  // Quem pediu nao aprova, nem o diretor: a regra da casa para mexer em saldo.
-  exigir(!(k.pedida_por&&usuarioNome&&k.pedida_por.trim().toUpperCase()===String(usuarioNome).trim().toUpperCase()),
+  exigir(!pediuACorrecao(k,usuarioNome),
     'mesma_pessoa','Voce pediu esta correcao — quem aprova e outra pessoa.');
   const c=exigirCorte(k.plano_id);
   // A previa e refeita AGORA: entre pedir e aprovar o estoque andou.
@@ -784,5 +789,5 @@ function conferir(id,dados,usuarioNome,op){
 
 module.exports={confirmar, voltar, cortar, cancelar, feito, aberto, aGuardar, doCorte, guardar,
   editar, edicoes, conferir, estadoConferencias, pausar, retomar, tempoLiquido, revendas, TIPOS_PEDIDO, previaCorrecao:(id,eds)=>previaParaTela(previa(exigirCorte(id),eds)),
-  pedirCorrecao, aprovarCorrecao, recusarCorrecao, correcoes,
+  pedirCorrecao, aprovarCorrecao, recusarCorrecao, correcoes, pediuACorrecao,
   resumo, gravarPlano, porId, abertoDe, ABERTAS, NOME_ETAPA, exigirCorte, exigirDono, exigirEtapa};

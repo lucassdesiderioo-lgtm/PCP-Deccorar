@@ -60,6 +60,9 @@ async function post(url, corpo){
   return { status:r.status, corpo:await r.json() };
 }
 const linha = (r, chave) => (r.linhas || []).find(l => l.chave === chave) || {};
+/* o sob medida de pé, sem nada esperando (a porta dele é testada no
+   teste_pendencias_sobmedida.js) */
+require('./sobmedida_pendencias').ligar(() => ({ n:0, desde:null }));
 
 function semear(){
   /* Um SKU de nome reconhecível: se ele aparecer no JSON da central, vazou detalhe. */

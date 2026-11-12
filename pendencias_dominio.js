@@ -26,6 +26,15 @@
  */
 const PERM = require('./permissoes');
 
+/* Uma linha do sob medida: a conta é da porta, nunca daqui (#12). */
+function smLinha(o){
+  const SMP = require('./sobmedida_pendencias');
+  return Object.assign({}, o, {
+    contar(){ return SMP.contar(o.tipo); },
+    minha(db, p){ return SMP.contar(o.tipo, p.sm || null); }
+  });
+}
+
 function rotulo(chave){
   const p = PERM.find(x => x.chave === chave);
   return p ? p.rotulo : chave;
@@ -164,6 +173,30 @@ const LINHAS = [
   { chave:'material_extra', tela:106, frase:['peça espera decidir o material','peças esperam decidir o material'], nome:'Material extra a decidir', perm:['material.extra'], onde:{ url:'/material-extra' },
     ajuda:'peça com problema ou recusada: dizer se usou material, e baixar',
     contar(db){ return require('./material_extra_dominio').pendentes(db); } },
+  /* O SOB MEDIDA NA CENTRAL (spec PENDENCIAS-NO-MENU, fase 3, 12/11/2026): cada
+     fila é a da tela dona de lá, pela porta (sobmedida_pendencias.js); sem a
+     porta a linha diz que não conseguiu contar. `minha` passa o usuário do sob
+     medida (`p.sm`), e a régua de pessoa é a de lá (dominio/pendencias_pcp.js). */
+  smLinha({ chave:'sm_baixa_boleto', tipo:'baixa_boleto', tela:616, nome:'Sob medida — baixa de boleto',
+    perm:['sobmedida.boleto.aprovar_baixa'], onde:{ url:'/sobmedida/financeiro' },
+    frase:['baixa de boleto espera outra pessoa aprovar','baixas de boleto esperam outra pessoa aprovar'],
+    ajuda:'baixa de boleto pedida, esperando outra pessoa aprovar (quem pediu não aprova)' }),
+  smLinha({ chave:'sm_descarte_sobra', tipo:'descarte_sobra', tela:603, nome:'Sob medida — descarte de sobra',
+    perm:['sobmedida.sobra.aprovar_descarte'], onde:{ url:'/sobmedida/sobras' },
+    frase:['descarte de sobra espera outra pessoa aprovar','descartes de sobra esperam outra pessoa aprovar'],
+    ajuda:'descarte de sobra pedido, esperando outra pessoa aprovar (quem pediu não aprova)' }),
+  smLinha({ chave:'sm_correcao_corte', tipo:'correcao_corte', tela:602, nome:'Sob medida — correção de corte',
+    perm:['sobmedida.corte.aprovar_correcao'], onde:{ url:'/sobmedida/corte' },
+    frase:['correção de corte espera outra pessoa aprovar','correções de corte esperam outra pessoa aprovar'],
+    ajuda:'correção pedida depois do Corte feito, esperando outra pessoa aprovar (quem pediu não aprova)' }),
+  smLinha({ chave:'sm_pedido_aprovar', tipo:'pedido_aprovar', tela:611, nome:'Sob medida — pedido esperando aprovação',
+    perm:['sobmedida.pedido.aprovar','sobmedida.pedido.aprovar_qualquer'], onde:{ url:'/sobmedida/pedidos' },
+    frase:['pedido da revenda espera aprovação','pedidos da revenda esperam aprovação'],
+    ajuda:'pedido enviado pela revenda esperando aprovação (cada vendedor aprova a sua carteira)' }),
+  smLinha({ chave:'sm_conferir', tipo:'conferir', tela:606, nome:'Sob medida — cadastro a conferir',
+    perm:['sobmedida.cadastro.editar'], onde:{ url:'/sobmedida/cadastros' },
+    frase:['cadastro novo (largura, endereço ou fornecedor) espera conferência','cadastros novos (largura, endereço ou fornecedor) esperam conferência'],
+    ajuda:'largura de bobina, endereço ou fornecedor criado na bancada, marcado para conferir' }),
   { chave:'devolucoes', tela:253, frase:['devolução espera a baixa','devoluções esperam a baixa'], nome:'Devoluções', perm:['devolucao.baixar'], onde:{ aba:'dv' },
     ajuda:'devoluções esperando a baixa com reputação e motivo',
     contar(db){
@@ -246,8 +279,8 @@ function total(db, pronto){
    `pode` = { tem(chave) -> bool, abre(rota) -> bool }, de quem chama (a rota,
    pela conta do portão). Devolve só números: nada de SKU, cliente ou saldo. */
 function minhas(db, pode){
-  const M = require('./telas');
-  const rotaDe = n => { const t = M.TELAS.find(x => x.n === n); return t ? t.rota : null; };
+  /* a tela dona, nas duas operações (as 6xx moram no tecido) */
+  const rotaDe = n => { const t = require('./abre_tela').telaDe(n); return t ? t.rota : null; };
   /* o portão ANTES da conta: a linha que a pessoa não resolve nem é contada
      (③ REVISÃO — cada aparelho pergunta a cada minuto) */
   const linhas = LINHAS.filter(L => {

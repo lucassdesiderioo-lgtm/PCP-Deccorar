@@ -13,6 +13,7 @@
  */
 const PEND = require('./pendencias_dominio');
 const QUEM = require('./quem');
+const AT = require('./abre_tela');
 const DIA = require('./pendencias_dia');   // o retrato de cada dia, para o relatório (R7)
 
 module.exports = function(app, db){
@@ -29,9 +30,12 @@ module.exports = function(app, db){
     if(!u || !ac) return res.status(401).json({ erro:'faça login' });
     try{
       const q = QUEM.quem(req);
+      const sm = AT.usuarioSm(ac, u);   // o usuário do sob medida (a régua de lá), ou null
       const pode = {
         tem: c => { try{ return !!ac.podePermissao(u, c); }catch(e){ return false; } },
-        abre: r => { try{ return !!ac.decidir(u, r, 'GET').ok; }catch(e){ return false; } },
+        /* as duas operações: o portão do PCP, ou o do sob medida (abre_tela.js) */
+        abre: r => AT.abre(ac, u, r, sm),
+        sm,
         /* quem é, para a régua de cada dono ("quem pediu não aprova") */
         quem: q ? { id:q.usuario_id, nome:q.usuario_nome || '' } : { id:null, nome:'' },
         temChave: app.locals.inventarioTemChave || null

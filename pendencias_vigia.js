@@ -27,7 +27,7 @@
  * admin_telas): middleware registrado depois de uma rota não roda para ela.
  */
 const PEND = require('./pendencias_dominio');
-const M = require('./telas');
+const AT = require('./abre_tela');
 
 /* Ação → as linhas da central que ela pode fazer crescer. */
 const VIGIA = [
@@ -38,10 +38,17 @@ const VIGIA = [
   [/^\/api\/skus$/,                         ['sku']],                                 // 402 salvar SKU
   [/^\/api\/pedidos\/\d+\/comprar$/,        ['pedido_aprovacao']],                    // 501 acima da alçada
   [/^\/api\/compras\/rapida$/,              ['pedido_aprovacao']],                    // 501 compra rápida
-  [/^\/api\/recebimento$/,                  ['recebimento_retido','recebimento_aviso']], // 502
+  [/^\/api\/recebimento$/,                  ['recebimento_retido','recebimento_aviso','sm_conferir']], // 502 (o rolo do sob medida pode criar largura nova)
   [/^\/api\/pedidos\/\d+\/fechar$/,         ['recebimento_retido']],                  // fechar com falta
   [/^\/api\/contagem-material\/\d+\/terminar$/, ['contagem_material']],               // 504
-  [/^\/api\/componentes$/,                  ['material_sem_almox']]                   // 1101
+  [/^\/api\/componentes$/,                  ['material_sem_almox']],                  // 1101
+  /* O SOB MEDIDA (fase 3): as rotas de lá são registradas no MESMO app, com o
+     prefixo, e o vigia as vê pelo caminho inteiro. */
+  [/^\/sobmedida\/api\/boletos\/\d+\/baixa$/,     ['sm_baixa_boleto']],                     // 616 pedir baixa
+  [/^\/sobmedida\/api\/sobras\/\d+\/descartar$/,  ['sm_descarte_sobra']],                   // 603 propor descarte
+  [/^\/sobmedida\/api\/planos\/\d+\/correcao$/,   ['sm_correcao_corte']],                   // 602 pedir correção
+  [/^\/sobmedida\/api\/pedidos\/\d+\/enviar$/,    ['sm_pedido_aprovar']],                   // 611 enviar pedido
+  [/^\/sobmedida\/api\/(rolos|hastes|andares|niveis|fornecedores)$/, ['sm_conferir']]       // cadastro criado na bancada
   /* ⚠️ A 251 (POST /api/devolucao) FICA DE FORA, por decisão do dono (12/11/2026):
      toda peça recebida nasce esperando a baixa, e a caixinha apareceria em toda
      devolução bipada, sem botão — quem recebe aprenderia a fechar sem ler. */
@@ -69,9 +76,9 @@ function novas(db, chaves, antes){
    saldo ou valor (a regra da central). */
 function descrever(acesso, u, lista){
   return lista.map(p => {
-    const L = linhaDe(p.chave), t = M.TELAS.find(x => x.n === L.tela) || {};
-    let pode = false;
-    try{ pode = !!(acesso && t.rota && acesso.decidir(u, t.rota, 'GET').ok); }catch(e){}
+    const L = linhaDe(p.chave), t = AT.telaDe(L.tela) || {};
+    /* as duas operações: o portão do PCP, ou o do sob medida (abre_tela.js) */
+    const pode = !!(t.rota && AT.abre(acesso, u, t.rota));
     return { chave:p.chave, n:p.n, frase:PEND.frase(L, p.n), tela:L.tela || null,
              nome_tela:t.nome || null, rota:pode ? t.rota : null, pode, quem:PEND.quemFora(L) };
   });
@@ -82,6 +89,9 @@ function vigiaDe(c){ const v = VIGIA.find(x => x[0].test(c)); return v ? v[1] : 
 module.exports = function(app, db){
   app.use((req, res, next) => {
     if(req.method !== 'POST' || !req.usuario) return next();
+    /* quem é, no PCP: o portão do sob medida TROCA o req.usuario pelo de lá
+       (as chaves sem o prefixo), e o caminho da caixinha se julga pelo do PCP */
+    const u = req.usuario;
     const chaves = vigiaDe(req.path);
     if(!chaves) return next();
     let antes = medir(db, chaves);
@@ -97,7 +107,7 @@ module.exports = function(app, db){
         if(corpo && typeof corpo === 'object' && !Array.isArray(corpo) && !corpo.erro
            && corpo.ok !== false && res.statusCode < 400){
           const n = novas(db, chaves, antes);
-          if(n.length) corpo = Object.assign({}, corpo, { pendencias:descrever(app.locals.acesso, req.usuario, n) });
+          if(n.length) corpo = Object.assign({}, corpo, { pendencias:descrever(app.locals.acesso, u, n) });
         }
       }catch(e){ console.log('[pendencias_vigia] ' + (e && e.message)); }
       return json(corpo);

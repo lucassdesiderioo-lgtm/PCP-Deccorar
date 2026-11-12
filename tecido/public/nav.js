@@ -145,3 +145,10 @@ fetch(BASE+'/api/eu',{credentials:'same-origin'})
   })
   .catch(function(){ /* moldura e conforto: a tela funciona sem ela */ });
 })();
+/* A caixinha "Abrir em Pendências" (spec PENDENCIAS-NO-MENU, fase 3): o mesmo
+   pendencias_aviso.js da medida padrão — a ação do sob medida que cria
+   pendência responde `pendencias`, e a caixinha aparece aqui também. */
+(function(){
+  if(typeof window!=='undefined' && window.__pendCaixa) return;
+  var sc=document.createElement('script'); sc.src='/pendencias_aviso.js'; document.head.appendChild(sc);
+})();
