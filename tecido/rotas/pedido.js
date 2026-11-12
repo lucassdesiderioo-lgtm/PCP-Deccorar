@@ -95,7 +95,12 @@ module.exports={rotas:[
 
   {metodo:'POST', caminho:'/api/pedidos/:id/enviar', permissao:LANCAR,
    manipulador:({params,usuario})=>podar(usuario,pedido.enviar(Number(params.id),usuario)),
-   detalhe:(req,d)=>d?('enviou o pedido '+d.numero+' · '+(d.preco.valor_total||'?')):null},
+   /* ⚠️ O `d` JA VEM PODADO: para quem nao tem `preco.ver` nao ha `preco`
+      (R-VAL). Ler `d.preco.valor_total` direto estourava DEPOIS de o pedido
+      estar enviado — 500 na tela e sem a linha da auditoria (CONSERTO de
+      12/11/2026). Sem o preco, a linha diz so o numero. */
+   detalhe:(req,d)=>d?('enviou o pedido '+d.numero+
+     (d.preco&&d.preco.valor_total?' · '+d.preco.valor_total:'')):null},
   {metodo:'POST', caminho:'/api/pedidos/:id/reabrir', permissao:LANCAR,
    manipulador:({params,corpo,usuario})=>podar(usuario,
      pedido.reabrir(Number(params.id),corpo.motivo,usuario)),
