@@ -19,15 +19,18 @@ const PREPARO = [
   { chave:'kit_comando',    nome:'Kit de comando' },
   { chave:'kit_instalacao', nome:'Kit de instalação' }
 ];
-/* As que toda persiana passa: nao se marcam na linha. */
-const SEMPRE = [
-  { chave:'montagem',  nome:'Montagem' },
-  { chave:'revisao',   nome:'Revisão' },
-  { chave:'embalagem', nome:'Embalagem' }
-];
-/* O que se pode marcar numa linha: as de preparo, e "sai direto na
-   embalagem" (fita, caixa, etiqueta). */
-const DE_LINHA = PREPARO.concat([{ chave:'embalagem', nome:'Sai direto na embalagem' }]);
+/* As que vem depois do preparo, e nao se marcam na linha. Dependem do que o
+   modelo e (o dono, 12/11/2026): a PERSIANA passa por montagem, revisao e
+   embalagem; o KIT (o modelo sem medida, `exige_medida = 0`, §7) passa so por
+   montagem e embalagem. */
+const MONTAGEM  = { chave:'montagem',  nome:'Montagem' };
+const REVISAO   = { chave:'revisao',   nome:'Revisão' };
+const EMBALAGEM = { chave:'embalagem', nome:'Embalagem' };
+const SEMPRE = [MONTAGEM, REVISAO, EMBALAGEM];
+const SEMPRE_KIT = [MONTAGEM, EMBALAGEM];
+/* O que se pode marcar numa linha: SO as de preparo. Toda linha tem uma (o
+   dono, 12/11/2026: "toda linha tem que ter uma etapa de preparo"). */
+const DE_LINHA = PREPARO.slice();
 
 const valida = c => DE_LINHA.some(e => e.chave === c);
 const nomeDe = c => { const e = DE_LINHA.find(x => x.chave === c); return e ? e.nome : null; };
@@ -43,16 +46,16 @@ const nomeDe = c => { const e = DE_LINHA.find(x => x.chave === c); return e ? e.
    fora (`sob_medida`): esta producao e a da medida padrao, e o sob medida tem
    a bancada dele (§19). Modelo que nao existe: null. */
 function roteiro(db, modelo_id){
-  const m = db.prepare('SELECT id, sob_medida FROM modelo WHERE id=?').get(modelo_id);
+  const m = db.prepare('SELECT id, sob_medida, exige_medida FROM modelo WHERE id=?').get(modelo_id);
   if(!m) return null;
   if(m.sob_medida) return { etapas:[], sem_etapa:0, motivo:'sob_medida' };
   const linhas = db.prepare('SELECT etapa FROM ficha_formula WHERE modelo_id=? AND ativo=1').all(modelo_id);
   if(!linhas.length) return { etapas:[], sem_etapa:0, motivo:'sem_ficha' };
   const marcadas = new Set(linhas.map(l => l.etapa).filter(Boolean));
   return {
-    etapas: PREPARO.filter(e => marcadas.has(e.chave)).concat(SEMPRE),
+    etapas: PREPARO.filter(e => marcadas.has(e.chave)).concat(m.exige_medida === 0 ? SEMPRE_KIT : SEMPRE),
     sem_etapa: linhas.filter(l => !l.etapa).length
   };
 }
 
-module.exports = { PREPARO, SEMPRE, DE_LINHA, valida, nomeDe, roteiro };
+module.exports = { PREPARO, SEMPRE, SEMPRE_KIT, DE_LINHA, valida, nomeDe, roteiro };

@@ -198,16 +198,23 @@ module.exports = function(app, db){
       else return res.status(400).json({erro:'"vai para o planejamento da produção" tem que ser sim ou não'});
     }
 
-    /* A ETAPA DA LINHA (PRODUCAO-MAPA-E-MOTOR fase 1, 12/11/2026). Ausente
-       preserva (o tablet sem refresh nao apaga a marca); vazio de proposito
-       tira; etapa que nao esta no etapas.js e recusada, e nada do envio grava.
-       Nao muda custo. */
+    /* A ETAPA DA LINHA (PRODUCAO-MAPA-E-MOTOR fase 1, 12/11/2026). TODA linha
+       tem uma etapa de preparo (o dono, 12/11/2026): a linha nova sem ela e
+       recusada, o vazio de proposito tambem, e a etapa fora da lista tambem —
+       e nada do envio grava. Ausente numa linha que ja tem etapa preserva (o
+       tablet sem refresh nao apaga a marca); a linha antiga sem etapa so salva
+       escolhendo uma. Nao muda custo. */
     let etapa;
     if(b.etapa !== undefined && b.etapa !== null){
       const e = String(b.etapa).trim();
-      if(e === '') etapa = '';
-      else if(ETAPAS.valida(e)) etapa = e;
-      else return res.status(400).json({erro:'etapa "'+e+'" não existe — escolha uma da lista'});
+      if(e === '') return res.status(400).json({erro:'escolha a etapa de preparo da linha: toda linha tem uma'});
+      if(!ETAPAS.valida(e)) return res.status(400).json({erro:'etapa "'+e+'" não existe — escolha uma da lista'});
+      etapa = e;
+    }
+    if(etapa === undefined){
+      const antes = b.id ? db.prepare('SELECT etapa FROM ficha_formula WHERE id=?').get(+b.id) : null;
+      if(!antes || !antes.etapa)
+        return res.status(400).json({erro:'escolha a etapa de preparo da linha: toda linha tem uma'});
     }
 
     const campos={ modelo_id:modelo, componente_id:comp, familia, expressao:expr,
@@ -218,7 +225,7 @@ module.exports = function(app, db){
         familia=@familia,expressao=@expressao,observacao=@observacao,ordem=@ordem,ativo=1,
         corte_largura=@corte_largura,corte_altura=@corte_altura,corte_unidade=@corte_unidade,
         planejamento=COALESCE(@planejamento, planejamento),
-        etapa=CASE WHEN @etapa IS NULL THEN etapa WHEN @etapa='' THEN NULL ELSE @etapa END
+        etapa=COALESCE(@etapa, etapa)
         WHERE id=@id`).run(Object.assign({id:+b.id, planejamento: plan===undefined ? null : plan,
           etapa: etapa===undefined ? null : etapa},campos));
       /* O recalculo de custo continua sendo disparado pela linha inteira, e nao

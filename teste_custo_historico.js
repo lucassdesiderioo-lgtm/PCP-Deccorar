@@ -121,6 +121,8 @@ const app = { locals:{ acesso:{ auditar:(req, cat, acao, alvo, det) => AUDIT.pus
   post(p, ...h){ rotas['POST ' + p] = h[h.length - 1]; } };
 require('./ficha_route')(app, db);
 function salvar(body){
+  /* toda linha da ficha tem etapa de preparo (PRODUCAO-MAPA-E-MOTOR, 12/11/2026) */
+  if(body && body.etapa === undefined) body = Object.assign({ etapa:'kit_instalacao' }, body);
   let st = 200, out = null;
   const res = { status(s){ st = s; return this; }, json(j){ out = j; return this; } };
   try{ rotas['POST /api/formulas']({ body, usuario:{ id:1, nome:'Lucas' }, params:{}, query:{}, headers:{}, socket:{} }, res); }

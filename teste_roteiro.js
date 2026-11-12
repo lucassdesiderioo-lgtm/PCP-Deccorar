@@ -77,9 +77,10 @@ const R = rotas();
 const salvar = R.post['/api/formulas'];
 
 /* ── A LISTA ──────────────────────────────────────────────────────────────── */
-caso('etapas.js tem as quatro etapas de preparo e "sai direto na embalagem"', () => {
+caso('etapas.js tem as quatro etapas de preparo, e a linha só aceita elas (o dono: toda linha tem etapa de preparo)', () => {
   igual(ETAPAS.PREPARO.map(e => e.chave), ['corte_tecido','corte_tubo','kit_comando','kit_instalacao']);
-  verdade(ETAPAS.valida('embalagem'), '"embalagem" é uma etapa de linha');
+  igual(ETAPAS.DE_LINHA.map(e => e.chave), ETAPAS.PREPARO.map(e => e.chave));
+  verdade(!ETAPAS.valida('embalagem'), '"sai direto na embalagem" não é etapa de preparo');
   verdade(!ETAPAS.valida('montagem'), 'montagem não é etapa de linha: é de toda persiana');
   verdade(!ETAPAS.valida('qualquer'), 'etapa inventada não vale');
 });
@@ -120,10 +121,21 @@ caso('sem o campo, a etapa gravada FICA (ausente não é vazio)', () => {
   chamar(salvar, { id:F_TUBO, modelo_id:1, componente_id:TUBO, expressao:'largura / 100' });
   igual(etapaDe(F_TUBO), 'corte_tubo');
 });
-caso('vazio de propósito tira a etapa', () => {
-  chamar(salvar, { id:F_TUBO, modelo_id:1, componente_id:TUBO, expressao:'largura / 100', etapa:'' });
-  igual(etapaDe(F_TUBO), null);
-  chamar(salvar, { id:F_TUBO, modelo_id:1, componente_id:TUBO, expressao:'largura / 100', etapa:'corte_tubo' });
+caso('vazio de propósito é recusado: a linha não fica sem etapa (400, nada grava)', () => {
+  const r = chamar(salvar, { id:F_TUBO, modelo_id:1, componente_id:TUBO, expressao:'largura / 200', etapa:'' });
+  igual(r.st, 400);
+  verdade(/etapa/i.test(r.out.erro), r.out.erro);
+  igual(etapaDe(F_TUBO), 'corte_tubo');
+  igual(db.prepare('SELECT expressao FROM ficha_formula WHERE id=?').get(F_TUBO).expressao, 'largura / 100');
+});
+caso('a linha antiga sem etapa não salva sem escolher uma (400)', () => {
+  const r = chamar(salvar, { id:F_KIT, modelo_id:1, componente_id:KIT, expressao:'2' });
+  igual(r.st, 400);
+  verdade(/etapa/i.test(r.out.erro), r.out.erro);
+  igual(db.prepare('SELECT expressao FROM ficha_formula WHERE id=?').get(F_KIT).expressao, '1');
+  const ok2 = chamar(salvar, { id:F_KIT, modelo_id:1, componente_id:KIT, expressao:'1', etapa:'kit_instalacao' });
+  igual(ok2.st, 200, JSON.stringify(ok2.out));
+  db.prepare('UPDATE ficha_formula SET etapa=NULL WHERE id=?').run(F_KIT);
 });
 caso('etapa que não existe é recusada (400) e nada grava', () => {
   const r = chamar(salvar, { id:F_TUBO, modelo_id:1, componente_id:TUBO, expressao:'largura / 200', etapa:'montagem' });
@@ -133,12 +145,15 @@ caso('etapa que não existe é recusada (400) e nada grava', () => {
   igual(db.prepare('SELECT expressao FROM ficha_formula WHERE id=?').get(F_TUBO).expressao, 'largura / 100',
     'a fórmula do mesmo envio também não grava');
 });
-caso('linha nova com etapa nasce com ela; sem o campo, vazia', () => {
-  const a = chamar(salvar, { modelo_id:1, componente_id:CX, expressao:'2', etapa:'embalagem' });
-  igual(etapaDe(a.out.id), 'embalagem');
+caso('linha nova nasce com a etapa; sem ela, é recusada (400) e não nasce', () => {
+  const a = chamar(salvar, { modelo_id:1, componente_id:CX, expressao:'2', etapa:'kit_instalacao' });
+  igual(a.st, 200, JSON.stringify(a.out));
+  igual(etapaDe(a.out.id), 'kit_instalacao');
+  const antes = db.prepare('SELECT COUNT(*) n FROM ficha_formula').get().n;
   const b = chamar(salvar, { modelo_id:1, componente_id:CX, expressao:'3' });
-  igual(etapaDe(b.out.id), null);
-  db.prepare('DELETE FROM ficha_formula WHERE id IN (?,?)').run(a.out.id, b.out.id);
+  igual(b.st, 400);
+  igual(db.prepare('SELECT COUNT(*) n FROM ficha_formula').get().n, antes, 'a linha não nasceu');
+  db.prepare('DELETE FROM ficha_formula WHERE id=?').run(a.out.id);
 });
 
 /* ── O ROTEIRO SAI DAS LINHAS ─────────────────────────────────────────────── */
@@ -151,15 +166,15 @@ caso('sem linha marcada, o roteiro é montagem → revisão → embalagem', () =
 caso('com linhas marcadas, as etapas de preparo vêm antes, na ordem da fábrica', () => {
   db.prepare("UPDATE ficha_formula SET etapa='kit_instalacao' WHERE id=?").run(F_KIT);
   db.prepare("UPDATE ficha_formula SET etapa='corte_tubo' WHERE id=?").run(F_TUBO);
-  db.prepare("UPDATE ficha_formula SET etapa='embalagem' WHERE id=?").run(F_CX);
+  db.prepare("UPDATE ficha_formula SET etapa='kit_instalacao' WHERE id=?").run(F_CX);
   const r = ETAPAS.roteiro(db, 1);
   igual(r.etapas.map(e => e.chave), ['corte_tubo','kit_instalacao','montagem','revisao','embalagem']);
   igual(r.sem_etapa, 0);
 });
 caso('a linha desativada não entra no roteiro', () => {
-  db.prepare("UPDATE ficha_formula SET ativo=0 WHERE id=?").run(F_KIT);
+  db.prepare("UPDATE ficha_formula SET ativo=0 WHERE id IN (?,?)").run(F_KIT, F_CX);
   igual(ETAPAS.roteiro(db, 1).etapas.map(e => e.chave), ['corte_tubo','montagem','revisao','embalagem']);
-  db.prepare("UPDATE ficha_formula SET ativo=1 WHERE id=?").run(F_KIT);
+  db.prepare("UPDATE ficha_formula SET ativo=1 WHERE id IN (?,?)").run(F_KIT, F_CX);
 });
 caso('modelo sem nenhuma linha ativa NÃO ganha roteiro (não se inventa montagem)', () => {
   db.prepare("INSERT INTO modelo (id,codigo,nome,exige_medida,sob_medida) VALUES (2,'ACESSORIO','Acessório',0,0)").run();
@@ -167,9 +182,14 @@ caso('modelo sem nenhuma linha ativa NÃO ganha roteiro (não se inventa montage
   igual(r.etapas, []);
   igual(r.motivo, 'sem_ficha');
 });
+caso('o kit (modelo sem medida) passa por montagem e embalagem, sem revisão (o dono, 12/11/2026)', () => {
+  const id = db.prepare("INSERT INTO ficha_formula (modelo_id,componente_id,expressao,ordem,etapa) VALUES (2,?,'1',1,'kit_instalacao')").run(KIT).lastInsertRowid;
+  igual(ETAPAS.roteiro(db, 2).etapas.map(e => e.chave), ['kit_instalacao','montagem','embalagem']);
+  db.prepare('DELETE FROM ficha_formula WHERE id=?').run(id);
+});
 caso('modelo sob medida fica fora: a spec é da medida padrão', () => {
   db.prepare("INSERT INTO modelo (id,codigo,nome,exige_medida,sob_medida) VALUES (3,'SOBMEDIDA','Sob medida',0,1)").run();
-  db.prepare("INSERT INTO ficha_formula (modelo_id,componente_id,expressao,ordem,etapa) VALUES (3,?,'1',1,'embalagem')").run(CX);
+  db.prepare("INSERT INTO ficha_formula (modelo_id,componente_id,expressao,ordem,etapa) VALUES (3,?,'1',1,'kit_instalacao')").run(CX);
   const r = ETAPAS.roteiro(db, 3);
   igual(r.etapas, []);
   igual(r.motivo, 'sob_medida');
@@ -220,6 +240,8 @@ caso('a 404 tem o campo Etapa no editor e manda a etapa ao salvar', () => {
   verdade(/id="edEtapa"/.test(h), 'campo edEtapa');
   verdade(/corpo\.etapa=\$\('#edEtapa'\)\.value/.test(h), 'salvarEditor manda a etapa');
   verdade(/\/api\/formulas\/roteiro\//.test(h), 'a tela pede o roteiro');
+  verdade(!/— sem etapa —/.test(h), 'não há opção de linha sem etapa');
+  verdade(/falta etapa/.test(h), 'a linha antiga sem etapa aparece marcada');
 });
 
 console.log('');
