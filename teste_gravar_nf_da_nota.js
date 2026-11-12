@@ -69,7 +69,10 @@ const item=v=>['X'+v.envio.slice(-4)+'ABC1 Cortina Rolo Blackout '+medida(v.sku)
     {k:'A', envio:'48502318254', sku:'BK130130BEGE', comprador:'Ana Lima', cidade:'Campinas, São Paulo', nota:{nf:'501',uf:'SP'}},
     {k:'B', pack:'2000015974927591', envio:'48485819541', sku:'BK150150BEGE', comprador:'Beto Reis', cidade:'Salvador, Bahia', nota:{nf:'502',uf:'SP'}},
     {k:'C', pack:'2000015974927593', envio:'48485819542', sku:'BK140140BEGE', comprador:'Caio Melo', nf:'503', cidade:'Santos, São Paulo', nota:{nf:'503',uf:'SP'}},
-    {k:'D', envio:'48490199401', sku:'BK100100BEGE', comprador:'Dora Paz', cidade:'São Paulo, São Paulo', nota:{nf:'504',uf:'SP'}}];
+    {k:'D', envio:'48490199401', sku:'BK100100BEGE', comprador:'Dora Paz', cidade:'São Paulo, São Paulo', nota:{nf:'504',uf:'SP'}},
+    /* E: sem NF, e a pagina seguinte e a nota 503, que a etiqueta C diz — a
+       conferencia retem, e o script nao pode gravar */
+    {k:'E', envio:'48490199999', sku:'BK120120BEGE', comprador:'Eva Luz', cidade:'Santos, São Paulo', nota:{nf:'503',uf:'SP'}}];
   const paginas=[];
   V.forEach(v=>{ paginas.push(etq(v)); paginas.push(danfe(v.nota)); });
   paginas.push(['Despachem as suas vendas o quanto antes.','Identifiicação Produtos'].concat(...V.map(item)));
@@ -88,6 +91,10 @@ const item=v=>['X'+v.envio.slice(-4)+'ABC1 Cortina Rolo Blackout '+medida(v.sku)
   ins.run('BK100100BEGE','',null,'48490199401','["48490199401"]',SRC,6,7,'pendente');                   // 4 D (NF vazia em texto)
   ins.run('BK160160BEGE',null,'2000015000000777',null,'[]',path.join(tmp,'lotes','1700000000000.pdf'),0,1,'pendente'); // 5 PDF sumiu
   ins.run('BK999',null,null,'48502318254','["48502318254"]',SRC,0,1,'pendente');                       // 6 A com outro SKU
+  ins.run('BK100100BEGE',null,null,'48490199401','["48490199401"]',SRC,0,7,'pendente');               // 7 D, a nota certa, mas a etiqueta em outra pagina
+  ins.run('BK130130BEGE',null,null,'48502318254','["48502318254"]',SRC,0,5,'pendente');               // 8 A, imprimindo outra nota
+  ins.run('BK130130BEGE',null,'2000015999999999','48502318254','["48502318254"]',SRC,0,1,'pendente'); // 9 tem pack (outro): o envio nao vale
+  ins.run('BK120120BEGE',null,null,'48490199999','["48490199999"]',SRC,8,9,'pendente');               // 10 E: a nota nao passa
   db.close();
   const nfs=()=>{ const d=new Database(path.join(tmp,'dados.db'),{readonly:true});
     const r={}; d.prepare('SELECT id,nf FROM lote ORDER BY id').all().forEach(x=>{ r[x.id]=x.nf; }); d.close(); return r; };
@@ -100,7 +107,11 @@ const item=v=>['X'+v.envio.slice(-4)+'ABC1 Cortina Rolo Blackout '+medida(v.sku)
   ok('simular nao grava nada', JSON.stringify(nfs())===JSON.stringify(antes), sim);
   ok('a simulacao diz que vai gravar a 501 na caixa #1', /#1\b[^\n]*501/.test(sim), sim);
   ok('a simulacao diz que vai gravar a 504 na caixa #4', /#4\b[^\n]*504/.test(sim), sim);
-  ok('e diz por que a #2 fica sem NF (o estado da nota)', /#2\b[^\n]*(SP|BA|estado|UF)/i.test(sim), sim);
+  ok('e diz por que a #2 fica sem NF (o estado da nota: SP contra BA)', /#2\b[^\n]*—[^\n]*\bSP\b[^\n]*\bBA\b/.test(sim), sim);
+  ok('a #7 (etiqueta em outra pagina) fica, dizendo a pagina', /#7\b[^\n]*—[^\n]*etiqueta esta em outra pagina/i.test(sim), sim);
+  ok('a #8 (imprime outra nota) fica, dizendo a nota', /#8\b[^\n]*—[^\n]*imprime a nota/i.test(sim), sim);
+  ok('a #9 (tem pack) nao e achada pelo envio', /#9\b[^\n]*—[^\n]*nao acha/i.test(sim), sim);
+  ok('a #10 (a nota e de outra etiqueta) fica, dizendo a conferencia', /#10\b[^\n]*—[^\n]*conferencia/i.test(sim), sim);
   ok('e que o PDF da #5 saiu de lotes/', /#5\b[^\n]*(PDF|lotes)/i.test(sim), sim);
   ok('e que a #6 nao bate o SKU', /#6\b[^\n]*(SKU|BK999|bate)/i.test(sim), sim);
   ok('a #3, que ja tem NF, nem entra na lista', !/#3\b/.test(sim), sim);
@@ -114,6 +125,7 @@ const item=v=>['X'+v.envio.slice(-4)+'ABC1 Cortina Rolo Blackout '+medida(v.sku)
   ok('a #3 continua com a NF que tinha', depois[3]==='503', JSON.stringify(depois));
   ok('a #5 (PDF sumiu) continua sem NF', !depois[5], JSON.stringify(depois));
   ok('a #6 (outro SKU) continua sem NF', !depois[6], JSON.stringify(depois));
+  ok('a #7, #8, #9 e #10 continuam sem NF', !depois[7] && !depois[8] && !depois[9] && !depois[10], JSON.stringify(depois));
   const bk=fs.existsSync(path.join(tmp,'backups'))?fs.readdirSync(path.join(tmp,'backups')):[];
   ok('o --aplicar fez backup antes', bk.some(f=>/^dados-antes-nf-da-nota-.*\.db$/.test(f)), JSON.stringify(bk)+'\n'+apl);
   if(bk.length){
@@ -126,6 +138,12 @@ const item=v=>['X'+v.envio.slice(-4)+'ABC1 Cortina Rolo Blackout '+medida(v.sku)
   const outra=rodar('--aplicar');
   ok('rodar de novo nao grava nada', JSON.stringify(nfs())===JSON.stringify(depois) && /nada a gravar/i.test(outra), outra);
   ok('e nao faz outro backup', (fs.readdirSync(path.join(tmp,'backups'))).length===bk.length);
+
+  /* Banco que nao existe e recusado, e nao criado vazio (§13). */
+  const vazio=require('fs').mkdtempSync(require('path').join(require('os').tmpdir(),'pcp-gravarnf-vazio-'));
+  let saida=''; try{ saida=execFileSync(process.execPath,[SCRIPT],{env:{...process.env, PCP_DIR:vazio}, encoding:'utf8', stdio:['ignore','pipe','pipe']}); }catch(e){ saida='ERRO '+(e.stderr||'')+(e.stdout||''); }
+  ok('com a pasta errada ele recusa e nao cria dados.db vazio', !fs.existsSync(path.join(vazio,'dados.db')) && /nao existe|ERRO/i.test(saida), saida);
+  fs.rmSync(vazio,{recursive:true,force:true});
 
   /* So mexe na coluna nf: o resto da linha fica como estava. */
   const d=new Database(path.join(tmp,'dados.db'),{readonly:true});

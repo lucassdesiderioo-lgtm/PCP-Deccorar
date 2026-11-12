@@ -39,11 +39,14 @@ async function analisar(db, lerPdf){
     if(!porPdf.has(cx.srcfile)) porPdf.set(cx.srcfile, await lerPdf(cx.srcfile));
     const ordens=porPdf.get(cx.srcfile);
     if(!ordens){ out.push({caixa:cx, gravar:false, porque:'o PDF '+path.basename(cx.srcfile)+' ja saiu de lotes/ (7 dias)'}); continue; }
-    const o=ordens.find(x=>
+    /* Pela chave, e entre as que casam, a da MESMA pagina: o pacote com duas
+       etiquetas do mesmo pack tem as duas no PDF (③ REVISAO). */
+    const cands=ordens.filter(x=>
       (cx.packId && x.packId===cx.packId) || (cx.venda && x.venda===cx.venda)
       || (!cx.packId && !cx.venda && cx.envio && x.envio===cx.envio));
-    if(!o){ out.push({caixa:cx, gravar:false, porque:'o leitor de hoje nao acha esta etiqueta no PDF'}); continue; }
-    if(o.labelPage!==cx.labelPage){ out.push({caixa:cx, gravar:false, porque:'a etiqueta esta em outra pagina do PDF ('+o.labelPage+' e nao '+cx.labelPage+'): confira a mao'}); continue; }
+    if(!cands.length){ out.push({caixa:cx, gravar:false, porque:'o leitor de hoje nao acha esta etiqueta no PDF'}); continue; }
+    const o=cands.find(x=>x.labelPage===cx.labelPage);
+    if(!o){ out.push({caixa:cx, gravar:false, porque:'a etiqueta esta em outra pagina do PDF ('+cands.map(x=>x.labelPage).join(', ')+' e nao '+cx.labelPage+'): confira a mao'}); continue; }
     if(String(o.sku||'').toUpperCase()!==String(cx.codigo||'').toUpperCase()){
       out.push({caixa:cx, gravar:false, porque:'o SKU nao bate: a folha diz '+(o.sku||'-')+' e a caixa e '+(cx.codigo||'-')}); continue;
     }
@@ -82,7 +85,9 @@ if(require.main===module) (async()=>{
   }
 
   console.log('banco:', C.BANCO);
-  const db=new Database(C.BANCO);
+  /* Pasta errada nao cria um dados.db vazio (§13): o banco tem que existir. */
+  if(!fs.existsSync(C.BANCO)){ console.error('o banco '+C.BANCO+' nao existe: confira a pasta (PCP_DIR / PCP_DB)'); process.exit(1); }
+  const db=new Database(C.BANCO, {fileMustExist:true});
   const lista=await analisar(db, lerPdf);
   const vai=lista.filter(r=>r.gravar), fica=lista.filter(r=>!r.gravar);
   const chave=c=>c.packId?'pack '+c.packId:c.venda?'venda '+c.venda:'envio '+(c.envio||'-');
