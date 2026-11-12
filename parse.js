@@ -294,7 +294,7 @@ async function parsePdf(uint8){
   const cruas = pecasCruas(controlLines, itensFolha);
   const pecasNaFolha = controlLines.length ? pecasDaFolhaInteira(controlLines) : null;
 
-  const orders=[], seen=new Set();
+  const orders=[], seen=new Map();
   for(let p=1;p<=N;p++){
     if(pages[p].type!=='label')continue;
     const t=pages[p].text, lines=pages[p].lines;
@@ -309,10 +309,14 @@ async function parsePdf(uint8){
     const buyer=nomeDaEtiqueta(lines);
     /* A etiqueta so com "Envio:" (12/11/2026) nao tem pack nem venda: a
        chave dela e o numero do envio. E ele e uma etiqueta fisica nos dois
-       formatos (o do codigo de barras), entao vale para toda etiqueta. */
-    const chaveEnvio=envio||null;
-    if((packId&&seen.has('p:'+packId))||(venda&&seen.has('v:'+venda))||(chaveEnvio&&seen.has('e:'+chaveEnvio))) continue;
-    if(packId)seen.add('p:'+packId); if(venda)seen.add('v:'+venda); if(chaveEnvio)seen.add('e:'+chaveEnvio);
+       formatos (o do codigo de barras), entao vale para toda etiqueta — mas
+       so quando o pack e a venda nao divergem (a regua do upload e do religar:
+       envio igual com pack diferente e outra etiqueta, ③ REVISAO r2). */
+    const donoE=envio?seen.get('e:'+envio):null;
+    const envioRep=!!donoE && !(packId&&donoE.packId&&packId!==donoE.packId) && !(venda&&donoE.venda&&venda!==donoE.venda);
+    if((packId&&seen.has('p:'+packId))||(venda&&seen.has('v:'+venda))||envioRep) continue;
+    if(packId)seen.set('p:'+packId,true); if(venda)seen.set('v:'+venda,true);
+    if(envio && !donoE) seen.set('e:'+envio,{packId:packId||null,venda:venda||null});
     const codes=new Set(); if(packId)codes.add(packId); if(venda)codes.add(venda);
     for(const ln of lines){ const c=ln.replace(/\s+/g,'');
       if(/^[0-9]{8,}$/.test(c)) codes.add(c);

@@ -265,13 +265,25 @@ module.exports=function(app,db){
          subir num formato e voltar no outro. Por isso toda etiqueta com envio
          confere o `e:`, e o volume de antes do deploy (lote.envio vazio) entra
          no `seen` pelo numero de 10 a 12 digitos que ja esta nos `codes` dele —
-         a mesma regua do envioDaEtiqueta (pack e venda tem 16). */
-      const seen=new Set(); db.prepare("SELECT packId,venda,envio,codes FROM lote").all().forEach(r=>{
-        if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); if(r.envio)seen.add('e:'+r.envio);
+         a mesma regua do envioDaEtiqueta (pack e venda tem 16).
+         ⚠️ ENVIO IGUAL COM PACK OU VENDA DIFERENTES NAO E A MESMA ETIQUETA (③
+         REVISAO r2): e a regua do religar (R-PDF-07). Recusar faria a venda
+         nova sumir calada, so como "+1 repetida". Por isso cada envio guarda
+         o pack e a venda do volume dono, e so recusa quando nao divergem. */
+      const seen=new Set(), donoEnvio=new Map();
+      const marcaEnvio=(d,dono)=>{ if(!donoEnvio.has(d)) donoEnvio.set(d,{packId:dono.packId||null, venda:dono.venda||null}); };
+      db.prepare("SELECT packId,venda,envio,codes FROM lote").all().forEach(r=>{
+        if(r.packId)seen.add('p:'+r.packId); if(r.venda)seen.add('v:'+r.venda); if(r.envio)marcaEnvio(r.envio,r);
         else { let cs=[]; try{ cs=JSON.parse(r.codes||'[]'); }catch(e){}
-          (Array.isArray(cs)?cs:[]).forEach(c=>{ const d=String(c||''); if(/^\d{10,12}$/.test(d)) seen.add('e:'+d); }); }
+          (Array.isArray(cs)?cs:[]).forEach(c=>{ const d=String(c||''); if(/^\d{10,12}$/.test(d)) marcaEnvio(d,r); }); }
       });
       const chaveEnvio=o=>o.envio||null;
+      const envioRepetido=o=>{
+        const d=o.envio && donoEnvio.get(o.envio); if(!d) return false;
+        if(o.packId && d.packId && o.packId!==d.packId) return false;
+        if(o.venda && d.venda && o.venda!==d.venda) return false;
+        return true;
+      };
       const ins=db.prepare("INSERT INTO lote (codigo,cor,buyer,city,nf,packId,venda,codes,srcfile,labelPage,danfePage,estagio,bloqueio,descricao,despachar_em,modalidade,envio) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
       const existe=db.prepare('SELECT 1 FROM skus WHERE codigo=?');
       const famVista=db.prepare('SELECT prefixo,vezes FROM familia_sku WHERE familia=?');
@@ -308,9 +320,8 @@ module.exports=function(app,db){
       let qtdDuvida=0;
       let novos=0,rep=0,religadas=0,semsku=0,bloq=0,divs=0,coleta=0,modal=0,pacotes=0,naoFecha=0,variasPecas=0; const desconhecidos={};
       db.transaction(()=>{ for(const o of orders){
-        const ce=chaveEnvio(o);
-        if((o.packId&&seen.has('p:'+o.packId))||(o.venda&&seen.has('v:'+o.venda))||(ce&&seen.has('e:'+ce))){ rep++; if(religar(o)) religadas++; continue; }
-        if(o.packId)seen.add('p:'+o.packId); if(o.venda)seen.add('v:'+o.venda); if(ce)seen.add('e:'+ce);
+        if((o.packId&&seen.has('p:'+o.packId))||(o.venda&&seen.has('v:'+o.venda))||envioRepetido(o)){ rep++; if(religar(o)) religadas++; continue; }
+        if(o.packId)seen.add('p:'+o.packId); if(o.venda)seen.add('v:'+o.venda); if(o.envio)marcaEnvio(o.envio,o);
         const sku=(o.sku||'').trim().toUpperCase();
         const ok = sku && existe.get(sku);
         let est='pendente', motivo=null, conflito=o.conflito;

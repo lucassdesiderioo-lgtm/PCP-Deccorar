@@ -1536,7 +1536,10 @@ sempre traz o MESMO número no código de barras, então a venda que subisse só
 com "Envio:" e voltasse com Pack ID virava dois volumes — e a que já estava no
 banco antes do deploy (número só nos `codes`) entrava de novo. Hoje o envio
 vale para toda etiqueta, nos dois sentidos, e o `seen` do upload lê os `codes`
-dos volumes antigos. O verificador conferiu nos dois PDFs reais: em toda
+dos volumes antigos. Na segunda rodada o revisor achou o avesso: envio igual
+com pack diferente era recusado como repetido, e a venda nova sumia calada.
+Hoje o envio só recusa quando o pack e a venda não divergem — a régua que o
+religar já usava. O verificador conferiu nos dois PDFs reais: em toda
 etiqueta há uma linha só de dígitos de 10 a 12 posições, e ela é o código de
 barras.
 

@@ -65,10 +65,10 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Status:** no ar.
 
 ### R-PDF-06 · O upload recusa volume que já existe no histórico inteiro
-- **Regra:** Pack ID ou Venda que já existem em `lote`, em qualquer dia, não entram de novo. **Desde 12/11/2026 há uma terceira chave** (R-PDF-11): o número do envio (o do código de barras, `lote.envio`). Ele vale para **toda** etiqueta, nos dois sentidos — a mesma venda pode subir só com "Envio:" e voltar com Pack ID, ou o contrário —, e o volume de antes do deploy entra pela leitura do número nos `codes` dele.
+- **Regra:** Pack ID ou Venda que já existem em `lote`, em qualquer dia, não entram de novo. **Desde 12/11/2026 há uma terceira chave** (R-PDF-11): o número do envio (o do código de barras, `lote.envio`). Ele vale para **toda** etiqueta, nos dois sentidos — a mesma venda pode subir só com "Envio:" e voltar com Pack ID, ou o contrário —, e o volume de antes do deploy entra pela leitura do número nos `codes` dele. **Envio igual com pack ou venda diferentes não é a mesma etiqueta** (a régua do R-PDF-07): a venda nova entra.
 - **Por quê:** com a dedup só do dia, resubir um PDF gerou 94 volumes fantasmas em 25/08/2026, cobrando etiqueta de peça que estava no caminhão.
 - **Exceções:** nenhuma. O passivo antigo sai pela Mesa (R-COR-02). A venda repetida cujo PDF sumiu **não entra de novo** — só volta a ter PDF (R-PDF-07).
-- **Teste que trava:** `teste_upload.js` (81: o envio nos dois sentidos e contra o volume de antes do deploy, escrito antes do conserto da ③ REVISÃO) · `teste_casos_reais.js` (`casos/2026-11-12-nf-9738.json` sobe o PDF duas vezes, e a segunda não grava nada).
+- **Teste que trava:** `teste_upload.js` (84: o envio nos dois sentidos, contra o volume de antes do deploy, e o envio igual com pack ou venda diferentes entrando — escritos antes dos consertos da ③ REVISÃO) · `teste_casos_reais.js` (`casos/2026-11-12-nf-9738.json` sobe o PDF duas vezes, e a segunda não grava nada).
 - **Status:** no ar desde 25/08/2026 · a chave do envio no código desde 12/11/2026, aguardando deploy.
 - **História:** armadilha #5.
 

@@ -268,6 +268,16 @@ async function main(){
     eq('um envio que não existe entra (a guarda não segura venda nova)', r.body.novos, 1);
     r = await subir([ vol('BK140140BEGE', { envio:'48400000123', codes:['48400000123'] }) ]);
     eq('a etiqueta com pack e venda novos e envio novo entra', r.body.novos, 1);
+    /* ③ REVISAO r2: o envio igual com pack ou venda DIFERENTES nao e a mesma
+       etiqueta — e a regua do religar (R-PDF-07). Recusar como repetida faria a
+       venda nova sumir calada, so como "+1 repetida" no resumo. */
+    db.prepare(`INSERT INTO lote (codigo,packId,venda,codes,estagio) VALUES ('BK140140BEGE','2000015000000001',null,'["2000015000000001","48500000001"]','embalado')`).run();
+    r = await subir([ vol('BK140140BEGE', { packId:'2000015999999999', venda:null, envio:'48500000001', codes:['2000015999999999','48500000001'] }) ]);
+    eq('envio igual com pack diferente: a venda nova entra (não é repetida)', r.body.novos, 1);
+    r = await subir([ vol('BK140140BEGE', { packId:null, venda:'2000019555555555', envio:'48400000077', codes:['2000019555555555','48400000077'] }) ]);
+    eq('envio igual com venda diferente: a venda nova entra', r.body.novos, 1);
+    r = await subir([ vol('BK140140BEGE', { packId:'2000015000000001', venda:null, envio:'48500000001', codes:['2000015000000001','48500000001'] }) ]);
+    eq('e o mesmo pack com o mesmo envio continua repetido', r.body.novos, 0);
   } finally { srv.close(); }
 }
 
