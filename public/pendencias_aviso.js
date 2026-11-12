@@ -76,7 +76,7 @@
       if(aqui(p.rota)) h += ' — <span style="font-weight:400">está nesta tela.</span>';
       else if(p.pode && p.rota) h += '<div style="margin-top:6px"><a href="' + esc(p.rota) + '" style="display:inline-block;padding:8px 12px;'
         + 'border-radius:8px;background:#c62828;color:#fff;text-decoration:none;font-weight:700">Abrir em ' + esc((p.tela ? p.tela + ' ' : '') + (p.nome_tela || 'Pendências')) + ' →</a></div>';
-      else h += '<div style="font-weight:400;margin-top:4px">Quem resolve: quem tem ' + esc(p.quem) + '.</div>';
+      else h += '<div style="font-weight:400;margin-top:4px">Quem resolve: ' + (/^nível /.test(p.quem || '') ? 'quem é de ' + esc(p.quem) : 'quem tem a permissão “' + esc(p.quem) + '”') + '.</div>';
       h += '</div>';
     });
     el.querySelector('.pendCaixaLista').insertAdjacentHTML('afterbegin', h);

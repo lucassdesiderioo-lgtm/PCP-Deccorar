@@ -2,15 +2,40 @@
 
 ```
 STATUS
-Situação: APROVADA pelo dono em 12/11/2026 · nada construído · próxima: fase 1
+Situação: EM CONSTRUÇÃO · aprovada pelo dono em 12/11/2026 · fase 1 construída e revisada, falta subir · próxima: fase 2
 Criada em: 12/11/2026
 Última atualização: 12/11/2026
-Fases: 1 ☐  2 ☐  3 ☐
+Fases: 1 ☑  2 ☐  3 ☐
 Risco: 🟡 (comportamento de tela e uma rota de leitura nova; não mexe em estoque, permissão, schema do PCP)
 Depende de: a central de Pendências (docs/arquivo/CENTRAL-DE-PENDENCIAS.md, a 204)
             o menu único (ORGANIZACAO-DO-SISTEMA, public/menu_telas.js)
 Tipo: NOVIDADE
 ```
+
+### Fase 1 — a caixinha "Abrir em Pendências" (12/11/2026, construída, falta subir)
+
+- **Quem sabe é o servidor** (`pendencias_vigia.js`, registrado no `server.js`
+  antes de qualquer rota): para cada ação da lista `VIGIA` ele conta as linhas
+  da central antes e depois, e a resposta de sucesso ganha `pendencias`.
+  Nenhuma conta nova (#12). As 12 ações vigiadas são as da tabela §3.2, mais a
+  compra rápida e o "fechar pedido com falta" (que também geram as mesmas
+  pendências).
+- **Quem desenha é o `public/pendencias_aviso.js`**, que o `nav.js` carrega em
+  toda tela: embrulha o `fetch`, e o POST com `pendencias` abre a caixa
+  vermelha no canto de baixo, que só fecha no ✕ e soma os avisos seguintes.
+- **Divergência D9 — a frase mora ao lado da linha da central**
+  (`pendencias_dominio.js`, campo `frase`), e não no `pendencias_aviso.js` como
+  a §3.2 escrevia: é o servidor que sabe o número, e assim continua um lugar só.
+- **Divergência D10 — o botão leva à TELA dona, e não ao card**: as listas das
+  telas donas desenham depois de carregar, e a âncora no endereço não acha o
+  card. Fica para a fase 2.
+- **③ REVISÃO** (`revisor-fabrica` e `testador-tela`), consertado com o teste
+  antes: o upload lê o PDF por segundos, e a conta de "antes" somava o que outra
+  pessoa fez nesse meio — hoje ele recomeça a conta depois da leitura
+  (`req.recontarPendencias`); e a caixinha nova apagava a anterior (a 103 sobe
+  vários PDFs seguidos). Em dúvida, para o dono: a 251 mostra a caixinha em
+  TODA peça recebida (toda devolução nasce esperando a baixa).
+- `teste_pendencias_caminho.js` (66).
 
 ## 1. O problema, nas palavras do dono (12/11/2026)
 
