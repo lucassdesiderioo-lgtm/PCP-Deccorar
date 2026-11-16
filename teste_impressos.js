@@ -152,6 +152,11 @@ async function main(){
     eq('e a linha leva o envio para a tela', r.body[0] && r.body[0].envio, '48462356937');
     ok('a linha do "Já impressos" escreve o envio', /envio <span[^']*'\+esc\(r\.envio\)/.test(html));
     ok('a ajuda da busca cita o envio', /NF, cliente, SKU ou envio/.test(html));
+    /* ③ REVISÃO: o clique fora de botão devolve o foco ao bipe, e focar o campo
+       apaga a seleção — o número do envio não se copiava na 201. */
+    ok('o número do envio leva a marca data-copiar', /data-copiar[^>]*user-select:all|user-select:all[^>]*data-copiar/.test(html));
+    ok('o keep espera a cópia, e por tempo limitado', /if\(copiando\(\)\)\{ setTimeout\(keep/.test(html) && /Date\.now\(\)-copiarEm>6000\) return false/.test(html));
+    ok('o clique no número não devolve o foco ao bipe', /closest\('[^']*\[data-copiar\][^']*'\)\)\s*keep\(\)/.test(html));
   } finally { srv.close(); }
 }
 

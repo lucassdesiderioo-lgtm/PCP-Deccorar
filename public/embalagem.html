@@ -276,7 +276,7 @@ function telaPacote(r,extras){
     +'<div style="font-weight:700;font-size:13px;margin-top:6px;border-top:1px solid #e0a63f;padding-top:6px">'
     +fita(total)+'</div></div>'
     +'<div style="font-size:26px;font-weight:800;color:var(--txt);line-height:1.15;margin:2px 0 4px">'+esc(r.pedido.buyer)+'</div>'
-    +'<div style="font-size:15px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b>'+(r.pedido.envio?' · envio <span style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace">'+esc(r.pedido.envio)+'</span>':'')+' · '+esc(r.pedido.city||'')+'</div>'
+    +'<div style="font-size:15px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b>'+(r.pedido.envio?' · envio <span data-copiar style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace">'+esc(r.pedido.envio)+'</span>':'')+' · '+esc(r.pedido.city||'')+'</div>'
     +itens.map(linhaItem).join('')
     +(faltam
       ? '<div style="margin-top:8px;font-weight:700">Faltam <b>'+faltam+'</b> persiana(s) — bipe o SKU de cada uma, <b>uma por uma</b>.</div>'
@@ -410,7 +410,7 @@ async function scanSku(sku){
   if(pecasDe(r.itens)>1){ telaPacote(r, col+adiant); return; }
   banner((r.coleta?'col':(r.adiantado?'warn':'cfm'))+' rotulo','Confira esta venda', col+adiant
     +'<div style="font-size:30px;font-weight:800;color:var(--txt);line-height:1.15;letter-spacing:-.5px;margin:2px 0 6px">'+esc(r.pedido.buyer)+'</div>'
-    +'<div style="font-size:16px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b>'+(r.pedido.envio?' · envio <span style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace">'+esc(r.pedido.envio)+'</span>':'')+' · '+esc(r.pedido.city||'')+'</div>'
+    +'<div style="font-size:16px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b>'+(r.pedido.envio?' · envio <span data-copiar style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace">'+esc(r.pedido.envio)+'</span>':'')+' · '+esc(r.pedido.city||'')+'</div>'
     +'<div style="border-top:1px solid var(--line);padding-top:10px">'
     +'<span class="sku" style="font-size:15px">'+esc(sku)+'</span>'
     +(pecaTxt(r.peca)?'<span style="font-weight:700;margin-left:8px">'+esc(pecaTxt(r.peca))+'</span>':'')
@@ -485,14 +485,31 @@ const scan=$('#scan');
    pro topo 50 ms depois de clicar, sem conseguir chegar no campo. O objetivo do
    keep é que o BIPE caia no lugar certo, nunca mexer no que a pessoa está
    olhando. */
+/* O NÚMERO DO ENVIO SE COPIA (16/11/2026). Focar o bipe apaga a seleção, e a
+   pessoa não conseguia copiar o envio para buscar no ML. O keep espera enquanto
+   o toque foi no número (`data-copiar`) ou há um pedaço dele selecionado — e no
+   máximo uns segundos: o bipe não pode ficar sem dono. */
+let copiarEm=0;
+document.addEventListener('pointerdown',e=>{ if(e.target.closest('[data-copiar]')) copiarEm=Date.now(); },true);
+const copiando=()=>{
+  if(Date.now()-copiarEm>6000) return false;
+  if(Date.now()-copiarEm<700) return true;
+  const sel=window.getSelection&&window.getSelection();
+  const n=sel&&sel.rangeCount&&!sel.isCollapsed?sel.anchorNode:null;
+  const el=n&&(n.nodeType===1?n:n.parentElement);
+  return !!(el&&el.closest('[data-copiar]'));
+};
 const keep=()=>{
   const a=document.activeElement;
   if(a===scan) return;
   if(a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return;
+  if(copiando()){ setTimeout(keep,500); return; }
   scan.focus({preventScroll:true});
 };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
-document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,select,textarea,label')) keep(); });
+/* O número do envio (data-copiar) fica de fora: focar o bipe apaga a seleção,
+   e a pessoa não conseguia copiar o envio para buscar no ML (16/11/2026). */
+document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,select,textarea,label,[data-copiar]')) keep(); });
 var tmr=null;
 function proc(){
   var v=(scan.value||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
@@ -933,7 +950,7 @@ function renderImp(){
       +(r.reimpressoes>0?'<span class="tag">reimpressa '+r.reimpressoes+'x</span>':'')+'</div>'
       /* Na caixa de várias o código do volume sai da linha e entra a lista:
          ele é o PRIMEIRO item, e sozinho fazia dois SKUs parecerem um. */
-      +'<div class="meta">NF <b>'+esc(r.nf||'—')+'</b>'+(r.envio?' · envio <span style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace">'+esc(r.envio)+'</span>':'')+(pecasDe(r.itens)>1?'':' · <b>'+esc(r.codigo||'—')+'</b>')+' · '+horaDe(r.embalado_em)
+      +'<div class="meta">NF <b>'+esc(r.nf||'—')+'</b>'+(r.envio?' · envio <span data-copiar style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace">'+esc(r.envio)+'</span>':'')+(pecasDe(r.itens)>1?'':' · <b>'+esc(r.codigo||'—')+'</b>')+' · '+horaDe(r.embalado_em)
       +(r.city?' · '+esc(r.city):'')
       +(r.estagio==='carregado'?' · <span style="color:#2e7d32">carregado</span>':'')
       /* O PDF de origem sai do servidor em 7 dias (cron). A tela diz ANTES do

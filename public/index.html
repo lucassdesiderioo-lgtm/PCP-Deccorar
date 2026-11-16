@@ -2548,8 +2548,8 @@ function idVenda(r){
   var p=[];
   if(r.packId) p.push('pack '+esc(r.packId));
   if(r.venda) p.push('venda '+esc(r.venda));
-  if(r.envio) p.push('envio <span style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace;color:#1f2a37;font-weight:700">'+esc(String(r.envio).replace(/\s+/g,''))+'</span>');
-  return p.length ? p.join(' · ') : 'pack — · venda — (sem número do envio)';
+  if(r.envio) p.push('envio <span style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace;color:var(--txt);font-weight:700">'+esc(String(r.envio).replace(/\s+/g,''))+'</span>');
+  return p.length ? p.join(' · ') : 'pack — · venda —';
 }
 async function carregarDiv(){
   var l=[]; try{ l=await (await fetch("/api/divergencias")).json(); }catch(e){}

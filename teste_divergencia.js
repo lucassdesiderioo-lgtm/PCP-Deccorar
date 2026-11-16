@@ -506,6 +506,13 @@ function conferir(nome,cond,detalhe){
     conferir('os três cards de Pendências escrevem a linha pelo idVenda (com o envio)', n>=3, 'achei '+n);
     conferir('a linha "pack — · venda —" escrita à mão saiu dos cards', !/pack '\+esc\(r\.packId\|\|"—"\)/.test(html));
     conferir('o envio vai num número que se seleciona inteiro', /envio <span[^']*user-select:all/.test(html));
+    /* ③ REVISÃO: o Admin é escuro, e a primeira versão pintou o número de
+       #1f2a37 — o número que veio para ser lido sumia no fundo. */
+    {
+      const fn=(html.match(/function idVenda\(r\)\{[\s\S]*?\n\}/)||[''])[0];
+      conferir('o número do envio não tem cor escura fixa (o card é escuro)', fn && !/color:#[0-3]/i.test(fn), fn.slice(0,200));
+      conferir('a linha sem número nenhum continua como antes', /'pack — · venda —'/.test(fn));
+    }
   }
 
   console.log('');

@@ -83,7 +83,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Regra:** `GET /api/impressos?q=` busca no **banco**, em todas as datas, por cliente, NF, SKU (inclusive os da caixa de várias), cidade, pack, venda e — desde 16/11/2026 — o **número do envio** (`lote.envio`, com ou sem o espaço da etiqueta) — até 60 resultados. Sem `q`, a lista é a do período (até 30 dias), com teto de 400. Quando qualquer das duas bate no teto, o cabeçalho `X-Cortado` diz, e a tela avisa. Só aparece o que foi impresso (`embalado`/`carregado`). `tem_pdf` diz antes do clique se o PDF ainda está no servidor; o caminho do arquivo não viaja.
 - **Por quê:** até 27/10/2026 a busca filtrava **no navegador** só as 400 da lista, e saindo ~57 caixas por dia as 400 eram uns 7 dias. O "30 dias" não trazia 30 dias, e a NF de uma semana e meia atrás dava "Nada com esse termo", calado.
 - **Exceções:** nenhuma. A permissão é a mesma de antes (`etiqueta.emitir`).
-- **Teste que trava:** `teste_impressos.js` (38: o envio, seção 7).
+- **Teste que trava:** `teste_impressos.js` (41: o envio, seção 7).
 - **Status:** no código desde 27/10/2026, aguardando deploy. Aberta a 1440 e a 400 px num banco semeado.
 
 ### R-PDF-11 · A etiqueta só com "Envio:" é etiqueta, e o número do envio é a chave dela
