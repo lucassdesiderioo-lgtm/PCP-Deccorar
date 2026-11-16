@@ -156,6 +156,9 @@ async function main(){
        apaga a seleção — o número do envio não se copiava na 201. */
     ok('o número do envio leva a marca data-copiar', /data-copiar[^>]*user-select:all|user-select:all[^>]*data-copiar/.test(html));
     ok('o keep espera a cópia, e por tempo limitado', /if\(copiando\(\)\)\{ setTimeout\(keep/.test(html) && /Date\.now\(\)-copiarEm>6000\) return false/.test(html));
+    /* ③ REVISÃO r3: vindo da busca, o #scan nunca perde o foco, e sem isto a
+       volta sozinha nunca começava — o bipe seguinte se perdia calado. */
+    ok('o toque no número também agenda a volta do foco', /closest\('\[data-copiar\]'\)\)\{ copiarEm=Date\.now\(\); setTimeout\(keep,/.test(html));
     ok('o clique no número não devolve o foco ao bipe', /closest\('[^']*\[data-copiar\][^']*'\)\)\s*keep\(\)/.test(html));
   } finally { srv.close(); }
 }

@@ -490,7 +490,9 @@ const scan=$('#scan');
    o toque foi no número (`data-copiar`) ou há um pedaço dele selecionado — e no
    máximo uns segundos: o bipe não pode ficar sem dono. */
 let copiarEm=0;
-document.addEventListener('pointerdown',e=>{ if(e.target.closest('[data-copiar]')) copiarEm=Date.now(); },true);
+/* E o toque agenda a volta: vindo da busca, o #scan nunca perde o foco, o
+   `blur` dele não dispara, e sem isto o bipe seguinte se perdia calado. */
+document.addEventListener('pointerdown',e=>{ if(e.target.closest('[data-copiar]')){ copiarEm=Date.now(); setTimeout(keep,800); } },true);
 const copiando=()=>{
   if(Date.now()-copiarEm>6000) return false;
   if(Date.now()-copiarEm<700) return true;
