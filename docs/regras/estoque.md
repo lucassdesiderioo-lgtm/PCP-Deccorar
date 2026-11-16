@@ -47,7 +47,7 @@
 - **Regra:** imprimir a etiqueta de venda **não mexe no saldo**: a caixa fica `embalado` sem `baixado_em` e **reserva** as persianas dela. A baixa (−1 de cada persiana, uma linha `conferencia` por SKU, referência `lote:<id>`) acontece **uma vez só**, quando a caixa é conferida — no bipe da área ou do canto (`carreg_route.js`), ou, se ela saiu sem ninguém conferir, no "foi no caminhão" do fechamento da saída (`saida_route.js`). `baixa_dominio.js` é o dono único da baixa, da reserva e do **livre** (saldo − reservado). Sem peça **livre**, não imprime.
 - **Por quê:** decisão do dono (22/10/2026, spec `CONFERENCIA-E-BAIXA`, D1): a venda cancelada entre a impressão e o caminhão deixava o saldo baixo até alguém lembrar de devolver. Baixar uma numa caixa de três continua deixando duas peças fora do sistema — a conta segue por PEÇA (#23).
 - **Exceções:** sob medida (R-EST-05): não reserva e não baixa, mas a caixa fica marcada como baixada. As caixas impressas **antes** de 22/10/2026 baixaram na impressão: a **virada** (`config.virada_baixa_conferencia`, uma vez só) deu a elas `baixado_em = embalado_em`, e a conferência não baixa de novo. A caixa que **sobrou** (R-REC-01) volta +1 por peça pelo mesmo dono (`baixa_dominio.devolver`, movimento `sobra`), e só se já tinha baixado.
-- **Teste que trava:** `teste_baixa_conferencia.js` (69) · `teste_etiqueta.js` (84) · `teste_livro.js` (65).
+- **Teste que trava:** `teste_baixa_conferencia.js` (69) · `teste_etiqueta.js` (86) · `teste_livro.js` (65).
 - **Status:** no ar desde 22/10/2026 (fase 2-A, PR #218) · ✅ a primeira caixa conferida baixou o estoque no mesmo dia (relato do dono) · antes disso a etiqueta baixava.
 - **História:** CLAUDE.md §2 e §5, armadilha #23 · spec `CONFERENCIA-E-BAIXA`.
 

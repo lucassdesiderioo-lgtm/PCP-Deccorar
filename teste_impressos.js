@@ -65,6 +65,11 @@ volume('BK140140BEGE','Retida','7779','bloqueado', dia(-40));
 const pdf = path.join(tmp, 'hoje.pdf'); fs.writeFileSync(pdf, '%PDF-teste');
 const comPdf = volume('BK160140BEGE','Hoje Com PDF','9001','embalado', dia(0), pdf);
 const semPdf = volume('BK160140BEGE','Hoje Sem PDF','9002','embalado', dia(0), path.join(tmp,'apagado.pdf'));
+/* A etiqueta nova só com "Envio:" (NF 9927, 16/11/2026): sem pack e sem venda,
+   e o número do envio é o único que dá para buscar no Mercado Livre. */
+const soEnvio = db.prepare(`INSERT INTO lote (codigo,buyer,city,nf,packId,venda,envio,estagio,data,embalado_em)
+  VALUES ('BK160140BEGE','Vanessa Envio','Curitiba','9927',NULL,NULL,'48462356937','embalado',?,?)`)
+  .run(dia(-20), dia(-20)+' 10:00:00').lastInsertRowid;
 
 async function main(){
   const srv = app.listen(0); await new Promise(r => srv.once('listening', r));
@@ -138,6 +143,15 @@ async function main(){
     ok('a busca chama /api/impressos?q=', /\/api\/impressos\?q='/.test(html));
     ok('a tela lê o aviso de corte', /x-cortado/i.test(html));
     ok('e o botão olha o tem_pdf', /tem_pdf/.test(html));
+
+    console.log('\n── 7. o número do envio (a etiqueta só com "Envio:") ──');
+    r = await lista('?q=48462356937');
+    eq('a busca acha pelo número do envio', JSON.stringify(ids(r.body)), JSON.stringify([soEnvio]));
+    r = await lista('?q=484623%2056937');
+    eq('mesmo escrito como na etiqueta, com o espaço', JSON.stringify(ids(r.body)), JSON.stringify([soEnvio]));
+    eq('e a linha leva o envio para a tela', r.body[0] && r.body[0].envio, '48462356937');
+    ok('a linha do "Já impressos" escreve o envio', /envio <span[^']*'\+esc\(r\.envio\)/.test(html));
+    ok('a ajuda da busca cita o envio', /NF, cliente, SKU ou envio/.test(html));
   } finally { srv.close(); }
 }
 

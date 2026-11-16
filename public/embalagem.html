@@ -161,7 +161,7 @@
           <select class="sel" id="impDias"><option value="1">hoje</option><option value="2">2 dias</option><option value="7">7 dias</option><option value="30">30 dias</option></select>
           <span id="impQtd" style="margin-left:auto"></span>
         </div>
-        <input class="busca" id="impBusca" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="buscar por cliente, NF ou SKU">
+        <input class="busca" id="impBusca" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="buscar por cliente, NF, SKU ou envio">
         <div id="impLista"></div>
       </div>
     </div>
@@ -276,7 +276,7 @@ function telaPacote(r,extras){
     +'<div style="font-weight:700;font-size:13px;margin-top:6px;border-top:1px solid #e0a63f;padding-top:6px">'
     +fita(total)+'</div></div>'
     +'<div style="font-size:26px;font-weight:800;color:var(--txt);line-height:1.15;margin:2px 0 4px">'+esc(r.pedido.buyer)+'</div>'
-    +'<div style="font-size:15px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+'</div>'
+    +'<div style="font-size:15px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b>'+(r.pedido.envio?' · envio <span style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace">'+esc(r.pedido.envio)+'</span>':'')+' · '+esc(r.pedido.city||'')+'</div>'
     +itens.map(linhaItem).join('')
     +(faltam
       ? '<div style="margin-top:8px;font-weight:700">Faltam <b>'+faltam+'</b> persiana(s) — bipe o SKU de cada uma, <b>uma por uma</b>.</div>'
@@ -410,7 +410,7 @@ async function scanSku(sku){
   if(pecasDe(r.itens)>1){ telaPacote(r, col+adiant); return; }
   banner((r.coleta?'col':(r.adiantado?'warn':'cfm'))+' rotulo','Confira esta venda', col+adiant
     +'<div style="font-size:30px;font-weight:800;color:var(--txt);line-height:1.15;letter-spacing:-.5px;margin:2px 0 6px">'+esc(r.pedido.buyer)+'</div>'
-    +'<div style="font-size:16px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b> · '+esc(r.pedido.city||'')+'</div>'
+    +'<div style="font-size:16px;margin-bottom:10px">NF <b>'+esc(r.pedido.nf||'—')+'</b>'+(r.pedido.envio?' · envio <span style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace">'+esc(r.pedido.envio)+'</span>':'')+' · '+esc(r.pedido.city||'')+'</div>'
     +'<div style="border-top:1px solid var(--line);padding-top:10px">'
     +'<span class="sku" style="font-size:15px">'+esc(sku)+'</span>'
     +(pecaTxt(r.peca)?'<span style="font-weight:700;margin-left:8px">'+esc(pecaTxt(r.peca))+'</span>':'')
@@ -906,7 +906,7 @@ function renderImp(){
     if(!l.length){ el.innerHTML='<span class="vazio">Nenhuma etiqueta impressa no período.</span>'; return; }
     /* O teto da lista não corta calado: quem escolheu "30 dias" tem que saber
        que não está vendo 30 dias, e por onde achar o resto. */
-    if(impCorte) h+='<div class="vazio" style="padding-bottom:8px;color:#8a5a00;font-weight:700">O período tem mais de '+impCorte+' vendas: aqui estão as '+impCorte+' mais recentes. Pra uma mais antiga, busque pela NF, cliente ou SKU — a busca olha todas as datas.</div>';
+    if(impCorte) h+='<div class="vazio" style="padding-bottom:8px;color:#8a5a00;font-weight:700">O período tem mais de '+impCorte+' vendas: aqui estão as '+impCorte+' mais recentes. Pra uma mais antiga, busque pela NF, cliente, SKU ou envio — a busca olha todas as datas.</div>';
   }
   // A ÚLTIMA é sempre a mesma venda, esteja a lista filtrada ou não — por isso
   // marcada por id, e não pela posição na tela. "Última" = última que saiu pela
@@ -933,7 +933,7 @@ function renderImp(){
       +(r.reimpressoes>0?'<span class="tag">reimpressa '+r.reimpressoes+'x</span>':'')+'</div>'
       /* Na caixa de várias o código do volume sai da linha e entra a lista:
          ele é o PRIMEIRO item, e sozinho fazia dois SKUs parecerem um. */
-      +'<div class="meta">NF <b>'+esc(r.nf||'—')+'</b>'+(pecasDe(r.itens)>1?'':' · <b>'+esc(r.codigo||'—')+'</b>')+' · '+horaDe(r.embalado_em)
+      +'<div class="meta">NF <b>'+esc(r.nf||'—')+'</b>'+(r.envio?' · envio <span style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace">'+esc(r.envio)+'</span>':'')+(pecasDe(r.itens)>1?'':' · <b>'+esc(r.codigo||'—')+'</b>')+' · '+horaDe(r.embalado_em)
       +(r.city?' · '+esc(r.city):'')
       +(r.estagio==='carregado'?' · <span style="color:#2e7d32">carregado</span>':'')
       /* O PDF de origem sai do servidor em 7 dias (cron). A tela diz ANTES do

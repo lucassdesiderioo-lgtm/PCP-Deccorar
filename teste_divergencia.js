@@ -485,6 +485,29 @@ function conferir(nome,cond,detalhe){
     fechar(ctx);
   }
 
+  /* O NÚMERO DO ENVIO NOS CARDS (16/11/2026, NF 9927). A etiqueta nova só traz
+     "Envio:", sem pack e sem venda: o card dizia "pack — · venda —", e a pessoa
+     não tinha número nenhum para achar o pedido no Mercado Livre. */
+  {
+    const ctx=await montar(); const db=ctx.db;
+    const so=(bloqueio)=>db.prepare(`INSERT INTO lote (codigo,buyer,nf,packId,venda,envio,estagio,bloqueio)
+      VALUES ('BK160140BEGE','Vanessa Macedo','9927',NULL,NULL,'48462356937','bloqueado',?)`).run(bloqueio).lastInsertRowid;
+    so('divergencia: leituras divergem: BK160140BEGE / BK140140BEGE');
+    so('modalidade: formato desconhecido');
+    const pac=so('pacote: a folha diz 2 persianas');
+    db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd,origem) VALUES (?,'BK160140BEGE',2,'folha')").run(pac);
+    for(const url of ['/api/divergencias','/api/modalidade/pendentes','/api/pacote/pendentes']){
+      const r=await chamar(ctx,'GET',url);
+      conferir('o envio vem no '+url, (r.body||[]).some(v=>v.envio==='48462356937'), JSON.stringify(r.body).slice(0,300));
+    }
+    fechar(ctx);
+    const html=require('fs').readFileSync(require('path').join(__dirname,'public','index.html'),'utf8');
+    const n=(html.match(/idVenda\(r\)/g)||[]).length;
+    conferir('os três cards de Pendências escrevem a linha pelo idVenda (com o envio)', n>=3, 'achei '+n);
+    conferir('a linha "pack — · venda —" escrita à mão saiu dos cards', !/pack '\+esc\(r\.packId\|\|"—"\)/.test(html));
+    conferir('o envio vai num número que se seleciona inteiro', /envio <span[^']*user-select:all/.test(html));
+  }
+
   console.log('');
   console.log(falhas? (falhas+' de '+casos+' FALHARAM') : ('todos os '+casos+' casos passaram'));
   process.exit(falhas?1:0);

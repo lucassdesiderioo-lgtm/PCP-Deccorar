@@ -2538,6 +2538,19 @@ function opcoesCatalogo(){
   }
   return h;
 }
+/* OS NÚMEROS DA VENDA NUM CARD DE PENDÊNCIAS (16/11/2026, NF 9927). A
+   etiqueta nova do ML só traz "Envio: 484623 56937", sem Pack ID e sem Venda, e
+   o card dizia "pack — · venda —": a pessoa não tinha número nenhum para achar
+   o pedido no Mercado Livre. O envio (lote.envio, gravado desde 12/11/2026,
+   R-PDF-11) sai junto, sem espaço no meio, num pedaço que um toque seleciona
+   inteiro. Os três cards escrevem a linha por aqui. */
+function idVenda(r){
+  var p=[];
+  if(r.packId) p.push('pack '+esc(r.packId));
+  if(r.venda) p.push('venda '+esc(r.venda));
+  if(r.envio) p.push('envio <span style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace;color:#1f2a37;font-weight:700">'+esc(String(r.envio).replace(/\s+/g,''))+'</span>');
+  return p.length ? p.join(' · ') : 'pack — · venda — (sem número do envio)';
+}
 async function carregarDiv(){
   var l=[]; try{ l=await (await fetch("/api/divergencias")).json(); }catch(e){}
   var card=document.getElementById("divCard"), lis=document.getElementById("divLista");
@@ -2552,7 +2565,7 @@ async function carregarDiv(){
     var r=l[i];
     h+='<div style="border-top:1px solid #d8dee6;padding:14px 0">'
       +'<div style="font-weight:700">'+esc(r.buyer||"—")+' · NF '+esc(r.nf||"—")+' · '+esc(r.data||"")+'</div>'
-      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">pack '+esc(r.packId||"—")+' · venda '+esc(r.venda||"—")+'</div>';
+      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">'+idVenda(r)+'</div>';
 
     /* POR QUE ESTE VOLUME PAROU. Sem isso a pessoa escolhe no chute: as cinco
        conferencias do §5 param o volume por motivos bem diferentes, e a que
@@ -2572,7 +2585,7 @@ async function carregarDiv(){
 
     h+='<div style="font-size:13px;font-weight:700;margin-bottom:2px">Qual peça o cliente comprou?</div>'
       +'<div style="font-size:12px;color:#5a6472;margin-bottom:10px">'
-      +'Abra a venda '+esc(r.venda||r.packId||"")+' no Mercado Livre e confira antes de escolher.</div>';
+      +'Abra a venda '+esc(r.venda||r.packId||(r.envio?'do envio '+r.envio:''))+' no Mercado Livre e confira antes de escolher.</div>';
 
     /* SAO DUAS DECISOES DIFERENTES, E A TELA SEPARA AS DUAS.
        "O sistema leu certo" e "o sistema leu errado, a peca e esta outra" nao
@@ -2731,7 +2744,7 @@ async function carregarPac(){
     var pecas=(r.itens||[]).reduce(function(s,x){ return s+(x.qtd||1); },0);
     h+='<div style="border-top:1px solid #d8dee6;padding:12px 0" data-pacvol="'+r.id+'">'
       +'<div style="font-weight:700">'+esc(r.buyer||"—")+' · NF '+esc(r.nf||"—")+' · '+esc(r.data||"")+'</div>'
-      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">pack '+esc(r.packId||"—")+' · venda '+esc(r.venda||"—")
+      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">'+idVenda(r)
       +(r.despachar_em?' · despacha '+esc(r.despachar_em):'')+'</div>'
       +'<div style="margin:8px 0;padding:8px 10px;border-radius:6px;background:#fff4e5;border:1px solid #e0c08a;font-size:12px;color:#8a5a00">'
       +'⚠ '+esc(r.motivo||"")+'</div>'
@@ -2805,7 +2818,7 @@ async function carregarMod(){
     h+='<div style="border-top:1px solid #d8dee6;padding:12px 0">'
       +'<div style="font-weight:700">'+esc(r.buyer||"—")+' · NF '+esc(r.nf||"—")+' · '+esc(r.data||"")
       +(r.codigo?' · <span style="font-family:ui-monospace,monospace">'+esc(r.codigo)+'</span>':'')+'</div>'
-      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">pack '+esc(r.packId||"—")+' · venda '+esc(r.venda||"—")
+      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">'+idVenda(r)
       +(r.despachar_em?' · despacha '+esc(r.despachar_em):'')+'</div>'
       +'<div style="margin:8px 0;padding:8px 10px;border-radius:6px;background:#f6f2fd;border:1px solid #d3c5ef;font-size:12px;color:#4b2a91">⚠ '+esc(r.motivo||"")+'</div>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap">'

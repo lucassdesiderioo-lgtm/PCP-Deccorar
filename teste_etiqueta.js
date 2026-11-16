@@ -37,7 +37,7 @@ db.exec(`
   CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT, buyer TEXT,
     city TEXT, nf TEXT, packId TEXT, venda TEXT, estagio TEXT DEFAULT 'pendente',
     embalado_em TEXT, data TEXT DEFAULT (date('now','localtime')), despachar_em TEXT, modalidade TEXT,
-    impresso_por TEXT);
+    impresso_por TEXT, envio TEXT);
   /* As pecas dentro da caixa (§5-B). O exp_route e o dono, mas quem le na hora
      de imprimir e o etq_route — entao ela precisa existir aqui. */
   CREATE TABLE lote_item (id INTEGER PRIMARY KEY AUTOINCREMENT, lote_id INTEGER NOT NULL,
@@ -153,6 +153,13 @@ const ok = (n, c, extra) => { casos++;
      hoje, o bipe segue trabalhando em vez de dizer que não há nada. */
   ok('e marca quando a venda escolhida é adiantada', px.adiantado === true,
      JSON.stringify({adiantado:px.adiantado, prazo:px.pedido&&px.pedido.despachar_em}));
+  /* O ENVIO vai junto do pedido (16/11/2026): a etiqueta só com "Envio:" não
+     tem pack nem venda, e o número do envio é o que se busca no ML. */
+  ok('o pedido do bipe traz o campo envio', px.pedido && ('envio' in px.pedido), JSON.stringify(px.pedido));
+  {
+    const html = require('fs').readFileSync(require('path').join(__dirname,'public','embalagem.html'),'utf8');
+    ok('o "Confira esta venda" escreve o envio ao lado da NF', /r\.pedido\.envio/.test(html));
+  }
   const nx = await chamar('GET /api/proximo/:sku', null, {sku:'NAOEXISTE'});
   ok('SKU fora do cadastro responde que não é cadastrado', nx.cadastrado === false);
   ok('a venda de agência NÃO vem marcada como coleta', px.coleta === false, JSON.stringify(px.coleta));

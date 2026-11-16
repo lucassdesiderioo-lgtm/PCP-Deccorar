@@ -648,7 +648,7 @@ module.exports=function(app,db){
      A lista vai com o que a peca E (as colunas de `skus`, §7) e nao so o
      codigo — e a mesma informacao que a bancada le pra conferir a persiana. */
   app.get('/api/pacote/pendentes',(req,res)=>{
-    const vols=db.prepare(`SELECT id,codigo,buyer,city,nf,packId,venda,data,despachar_em,bloqueio,descricao,modalidade
+    const vols=db.prepare(`SELECT id,codigo,buyer,city,nf,packId,venda,envio,data,despachar_em,bloqueio,descricao,modalidade
       FROM lote WHERE estagio='bloqueado' AND bloqueio LIKE 'pacote%'
       ORDER BY data DESC, id DESC`).all();
     const itens=db.prepare(`SELECT i.id,i.codigo,i.qtd,i.cor,i.descricao,i.origem,
@@ -723,7 +723,7 @@ module.exports=function(app,db){
      `pendente` se o SKU estiver cadastrado — senao continua bloqueado, agora
      pelo §6, que e a proxima trava da fila. */
   app.get('/api/modalidade/pendentes',(req,res)=>{
-    res.json(db.prepare(`SELECT id,codigo,buyer,city,nf,packId,venda,data,despachar_em,bloqueio,descricao
+    res.json(db.prepare(`SELECT id,codigo,buyer,city,nf,packId,venda,envio,data,despachar_em,bloqueio,descricao
       FROM lote WHERE estagio='bloqueado' AND bloqueio LIKE 'modalidade%'
       ORDER BY data DESC, id DESC`).all()
       .map(r=>Object.assign({},r,{motivo:String(r.bloqueio||'').replace(/^modalidade:\s*/,'')})));
@@ -821,7 +821,7 @@ module.exports=function(app,db){
     LEFT JOIN modelo m ON m.id=s.modelo_id`).all();
 
   app.get('/api/divergencias',(req,res)=>{
-    const rows=db.prepare(`SELECT id,codigo,buyer,city,nf,packId,venda,data,bloqueio,descricao
+    const rows=db.prepare(`SELECT id,codigo,buyer,city,nf,packId,venda,envio,data,bloqueio,descricao
       FROM lote WHERE estagio='bloqueado' AND bloqueio LIKE 'divergencia%'
       ORDER BY data DESC, id DESC`).all();
     if(!rows.length) return res.json([]);
@@ -1088,7 +1088,10 @@ module.exports=function(app,db){
      das duas bate no teto, o cabecalho `X-Cortado` diz, e a tela avisa. */
   const TETO_LISTA=400, TETO_BUSCA=60;
   const sem=s=>"REPLACE(REPLACE(REPLACE(REPLACE(REPLACE("+s+",' ',''),'-',''),'.',''),'/',''),'_','')";
-  const alvoBusca="(COALESCE(buyer,'')||' '||COALESCE(nf,'')||' '||COALESCE(codigo,'')||' '||COALESCE(city,'')||' '||COALESCE(packId,'')||' '||COALESCE(venda,''))";
+  const alvoBusca="(COALESCE(buyer,'')||' '||COALESCE(nf,'')||' '||COALESCE(codigo,'')||' '||COALESCE(city,'')||' '||COALESCE(packId,'')||' '||COALESCE(venda,'')||' '||COALESCE(envio,''))";
+  /* O ENVIO entra na busca (16/11/2026): a etiqueta so com "Envio:" nao tem
+     pack nem venda, e o numero do envio e o que se acha no Mercado Livre. O
+     "tira o que nao e letra nem numero" ja faz "484623 56937" achar o gravado. */
   const comoLike=s=>'%'+s.replace(/[\\%_]/g,c=>'\\'+c)+'%';
   app.get('/api/impressos',(req,res)=>{
     let dias=parseInt(req.query.dias,10); if(!(dias>=1)) dias=1; if(dias>30) dias=30;
@@ -1110,7 +1113,7 @@ module.exports=function(app,db){
        alguém voltar e conferir, e para REIMPRIMIR: tirar de novo a etiqueta de
        uma caixa de duas sem saber que são duas é a descoberta tardia um passo
        adiante. Soma das `qtd`, nunca `COUNT(*)` (§5, #23). */
-    const cols=`SELECT id,codigo,cor,buyer,city,nf,packId,venda,estagio,data,despachar_em,
+    const cols=`SELECT id,codigo,cor,buyer,city,nf,packId,venda,envio,estagio,data,despachar_em,
         embalado_em,carregado_em,COALESCE(reimpressoes,0) reimpressoes,reimpresso_em,srcfile,
         COALESCE((SELECT SUM(i.qtd) FROM lote_item i WHERE i.lote_id=lote.id),1) pecas,
         CASE WHEN ${COLETA()} THEN 1 ELSE 0 END coleta

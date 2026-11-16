@@ -70,7 +70,7 @@ module.exports=function(app,db){
        O que impede adiantar o que nao pode e a trava de estoque, que ja existe
        logo abaixo: sem peca na prateleira nada e impresso. E exatamente a regra
        "so se tiver estoque disponivel". */
-    const p=db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,despachar_em,modalidade
+    const p=db.prepare(`SELECT id,codigo,cor,buyer,city,nf,packId,venda,envio,despachar_em,modalidade
       FROM lote WHERE codigo=? AND estagio='pendente'`+FM+`
       ORDER BY `+ORDEM_URGENCIA+` LIMIT 1`).get(sku);
     /* Quando o filtro nao acha nada, a tela precisa saber se e porque NAO HA
