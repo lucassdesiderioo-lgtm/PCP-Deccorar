@@ -295,9 +295,13 @@ function montar(db, modulos){
   const nSob    = nb('NB SobMedida','coleta',  dia(4)+' 08:30:00', dia(4));
   db.prepare("UPDATE lote SET codigo='SOBMEDIDA' WHERE id=?").run(nSob);
   const xCanc   = nb('X Cancelada', 'coleta',  dia(3)+' 08:00:00', dia(3), "estagio='cancelado'");
+  /* A caixa de várias com um item cancelado pelo ML continua `embalado`, com
+     `cancelada_varias=1`, esperando uma pessoa no card (§3): não entra. */
+  const xCancV  = nb('X CancVarias','coleta',  dia(3)+' 08:00:00', dia(3), "cancelada_varias=1, cancelada_em='"+dia(2)+" 09:00:00'");
+  db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd) VALUES (?,'BK140140BEGE',1),(?,'BK160140CINZA',1)").run(xCancV, xCancV);
   const fechadas = [nCol,nColAt,nTarde,nAg,nNull,nJaBaix,nVarias,nSob];
   const baixam   = [nCol,nColAt,nTarde,nAg,nNull,nVarias,nSob];   // a sob medida ganha a marca, sem mexer em saldo
-  const fora = [xHoje,xFut,xConf,xCarro,xTeste,xPend,xCanc];
+  const fora = [xHoje,xFut,xConf,xCarro,xTeste,xPend,xCanc,xCancV];
   const foraAntes = fora.map(foto);
   const modAntes2 = db.prepare('SELECT id,modalidade FROM lote ORDER BY id').all();
   const BAIXA = require('./baixa_dominio');
@@ -414,9 +418,14 @@ function montar(db, modulos){
   ok('o LIVRE de cada SKU é o mesmo antes e depois: a peça já não estava na prateleira',
      SKUS.every(c => BAIXA.disponivel(db, c) === livreAntes[c]),
      SKUS.map(c => c + ' ' + livreAntes[c] + '→' + BAIXA.disponivel(db, c)).join(', '));
+  ok('a caixa de várias com item cancelado não baixa nem fecha: espera a pessoa no card (L6, §3)',
+     porRef(xCancV).length === 0 && l(xCancV).estagio === 'embalado' && !l(xCancV).saida_id && !l(xCancV).baixado_em);
   ok('a cancelada não baixa nem fecha (L6)',
      porRef(xCanc).length === 0 && l(xCanc).estagio === 'cancelado' && !l(xCanc).baixado_em);
   const sn2 = fecharNaoBipadas(db, {aplicar:true, ate:ATE});
+  ok('o resultado conta o que FECHOU e o que BAIXOU de fato, não a previsão',
+     sn.fechadas === fechadas.length && sn.baixadas === baixam.length && sn.pecas_baixadas === 8,
+     JSON.stringify({f:sn.fechadas, b:sn.baixadas, p:sn.pecas_baixadas}));
   ok('rodar de novo não acha nada e não cria outra saída',
      sn2.caixas.length === 0 && !sn2.saida_id &&
      db.prepare('SELECT COUNT(*) n FROM saida').get().n === saidasAntes + 1);
@@ -427,6 +436,51 @@ function montar(db, modulos){
   ok('o script tem o modo --nao-bipadas, exige --ate e faz backup antes de gravar',
      /--nao-bipadas/.test(texto) && /--ate/.test(texto) &&
      texto.indexOf('await db.backup(') < texto.lastIndexOf('fecharNaoBipadas(db,{aplicar:true'));
+
+  /* SKU FORA DO CADASTRO: a simulação diz, e o aplicar recusa ANTES de gravar
+     qualquer coisa — o movimentar estouraria no meio e derrubaria a rodada. */
+  const xSemCad = nb('X SemCadastro', 'coleta', dia(3)+' 08:00:00', dia(3));
+  db.prepare("UPDATE lote SET codigo='ZZZ-SEM-CADASTRO' WHERE id=?").run(xSemCad);
+  const s3 = fecharNaoBipadas(db, {aplicar:false, ate:ATE});
+  const qz = (s3.quadro || []).find(x => x.codigo === 'ZZZ-SEM-CADASTRO');
+  ok('simulação: SKU fora do cadastro aparece como tal, e não com saldo 0',
+     !!qz && qz.sem_cadastro === true && qz.saldo_antes === null, JSON.stringify(qz));
+  let erroCad = null;
+  const saidas3 = db.prepare('SELECT COUNT(*) n FROM saida').get().n;
+  try{ fecharNaoBipadas(db, {aplicar:true, ate:ATE}); }catch(e){ erroCad = e.message; }
+  ok('aplicar com SKU fora do cadastro é recusado dizendo qual, e nada grava',
+     !!erroCad && /ZZZ-SEM-CADASTRO/.test(erroCad) && /cadastre/.test(erroCad) && l(xSemCad).estagio === 'embalado' &&
+     db.prepare('SELECT COUNT(*) n FROM saida').get().n === saidas3, erroCad || 'não recusou');
+  db.prepare("UPDATE lote SET estagio='cancelado' WHERE id=?").run(xSemCad);
+
+  /* A CAIXA CONFERIDA ENTRE A LEITURA E A GRAVAÇÃO: não fecha, não baixa, não
+     entra nos ids da saída e não é contada no resultado. */
+  const xCorrida = nb('X Corrida', 'coleta', dia(3)+' 08:00:00', dia(3));
+  const nOk      = nb('NB Ok',     'coleta', dia(3)+' 08:10:00', dia(3));
+  const resOrig = BAIXA.reservados;
+  BAIXA.reservados = function(){ db.prepare("UPDATE lote SET conferido_em=datetime('now','localtime') WHERE id=?").run(xCorrida);
+    return resOrig.apply(this, arguments); };
+  let s4;
+  try{ s4 = fecharNaoBipadas(db, {aplicar:true, ate:ATE}); } finally { BAIXA.reservados = resOrig; }
+  const sd4 = db.prepare('SELECT * FROM saida WHERE id=?').get(s4.saida_id);
+  ok('a caixa conferida no meio não fecha nem baixa, e fica fora da saída e da conta',
+     l(xCorrida).estagio === 'embalado' && !l(xCorrida).baixado_em && l(nOk).estagio === 'carregado' &&
+     s4.fechadas === 1 && s4.baixadas === 1 && s4.pecas_baixadas === 1 &&
+     sd4.qtd_sistema === 1 && JSON.parse(sd4.ids).join() === String(nOk),
+     JSON.stringify({f:s4.fechadas, b:s4.baixadas, p:s4.pecas_baixadas, sd:sd4 && [sd4.qtd_sistema, sd4.ids]}));
+
+  /* TODAS CONFERIDAS NO MEIO: a saída passivo não nasce vazia. */
+  const xSo = nb('X SoEla', 'coleta', dia(3)+' 08:00:00', dia(3));
+  const saidas5 = db.prepare('SELECT COUNT(*) n FROM saida').get().n;
+  BAIXA.reservados = function(){ db.prepare("UPDATE lote SET conferido_em=datetime('now','localtime') WHERE id=?").run(xSo);
+    return resOrig.apply(this, arguments); };
+  let s5;
+  try{ s5 = fecharNaoBipadas(db, {aplicar:true, ate:ATE}); } finally { BAIXA.reservados = resOrig; }
+  ok('se nenhuma caixa fechou, não fica saída passivo vazia',
+     !s5.saida_id && s5.fechadas === 0 && db.prepare('SELECT COUNT(*) n FROM saida').get().n === saidas5,
+     JSON.stringify({id:s5.saida_id, f:s5.fechadas}));
+  ok('o aviso separa a caixa de várias que espera decisão no card da que já foi decidida',
+     /cancelada_resolvida_em IS NULL/.test(texto) && /cancelada_resolvida_em IS NOT NULL/.test(texto));
 
   // ── 6. O MODO TESTE COBRE A REIMPRESSÃO (fase 3 da QUEM-FEZ-E-REVISAO) ────
   require('./teste_route')({ get(){}, post(){}, locals:{} }, db);

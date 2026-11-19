@@ -137,8 +137,12 @@ function fecharPassivo(db, opcoes){
  * a hora da rodada; a linha do livro fica com a hora real e o motivo. A que ja
  * tinha baixado (antes de 22/10) so e fechada. O saldo negativo fica negativo
  * (R-EST-08), e a simulacao diz quais SKUs. */
+/* ⚠️ A caixa de varias com um item cancelado pelo ML continua `embalado`, com
+   `cancelada_varias=1`, esperando uma pessoa no card "Canceladas depois da
+   etiqueta" (§3): ela NUNCA entra aqui (L6) — fecha-la tiraria a caixa do card
+   e daria baixa na persiana que o cliente cancelou. */
 const NAO_BIPADA = "estagio='embalado' AND conferido_em IS NULL AND no_carro_em IS NULL" +
-  " AND saida_id IS NULL AND COALESCE(teste,0)=0";
+  " AND saida_id IS NULL AND COALESCE(teste,0)=0 AND COALESCE(cancelada_varias,0)=0";
 
 function carimbo(c){
   const impresso = String(c.embalado_em || c.data || '').slice(0, 10);
@@ -176,15 +180,26 @@ function fecharNaoBipadas(db, opcoes){
     c.pecas = c.ja_baixou ? [] : BAIXA.pecas(db, c).filter(p => !p.sob_medida);
     for(const p of c.pecas) por[p.codigo] = (por[p.codigo] || 0) + p.qtd;
   }
+  /* SKU fora do cadastro aparece como tal, e nao com saldo 0: o movimentar o
+     recusaria dentro da transacao (que desfaria tudo): a recusa vem antes,
+     dizendo qual SKU. */
   const quadro = Object.keys(por).sort().map(codigo => {
-    const antes = ESTOQUE.saldo(db, codigo) || 0, depois = antes - por[codigo];
-    return { codigo, pecas: por[codigo], saldo_antes: antes, saldo_depois: depois,
+    const s = ESTOQUE.saldo(db, codigo);
+    if(s === null || s === undefined)
+      return { codigo, pecas: por[codigo], saldo_antes: null, saldo_depois: null, livre: null,
+               negativo: false, sem_cadastro: true };
+    const depois = s - por[codigo];
+    return { codigo, pecas: por[codigo], saldo_antes: s, saldo_depois: depois,
              livre: BAIXA.disponivel(db, codigo, reserva), negativo: depois < 0 };
   });
-  if(!aplicar || !caixas.length) return { caixas, saida_id: null, quadro };
+  const vazio = { caixas, saida_id: null, quadro, fechadas: 0, baixadas: 0, pecas_baixadas: 0 };
+  if(!aplicar || !caixas.length) return vazio;
+  const semCad = quadro.filter(q => q.sem_cadastro).map(q => q.codigo);
+  if(semCad.length) throw new Error('SKU fora do cadastro: ' + semCad.join(', ') +
+    ' — cadastre (ou confira a caixa) antes; nada foi gravado');
 
   garantirSaida(db);
-  let saida_id = null;
+  let saida_id = null, fechadas = 0, baixadas = 0, pecas_baixadas = 0;
   db.transaction(() => {
     saida_id = db.prepare(`INSERT INTO saida (tipo, fechada_em, fechado_por, qtd_sistema, ids, motivo)
       VALUES ('passivo', datetime('now','localtime'), 'fechar_saida_passivo.js --nao-bipadas', ?, ?, ?)`)
@@ -196,13 +211,22 @@ function fecharNaoBipadas(db, opcoes){
     const up = db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=@t, saida_id=@s,
         saiu_em=@t, saiu_por=@por, retirado_em=CASE WHEN @col THEN @t ELSE retirado_em END
       WHERE id=@id AND ${NAO_BIPADA}`);
+    const ids = [];
     for(const c of caixas){
       if(!up.run({ t: c.saida, s: saida_id, por: c.coleta ? 'coleta' : 'agencia', col: c.coleta ? 1 : 0, id: c.id }).changes) continue;
-      /* A baixa so na que nunca baixou; o `baixar` confere de novo. */
-      BAIXA.baixar(db, { id: c.id }, null, { em: c.saida, motivo: MOTIVO_BAIXA });
+      ids.push(c.id); fechadas++;
+      /* A baixa so na que nunca baixou; o `baixar` confere de novo. A conta e
+         do que moveu DE FATO, e nao da previsao da simulacao. */
+      const antes = db.prepare('SELECT baixado_em FROM lote WHERE id=?').get(c.id).baixado_em;
+      const moveu = BAIXA.baixar(db, { id: c.id }, null, { em: c.saida, motivo: MOTIVO_BAIXA });
+      if(!antes){ baixadas++; pecas_baixadas += moveu.reduce((a, m) => a - m.delta, 0); }
     }
+    /* A saida guarda so o que fechou: a caixa conferida no meio nao saiu aqui.
+       Se nenhuma fechou, a saida nao fica de pe vazia. */
+    if(!ids.length){ db.prepare('DELETE FROM saida WHERE id=?').run(saida_id); saida_id = null; }
+    else db.prepare('UPDATE saida SET qtd_sistema=?, ids=? WHERE id=?').run(ids.length, JSON.stringify(ids), saida_id);
   })();
-  return { caixas, saida_id, quadro };
+  return { caixas, saida_id, quadro, fechadas, baixadas, pecas_baixadas };
 }
 
 module.exports = { fecharPassivo, fecharNaoBipadas, carimbo };
@@ -235,8 +259,12 @@ async function rodarNaoBipadas(){
     console.log('    ' + 'SKU'.padEnd(22) + 'pecas'.padStart(6) + 'saldo antes'.padStart(13) +
       'saldo depois'.padStart(14) + 'livre'.padStart(7));
     for(const q of quadro)
-      console.log('    ' + q.codigo.padEnd(22) + String(q.pecas).padStart(6) + String(q.saldo_antes).padStart(13) +
-        String(q.saldo_depois).padStart(14) + String(q.livre).padStart(7) + (q.negativo ? '   ⚠ fica negativo' : ''));
+      console.log('    ' + q.codigo.padEnd(22) + String(q.pecas).padStart(6) +
+        (q.sem_cadastro ? '   ⛔ SKU FORA DO CADASTRO — o --aplicar recusa' :
+          String(q.saldo_antes).padStart(13) + String(q.saldo_depois).padStart(14) + String(q.livre).padStart(7) +
+          (q.negativo ? '   ⚠ fica negativo' : '')));
+    const sc = quadro.filter(q => q.sem_cadastro).length;
+    if(sc) console.log('\n  ⛔ ' + sc + ' SKU(s) fora do cadastro: cadastre antes de gravar (o --aplicar recusa sem gravar nada)');
     const neg = quadro.filter(q => q.negativo).length;
     if(neg) console.log('\n  ⚠ ' + neg + ' SKU(s) ficam com saldo negativo — fica negativo (R-EST-08); confira no Inventario');
   }
@@ -247,6 +275,18 @@ async function rodarNaoBipadas(){
   const depois = db.prepare(`SELECT COUNT(*) n FROM lote WHERE ${NAO_BIPADA}
     AND date(COALESCE(embalado_em, data)) > ?`).get(ate).n;
   if(depois) console.log('  (' + depois + ' caixa(s) impressas depois de ' + ate + ' ficam de fora — sao trabalho, bipe-as)');
+  /* A caixa de varias com item cancelado: o mesmo criterio, sem o filtro dela.
+     A que ainda nao foi decidida espera no card; a ja decidida na Mesa nao
+     esta mais no card, e fica de fora deste script do mesmo jeito. */
+  const MESMO = NAO_BIPADA.replace(' AND COALESCE(cancelada_varias,0)=0', '') +
+    ' AND COALESCE(cancelada_varias,0)=1 AND date(COALESCE(embalado_em, data)) <= ?' +
+    ' AND (despachar_em IS NULL OR despachar_em <= ?)';
+  const cancV = db.prepare(`SELECT COUNT(*) n FROM lote WHERE ${MESMO} AND cancelada_resolvida_em IS NULL`).get(ate, hoje).n;
+  const cancD = db.prepare(`SELECT COUNT(*) n FROM lote WHERE ${MESMO} AND cancelada_resolvida_em IS NOT NULL`).get(ate, hoje).n;
+  if(cancV) console.log('  (' + cancV + ' caixa(s) de varias com item cancelado ficam de fora — esperam decisao no card' +
+    ' "Canceladas depois da etiqueta", em Admin → Pendencias)');
+  if(cancD) console.log('  (' + cancD + ' caixa(s) de varias com item cancelado, ja decididas na Mesa, ficam de fora — este' +
+    ' script nao sabe qual peca o ML cancelou: confira na Conferencia ou acerte o saldo por Admin → Estoque)');
   if(!caixas.length){ console.log('\nNada a fechar.'); db.close(); return; }
   if(!APLICAR){
     console.log('\nSIMULACAO — nada foi gravado. Confira a lista antes de gravar.');
@@ -258,9 +298,8 @@ async function rodarNaoBipadas(){
   await db.backup(arq);
   console.log('\nbackup -> ' + arq);
   const r = fecharNaoBipadas(db,{aplicar:true, ate});
-  const baixou = r.caixas.filter(c => !c.ja_baixou).length;
-  console.log('saida #' + r.saida_id + ' (passivo): ' + r.caixas.length + ' caixa(s) fechada(s), ' +
-    baixou + ' com baixa · ' + r.quadro.reduce((a, q) => a + q.pecas, 0) + ' peca(s) baixada(s)');
+  console.log('saida #' + r.saida_id + ' (passivo): ' + r.fechadas + ' caixa(s) fechada(s), ' +
+    r.baixadas + ' com baixa · ' + r.pecas_baixadas + ' peca(s) baixada(s)');
   db.close();
 }
 

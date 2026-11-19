@@ -3,7 +3,13 @@
 > **STATUS · 19/11/2026 — EM CÓDIGO, falta subir e aplicar** · aprovada pelo dono em 19/11/2026
 > - Construída em 19/11/2026: `baixa_dominio.baixar` ganhou `opcoes` (`em`, `motivo`), e o
 >   `fechar_saida_passivo.js --nao-bipadas` dá a baixa na mesma transação; `teste_saida.js`
->   (80 casos) com os casos novos escritos antes, reprovando no código de antes.
+>   (87 casos) com os casos novos escritos antes, reprovando no código de antes.
+> - ③ REVISÃO (três rodadas): a caixa de várias com item cancelado (`cancelada_varias=1`)
+>   entrava e baixava a persiana cancelada — ficou de fora (é a L6); SKU fora do cadastro
+>   passou a ser dito na simulação e recusado antes do `--aplicar`; o resultado e a saída
+>   contam só o que fechou de fato, e a saída vazia não nasce.
+> - Divergência anotada: a caixa de várias **já decidida na Mesa** também fica de fora (a
+>   spec não falava dela); fazê-la entrar seria regra nova, para o dono decidir.
 > - `REGRA` 🔴: mexe em estoque. Muda a R-PAS-02.
 > - Uma fase. Nenhuma tela, ação ou setor novo.
 > - Desenhada no Projeto em 19/11/2026, a partir do pedido do dono: *"preciso
