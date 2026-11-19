@@ -1,6 +1,9 @@
 # LIMPEZA — CAIXAS QUE SAÍRAM SEM CONFERÊNCIA
 
-> **STATUS · 19/11/2026 — PLANEJADO · aprovada pelo dono em 19/11/2026, nada construído**
+> **STATUS · 19/11/2026 — EM CÓDIGO, falta subir e aplicar** · aprovada pelo dono em 19/11/2026
+> - Construída em 19/11/2026: `baixa_dominio.baixar` ganhou `opcoes` (`em`, `motivo`), e o
+>   `fechar_saida_passivo.js --nao-bipadas` dá a baixa na mesma transação; `teste_saida.js`
+>   (80 casos) com os casos novos escritos antes, reprovando no código de antes.
 > - `REGRA` 🔴: mexe em estoque. Muda a R-PAS-02.
 > - Uma fase. Nenhuma tela, ação ou setor novo.
 > - Desenhada no Projeto em 19/11/2026, a partir do pedido do dono: *"preciso

@@ -506,12 +506,12 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 - **Teste que trava:** `teste_saida.js`.
 - **Status:** aplicado em produção em 26/09/2026 (saída #1, 399 caixas) · o canto foi conferido vazio pelo dono. O canto voltou a encher (281 caixas de 05/10 a 22/10/2026, a saída do caminhão deixou de ser fechada) e o `--ate` entrou para a segunda rodada.
 
-### R-PAS-02 · O passivo das caixas nunca bipadas exige data de corte de quem viu sair
-- **Regra:** `node fechar_saida_passivo.js --nao-bipadas --ate AAAA-MM-DD` (simula) e `--aplicar` gravam uma saída `tipo='passivo'` e, em cada caixa, `carregado`, `saida_id` e `saiu_por` pela modalidade. A data é **obrigatória**, no formato, e não pode ser futura. O carimbo é o dia do despacho às 15:00, nunca antes do dia da impressão nem do próprio `embalado_em`; sem despacho lido, vale o dia da impressão. `retirado_em` só na coleta; `conferido_em` fica vazio. Estoque e modalidade não se mexem.
-- **Por quê:** "etiqueta impressa e sem bipe" também descreve a caixa impressa hoje cedo, que ainda está na pilha.
-- **Exceções:** ficam de fora o despacho depois de hoje, a agência já conferida na área ou no carro, a caixa já ligada a uma saída e o modo teste. A última linha da simulação não pode ser um comando executável sozinho.
-- **Teste que trava:** `teste_saida.js` (os 21 últimos casos).
-- **Status:** aplicado em produção em 01/10/2026 (saída #3, 485 caixas). A prova que importa é a fila *coleta impressa e não bipada pro canto* não voltar a crescer.
+### R-PAS-02 · O passivo das caixas nunca conferidas exige data de corte de quem viu sair, e dá a baixa
+- **Regra:** `node fechar_saida_passivo.js --nao-bipadas --ate AAAA-MM-DD` (simula) e `--aplicar` (com `await db.backup()` antes) gravam, numa transação, uma saída `tipo='passivo'` e, em cada caixa, `carregado`, `saida_id` e `saiu_por` pela modalidade. A data é **obrigatória**, no formato, e **no máximo ontem** (desde 19/11/2026). O carimbo é o dia do despacho às 15:00, nunca antes do dia da impressão nem do próprio `embalado_em`; sem despacho lido, vale o dia da impressão. `retirado_em` só na coleta; `conferido_em` e `conferido_por` ficam vazios. A modalidade não se mexe. **Desde 19/11/2026 a caixa que nunca baixou recebe a baixa** pelo `baixa_dominio.baixar`: −1 por persiana, uma linha no livro por SKU (tipo `conferencia`, com o motivo do passivo), sob medida não move saldo, e `baixado_em` recebe o **carimbo de saída**, nunca a hora da rodada. A que já tinha baixado só fecha. A simulação mostra, por SKU, as peças, o saldo antes e depois e o livre (que não muda), e marca o que fica negativo.
+- **Por quê:** "etiqueta impressa e sem bipe" também descreve a caixa impressa hoje cedo, que ainda está na pilha. E desde 22/10/2026 a baixa é na conferência: fechar sem baixar deixava o saldo alto para sempre (as 187 caixas de 10/11 a 18/11, spec `LIMPEZA-SAIU-SEM-CONFERENCIA`).
+- **Exceções:** ficam de fora o despacho depois de hoje, a agência já conferida na área ou no carro, a caixa já ligada a uma saída, a venda cancelada e o modo teste. O saldo negativo fica negativo (R-EST-08). A última linha da simulação não pode ser um comando executável sozinho.
+- **Teste que trava:** `teste_saida.js` (o grupo 7, 39 casos).
+- **Status:** aplicado em produção em 01/10/2026 (saída #3, 485 caixas), quando ainda não dava baixa. A baixa (19/11/2026) está construída e falta subir e aplicar; a prova é a 204 zerar "caixas impressas sem conferência" depois da rodada.
 
 ---
 
