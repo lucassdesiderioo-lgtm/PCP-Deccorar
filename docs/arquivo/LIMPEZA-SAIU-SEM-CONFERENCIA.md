@@ -1,6 +1,7 @@
 # LIMPEZA — CAIXAS QUE SAÍRAM SEM CONFERÊNCIA
 
-> **STATUS · 19/11/2026 — EM CÓDIGO, falta subir e aplicar** · aprovada pelo dono em 19/11/2026
+> **STATUS · 20/11/2026 — CONCLUÍDA E ARQUIVADA** · aprovada pelo dono em 19/11/2026
+> - No ar desde 19/11/2026 (PR #357) e aplicada no mesmo dia: a saída #30 (19/11/2026, 17:10) fechou **188 caixas** impressas de 10 a 18/11 (as 187 e a #4581, depois de desfeita a correção #64) e baixou **195 peças** em **23 SKUs** (190 linhas no livro); `SUM(delta) = skus.estoque` em todos os SKUs, e a simulação seguinte deu "Nada a fechar". Fica de fora o §7, como estava.
 > - Construída em 19/11/2026: `baixa_dominio.baixar` ganhou `opcoes` (`em`, `motivo`), e o
 >   `fechar_saida_passivo.js --nao-bipadas` dá a baixa na mesma transação; `teste_saida.js`
 >   (87 casos) com os casos novos escritos antes, reprovando no código de antes.

@@ -511,7 +511,7 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 - **Por quê:** "etiqueta impressa e sem bipe" também descreve a caixa impressa hoje cedo, que ainda está na pilha. E desde 22/10/2026 a baixa é na conferência: fechar sem baixar deixava o saldo alto para sempre (as 187 caixas de 10/11 a 18/11, spec `LIMPEZA-SAIU-SEM-CONFERENCIA`).
 - **Exceções:** ficam de fora o despacho depois de hoje, a agência já conferida na área ou no carro, a caixa já ligada a uma saída, a venda cancelada, a caixa de várias com item cancelado (`cancelada_varias=1`, decidida ou não: a simulação conta as duas) e o modo teste. SKU fora do cadastro: a simulação mostra ⛔, e o `--aplicar` recusa sem gravar nada. A saída grava só as caixas que fecharam de fato. O saldo negativo fica negativo (R-EST-08). A última linha da simulação não pode ser um comando executável sozinho.
 - **Teste que trava:** `teste_saida.js` (o grupo 7, 46 casos).
-- **Status:** aplicado em produção em 01/10/2026 (saída #3, 485 caixas), quando ainda não dava baixa. A baixa (19/11/2026) está construída e falta subir e aplicar; a prova é a 204 zerar "caixas impressas sem conferência" depois da rodada.
+- **Status:** aplicado em produção em 01/10/2026 (saída #3, 485 caixas), quando ainda não dava baixa. A baixa está no ar e aplicada desde 19/11/2026 (PR #357): a saída #30 (19/11/2026, 17:10) fechou **188 caixas** impressas de 10 a 18/11 (as 187 e a #4581, depois de desfeita a correção #64) e baixou **195 peças** em **23 SKUs** (190 linhas no livro); `SUM(delta) = skus.estoque` em todos os SKUs, e a simulação seguinte deu "Nada a fechar".
 
 ---
 

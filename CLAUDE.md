@@ -2548,11 +2548,12 @@ simulam sem `--aplicar`.
 > - **A que já tinha baixado (antes de 22/10) só fecha**, e a simulação diz
 >   quantas. O saldo negativo fica negativo (R-EST-08), e o quadro por SKU da
 >   simulação marca quais; o **livre não muda**.
-> - ⚠️ **Construído, falta subir e aplicar.** A rodada combinada (tela 205:
->   desfazer a correção #64 da caixa #4581; simular `--ate 2026-11-18`, o dono
->   confere o quadro, `--aplicar`) é fora do horário de expedição e sem contagem
->   de inventário em andamento. A prova é a 204 zerar "caixas impressas sem
->   conferência" e a Conferência perder a linha âmbar.
+> - ✅ **NO AR E APLICADO EM 19/11/2026** (PR #357): o dono fez o deploy e
+>   rodou a limpeza — a saída #30 (19/11/2026, 17:10) fechou **188 caixas** impressas de 10 a 18/11 (as 187 e a #4581, depois de desfeita a correção #64) e baixou **195 peças** em **23 SKUs** (190 linhas no livro); `SUM(delta) = skus.estoque` em todos os SKUs, e a simulação seguinte deu "Nada a fechar". As 560 caixas de
+>   coleta do mesmo período saíram conferidas e baixadas como sempre. A spec foi
+>   para `docs/arquivo/`. ⚠️ **Ainda não conferido na tela:** a 204 com o
+>   contador "caixas impressas sem conferência" só com as impressas depois de
+>   18/11 (62 no dia 20/11, trabalho da Conferência).
 
 ---
 
