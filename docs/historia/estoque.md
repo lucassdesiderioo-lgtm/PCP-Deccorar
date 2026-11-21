@@ -343,6 +343,8 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > `+1`.** A fila não é obrigatória para embalar — é regra, está logo acima, e é
 > o que torna o `limpar_fila.js` seguro. A auditoria de 17/08 listava isso como
 > defeito porque é anterior a essa decisão. Há caso travando.
+> ⚠️ **Até 21/11/2026**: desde então a persiana só embala com a linha dela na
+> fila (R-EMB-02, spec `EMBALAGEM-SO-DA-REVISAO`).
 >
 > **Rode `node teste_montagem.js` ao mexer no `mont_route.js` ou no
 > `montagem.html`** — os 42 casos travam a transação, o SKU, o kit, o modo teste

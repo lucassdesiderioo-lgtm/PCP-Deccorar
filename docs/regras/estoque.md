@@ -245,7 +245,7 @@
 - **Por quê:** o espelho da R-REV-07, decidido pelo dono em 21/11/2026: o bipe duplo ou apressado fechava a embalagem sem a peça ter sido embalada de verdade.
 - **Exceções:** ⚠ **a frase do 409 serve às duas páginas** ("a embalagem NÃO foi gravada e o tempo recomeça: bipe o SKU agora e espere 45 s antes de bipar o kit e o SKU"): o tablet com a página antiga em cache já descartou a embalagem quando a lê. Na tela nova a embalagem fica de pé enquanto o servidor responde, o bipe nesse meio é ignorado, e o envio desiste em 20 s. ⚠ **a tela não recusa sozinha, ao contrário da Revisão**: quem decide é só o servidor. Uma tela com o número dela, no dia em que o `config` baixasse o mínimo, diria "continua" de uma embalagem já gravada, e o segundo bipe somaria +2. Vale para todo SKU, inclusive kit e acessório. A bancada do sob medida não entra.
 - **Teste que trava:** `teste_montagem.js` (seção 9).
-- **Status:** construída em 21/11/2026, falta subir (spec `EMBALAGEM-TEMPO-MINIMO`).
+- **Status:** no ar desde 21/11/2026 (PR #359, spec `EMBALAGEM-TEMPO-MINIMO`).
 
 ---
 

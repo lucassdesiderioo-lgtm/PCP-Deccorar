@@ -134,7 +134,7 @@ r = chamar('POST','/api/montagem',{codigo:'BK140140BEGE', kit_ok:1});
 eq('sem o campo, a chamada passa (tablet com pagina velha nao trava)', r.status, 200);
 eq('e soma normalmente', estoqueDe('BK140140BEGE'), 2);
 
-console.log('\n── 3. a fila, e o que NAO e bug (§4) ──');
+console.log('\n── 3. a fila (desde 21/11/2026 a persiana so embala vindo dela) ──');
 const fHoje = novaFila('BK160160CINZA','hoje');
 db.prepare("INSERT INTO producao (codigo,qtd,produzido) VALUES ('BK160160CINZA',3,0)").run();
 r = chamar('POST','/api/montagem',{codigo:'BK160160CINZA', kit_ok:1});

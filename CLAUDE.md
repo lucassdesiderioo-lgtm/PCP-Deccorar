@@ -810,7 +810,7 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 > próprio, no dia em que o `config` baixasse o mínimo ela diria "continua" de
 > uma embalagem já gravada, e o segundo bipe somaria +2. **Teste ou script que
 > embala tem que mandar `segundos` ≥ o mínimo** (o `teste_montagem.js` zera o
-> mínimo nas seções 1 a 8, que não são sobre tempo). ⚠️ **A frase do 409 diz
+> mínimo nas seções que não são sobre tempo). ⚠️ **A frase do 409 diz
 > "NÃO foi gravada e o tempo recomeça: bipe o SKU agora e espere 45 s antes de
 > bipar o kit e o SKU"** (③ REVISÃO): ela é o que o tablet com a página
 > ANTIGA em cache mostra, e lá a embalagem já foi descartada e o cronômetro
