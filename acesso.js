@@ -937,6 +937,8 @@ module.exports = function(app, db){
     if(M !== 'GET' && eq('/api/rejeicao')) return 'revisao.rejeitar';
     if(pre('/api/material-extra')) return 'material.extra';   // a 106 (FICHAS-NO-CADASTRO-UNICO)
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';
+    /* Cancelar a embalagem em andamento (21/11/2026): a mesma bancada. */
+    if(eq('/api/montagem/cancelar')) return 'embalagem.executar';
     if(M !== 'GET' && eq('/api/embalar')) return 'etiqueta.emitir';
     if(M !== 'GET' && eq('/api/carregar')) return 'carregamento.executar';
     /* A caixa de varias peca a peca e o "Recomecar" (CARREGAMENTO-SEGUNDA-PESSOA

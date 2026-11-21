@@ -417,6 +417,20 @@ module.exports=function(app,db){
     const prog=db.prepare("SELECT COUNT(*) n FROM montagem WHERE data=date('now','localtime')").get();
     res.json({ok:true,total_hoje:prog.n,naFila:naFila,abatido:abatido,estoque:est?est.estoque:0});
   });
+  /* CANCELAR A EMBALAGEM EM ANDAMENTO (21/11/2026): o espelho do "Cancelar
+     revisao" (R-REV-08). Quem precisa largar a bancada zera a embalagem na
+     tela; aqui so fica o rastro — quem, quando, quantos segundos. NADA grava:
+     nem montagem, nem +1, nem a fila (a peca continua esperando embalagem). */
+  app.post('/api/montagem/cancelar',(req,res)=>{
+    const q=QUEM.exigir(req,res); if(!q) return;
+    const b=req.body||{};
+    const cod=String(b.codigo||'').trim().toUpperCase();
+    if(!cod) return res.status(400).json({erro:'codigo'});
+    const txt=v=>v==null||v===''?null:String(v).slice(0,40);
+    db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,inicio,fim,usuario_id,usuario_nome)
+      VALUES ('cancelada',?,?,?,?,?,?)`).run(cod,Math.round(+b.segundos||0),txt(b.inicio),txt(b.fim),q.usuario_id,q.usuario_nome);
+    res.json({ok:true});
+  });
   app.get('/api/fila',(req,res)=>{
     /* A MESMA REGUA DA TRAVA DO POST (③ REVISAO): so a fila do momento (modo
        teste so a de teste) e o codigo em maiuscula. Antes a lista mostrava a

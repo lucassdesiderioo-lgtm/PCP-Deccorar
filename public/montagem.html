@@ -44,6 +44,9 @@
 <div class="links"><a class="link" href="/embalagem">Etiqueta de Venda</a><a class="link" href="/painel">Painel</a></div></header>
 <div class="wrap">
   <div class="banner" id="banner"></div>
+  <!-- CANCELAR A EMBALAGEM (21/11/2026): aparece so com uma embalagem aberta.
+       O espelho do "Cancelar revisao": nada grava, a peca continua na fila. -->
+  <div id="cancLin" style="display:none;text-align:center;margin:-4px 0 14px"><button type="button" id="cancEmb" style="padding:11px 20px;border-radius:9px;border:1px solid #c9d1db;background:transparent;color:#3b4552;font-size:14px;cursor:pointer">Cancelar embalagem</button></div>
   <input id="scan" autocomplete="off">
   <div class="stats" id="stats"></div>
   <div class="fila"><div class="ft">Aguardando embalagem</div><div id="filaLista"></div></div>
@@ -86,7 +89,9 @@ async function stats(){
 function fmt(s){ s=+s||0; const m=Math.floor(s/60); return (m?m+'m':'')+(s%60)+'s'; }
 function mmss(ms){ const t=Math.floor(ms/1000),m=Math.floor(t/60); return String(m).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); }
 function steps(){ return '<div class="steps"><span class="chip done">1 · SKU ✓</span><span class="chip '+(emb&&emb.kitOk?'done':'')+'">2 · Kit '+(emb&&emb.kitOk?'✓':'…')+'</span><span class="chip">3 · SKU final</span></div>'; }
-function banner(kind,title,sub,extra){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(extra||''); }
+function banner(kind,title,sub,extra){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(extra||''); mostrarCancelar(); }
+/* O botao acompanha o banner: so com uma embalagem aberta e fora do envio. */
+function mostrarCancelar(){ var l=document.getElementById('cancLin'); if(l) l.style.display=(emb && !emb.enviando)?'':'none'; }
 /* Descricao da peca em letra grande. Sai do formatador unico do /sku.js — a
    mesma frase da tela de Etiqueta de Venda, pra ninguem achar que sao medidas
    diferentes. SKU sem medida/cor no cadastro avisa em vermelho em vez de ficar
@@ -98,6 +103,24 @@ function pecaHtml(info){
 }
 function idle(){ emb=null; if(!KIT){ banner('err','Código do kit não cadastrado','Peça ao responsável para cadastrar o código do kit no <b>Admin → Cadastros</b>. Sem isso não dá pra conferir o kit na embalagem.'); return; } banner('','Pronto','Bipe o <b>SKU</b> da persiana pra começar a embalagem.'); }
 function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const t=$('#tm'); if(emb&&t) t.textContent=mmss(Date.now()-emb.inicio); },250); }
+/* CANCELAR A EMBALAGEM EM ANDAMENTO (21/11/2026), o espelho do "Cancelar
+   revisao" (R-REV-08): zera num toque, sem motivo. NADA foi gravado; o servidor
+   so guarda quem cancelou. A peca continua em "Aguardando embalagem". */
+async function cancelarEmb(){
+  const cur=emb; if(!cur || cur.enviando) return;
+  const seg=Math.round((Date.now()-cur.inicio)/1000);
+  clearInterval(tick); tick=null; emb=null; bipePerdido=null;
+  avisoFixo=true;
+  banner('','Embalagem cancelada', '<b>'+cur.codigo+'</b> · nada foi gravado, e a peça continua em "Aguardando embalagem". Bipe o SKU para começar de novo.');
+  beep(true);
+  try{
+    const r=await (await fetch('/api/montagem/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({codigo:cur.codigo,segundos:seg,inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
+    if(r && r.erro && !emb){ avisoFixo=true; banner('err','Embalagem cancelada, sem registro', '<b>'+cur.codigo+'</b> · nada foi gravado, mas o cancelamento não ficou registrado ('+r.erro+'). Bipe o SKU para começar de novo.'); }
+  }catch(e){ /* sem conexao: a embalagem ja foi zerada na tela e nada foi gravado */ }
+  carregarFila();
+}
+document.getElementById('cancEmb').addEventListener('click', cancelarEmb);
 function abrir(info){
   emb={codigo:info.codigo,cor:info.cor||'',peca:pecaHtml(info),inicio:Date.now(),kitOk:false}; startTimer();
   /* A CONFERENCIA DA PECA ACONTECE AQUI, e so aqui.
@@ -198,7 +221,7 @@ function rapidoDemais(cur, r){
 async function finish(){
   const cur=emb; if(!cur || cur.enviando) return;
   bipePerdido=null;
-  cur.enviando=true;
+  cur.enviando=true; mostrarCancelar();
   const seg=Math.round((Date.now()-cur.inicio)/1000);
   try{
     /* O ENVIO TEM LIMITE DE TEMPO (③ REVISAO r2): com a embalagem de pe

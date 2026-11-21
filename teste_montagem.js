@@ -468,6 +468,41 @@ console.log('\n── 10. a persiana so embala se veio da revisao (EMBALAGEM-SO-
   ok('a regra da tela e a mesma do servidor: so persiana (exige_medida)', /exige_medida===0\) return false/.test(tela));
 }
 
+console.log('\n── 11. cancelar a embalagem em andamento (21/11/2026) ──');
+/* O espelho do "Cancelar revisao" (R-REV-08): quem precisa largar a bancada
+   zera a embalagem num toque. Nada grava — nem montagem, nem +1, nem a fila —,
+   e fica o evento `cancelada` em montagem_evento, com quem cancelou. */
+{
+  const h = rotas['POST /api/montagem/cancelar'];
+  ok('a rota de cancelar existe', typeof h === 'function');
+  if(h){
+    const fc = novaFila('BK150150REV','estoque');
+    const foto = () => JSON.stringify({m:nMontagem(), e:estoqueDe('BK150150REV'), f:filaSit(fc),
+      l:db.prepare('SELECT COUNT(*) n FROM movimento_estoque').get().n});
+    const a = foto();
+    const ev = () => db.prepare("SELECT * FROM montagem_evento WHERE tipo='cancelada' ORDER BY id").all();
+    eq('sem login → 401', chamar('POST','/api/montagem/cancelar',{codigo:'BK150150REV', segundos:12},null).status, 401);
+    eq('   e nada vira evento', ev().length, 0);
+    eq('sem codigo → 400', chamar('POST','/api/montagem/cancelar',{}).status, 400);
+    const r11 = chamar('POST','/api/montagem/cancelar',{codigo:'bk150150rev', segundos:12.4},{id:9,nome:'Rita'});
+    eq('cancelar → 200', r11.status, 200);
+    eq('   nada mudou: embalagem, saldo, fila e livro', foto(), a);
+    const e = ev();
+    eq('   fica uma linha "cancelada" em montagem_evento', e.length, 1);
+    eq('   com o codigo em maiuscula', e[0] && e[0].codigo, 'BK150150REV');
+    eq('   com os segundos', e[0] && e[0].segundos, 12);
+    eq('   e com quem cancelou', e[0] && e[0].usuario_id, 9);
+  }
+  const ac = fs.readFileSync(path.join(__dirname,'acesso.js'),'utf8');
+  ok('a rota tem linha propria no permDaRota (embalagem.executar)', /eq\('\/api\/montagem\/cancelar'\)\)\s*return\s*'embalagem\.executar'/.test(ac));
+  const tela = fs.readFileSync(path.join(__dirname,'public','montagem.html'),'utf8');
+  ok('a tela tem o botao "Cancelar embalagem"', /Cancelar embalagem/.test(tela) && /function cancelarEmb\(/.test(tela));
+  const fc2 = tela.slice(tela.indexOf('function cancelarEmb('), tela.indexOf('function cancelarEmb(') + 1500);
+  ok('cancelar zera a embalagem e chama a rota', /emb=null/.test(fc2) && /\/api\/montagem\/cancelar/.test(fc2));
+  ok('o aviso do cancelamento fica ate o proximo bipe', /avisoFixo=true/.test(fc2));
+  ok('com o envio no ar nao se cancela', /enviando\) return/.test(fc2));
+}
+
 console.log('\n────────────────────────────────────────────');
 console.log(falhas ? '  ' + falhas + ' de ' + n + ' FALHARAM' : '  todos os ' + n + ' casos passaram');
 try{ db.close(); fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}
