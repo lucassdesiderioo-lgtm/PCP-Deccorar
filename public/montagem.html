@@ -76,7 +76,7 @@ async function load(){
   stats();
   /* A recusa "Não passou pela Revisão" e o "Sem conexão" ficam ate o proximo
      bipe (③ REVISAO): este redesenho de 4 s os apagava em menos de 4 s. */
-  if(!emb && !avisoFixo) idle();
+  if(!emb && !avisoFixo && !conferindo) idle();
 }
 async function stats(){
   const st=await (await fetch('/api/montagem/hoje')).json();
@@ -129,7 +129,7 @@ async function conferirRevisao(info){
   /* SEM CONEXAO NAO E "SEM REVISAO" (③ REVISAO, §12): mandar a peca a Revisao
      por falta de rede criaria uma segunda linha na fila para a mesma peca. */
   if(!leu){ avisoFixo=true; banner('err','Sem conexão','Não deu para conferir a fila da Revisão. <b>Bipe o SKU de novo</b>; se repetir, confira o Wi-Fi.'+perdido()); beep(false); return; }
-  if(!naoNaFila(info)){ abrir(info); return; }
+  if(!naoNaFila(info)){ bipePerdido=null; abrir(info); return; }
   semRevisao(info.codigo);
 }
 function semRevisao(cod){
@@ -144,8 +144,9 @@ function perdido(){
 }
 function handle(code){
   code=(code||'').trim().toUpperCase(); if(!code) return;
-  avisoFixo=false;
   const now=Date.now(); if(last.c===code && now-last.t<700) return; last={c:code,t:now};
+  /* solta o aviso fixo so o bipe que passou do filtro de 700 ms (③ r3) */
+  avisoFixo=false;
   /* COM O ENVIO NO AR, O BIPE E IGNORADO (③ REVISAO, EMBALAGEM-TEMPO-MINIMO):
      a embalagem fica de pe ate o servidor responder. Antes ela era zerada
      antes do envio, e um bipe nesse meio abria uma embalagem nova escondida —
@@ -195,6 +196,7 @@ function rapidoDemais(cur, r){
 }
 async function finish(){
   const cur=emb; if(!cur || cur.enviando) return;
+  bipePerdido=null;
   cur.enviando=true;
   const seg=Math.round((Date.now()-cur.inicio)/1000);
   try{

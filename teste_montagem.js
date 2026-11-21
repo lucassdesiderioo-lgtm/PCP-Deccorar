@@ -459,10 +459,12 @@ console.log('\n── 10. a persiana so embala se veio da revisao (EMBALAGEM-SO-
   ok('a lista "Aguardando" nao mostra a linha de teste (a trava nao a aceita)', !lista.some(f => f.codigo === 'BK200200TST'), JSON.stringify(lista));
   ok('a lista devolve o codigo em maiuscula, como a trava compara', lista.some(f => f.codigo === 'BK210210LST'));
   ok('o aviso sem revisao e o "Sem conexão" nao sao apagados pelo redesenho de 4 s',
-     /if\(!emb && !avisoFixo\) idle\(\)/.test(tela) && /function semRevisao\(cod\)\{\s*avisoFixo=true/.test(tela) && /avisoFixo=true; banner\('err','Sem conexão'/.test(tela));
-  ok('e o proximo bipe solta o aviso', /if\(!code\) return;\s*avisoFixo=false;/.test(tela));
+     /if\(!emb && !avisoFixo && !conferindo\) idle\(\)/.test(tela) && /function semRevisao\(cod\)\{\s*avisoFixo=true/.test(tela) && /avisoFixo=true; banner\('err','Sem conexão'/.test(tela));
+  ok('e o proximo bipe solta o aviso', /now-last\.t<700\) return; last=\{c:code,t:now\};[\s\S]{0,120}avisoFixo=false;/.test(tela));
   ok('o bipe durante a conferencia diz que nao valeu (e o aviso final repete)',
      /if\(conferindo\)\{ bipePerdido=code; banner\('err','Bipe não valeu'/.test(tela) && /function perdido\(\)/.test(tela));
+  ok('o bipe perdido de uma conferencia nao sobra para a embalagem seguinte (③ r3)',
+     /if\(!naoNaFila\(info\)\)\{ bipePerdido=null; abrir\(info\)/.test(tela) && /cur\.enviando\) return;\s*bipePerdido=null;/.test(tela));
   ok('a regra da tela e a mesma do servidor: so persiana (exige_medida)', /exige_medida===0\) return false/.test(tela));
 }
 
