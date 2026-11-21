@@ -129,7 +129,8 @@ async function conferirRevisao(info){
   /* SEM CONEXAO NAO E "SEM REVISAO" (③ REVISAO, §12): mandar a peca a Revisao
      por falta de rede criaria uma segunda linha na fila para a mesma peca. */
   if(!leu){ avisoFixo=true; banner('err','Sem conexão','Não deu para conferir a fila da Revisão. <b>Bipe o SKU de novo</b>; se repetir, confira o Wi-Fi.'+perdido()); beep(false); return; }
-  if(!naoNaFila(info)){ bipePerdido=null; abrir(info); return; }
+  /* achou a peca: abre, e o bipe que nao valeu no meio aparece embaixo (③ r3) */
+  if(!naoNaFila(info)){ const nota=perdido(); abrir(info); if(nota) $('#banner').insertAdjacentHTML('beforeend', nota); return; }
   semRevisao(info.codigo);
 }
 function semRevisao(cod){

@@ -464,7 +464,7 @@ console.log('\n── 10. a persiana so embala se veio da revisao (EMBALAGEM-SO-
   ok('o bipe durante a conferencia diz que nao valeu (e o aviso final repete)',
      /if\(conferindo\)\{ bipePerdido=code; banner\('err','Bipe não valeu'/.test(tela) && /function perdido\(\)/.test(tela));
   ok('o bipe perdido de uma conferencia nao sobra para a embalagem seguinte (③ r3)',
-     /if\(!naoNaFila\(info\)\)\{ bipePerdido=null; abrir\(info\)/.test(tela) && /cur\.enviando\) return;\s*bipePerdido=null;/.test(tela));
+     /if\(!naoNaFila\(info\)\)\{ const nota=perdido\(\); abrir\(info\); if\(nota\) \$\('#banner'\)\.insertAdjacentHTML/.test(tela) && /cur\.enviando\) return;\s*bipePerdido=null;/.test(tela));
   ok('a regra da tela e a mesma do servidor: so persiana (exige_medida)', /exige_medida===0\) return false/.test(tela));
 }
 

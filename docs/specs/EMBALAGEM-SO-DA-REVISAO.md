@@ -57,3 +57,22 @@ embalada não conta; a ordem das recusas; com fila 200 e consome; devolução
 passa; SKU sem modelo é persiana; kit e sob medida passam; a tela confere no 1º
 bipe). `teste_livro`, `teste_fichas_material` e `teste_regras_estoque` passaram
 a pôr a peça na fila antes de embalar.
+
+## O que a ③ REVISÃO mudou (21/11/2026, três rodadas)
+
+- **A transação consome a fila com a mesma régua da trava** (`UPPER(codigo)`):
+  com comparação exata, uma linha em minúscula passava na trava, nunca era
+  consumida e autorizava +1 para sempre.
+- **A lista "Aguardando embalagem" (`GET /api/fila`) usa a régua da trava**: só
+  a fila do momento (sem a linha de teste fora do modo teste) e o código em
+  maiúscula. Antes a lista abria a embalagem que o servidor recusava no fim.
+- **Sem conexão não é "sem revisão"**: a tela diz "Sem conexão" em vez de
+  mandar a peça à Revisão (o que criaria uma segunda linha na fila).
+- **Os avisos ficam até o próximo bipe**: o redesenho de 4 s apagava a recusa
+  e o "Sem conexão" (e trocava o "Conferindo…" por "Pronto").
+- **O bipe que chega durante a conferência diz que não valeu**, e o aviso final
+  (recusa, sem conexão ou a embalagem aberta) repete qual bipe não valeu; ele
+  não sobra para a embalagem seguinte. O aviso fixo só se solta depois do filtro
+  de 700 ms.
+- **A prévia do "Tirar da fila" na Mesa** só avisa da trava quando o SKU é
+  persiana; o cabeçalho do `limpar_fila.js` foi atualizado.
