@@ -88,6 +88,14 @@ function desenharMenu(){
   if(location.pathname.indexOf('/login')===0 || (typeof window!=='undefined' && window.__pendCaixa)) return;
   var sc=document.createElement('script'); sc.src='/pendencias_aviso.js'; document.head.appendChild(sc);
 })();
+/* O "?" DE TODA TELA (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026) mora no
+   manual_ajuda.js, um arquivo só para as duas operações: ele pergunta a ficha
+   da tela em que a pessoa está e, se ela tem `manual.ler`, põe o botão ao lado
+   do ☰ Menu e abre a ficha num painel na mesma página. */
+(function(){
+  if(location.pathname.indexOf('/login')===0 || (typeof window!=='undefined' && window.__manualAjuda)) return;
+  var sc=document.createElement('script'); sc.src='/manual_ajuda.js'; document.head.appendChild(sc);
+})();
 /* SÓ ESCONDE, NUNCA FORÇA A APARECER: a regra pega o botão cuja marca não
    tem NENHUMA chave da pessoa. O que ela tem segue a tela — se a própria tela
    esconde o botão (`display:none` no estilo), ele continua escondido. Um

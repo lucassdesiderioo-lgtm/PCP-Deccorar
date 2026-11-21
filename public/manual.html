@@ -1,0 +1,197 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual</title>
+<!-- 907 MANUAL (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026): a ficha de cada
+     tela, em língua de fábrica. Abre em "Minhas telas" (D7); "Todas as telas"
+     só para quem tem manual.ver_todas (D8). Nada aqui é copiado: as telas, as
+     ligações e os botões vêm do mapa e do registro de permissões; o texto vem
+     das fichas de docs/manual/; o valor dos parâmetros, do config, agora.
+     Fundo CLARO: é tela de operação (DESIGN §1). O desenho da ficha é o do
+     manual_ajuda.js, o mesmo do "?" — duas cópias divergiriam. -->
+<style>
+  :root{--bg:#ffffff;--panel:#f4f6f8;--line:#d8dee6;--txt:#1a1d23;--muted:#5a6472;--amber:#b26a00;--green:#2e7d32;--red:#c62828;--blue:#1565c0}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif;font-size:15px}
+  header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .mark{width:36px;height:36px;border-radius:9px;background:var(--blue);display:grid;place-items:center;color:#fff;font-weight:800;font-size:18px}
+  header .sub{font-size:12px;color:var(--muted)}
+  .wrap{max-width:1280px;margin:0 auto;padding:14px 16px}
+  .topo{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 14px}
+  .topo input{flex:1 1 260px;min-width:0;font:inherit;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--txt)}
+  .bt{font:inherit;font-size:14px;font-weight:700;padding:9px 14px;border-radius:10px;border:1px solid var(--blue);background:transparent;color:var(--blue);cursor:pointer;min-height:40px;text-decoration:none;white-space:nowrap}
+  .bt.on{background:var(--blue);color:#fff}
+  .bt.g{border-color:var(--line);color:var(--muted)}
+  .grade{display:grid;grid-template-columns:minmax(0,280px) minmax(0,1fr);gap:16px}
+  @media (max-width:900px){.grade{grid-template-columns:minmax(0,1fr)}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+  .card h2{margin:0 0 8px;font-size:15px}
+  .lista .mod{margin:0 0 10px}
+  .lista .mod .tit{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:800;margin:0 0 4px}
+  .lista .bloco{font-size:12px;color:var(--muted);font-weight:700;margin:6px 0 2px 8px}
+  .lista a.tela{display:block;min-height:36px;line-height:36px;padding:0 10px;border-radius:8px;text-decoration:none;color:var(--txt)}
+  .lista a.tela b{color:var(--muted);margin-right:6px}
+  .lista a.tela.on{background:var(--blue);color:#fff}.lista a.tela.on b{color:#fff}
+  .lista a.tela.fora{color:var(--muted)}
+  .lista a.tela .rasc{font-size:11px;color:var(--amber);margin-left:6px}
+  .conteudo{min-width:0}
+  .vazio{color:var(--muted)}
+  .rola{overflow-x:auto;max-width:100%}
+  svg text{font-family:system-ui,Segoe UI,Roboto,sans-serif}
+  .mapaNo{cursor:pointer}
+  .res{margin:0 0 8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+  .res a{color:var(--blue);font-weight:700;text-decoration:none}
+  .res .onde{font-size:12px;color:var(--muted)}
+  .glo dt{font-weight:800;margin:10px 0 2px}.glo dd{margin:0;color:var(--txt);line-height:1.45}
+  .mud li{margin:0 0 8px;line-height:1.4}.mud .d{font-weight:800}.mud .t{color:var(--muted);font-size:12px}
+  .aviso{background:#fff4e5;color:var(--amber);border:1px solid var(--amber);border-radius:10px;padding:10px 12px;font-weight:700;margin:0 0 12px}
+</style></head><body>
+<header><div class="mark">?</div><div><b>907 · Manual</b><div class="sub">Como cada tela funciona, para quem a opera</div></div></header>
+<div class="wrap">
+  <div class="topo">
+    <input id="busca" type="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="procurar tela, botão, palavra ou termo…" aria-label="Procurar no manual">
+    <button class="bt on" id="btMinhas" type="button">Minhas telas</button>
+    <button class="bt" id="btTodas" type="button" hidden>Todas as telas</button>
+    <a class="bt g" href="#mapa" id="lkMapa">Mapa</a>
+    <a class="bt g" href="#glossario" id="lkGlo">Glossário</a>
+    <a class="bt g" href="#mudou" id="lkMud">O que mudou</a>
+  </div>
+  <div class="grade">
+    <div class="card lista" id="lista"><div class="vazio">carregando…</div></div>
+    <div class="conteudo" id="conteudo"><div class="card"><div class="vazio">carregando…</div></div></div>
+  </div>
+</div>
+<script src="/manual_ajuda.js"></script>
+<script>
+var esc=MANUAL_FICHA.esc;
+var D={ minhas:null, todas:null, modo:'minhas', mapa:null, glo:null, mud:null };
+async function jget(u){ var r=await fetch(u,{credentials:'same-origin'}); var j=null; try{ j=await r.json(); }catch(e){} return { s:r.status, j:j }; }
+function dados(){ return D.modo==='todas' && D.todas ? D.todas : D.minhas; }
+function fichaDe(n){ var d=dados(); return d ? (d.fichas||[]).filter(function(f){ return f.n===+n; })[0] : null; }
+function nomeMod(ch){ return MANUAL_FICHA.nomeModulo(ch, (D.minhas||{}).modulos||[]); }
+function slugify(h){ return (h||'').replace(/^#/,''); }
+
+/* ── a lista à esquerda: módulo → bloco → tela, na ordem do menu ─────────── */
+function desenharLista(atual){
+  var d=dados(), el=document.getElementById('lista');
+  if(!d){ el.innerHTML='<div class="vazio">carregando…</div>'; return; }
+  var porMod={}; (d.fichas||[]).forEach(function(f){ (porMod[f.modulo]=porMod[f.modulo]||[]).push(f); });
+  var blocos=d.blocos||{}, ordemB=Object.keys(blocos), h='';
+  (d.modulos||[]).forEach(function(m){
+    var fs=porMod[m.chave]; if(!fs||!fs.length) return;
+    var porB={}, usados=[];
+    fs.forEach(function(f){ var b=f.bloco||'comum'; if(!porB[b]){ porB[b]=[]; usados.push(b); } porB[b].push(f); });
+    usados.sort(function(a,b){ return ordemB.indexOf(a)-ordemB.indexOf(b); });
+    h+='<div class="mod"><div class="tit">'+esc(m.nome)+'</div>'+usados.map(function(b){
+      var linhas=porB[b].slice().sort(function(x,y){ return x.n-y.n; }).map(function(f){
+        return '<a class="tela'+(f.n===atual?' on':'')+(f.opera===false?' fora':'')+'" href="#tela='+f.n+'"><b>'+f.n+'</b>'+esc(f.titulo||f.nome)
+          +(f.situacao==='rascunho'?'<span class="rasc">rascunho</span>':'')+'</a>';
+      }).join('');
+      return (usados.length>1?'<div class="bloco">'+esc(blocos[b]||b)+'</div>':'')+linhas;
+    }).join('')+'</div>';
+  });
+  el.innerHTML=h||'<div class="vazio">Seu acesso não alcança nenhuma tela.</div>';
+}
+
+/* ── a ficha ────────────────────────────────────────────────────────────── */
+async function mostrarFicha(n){
+  var el=document.getElementById('conteudo');
+  var f=fichaDe(n);
+  if(!f){ var r=await jget('/api/manual/ficha/'+encodeURIComponent(n)); f=r.s===200?r.j:null; if(!f){ el.innerHTML='<div class="card"><div class="vazio">Tela que não existe no manual.</div></div>'; return; } }
+  el.innerHTML='<div class="card">'+MANUAL_FICHA.html(f,{ modulos:(D.minhas||{}).modulos, semLink:true })+'</div>';
+}
+
+/* ── o mapa: desenho gerado do `liga`, nunca arte ───────────────────────── */
+async function mostrarMapa(){
+  var el=document.getElementById('conteudo');
+  if(!D.mapa){ var r=await jget('/api/manual/mapa'); if(r.s!==200){ el.innerHTML='<div class="card vazio">Não deu para ler o mapa.</div>'; return; } D.mapa=r.j; }
+  var m=D.mapa, porMod={};
+  m.telas.forEach(function(t){ (porMod[t.modulo]=porMod[t.modulo]||[]).push(t); });
+  var cols=(m.modulos||[]).filter(function(x){ return porMod[x.chave]; });
+  var W=230, H=44, PAD=14, topo=34;
+  var pos={}, maxLin=0;
+  cols.forEach(function(c,ci){ var ts=porMod[c.chave].slice().sort(function(a,b){ return a.n-b.n; }); maxLin=Math.max(maxLin,ts.length);
+    ts.forEach(function(t,li){ pos[t.n]={ x:PAD+ci*W, y:topo+li*H, t:t }; }); });
+  var larg=PAD*2+cols.length*W, alt=topo+maxLin*H+PAD;
+  var s='<svg width="'+larg+'" height="'+alt+'" viewBox="0 0 '+larg+' '+alt+'" role="img" aria-label="Mapa das telas e das ligações">';
+  // ligações primeiro, por baixo
+  (m.ligacoes||[]).forEach(function(l){ var a=pos[l.de], b=pos[l.para]; if(!a||!b) return;
+    var x1=a.x+W-30, y1=a.y+H/2-6, x2=b.x+10, y2=b.y+H/2-6; if(a.x===b.x){ x1=a.x+W-30; x2=b.x+W-30; }
+    var cx=(x1+x2)/2;
+    s+='<path d="M'+x1+' '+y1+' C'+cx+' '+y1+' '+cx+' '+y2+' '+x2+' '+y2+'" fill="none" stroke="#1565c0" stroke-opacity=".22" stroke-width="1.5"/>'; });
+  cols.forEach(function(c,ci){ s+='<text x="'+(PAD+ci*W)+'" y="20" font-size="12" font-weight="800" fill="#5a6472" style="text-transform:uppercase">'+esc(c.nome.toUpperCase())+'</text>'; });
+  m.telas.forEach(function(t){ var p=pos[t.n]; if(!p) return; var op=t.opera;
+    s+='<g class="mapaNo" data-n="'+t.n+'" tabindex="0" role="link" aria-label="'+t.n+' '+esc(t.nome)+(op?'':' (você não opera)')+'">'
+      +'<rect x="'+p.x+'" y="'+p.y+'" width="'+(W-20)+'" height="'+(H-10)+'" rx="9" fill="'+(op?'#fff':'#f4f6f8')+'" stroke="'+(op?'#1565c0':'#d8dee6')+'" stroke-width="1.5"/>'
+      +'<text x="'+(p.x+10)+'" y="'+(p.y+22)+'" font-size="13" fill="'+(op?'#1a1d23':'#8b97a5')+'"><tspan font-weight="800" fill="'+(op?'#1565c0':'#8b97a5')+'">'+t.n+'</tspan>  '+esc(t.nome.length>22?t.nome.slice(0,21)+'…':t.nome)+'</text></g>'; });
+  s+='</svg>';
+  el.innerHTML='<div class="card"><h2>O mapa</h2><p class="vazio" style="margin:0 0 8px">Cada caixa é uma tela; a linha diz de onde ela recebe e para onde manda. As suas telas estão em azul; as outras, em cinza, só pelo nome.</p><div class="rola">'+s+'</div></div>';
+  el.querySelectorAll('.mapaNo').forEach(function(g){ var ir=function(){ location.hash='#tela='+g.getAttribute('data-n'); }; g.onclick=ir; g.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); ir(); } }; });
+}
+
+/* ── o glossário ────────────────────────────────────────────────────────── */
+async function mostrarGlossario(){
+  var el=document.getElementById('conteudo');
+  if(!D.glo){ var r=await jget('/api/manual/glossario'); D.glo=r.s===200?(r.j.termos||[]):[]; }
+  el.innerHTML='<div class="card"><h2>Glossário</h2><dl class="glo">'+D.glo.map(function(t){ return '<dt id="termo-'+esc(t.termo.toLowerCase().replace(/[^a-z0-9]+/g,'-'))+'">'+esc(t.termo)+'</dt><dd>'+esc(t.texto)+'</dd>'; }).join('')+'</dl></div>';
+}
+
+/* ── o que mudou ────────────────────────────────────────────────────────── */
+async function mostrarMudancas(){
+  var el=document.getElementById('conteudo');
+  var r=await jget('/api/manual/mudancas'); var m=r.s===200?r.j:{ mudancas:[], dias:30 };
+  el.innerHTML='<div class="card"><h2>O que mudou nas suas telas — últimos '+esc(m.dias)+' dias</h2>'
+    +(m.mudancas.length?'<ul class="mud">'+m.mudancas.map(function(x){ return '<li><span class="d">'+esc(x.data)+'</span> · <a href="#tela='+x.n+'">'+x.n+' '+esc(x.nome)+'</a><br>'+MANUAL_FICHA.texto(x.texto)+'</li>'; }).join('')+'</ul>'
+      :'<p class="vazio">Nada mudou nas suas telas neste período.</p>')+'</div>';
+}
+
+/* ── a busca: tela, botão, palavra, termo — só no que a pessoa alcança ─── */
+function norm(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
+function textoDaFicha(f){ var s=f.secoes||{}; var partes=[f.titulo,f.nome];
+  ['para_que_serve','botoes','mostra','porque','perguntas'].forEach(function(k){ (s[k]||[]).forEach(function(i){ partes.push(i.nome,i.texto); }); });
+  (f.acoes||[]).forEach(function(a){ partes.push(a.rotulo,a.desc); }); return norm(partes.join(' ')); }
+async function buscar(q){
+  var el=document.getElementById('conteudo'), d=dados(); q=norm(q.trim()); if(!q) return;
+  if(!D.glo){ var r=await jget('/api/manual/glossario'); D.glo=r.s===200?(r.j.termos||[]):[]; }
+  var fichas=(d?d.fichas:[]).filter(function(f){ return f.opera!==false && textoDaFicha(f).indexOf(q)>=0; });
+  var termos=D.glo.filter(function(t){ return norm(t.termo+' '+t.texto).indexOf(q)>=0; });
+  var h='<div class="card"><h2>Resultados para “'+esc(q)+'”</h2>';
+  if(!fichas.length&&!termos.length) h+='<p class="vazio">Nada encontrado nas suas telas nem no glossário.</p>';
+  fichas.forEach(function(f){ var onde=(f.acoes||[]).filter(function(a){ return norm(a.rotulo).indexOf(q)>=0; }).map(function(a){ return 'botão “'+a.rotulo+'”'; });
+    h+='<div class="res"><a href="#tela='+f.n+'">'+f.n+' '+esc(f.titulo||f.nome)+'</a>'+(onde.length?'<div class="onde">'+esc(onde.join(' · '))+'</div>':'')+'</div>'; });
+  termos.forEach(function(t){ h+='<div class="res"><a href="#glossario">'+esc(t.termo)+'</a> <span class="onde">no glossário</span><div>'+esc(t.texto)+'</div></div>'; });
+  el.innerHTML=h+'</div>';
+}
+
+/* ── o roteiro pelo hash ────────────────────────────────────────────────── */
+async function rota(){
+  var h=slugify(location.hash); var m=/^tela=(\d+)$/.exec(h);
+  ['lkMapa','lkGlo','lkMud'].forEach(function(id){ document.getElementById(id).classList.remove('on'); });
+  if(m){ desenharLista(+m[1]); await mostrarFicha(+m[1]); }
+  else if(h==='glossario'){ desenharLista(0); document.getElementById('lkGlo').classList.add('on'); await mostrarGlossario(); }
+  else if(h==='mudou'){ desenharLista(0); document.getElementById('lkMud').classList.add('on'); await mostrarMudancas(); }
+  else { desenharLista(0); document.getElementById('lkMapa').classList.add('on'); await mostrarMapa(); }
+}
+async function modo(novo){
+  if(novo==='todas' && !D.todas){ var r=await jget('/api/manual/todas'); if(r.s!==200){ return; } D.todas=r.j; }
+  D.modo=novo; D.mapa=null;
+  document.getElementById('btMinhas').classList.toggle('on', novo==='minhas');
+  document.getElementById('btTodas').classList.toggle('on', novo==='todas');
+  await rota();
+}
+async function iniciar(){
+  var r=await jget('/api/manual/minhas');
+  if(r.s===401){ location.href='/login?r=/manual'; return; }
+  if(r.s!==200){ document.getElementById('conteudo').innerHTML='<div class="card"><div class="aviso">Seu acesso não alcança o manual. Peça a permissão "Ler o manual" a quem cuida dos acessos.</div></div>'; document.getElementById('lista').innerHTML=''; return; }
+  D.minhas=r.j;
+  if(D.minhas.ver_todas){ var bt=document.getElementById('btTodas'); bt.hidden=false; bt.onclick=function(){ modo('todas'); }; }
+  document.getElementById('btMinhas').onclick=function(){ modo('minhas'); };
+  var b=document.getElementById('busca'), tmr=null;
+  b.addEventListener('input', function(){ clearTimeout(tmr); var q=b.value; tmr=setTimeout(function(){ if(q.trim()) buscar(q); else rota(); }, 250); });
+  b.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); buscar(b.value); } });
+  window.addEventListener('hashchange', function(){ document.getElementById('busca').value=''; rota(); });
+  await rota();
+}
+iniciar();
+</script>
+<script src="/nav.js"></script>
+</body></html>

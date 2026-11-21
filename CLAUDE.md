@@ -155,6 +155,7 @@ R6. `escrivao-papel` antes do commit final.
 | resolveu dívida | risque na §14, com data |
 | trabalhou numa spec | STATUS da spec + índice em `docs/specs/README.md` |
 | terminou a spec inteira | spec vai para `docs/arquivo/` |
+| mexeu em tela, botão, número mostrado ou regra que a tela aplica | a ficha da tela em `docs/manual/`, com a linha datada em "Mudanças", e `node manual_retrato.js` regravado (§26) |
 
 10. Commit com mensagem clara. Em branch: **abra o PR**.
 11. Entregue o **FECHAMENTO** e **✋ espere o "pode subir"** antes de merge ou deploy:
@@ -3731,7 +3732,8 @@ Esperado: telas `302`, API `401`, `/login` `200`.
 fase 2), e a 106 `/material-extra` (FICHAS-NO-CADASTRO-UNICO) — e, desde
 05/11/2026, a tela 206 `/coleta-horarios` (HORARIOS-DE-COLETA) — e, desde
 08/11/2026, a 905 `/minha-producao` (RELATORIOS-UNIFICADOS) — e, desde
-11/11/2026, a 906 `/parametros` (ARRUMAR-O-LUGAR fase 3).
+11/11/2026, a 906 `/parametros` (ARRUMAR-O-LUGAR fase 3) — e, desde 21/11/2026,
+a 907 `/manual` (MANUAL-DO-SISTEMA fase 1; e `/api/manual/minhas` tem que dar 401).
 
 Proteção contra força bruta: 5 PINs errados bloqueiam a pessoa por 1 minuto —
 **inclusive com o PIN certo**, senão a trava só atrasaria quem chuta —, e a trava é
@@ -4221,7 +4223,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 20 | ~~**Editar um setor APAGA, sem avisar, as permissões que ele tem acima do próprio nível.**~~ **RESOLVIDO em 26/10/2026** (fase 3 da `ACESSOS-UNIFICADOS`, R-ACE-03) — o nível do setor virou **etiqueta**: a tela mostra a caixinha acima do nível como ela está (marcada, com o aviso "acima do nível do setor") e manda a lista inteira (`todas`); a tela antiga, sem a marca, não apaga nada. A permissão **sensível nova** pede confirmação (409 `sensiveis`) antes de entrar. As três **intransferíveis** continuam fora de qualquer setor que não seja o Admin Geral, agora por trava própria, e não mais pelo nível · `teste_setor_salvar.js` (26). **Desde 04/11/2026 o nível volta a travar** (fase 4 da `ACESSO-POR-TELA-E-NIVEL`), mas recusando a chave **nova** na hora, dizendo por quê — a que já estava fica, nunca se apaga (§10) | — |
 | 21 | ~~**A tarja "sem estoque" da Etiqueta de Venda só acusa o livre ≤ 0**, e não a fila inteira do SKU~~ **RESOLVIDO em 06/11/2026** (CONSERTO) — a linha e a peça da caixa contam a fila inteira de hoje do SKU (`tarja_estoque.js`, dono único), o sob medida não ganha tarja e o JOIN da linha é em maiúscula. A trava da impressão não mudou. **Fica aberto:** o painel "Pra despachar depois" continua com a regra antiga · `teste_tarja_estoque.js` (23) | — |
 | 22 | **O `pdfjs-dist` está na versão 3.11, e o `npm audit` acusa.** A falha (PDF malicioso rodando JavaScript) está fechada pela opção `isEvalSupported:false` em todo `getDocument` (07/11/2026, §12), mas a versão continua acusada, e com ela a instalação opcional do `canvas` (`@mapbox/node-pre-gyp`, `tar`), que o PCP nunca chama e que só roda no `npm install`. O conserto do audit é a **versão 6**: só carrega por `import` (ESM) e mexe no texto que o `parse.js` lê — tem que passar pelo caderno de casos reais inteiro (R-INV-01) antes de subir. O Express (`proxy-addr`, `body-parser`, `qs`) foi consertado no mesmo dia, e o `tecido/` dá 0 vulnerabilidades. ✅ No ar desde 07/11/2026 (PR #307) | Baixo enquanto a opção estiver em todo `getDocument` |
-| 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **três formas**: dado que ninguém preencheu, **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2; o `POST /api/componentes` ficou **oito meses**, e no lugar dele se fazia `INSERT` à mão — §7-B, armadilha #33) e **chave de permissão que nenhuma rota lê** (a `minimo.definir` da linha abaixo). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
+| 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **três formas**: dado que ninguém preencheu, **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2; o `POST /api/componentes` ficou **oito meses**, e no lugar dele se fazia `INSERT` à mão — §7-B, armadilha #33) e **chave de permissão que nenhuma rota lê** (a `minimo.definir` da linha abaixo). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa. **Desde 21/11/2026 o manual (§26) cobre a ponta de quem opera:** tela, ação ou regra sem a ficha reprova o `teste_manual.js` — a regra que ninguém explica à bancada passa a acusar; a flag não preenchida continua sem quem acuse | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
 
 ---
 
@@ -5507,7 +5509,7 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 | 600 | **fechada** — as 16 telas do sob medida ficam com o número; nenhuma nasce aqui | — |
 | 700 | Frota | reservado |
 | 800 | Mercado Livre (integração) | reservado |
-| 900 | Administração | existe (hoje "Sistema") |
+| 900 | Administração | existe (hoje "Sistema"); desde 21/11/2026 também a 907 Manual (§26) |
 | 1000 | Comercial | existe em parte (609–611) · consumidor final reservado |
 | 1100 | Cadastros | existe (402–404, 902, 606/608 e, desde 11/11/2026, 1101–1103) |
 | 1200 | Almoxarifado | existe (502–504, 603–605 e, desde 11/11/2026, 1201) |
@@ -5832,3 +5834,74 @@ teste_corte_separacao.js`.
 ⚠️ **Construído, falta subir** (12/11/2026). As fases 2 a 6 (o corte com o maço de
 etiquetas, a montagem, os kits, a rejeição com dono, o cartão de ponto) não
 começaram.
+
+---
+
+## 26. O manual do sistema — a ficha de cada tela, dentro da tela (21/11/2026)
+
+Spec `docs/specs/MANUAL-DO-SISTEMA.md`, fase 1 (a fundação) construída em
+21/11/2026, falta subir; duas linhas em `docs/DECISOES.md` (D7 e D8). O dono:
+*"estar a regra de cada tela … dentro de cada tela eu também consigo ler como
+funciona … tudo que for novo, esse manual vai se atualizando"*.
+
+| Dono único | O quê |
+|---|---|
+| `manual.js` | ler, validar e montar a ficha; o retrato; **o único que lê `docs/manual/`** |
+| `manual_route.js` | as seis leituras (`/api/manual/*`), sem escrita |
+| `manual_retrato.js` | regrava `docs/manual/retrato.json` e **recusa** sem a linha de "Mudanças" |
+| `public/manual_ajuda.js` | o botão "?" e o desenho da ficha, um só para as duas operações |
+| `public/manual.html` | a 907 Manual (Administração · Comum, nível Operação, `manual.ler`) |
+| `docs/manual/NNN-nome.md` | uma ficha por tela, as 53; `glossario.md` |
+
+O que parece bug e não é:
+
+- **As 53 fichas estão em RASCUNHO, e a 907 não foi apresentada ao time.** A
+  fase 1 é a fundação: o teste já cobra tela nova, e o dono confere a tela. O
+  texto é das fases 2 a 4. A lista `RASCUNHOS_INICIAIS` do `teste_manual.js`
+  **só encolhe** (R-ORG-14): ficha escrita sai dela, e tela nova nasce `pronta`.
+- **Cada pessoa vê só as telas que opera (D7)**, pela conta do portão
+  (`abre_tela.js`, a mesma do ☰ Menu). A tela que ela não opera volta **só** nome,
+  módulo e nível — nenhuma seção. **"Ver todas" é a chave `manual.ver_todas`**
+  (D8), nível Supervisor: dada por exceção a quem é Operação, não vale (teto).
+- **As duas chaves nascem só para o Admin Geral** (R-ALC-06), sem backfill. No
+  deploy da fase 1 **ninguém da bancada vê o "?"**, e é assim que deve ser até a
+  fase 2, quando o dono marca `manual.ler` nos setores.
+- **O que o sistema sabe, o manual lê na hora e nunca copia:** as telas e o
+  `liga` (os dois mapas), as ações pelo `permissoes.js` e pelo `TELA_DA_CHAVE`,
+  o valor de hoje de cada parâmetro (`config`, a cada pedido). As fichas são
+  lidas **no boot** (§12): editou, reinicia.
+- ⚠️ **O RETRATO É O QUE FAZ A RÉGUA SER TESTE, E NÃO PAPEL.** `retrato.json`
+  guarda a impressão digital do corpo de cada ficha, a última linha de
+  "Mudanças", a situação e as ações da tela, e a impressão de cada cartão de
+  `docs/regras/` citado. Texto, cartão ou ação que mudou sem linha nova em
+  "Mudanças" é **recusado** pelo `manual_retrato.js`, e o `teste_manual.js`
+  exige que o retrato bata com os arquivos. **Não se regrava para o teste
+  passar** — a linha é o que a 907 mostra em "O que mudou". Mudar só o
+  cabeçalho, ou só acrescentar uma linha em "Mudanças", não pede linha.
+- **A ficha não tem R$, nome de arquivo, rota, SQL nem código de cartão** no
+  corpo (os cartões vão no cabeçalho), e a Regra B do §20 vale nela: o
+  `teste_linguagem.js` passou a varrer `docs/manual/`.
+- **O "?" não toma o foco, e na bancada o bipe continua com ele.** A Etiqueta
+  de Venda puxa o foco de volta ("o bipe não pode ficar sem dono"); o painel é
+  leitura, abre na mesma página (nunca em aba nova, §12) e fecha devolvendo o
+  foco a quem o tinha. Sem `manual.ler` a rota é 403 e o botão não nasce.
+- **O "Onde entra no fluxo" é gerado do `liga`**; a ficha pode trazer uma frase
+  a mais, nunca substituí-lo.
+
+**Rode `node teste_manual.js` (89) ao mexer em qualquer ficha, cartão, no
+`manual.js`, no `manual_route.js`, no `manual_retrato.js`, no `permissoes.js`
+ou nos dois mapas de telas** — oito defeitos foram reintroduzidos um a um, e
+cada um reprova: a 907 sem ficha (3 casos), cartão inexistente citado (1), texto
+mudado sem a linha de "Mudanças" (2), a ficha inteira a quem não opera (2), o
+"todas" sem exigir a chave (3), o `permDaRota` sem as linhas (1, mais 1 no
+`teste_cobertura.js`), cartão mudado sem regravar o retrato (2) e um segundo
+leitor de `docs/manual/` (1). **`node teste_manual_tela.js` (44, num Chromium; sem
+navegador diz PULADO) ao mexer na 907, no `manual_ajuda.js` ou nas barras; e
+`node manual_retrato.js` depois de escrever a linha de "Mudanças".** Também
+`teste_mapa`, `teste_lugar`, `teste_cobertura`, `teste_acesso`, `teste_menu`,
+`teste_linguagem` e `cd tecido && npm test` ganharam a 907.
+
+⚠️ **Construído, falta subir.** Ainda não provado com dado real: a 907 aberta
+pelo dono no servidor com as 53 em rascunho e o mapa; `/manual` dando 302 sem
+login no servidor; o "?" aparecendo para o Admin Geral e para ninguém mais.
+Prova que não foi feita se escreve como não feita.

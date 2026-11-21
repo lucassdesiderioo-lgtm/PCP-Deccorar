@@ -2,11 +2,28 @@
 
 ```
 STATUS
-Situação: PLANEJADO · aguardando a aprovação do dono
+Situação: EM CONSTRUÇÃO · aprovada pelo dono em 21/11/2026 ("pode seguir, monte o PLANO da fase 1")
 Criada em: 21/11/2026
 Última atualização: 21/11/2026
-Fase atual: nenhuma começou
-Fases: 1 ☐  2 ☐  3 ☐  4 ☐  5 ☐
+Fase atual: 1 construída, falta subir — a fundação: 907, "?", seis rotas, 53 fichas em
+            rascunho, glossário, retrato, teste_manual.js (89) e teste_manual_tela.js (44).
+            ⚠️ NÃO é apresentada ao time antes da fase 2 (§10). Próxima: fase 2.
+Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐
+Divergências na construção (valem sobre o texto da spec):
+  D-C1 o retrato fotografa o CARTÃO INTEIRO (título, regra, exceções, teste, status),
+       e não só a linha "Regra:" — mudar a exceção de um cartão também cobra a linha
+       na ficha. É mais estrito que a §3.3 regra 9 escrevia, e no mesmo sentido.
+  D-C2 a "última linha de Mudanças" que o retrato compara é a DATA E O TEXTO da linha
+       mais recente, e não só a data: duas mudanças no mesmo dia exigem duas linhas.
+  D-C3 o "?" não toma o foco: na bancada a tela puxa o bipe de volta ("o bipe não
+       pode ficar sem dono", Etiqueta de Venda), e o painel é leitura — o leitor
+       continua funcionando com ele aberto; fechar devolve o foco a quem o tinha.
+  D-C4 a rota da ficha aceita `aqui?rota=/operador` (é o que o "?" pergunta); são as
+       mesmas seis rotas da §6.
+  D-C5 a prova D7 ("não cancela a revisão") foi feita como "não apaga o digitado nem
+       rouba o foco de um campo comum": o campo de bipe processa o que entra como um
+       bipe, e a revisão de verdade pede o servidor inteiro. A prova na bancada é da
+       fase 2.
 Risco: 🔴 na fase 1 (tela nova, duas permissões novas, botão em toda tela, o retrato) ·
        🟢 nas fases 2 a 4 (texto) · 🟡 na fase 5 (o ponto no "?")
 Depende de: ACESSO-POR-TELA-E-NIVEL (o mapa de telas, o nível, a tela de Acessos pelo mapa)

@@ -915,6 +915,12 @@ module.exports = function(app, db){
     if(eq('/devolucoes')) return ['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro','devolucao.baixar'];
     // As telas que a pessoa abre (fase 5): cada um ve as proprias, so nome e endereco.
     if(eq('/api/telas/minhas')) return '@logado';
+    /* O MANUAL (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026): seis leituras. "Ver
+       todas as telas" é chave própria (D8); o resto é de quem lê o manual. A tela
+       /manual sai do mapa, como as outras. ANTES do pre('/api/manual'): a linha
+       da chave mais estreita vem primeiro, senão cairia na mais larga. */
+    if(eq('/api/manual/todas')) return 'manual.ver_todas';
+    if(pre('/api/manual')) return 'manual.ler';
     if(eq('/baixar-backup')) return '@ag';
     // ── acoes/admin por API ──
     // A tarja do modo teste aparece para todos (§11): so o booleano, so leitura.

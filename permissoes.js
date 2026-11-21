@@ -366,4 +366,14 @@ module.exports = [
   { chave:'auditoria.ver',        grupo:'Sistema',    tela:901, nivel:'admin_geral',
     rotulo:'Ver auditoria',       desc:'Histórico de ações e cobertura',
     sensivel:true, intransferivel:true },
+  // ─── MANUAL (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026) ─────────────
+  /* A ficha de cada tela, lida pelo "?" e pela 907. `manual.ler` abre a 907 e
+     o "?" com as fichas das telas que a pessoa opera (D7); `manual.ver_todas`
+     mostra o manual inteiro (D8), e e de nivel Supervisor por decisao do dono:
+     a bancada "nao deve ter acesso a tudo, para nao se perder". As duas nascem
+     so para o Admin Geral (R-ALC-06); o dono marca na tela de Acessos. */
+  { chave:'manual.ler',           grupo:'Sistema',    tela:907, nivel:'operacao',
+    rotulo:'Ler o manual',        desc:'Abrir a ficha das telas que a pessoa opera, pelo ? e pela 907' },
+  { chave:'manual.ver_todas',     grupo:'Sistema',    tela:907, nivel:'supervisor',
+    rotulo:'Ver o manual de todas as telas', desc:'Ler a ficha das telas que a pessoa não opera' }
 ];

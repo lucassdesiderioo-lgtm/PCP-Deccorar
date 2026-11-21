@@ -49,7 +49,10 @@ const EXCECOES = [
 function arquivos(dir, filtro, acc){
   acc = acc || [];
   for(const f of fs.readdirSync(path.join(RAIZ, dir))){
-    if(f === 'node_modules' || f === '.git' || f === 'docs') continue;
+    /* docs/ fica de fora — e para quem edita —, MENOS docs/manual/: a ficha e
+       texto que o time le na 907 e no "?" (spec MANUAL-DO-SISTEMA, §3.3 regra 3). */
+    if(f === 'node_modules' || f === '.git') continue;
+    if(dir === '.' && f === 'docs'){ arquivos('docs/manual', filtro, acc); continue; }
     const rel = path.join(dir, f);
     if(fs.statSync(path.join(RAIZ, rel)).isDirectory()) arquivos(rel, filtro, acc);
     else if(filtro(rel)) acc.push(rel.split(path.sep).join('/'));
@@ -63,7 +66,8 @@ function arquivos(dir, filtro, acc){
    teste, §11) e entra. */
 const ehTeste = (f) => (/(^|\/)teste_[^/]*\.js$/.test(f) && !/(^|\/)teste_route\.js$/.test(f))
                     || /^tecido\/teste\//.test(f);
-const VARRIDOS = arquivos('.', (f) => /\.(js|html)$/.test(f) && !ehTeste(f.replace(/^\.\//, '')))
+/* .md so o de docs/manual/: o resto da documentacao e para quem edita, e fala de dono unico e de gestao de proposito */
+const VARRIDOS = arquivos('.', (f) => (/\.(js|html)$/.test(f) || /^(\.\/)?docs\/manual\/[^/]+\.md$/.test(f)) && !ehTeste(f.replace(/^\.\//, '')))
   .map((f) => f.replace(/^\.\//, ''));
 
 function achados(){
