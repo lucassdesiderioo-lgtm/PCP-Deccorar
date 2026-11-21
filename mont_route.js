@@ -424,7 +424,7 @@ module.exports=function(app,db){
   app.post('/api/montagem/cancelar',(req,res)=>{
     const q=QUEM.exigir(req,res); if(!q) return;
     const b=req.body||{};
-    const cod=String(b.codigo||'').trim().toUpperCase();
+    const cod=String(b.codigo||'').trim().toUpperCase().slice(0,80);
     if(!cod) return res.status(400).json({erro:'codigo'});
     const txt=v=>v==null||v===''?null:String(v).slice(0,40);
     db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,inicio,fim,usuario_id,usuario_nome)

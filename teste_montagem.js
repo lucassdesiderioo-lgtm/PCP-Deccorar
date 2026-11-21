@@ -501,6 +501,8 @@ console.log('\n── 11. cancelar a embalagem em andamento (21/11/2026) ──'
   ok('cancelar zera a embalagem e chama a rota', /emb=null/.test(fc2) && /\/api\/montagem\/cancelar/.test(fc2));
   ok('o aviso do cancelamento fica ate o proximo bipe', /avisoFixo=true/.test(fc2));
   ok('com o envio no ar nao se cancela', /enviando\) return/.test(fc2));
+  ok('kit e sob medida nao ouvem "continua em Aguardando embalagem" (③)', /persiana:info\.exige_medida!==0/.test(tela) && /cur\.persiana \?/.test(fc2));
+  ok('a recusa do registro nao mostra a chave crua (③)', !/r\.erro\+'\)/.test(fc2));
 }
 
 console.log('\n────────────────────────────────────────────');

@@ -111,18 +111,22 @@ async function cancelarEmb(){
   const seg=Math.round((Date.now()-cur.inicio)/1000);
   clearInterval(tick); tick=null; emb=null; bipePerdido=null;
   avisoFixo=true;
-  banner('','Embalagem cancelada', '<b>'+cur.codigo+'</b> · nada foi gravado, e a peça continua em "Aguardando embalagem". Bipe o SKU para começar de novo.');
+  /* Kit, acessorio e sob medida nao passam pela fila (R-EMB-02): para eles nao
+     se fala da lista "Aguardando embalagem" (③ REVISAO). */
+  const resto=cur.persiana ? ' · nada foi gravado, e a peça continua em "Aguardando embalagem".' : ' · nada foi gravado.';
+  banner('','Embalagem cancelada', '<b>'+cur.codigo+'</b>'+resto+' Bipe o SKU para começar de novo.');
   beep(true);
   try{
     const r=await (await fetch('/api/montagem/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({codigo:cur.codigo,segundos:seg,inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
-    if(r && r.erro && !emb){ avisoFixo=true; banner('err','Embalagem cancelada, sem registro', '<b>'+cur.codigo+'</b> · nada foi gravado, mas o cancelamento não ficou registrado ('+r.erro+'). Bipe o SKU para começar de novo.'); }
+    /* sem a chave crua na tela (§20): "nao_logado" nao diz nada a quem embala */
+    if(r && r.erro && !emb){ avisoFixo=true; banner('err','Embalagem cancelada, sem registro', '<b>'+cur.codigo+'</b> · nada foi gravado, mas o cancelamento não ficou registrado. Se a tela pedir o PIN, entre de novo. Bipe o SKU para começar de novo.'); }
   }catch(e){ /* sem conexao: a embalagem ja foi zerada na tela e nada foi gravado */ }
   carregarFila();
 }
 document.getElementById('cancEmb').addEventListener('click', cancelarEmb);
 function abrir(info){
-  emb={codigo:info.codigo,cor:info.cor||'',peca:pecaHtml(info),inicio:Date.now(),kitOk:false}; startTimer();
+  emb={codigo:info.codigo,cor:info.cor||'',peca:pecaHtml(info),inicio:Date.now(),kitOk:false,persiana:info.exige_medida!==0}; startTimer();
   /* A CONFERENCIA DA PECA ACONTECE AQUI, e so aqui.
      Depois de ensacada a persiana some dentro do saco preto e o unico jeito
      de saber o que tem dentro passa a ser a etiqueta colada por fora. Este

@@ -248,7 +248,7 @@
 - **Status:** no ar desde 21/11/2026 (PR #359, spec `EMBALAGEM-TEMPO-MINIMO`).
 
 ### R-EMB-10 · "Cancelar embalagem" zera a embalagem em andamento
-- **Regra:** com uma embalagem aberta, o botão "Cancelar embalagem" (embaixo do aviso) zera tudo num toque, sem motivo e sem confirmação. **Nada grava**: nem `montagem`, nem o +1, nem a fila — a peça continua em "Aguardando embalagem". Fica uma linha `cancelada` em `montagem_evento`, com quem cancelou e os segundos (`POST /api/montagem/cancelar`, `embalagem.executar`, 401 sem login). O aviso "Embalagem cancelada" fica até o próximo bipe. Com o envio do bipe final no ar, o botão some.
+- **Regra:** com uma embalagem aberta, o botão "Cancelar embalagem" (embaixo do aviso) zera tudo num toque, sem motivo e sem confirmação. **Nada grava**: nem `montagem`, nem o +1, nem a fila — a persiana continua em "Aguardando embalagem" (kit, acessório e sob medida nunca estiveram nela, e a frase não fala da lista). Fica uma linha `cancelada` em `montagem_evento`, com quem cancelou e os segundos (`POST /api/montagem/cancelar`, `embalagem.executar`, 401 sem login). O aviso "Embalagem cancelada" fica até o próximo bipe. Com o envio do bipe final no ar, o botão some.
 - **Por quê:** o dono, 21/11/2026: quem precisa largar a bancada para atender outra pessoa não tinha saída — a tela ficava presa na peça ("Termine a persiana atual"). O espelho da R-REV-08.
 - **Exceções:** sem conexão, a embalagem é zerada na tela do mesmo jeito (nada foi gravado), e só o registro do cancelamento se perde. Ao voltar, o tempo recomeça no 1º bipe (R-EMB-09).
 - **Teste que trava:** `teste_montagem.js` (seção 11).
