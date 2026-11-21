@@ -435,10 +435,21 @@ console.log('\n── 10. a persiana so embala se veio da revisao (EMBALAGEM-SO-
   eq('sob medida (modelo sem medida) embala sem fila', chamar('POST','/api/montagem',corpo('SOBMEDIDA')).status, 200);
   eq('e o kit nao vira evento de recusa', evs().length, 6);
 
+  /* ③ REVISAO: a trava perguntava em maiuscula e a transacao consumia com
+     comparacao exata — uma linha em minuscula autorizava +1 para sempre. */
+  db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('BK190190MIN',0,91)").run();
+  const fmin = db.prepare("INSERT INTO fila (codigo,modo) VALUES ('bk190190min','estoque')").run().lastInsertRowid;
+  eq('linha da fila em minuscula: a primeira embala', chamar('POST','/api/montagem',corpo('BK190190MIN')).status, 200);
+  eq('   e a linha e consumida', filaSit(fmin), 'embalado');
+  eq('   e a segunda, sem outra linha, e recusada', chamar('POST','/api/montagem',corpo('BK190190MIN')).status, 409);
+  eq('   o estoque subiu so 1', estoqueDe('BK190190MIN'), 1);
+
   const tela = fs.readFileSync(path.join(__dirname,'public','montagem.html'),'utf8');
   ok('a tela trata a recusa sem_revisao', /sem_revisao/.test(tela));
   ok('no 1o bipe a tela confere a fila (e pergunta de novo antes de recusar)',
      /async function conferirRevisao/.test(tela) && /conferirRevisao[\s\S]{0,600}await carregarFila\(\)/.test(tela));
+  ok('sem conexao a tela diz "Sem conexão", e nao "Não passou pela Revisão" (③)',
+     /if\(!leu\)\{\s*banner\('err','Sem conexão'/.test(tela) && /catch\(e\)\{ return false; \}/.test(tela));
   ok('a regra da tela e a mesma do servidor: so persiana (exige_medida)', /exige_medida===0\) return false/.test(tela));
 }
 

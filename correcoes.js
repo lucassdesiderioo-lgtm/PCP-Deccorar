@@ -524,6 +524,12 @@ const ACOES = {
     previa(db, f){
       const dia = String(f.revisado_em || f.data || '').slice(0, 10);
       const dias = dia ? Math.round((new Date(hoje(db) + 'T12:00:00') - new Date(dia + 'T12:00:00')) / 86400000) : null;
+      /* A persiana so embala vindo da fila (R-EMB-02, 21/11/2026); kit,
+         acessorio e sob medida (modelo sem medida) embalam sem ela. A regua e
+         a da embalagem: sem modelo (ou sem a coluna) conta como persiana. */
+      let persiana = true;
+      try{ const m = db.prepare('SELECT COALESCE(m.exige_medida,1) e FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=UPPER(?)').get(f.codigo);
+           persiana = !m || m.e !== 0; }catch(e){ persiana = true; }
       return {
         antes:  { fila:f },
         depois: { fila:null },
@@ -533,7 +539,9 @@ const ACOES = {
           (dias === 0 ? 'Confira o carrinho da bancada antes: a peça pode estar lá esperando o kit. ' : '') +
           (f.modo === 'devolucao' ? 'Veio de uma devolução (peça que voltou do Mercado Livre para reembalar): tirar perde o ' +
             'vínculo, e a peça física continua na fábrica. ' : '') +
-          'O estoque não se mexe. ⚠ Se a peça EXISTIR, ela deixa de poder ser embalada: só volta à fila revisada de novo, ou desfazendo esta correção (desde 21/11/2026 a persiana só embala vindo da Revisão).'
+          'O estoque não se mexe. ' + (persiana
+            ? '⚠ Se a peça EXISTIR, ela deixa de poder ser embalada: só volta à fila revisada de novo, ou desfazendo esta correção (desde 21/11/2026 a persiana só embala vindo da Revisão).'
+            : 'Este SKU não é persiana com medida: se a peça aparecer, ela embala mesmo fora da fila.')
       };
     },
     executar(db, f){ db.prepare('DELETE FROM fila WHERE id=?').run(f.id); },

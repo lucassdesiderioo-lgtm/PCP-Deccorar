@@ -339,7 +339,10 @@ module.exports=function(app,db){
       db.transaction(()=>{
         const mid=db.prepare("INSERT INTO montagem (codigo,inicio,fim,segundos,kit_ok,usuario_id,usuario_nome) VALUES (?,?,?,?,1,?,?)")
           .run(cod,inicio,fim,seg,q.usuario_id,q.usuario_nome).lastInsertRowid;
-        const f=db.prepare("SELECT id,modo FROM fila WHERE codigo=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod,emTeste);
+        /* ⚠️ A MESMA REGUA DA TRAVA (UPPER), ③ REVISAO: com comparacao exata aqui,
+           uma linha em minuscula passava na trava e nunca era consumida —
+           e autorizava +1 para sempre. */
+        const f=db.prepare("SELECT id,modo FROM fila WHERE UPPER(codigo)=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod,emTeste);
         if(f){ db.prepare("UPDATE fila SET situacao='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(f.id); naFila=true; modo=f.modo; }
         /* O modo da fila fica na linha da embalagem (FICHAS-NO-CADASTRO-UNICO):
            o "consumido por operacao" nao conta a devolucao reembalada. */
