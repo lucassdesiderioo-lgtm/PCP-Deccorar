@@ -505,6 +505,17 @@ console.log('\n── 11. cancelar a embalagem em andamento (21/11/2026) ──'
   ok('a recusa do registro nao mostra a chave crua (③)', !/r\.erro\+'\)/.test(fc2));
 }
 
+console.log('\n── 12. o resultado do bipe final fica na tela até o próximo bipe (21/11/2026) ──');
+/* O redesenho de 4 s (load -> idle) trocava o "Embalada ✓" por "Pronto" em
+   menos de 1 s: quem não leu a tempo podia embalar a peça de novo (+1 duas
+   vezes). O mesmo para "Não deu pra embalar" e "Falha de conexão". */
+{
+  const tela = fs.readFileSync(path.join(__dirname,'public','montagem.html'),'utf8');
+  ok('"Embalada ✓" fica até o próximo bipe', /avisoFixo=true;\s*banner\('ok','Embalada ✓/.test(tela));
+  ok('"Não deu pra embalar" fica até o próximo bipe', /avisoFixo=true;\s*banner\('err','Não deu pra embalar'/.test(tela));
+  ok('"Falha de conexão" fica até o próximo bipe', /avisoFixo=true;\s*banner\('err','Falha de conexão'/.test(tela));
+}
+
 console.log('\n────────────────────────────────────────────');
 console.log(falhas ? '  ' + falhas + ' de ' + n + ' FALHARAM' : '  todos os ' + n + ' casos passaram');
 try{ db.close(); fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}

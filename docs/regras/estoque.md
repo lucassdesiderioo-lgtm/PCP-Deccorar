@@ -39,7 +39,7 @@
 - **Regra:** o fim da embalagem soma +1 por um movimento `embalagem` no livro. As quatro escritas (`montagem`, `fila`, `skus`, `producao`) entram juntas ou nenhuma entra.
 - **Por quê:** é o primeiro momento em que a persiana está pronta e ensacada. Escrita pela metade deixava a peça na prateleira e em lugar nenhum do sistema.
 - **Exceções:** sob medida (R-EST-05).
-- **Teste que trava:** `teste_montagem.js` (152) · `teste_livro.js` (65).
+- **Teste que trava:** `teste_montagem.js` (155) · `teste_livro.js` (65).
 - **Status:** no ar desde 17/09/2026.
 - **História:** armadilha #26.
 
