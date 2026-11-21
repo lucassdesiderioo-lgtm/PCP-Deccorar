@@ -516,6 +516,20 @@ console.log('\n── 12. o resultado do bipe final fica na tela até o próximo
   ok('"Falha de conexão" fica até o próximo bipe', /avisoFixo=true;\s*banner\('err','Falha de conexão'/.test(tela));
 }
 
+console.log('\n── 13. o tempo da peça ao lado da mediana de quem embalou (TEMPO-NA-BANCADA) ──');
+{
+  cfgSet('emb_minimo_seg','0');
+  const PEPE={id:77,nome:'Pepe'};
+  const emb = seg => { novaFila('BK140140BEGE','estoque');
+    return chamar('POST','/api/montagem',{codigo:'BK140140BEGE', kit_ok:1, kit_codigo:(db.prepare("SELECT valor FROM config WHERE chave='kit_codigo'").get()||{}).valor, segundos:seg}, PEPE).body; };
+  let b = emb(60);
+  ok('a primeira embalagem da pessoa volta sem média', b && b.ok && b.tempo && b.tempo.segundos===60 && b.tempo.mediana===null, JSON.stringify(b));
+  b = emb(70);
+  ok('a segunda compara com a primeira, e acima dela é "melhorar"', b.tempo.mediana===60 && b.tempo.aviso==='melhorar', JSON.stringify(b.tempo));
+  b = emb(50);
+  ok('abaixo da mediana é "parabéns"', b.tempo.mediana===65 && b.tempo.aviso==='parabens', JSON.stringify(b.tempo));
+}
+
 console.log('\n────────────────────────────────────────────');
 console.log(falhas ? '  ' + falhas + ' de ' + n + ' FALHARAM' : '  todos os ' + n + ' casos passaram');
 try{ db.close(); fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}

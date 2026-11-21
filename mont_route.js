@@ -6,6 +6,7 @@
 const KIT_BIPE = require('./public/kit_bipe.js');
 const ESTOQUE  = require('./estoque_dominio');
 const QUEM     = require('./quem');
+const TEMPO    = require('./tempo_operador');
 /* O tempo minimo da embalagem, em segundos (EMBALAGEM-TEMPO-MINIMO, 21/11/2026).
    E so o padrao do boot: quem manda e config.emb_minimo_seg. */
 const EMB_MINIMO_PADRAO = 45;
@@ -334,11 +335,12 @@ module.exports=function(app,db){
     }
 
     // Fila do MOMENTO (emTeste, acima): em modo teste só linha de teste, fora dele só linha real.
-    let naFila=false, modo='estoque', abatido=false;
+    let naFila=false, modo='estoque', abatido=false, novo=null;
     try{
       db.transaction(()=>{
         const mid=db.prepare("INSERT INTO montagem (codigo,inicio,fim,segundos,kit_ok,usuario_id,usuario_nome) VALUES (?,?,?,?,1,?,?)")
           .run(cod,inicio,fim,seg,q.usuario_id,q.usuario_nome).lastInsertRowid;
+        novo=mid;
         /* ⚠️ A MESMA REGUA DA TRAVA (UPPER), ③ REVISAO: com comparacao exata aqui,
            uma linha em minuscula passava na trava e nunca era consumida —
            e autorizava +1 para sempre. */
@@ -415,7 +417,9 @@ module.exports=function(app,db){
     }
     const est=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(cod);
     const prog=db.prepare("SELECT COUNT(*) n FROM montagem WHERE data=date('now','localtime')").get();
-    res.json({ok:true,total_hoje:prog.n,naFila:naFila,abatido:abatido,estoque:est?est.estoque:0});
+    /* TEMPO-NA-BANCADA (R-TEM-01): o tempo desta peça ao lado da mediana de quem a fez. */
+    const tempo=TEMPO.seguro(db,'montagem',q.usuario_id,cod,seg,novo);
+    res.json({ok:true,total_hoje:prog.n,naFila:naFila,abatido:abatido,estoque:est?est.estoque:0,tempo});
   });
   /* CANCELAR A EMBALAGEM EM ANDAMENTO (21/11/2026): o espelho do "Cancelar
      revisao" (R-REV-08). Quem precisa largar a bancada zera a embalagem na

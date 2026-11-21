@@ -1,10 +1,10 @@
 # TEMPO-NA-BANCADA — a pessoa vê o tempo da peça ao lado da própria mediana
 
-> **STATUS — 21/11/2026: RASCUNHO, esperando o "pode seguir" do dono.** As
-> escolhas foram feitas na conversa de 21/11/2026 sobre os três exemplos de tela
-> (artifact "Tempo na bancada"): **opção B** (duas barras), **a mediana da própria
-> pessoa naquele SKU nos últimos 30 dias**, e **só a própria pessoa vê**. Uma fase.
-> `REGRA` 🟡 (cálculo exibido; não mexe em estoque, permissão nem schema).
+> **STATUS — 21/11/2026: APROVADA E CONSTRUÍDA, falta subir.** O dono escolheu a
+> **opção B** (duas barras), a **mediana da própria pessoa no SKU, 30 dias**, **só a
+> própria pessoa vê**, e acrescentou o aviso: **"Parabéns!"** no tempo da mediana ou
+> abaixo, **"Você pode melhorar"** acima (*"pode seguir"*). Uma fase. `REGRA` 🟡.
+> Cartão **R-TEM-01** em `docs/regras/estoque.md`; linha em `docs/DECISOES.md`.
 
 ## O pedido
 
@@ -37,10 +37,14 @@ Sua média   ████████████░░░░░░░   31 s   
 - **Só a própria pessoa vê, e só o dela** (decisão do dono). Quem é vem do login
   (`quem.js`), nunca da tela; nenhum nome, id ou tempo de colega viaja.
 - **Quem calcula é o servidor**, na resposta do bipe que fecha a peça (o `POST`
-  que grava), num campo `tempo: {segundos, mediana, base:'sku'|'geral'|null, n}`.
+  que grava), num campo `tempo: {segundos, mediana, base:'sku'|'geral'|null, n, aviso:'parabens'|'melhorar'|null}`.
   A tela só desenha. Nenhuma rota nova, nenhuma permissão nova.
 - **Conta-se a linha gravada com o id do login** (`usuario_id`); a linha antiga sem
   id não é de ninguém (a régua da §21). Tempo zero ou vazio fica de fora.
+- **O aviso embaixo das barras** (decisão do dono): **"Parabéns!"** quando a peça
+  saiu no tempo da mediana ou abaixo, **"Você pode melhorar"** quando passou dela,
+  com a diferença em segundos. Na primeira peça (sem média), nenhum dos dois.
+  Quem decide é o servidor (`aviso`), não a tela.
 - **O número não trava nada**: o mínimo de 15 s (R-REV-07) e de 45 s (R-EMB-09)
   continuam sendo as únicas recusas por tempo.
 
