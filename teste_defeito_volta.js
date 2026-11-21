@@ -146,6 +146,10 @@ ok('o setor responsável aparece', (r.body.porSetor || []).some(s => s.setor ===
 db.prepare("INSERT INTO rejeicao (codigo,motivo) VALUES ('BK140140BEGE','antiga')").run();
 r = chamar('GET', '/api/rejeicao/resumo');
 ok('a peça com problema de antes (sem origem) conta como achada na revisão', (r.body.porOrigem || []).find(o => o.origem === 'revisao').qtd === 2);
+{ const linhaEmb = (r.body.lista || []).find(x => x.origem === 'embalagem');
+  ok('na 104, a linha achada na embalagem diz quem achou (o dono, 21/11/2026)', linhaEmb && linhaEmb.achou_por === 'Ana', JSON.stringify(linhaEmb));
+  const t104 = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+  ok('a 104 escreve quem achou na coluna Quem', /achou_por/.test(t104)); }
 
 console.log('\n── 6. permissão e telas ──');
 const app2 = { locals:{}, router:{ stack:[] }, get(){}, post(){}, delete(){} };

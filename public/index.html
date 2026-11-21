@@ -3249,7 +3249,7 @@ async function carregarProb(){
   var t='<table><thead><tr><th>Quando</th><th>SKU</th><th>Motivo</th><th>Onde</th><th>Setor</th><th>Quem</th><th>Obs</th></tr></thead><tbody>';
   for(var k=0;k<d.lista.length;k++){
     var r=d.lista[k];
-    t+='<tr><td style="font-size:13px;color:var(--muted)">'+(r.criado_em||'').slice(5,16)+'</td><td><b>'+r.codigo+'</b></td><td>'+r.motivo+'</td><td style="font-size:13px">'+(r.origem==='embalagem'?'embalagem':'revisão')+'</td><td style="font-size:13px">'+(r.setor||'—')+'</td><td style="color:var(--muted)">'+(r.usuario||'-')+'</td><td style="color:var(--muted);font-size:13px">'+(r.obs||'')+'</td></tr>';
+    t+='<tr><td style="font-size:13px;color:var(--muted)">'+(r.criado_em||'').slice(5,16)+'</td><td><b>'+r.codigo+'</b></td><td>'+r.motivo+'</td><td style="font-size:13px">'+(r.origem==='embalagem'?'embalagem':'revisão')+'</td><td style="font-size:13px">'+(r.setor||'—')+'</td><td style="color:var(--muted)">'+(r.achou_por?'achou: '+r.achou_por+' · conferiu: ':'')+(r.usuario||'-')+'</td><td style="color:var(--muted);font-size:13px">'+(r.obs||'')+'</td></tr>';
   }
   document.getElementById('pbLista').innerHTML=t+'</tbody></table>';
 }

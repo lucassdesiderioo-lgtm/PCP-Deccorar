@@ -94,7 +94,10 @@ module.exports=function(app,db){
          antes, sem origem, e da Revisao — era a unica porta. */
       porOrigem: db.prepare("SELECT CASE WHEN origem='embalagem' THEN 'embalagem' ELSE 'revisao' END origem, COUNT(*) qtd FROM rejeicao WHERE "+w+" GROUP BY 1 ORDER BY 1 DESC").all(...p),
       porSetor: db.prepare("SELECT setor, COUNT(*) qtd FROM rejeicao WHERE "+w+" AND setor IS NOT NULL GROUP BY setor ORDER BY qtd DESC").all(...p),
-      lista: db.prepare('SELECT * FROM rejeicao WHERE '+w+' ORDER BY id DESC LIMIT 100').all(...p),
+      /* A peca achada na embalagem diz QUEM ACHOU, ao lado de quem conferiu na
+         Revisao (o dono, 21/11/2026). O banco sem a tabela da volta cai na lista simples. */
+      lista: (()=>{ try{ return db.prepare('SELECT r.*, d.achou_por FROM rejeicao r LEFT JOIN embalagem_defeito d ON d.rejeicao_id=r.id WHERE '+w.replace(/\bdata\b/g,'r.data')+' ORDER BY r.id DESC LIMIT 100').all(...p); }
+        catch(e){ return db.prepare('SELECT * FROM rejeicao WHERE '+w+' ORDER BY id DESC LIMIT 100').all(...p); } })(),
       total: db.prepare('SELECT COUNT(*) c FROM rejeicao WHERE '+w).get(...p).c
     });
   });
