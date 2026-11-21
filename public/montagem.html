@@ -56,7 +56,7 @@
 <script src="/kit_bipe.js"></script>
 <script>
 const $=s=>document.querySelector(s);
-let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[];
+let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[], avisoFixo=false;
 async function carregarFila(){
   try{
     const lista=await (await fetch('/api/fila')).json();
@@ -74,7 +74,9 @@ async function load(){
   SKUS=await (await fetch('/api/skus')).json();
   KIT=(await (await fetch('/api/config/kit')).json()).kit;
   stats();
-  if(!emb) idle();
+  /* A recusa "Não passou pela Revisão" e o "Sem conexão" ficam ate o proximo
+     bipe (③ REVISAO): este redesenho de 4 s os apagava em menos de 4 s. */
+  if(!emb && !avisoFixo) idle();
 }
 async function stats(){
   const st=await (await fetch('/api/montagem/hoje')).json();
@@ -117,31 +119,41 @@ function naoNaFila(info){
 /* A lista "Aguardando embalagem" se atualiza a cada 4 s: antes de recusar, a
    tela pergunta de novo — a peca pode ter saido da Revisao agora. O bipe
    nesse meio e ignorado. */
-let conferindo=false;
+let conferindo=false, bipePerdido=null;
 async function conferirRevisao(info){
-  if(conferindo){ beep(false); return; }
-  conferindo=true;
+  conferindo=true; bipePerdido=null;
+  banner('','Conferindo a fila da Revisão…','Aguarde: <b>'+info.codigo+'</b> não está na lista "Aguardando embalagem", e a tela está perguntando de novo.');
   let leu=false;
   try{ leu=await carregarFila(); }finally{ conferindo=false; }
   if(emb) return;
   /* SEM CONEXAO NAO E "SEM REVISAO" (③ REVISAO, §12): mandar a peca a Revisao
      por falta de rede criaria uma segunda linha na fila para a mesma peca. */
-  if(!leu){ banner('err','Sem conexão','Não deu para conferir a fila da Revisão. <b>Bipe o SKU de novo</b>; se repetir, confira o Wi-Fi.'); beep(false); return; }
+  if(!leu){ avisoFixo=true; banner('err','Sem conexão','Não deu para conferir a fila da Revisão. <b>Bipe o SKU de novo</b>; se repetir, confira o Wi-Fi.'+perdido()); beep(false); return; }
   if(!naoNaFila(info)){ abrir(info); return; }
   semRevisao(info.codigo);
 }
 function semRevisao(cod){
+  avisoFixo=true;
   banner('err','Não passou pela Revisão','Não há nenhuma <b>'+cod+'</b> esperando embalagem.'
-    +'<div class="confira">Leve a persiana para a <b>Revisão</b> e embale depois.</div>'); beep(false);
+    +'<div class="confira">Leve a persiana para a <b>Revisão</b> e embale depois.</div>'+perdido()); beep(false);
+}
+/* O bipe que chegou durante a conferencia da fila nao valeu: o aviso final diz qual. */
+function perdido(){
+  const c=bipePerdido; bipePerdido=null;
+  return c ? '<div class="confira">O bipe de <b>'+c+'</b> chegou enquanto a tela conferia e <b>não valeu</b>: bipe de novo.</div>' : '';
 }
 function handle(code){
   code=(code||'').trim().toUpperCase(); if(!code) return;
+  avisoFixo=false;
   const now=Date.now(); if(last.c===code && now-last.t<700) return; last={c:code,t:now};
   /* COM O ENVIO NO AR, O BIPE E IGNORADO (③ REVISAO, EMBALAGEM-TEMPO-MINIMO):
      a embalagem fica de pe ate o servidor responder. Antes ela era zerada
      antes do envio, e um bipe nesse meio abria uma embalagem nova escondida —
      e a recusa do tempo apagava o desenho dela. */
   if(emb && emb.enviando){ beep(false); return; }
+  /* O BIPE DURANTE A CONFERENCIA DA FILA DIZ QUE NAO VALEU (③ REVISAO): com
+     rede lenta ele se perdia so com o bipe grave. */
+  if(conferindo){ bipePerdido=code; banner('err','Bipe não valeu','A tela ainda está conferindo a fila da Revisão. <b>Bipe de novo</b> em instantes.'); beep(false); return; }
   // Kit: compara so letras/numeros. O leitor + teclado ABNT2 embaralha os
   // simbolos do link do Drive (: -> Ç, / -> ;), mas o miolo alfanumerico e o
   // mesmo. Assim bate tanto bipando o QR quanto digitando a URL limpa.

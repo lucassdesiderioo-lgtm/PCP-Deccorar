@@ -418,9 +418,13 @@ module.exports=function(app,db){
     res.json({ok:true,total_hoje:prog.n,naFila:naFila,abatido:abatido,estoque:est?est.estoque:0});
   });
   app.get('/api/fila',(req,res)=>{
-    res.json(db.prepare(`SELECT f.codigo, s.cor, COUNT(*) qtd, MIN(f.revisado_em) desde
-      FROM fila f LEFT JOIN skus s ON s.codigo=f.codigo
-      WHERE f.situacao='aguardando' GROUP BY f.codigo ORDER BY desde`).all());
+    /* A MESMA REGUA DA TRAVA DO POST (③ REVISAO): so a fila do momento (modo
+       teste so a de teste) e o codigo em maiuscula. Antes a lista mostrava a
+       linha de teste e abria a embalagem que o servidor recusava no fim. */
+    const emTeste = cfg('modo_teste')==='1' ? 1 : 0;
+    res.json(db.prepare(`SELECT UPPER(f.codigo) codigo, s.cor, COUNT(*) qtd, MIN(f.revisado_em) desde
+      FROM fila f LEFT JOIN skus s ON s.codigo=UPPER(f.codigo)
+      WHERE f.situacao='aguardando' AND COALESCE(f.teste,0)=? GROUP BY UPPER(f.codigo) ORDER BY desde`).all(emTeste));
   });
   app.get('/api/montagem/hoje',(req,res)=> res.json(db.prepare("SELECT codigo, COUNT(*) qtd, ROUND(AVG(segundos)) tmedio FROM montagem WHERE data=date('now','localtime') GROUP BY codigo ORDER BY qtd DESC").all()));
 };

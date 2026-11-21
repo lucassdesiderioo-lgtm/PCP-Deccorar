@@ -449,7 +449,20 @@ console.log('\n── 10. a persiana so embala se veio da revisao (EMBALAGEM-SO-
   ok('no 1o bipe a tela confere a fila (e pergunta de novo antes de recusar)',
      /async function conferirRevisao/.test(tela) && /conferirRevisao[\s\S]{0,600}await carregarFila\(\)/.test(tela));
   ok('sem conexao a tela diz "Sem conexão", e nao "Não passou pela Revisão" (③)',
-     /if\(!leu\)\{\s*banner\('err','Sem conexão'/.test(tela) && /catch\(e\)\{ return false; \}/.test(tela));
+     /if\(!leu\)\{\s*avisoFixo=true;\s*banner\('err','Sem conexão'/.test(tela) && /catch\(e\)\{ return false; \}/.test(tela));
+  /* ③ REVISAO r2 (testador de tela): a lista e a trava com a mesma regua; o
+     aviso fica ate o proximo bipe; o bipe durante a conferencia diz que nao valeu. */
+  db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('BK200200TST',0,91)").run();
+  db.prepare("INSERT INTO fila (codigo,modo,teste) VALUES ('BK200200TST','estoque',1)").run();
+  db.prepare("INSERT INTO fila (codigo,modo) VALUES ('bk210210lst','estoque')").run();
+  const lista = chamar('GET','/api/fila').body;
+  ok('a lista "Aguardando" nao mostra a linha de teste (a trava nao a aceita)', !lista.some(f => f.codigo === 'BK200200TST'), JSON.stringify(lista));
+  ok('a lista devolve o codigo em maiuscula, como a trava compara', lista.some(f => f.codigo === 'BK210210LST'));
+  ok('o aviso sem revisao e o "Sem conexão" nao sao apagados pelo redesenho de 4 s',
+     /if\(!emb && !avisoFixo\) idle\(\)/.test(tela) && /function semRevisao\(cod\)\{\s*avisoFixo=true/.test(tela) && /avisoFixo=true; banner\('err','Sem conexão'/.test(tela));
+  ok('e o proximo bipe solta o aviso', /if\(!code\) return;\s*avisoFixo=false;/.test(tela));
+  ok('o bipe durante a conferencia diz que nao valeu (e o aviso final repete)',
+     /if\(conferindo\)\{ bipePerdido=code; banner\('err','Bipe não valeu'/.test(tela) && /function perdido\(\)/.test(tela));
   ok('a regra da tela e a mesma do servidor: so persiana (exige_medida)', /exige_medida===0\) return false/.test(tela));
 }
 
