@@ -112,6 +112,7 @@ const MSG = {
   nada:           'Não há revisão para desfazer agora.'
 };
 
+const TEMPO = require('./tempo_operador');
 const QUEM = require('./quem');
 module.exports=function(app,db){
   /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
@@ -137,14 +138,18 @@ module.exports=function(app,db){
       return res.status(409).json({erro:'Rápido demais ('+seg+' s) — a revisão continua. Termine de revisar e bipe de novo.',
         motivo:'rapido_demais',minimo:min,segundos:seg});
     }
+    let novo=null;
     db.transaction(()=>{
       const id=db.prepare('INSERT INTO revisao (codigo,inicio,fim,segundos,usuario_id,usuario_nome,modo) VALUES (?,?,?,?,?,?,?)')
         .run(cod,inicio,fim,seg,q.usuario_id,q.usuario_nome,modo).lastInsertRowid;
       db.prepare('INSERT INTO fila (codigo,modo,revisao_id) VALUES (?,?,?)').run(cod,modo,id);
+      novo=id;
     })();
     const est=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(cod);
     const prog=db.prepare(`SELECT COALESCE(SUM(qtd),0) pedido, COALESCE(SUM(produzido),0) feito FROM producao WHERE codigo=? AND data=date('now','localtime')`).get(cod);
-    res.json({ok:true,codigo:cod,estoque:est?est.estoque:null,pedido:prog.pedido,feito:prog.feito});
+    /* TEMPO-NA-BANCADA (R-TEM-01): o tempo desta peça ao lado da mediana de quem a fez. */
+    const tempo=TEMPO.seguro(db,'revisao',q.usuario_id,cod,seg,novo);
+    res.json({ok:true,codigo:cod,estoque:est?est.estoque:null,pedido:prog.pedido,feito:prog.feito,tempo});
   });
 
   /* Zera a revisao em andamento. Ela so existe na tela (o cronometro), entao

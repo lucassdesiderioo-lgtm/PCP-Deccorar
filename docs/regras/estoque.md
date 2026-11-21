@@ -39,7 +39,7 @@
 - **Regra:** o fim da embalagem soma +1 por um movimento `embalagem` no livro. As quatro escritas (`montagem`, `fila`, `skus`, `producao`) entram juntas ou nenhuma entra.
 - **Por quê:** é o primeiro momento em que a persiana está pronta e ensacada. Escrita pela metade deixava a peça na prateleira e em lugar nenhum do sistema.
 - **Exceções:** sob medida (R-EST-05).
-- **Teste que trava:** `teste_montagem.js` (152) · `teste_livro.js` (65).
+- **Teste que trava:** `teste_montagem.js` (158) · `teste_livro.js` (65).
 - **Status:** no ar desde 17/09/2026.
 - **História:** armadilha #26.
 
@@ -252,7 +252,15 @@
 - **Por quê:** o dono, 21/11/2026: quem precisa largar a bancada para atender outra pessoa não tinha saída — a tela ficava presa na peça ("Termine a persiana atual"). O espelho da R-REV-08.
 - **Exceções:** sem conexão, a embalagem é zerada na tela do mesmo jeito (nada foi gravado), e só o registro do cancelamento se perde. Ao voltar, o tempo recomeça no 1º bipe (R-EMB-09).
 - **Teste que trava:** `teste_montagem.js` (seção 11).
-- **Status:** construída em 21/11/2026, falta subir.
+- **Status:** no ar desde 21/11/2026 (PR #360).
+
+### R-TEM-01 · Ao terminar a peça, a pessoa vê o tempo dela ao lado da própria mediana
+- **Regra:** na Revisão (101) e na Embalagem (102), o aviso verde do fim mostra duas barras — **"Agora"** e **"Sua média"** — e o aviso **"Parabéns!"** (no tempo da mediana ou mais rápido) ou **"Você pode melhorar"** (acima dela). "Sua média" é a **mediana** da própria pessoa **naquele SKU** nos **últimos 30 dias** (`data >= hoje − 30`), sem contar a peça que acabou de gravar; sem peça do SKU no período, a de **todos os SKUs** ("(todos os SKUs)"); sem nenhuma, só a barra de agora e *"Primeira peça — ainda sem média"*, sem aviso. Conta só a linha com o id do login (a sem id não é de ninguém), sem teste e com tempo > 0. **Quem calcula e decide o aviso é o servidor** (`tempo_operador.js`, dono único), na resposta do bipe que grava (`tempo`); a tela só desenha (`public/tempo_bancada.js`). **Só a própria pessoa vê**, e só o dela. **Não trava nada**: as recusas por tempo continuam sendo só a R-REV-07 e a R-EMB-09.
+- **Por quê:** o dono, 21/11/2026: *"esse SKU fez em tanto tempo e a média do tempo que você tem é de tanto"*; escolheu as barras, a mediana (uma peça parada não puxa o número) e o aviso.
+- **Vale para as próximas telas:** toda tela nova que mede o tempo de uma atividade do operador registra a atividade no `tempo_operador.js` (`ATIVIDADES`), devolve `tempo` no bipe que fecha a peça e desenha com o `tempoBancada`.
+- **Exceções:** o sob medida (bancada 6xx) fica de fora até spec própria; o tablet com a página antiga ignora o campo até ser recarregado; a conta que falhar não derruba o bipe (vai ao log, `tempo:null`).
+- **Teste que trava:** `teste_tempo_operador.js` (28) e `teste_montagem.js` (seção 13).
+- **Status:** construído em 21/11/2026, falta subir.
 
 ---
 

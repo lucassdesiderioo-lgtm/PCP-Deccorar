@@ -505,6 +505,31 @@ console.log('\n── 11. cancelar a embalagem em andamento (21/11/2026) ──'
   ok('a recusa do registro nao mostra a chave crua (③)', !/r\.erro\+'\)/.test(fc2));
 }
 
+console.log('\n── 12. o resultado do bipe final fica na tela até o próximo bipe (21/11/2026) ──');
+/* O redesenho de 4 s (load -> idle) trocava o "Embalada ✓" por "Pronto" em
+   menos de 1 s: quem não leu a tempo podia embalar a peça de novo (+1 duas
+   vezes). O mesmo para "Não deu pra embalar" e "Falha de conexão". */
+{
+  const tela = fs.readFileSync(path.join(__dirname,'public','montagem.html'),'utf8');
+  ok('"Embalada ✓" fica até o próximo bipe', /avisoFixo=true;\s*banner\('ok','Embalada ✓/.test(tela));
+  ok('"Não deu pra embalar" fica até o próximo bipe', /avisoFixo=true;\s*banner\('err','Não deu pra embalar'/.test(tela));
+  ok('"Falha de conexão" fica até o próximo bipe', /avisoFixo=true;\s*banner\('err','Falha de conexão'/.test(tela));
+}
+
+console.log('\n── 13. o tempo da peça ao lado da mediana de quem embalou (TEMPO-NA-BANCADA) ──');
+{
+  cfgSet('emb_minimo_seg','0');
+  const PEPE={id:77,nome:'Pepe'};
+  const emb = seg => { novaFila('BK140140BEGE','estoque');
+    return chamar('POST','/api/montagem',{codigo:'BK140140BEGE', kit_ok:1, kit_codigo:(db.prepare("SELECT valor FROM config WHERE chave='kit_codigo'").get()||{}).valor, segundos:seg}, PEPE).body; };
+  let b = emb(60);
+  ok('a primeira embalagem da pessoa volta sem média', b && b.ok && b.tempo && b.tempo.segundos===60 && b.tempo.mediana===null, JSON.stringify(b));
+  b = emb(70);
+  ok('a segunda compara com a primeira, e acima dela é "melhorar"', b.tempo.mediana===60 && b.tempo.aviso==='melhorar', JSON.stringify(b.tempo));
+  b = emb(50);
+  ok('abaixo da mediana é "parabéns"', b.tempo.mediana===65 && b.tempo.aviso==='parabens', JSON.stringify(b.tempo));
+}
+
 console.log('\n────────────────────────────────────────────');
 console.log(falhas ? '  ' + falhas + ' de ' + n + ' FALHARAM' : '  todos os ' + n + ' casos passaram');
 try{ db.close(); fs.rmSync(tmp,{recursive:true,force:true}); }catch(e){}

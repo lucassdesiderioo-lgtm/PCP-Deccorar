@@ -57,6 +57,7 @@
      pergunta "isto e o kit?" tem uma regua so, senao a tela aceitaria um bipe
      que o servidor recusa no dia em que uma das duas mudasse. -->
 <script src="/kit_bipe.js"></script>
+<script src="/tempo_bancada.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[], avisoFixo=false;
@@ -251,14 +252,15 @@ async function finish(){
     /* SEM REVISAO (R-EMB-02, 21/11/2026): a peca saiu da fila entre o 1o bipe
        e o final (outra bancada embalou a ultima, alguem tirou da fila). */
     if(r && r.motivo==='sem_revisao'){ semRevisao(cur.codigo); stats(); carregarFila(); return; }
-    if(r && r.erro){ banner('err','Não deu pra embalar', r.erro); beep(false); stats(); return; }
-    banner('ok','Embalada ✓ ('+fmt(seg)+')', cur.codigo+' · kit conferido · foi pro estoque.'); beep(true); stats(); carregarFila();
+    if(r && r.erro){ avisoFixo=true; banner('err','Não deu pra embalar', r.erro); beep(false); stats(); return; }
+    /* o resultado fica até o próximo bipe: o redesenho de 4 s o apagava em menos de 1 s */
+    avisoFixo=true; banner('ok','Embalada ✓ ('+fmt(seg)+')', cur.codigo+' · kit conferido · foi pro estoque.', (window.tempoBancada?tempoBancada(r&&r.tempo):'')); beep(true); stats(); carregarFila();
   }catch(e){
     /* A RESPOSTA PODE SE PERDER DEPOIS DA GRAVACAO (§12, ③ REVISAO r3): aqui
        rebipar soma +1 de novo. A frase diz isso, e o contador de hoje e
        atualizado para a pessoa conferir antes de embalar outra vez. */
     clearInterval(tick); tick=null; emb=null;
-    banner('err','Falha de conexão', 'A embalagem de <b>'+cur.codigo+'</b> pode ter sido gravada: confira o contador de hoje antes de embalar de novo.'
+    avisoFixo=true; banner('err','Falha de conexão', 'A embalagem de <b>'+cur.codigo+'</b> pode ter sido gravada: confira o contador de hoje antes de embalar de novo.'
       +'<div style="font-size:12px;color:#8b97a5;margin-top:8px">'+String(e&&e.name==='AbortError'?'o servidor não respondeu em 20 s':e)+'</div>');
     beep(false); stats();
   }
