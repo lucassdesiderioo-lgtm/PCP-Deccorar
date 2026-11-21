@@ -39,7 +39,7 @@
 - **Regra:** o fim da embalagem soma +1 por um movimento `embalagem` no livro. As quatro escritas (`montagem`, `fila`, `skus`, `producao`) entram juntas ou nenhuma entra.
 - **Por quê:** é o primeiro momento em que a persiana está pronta e ensacada. Escrita pela metade deixava a peça na prateleira e em lugar nenhum do sistema.
 - **Exceções:** sob medida (R-EST-05).
-- **Teste que trava:** `teste_montagem.js` (64) · `teste_livro.js` (65).
+- **Teste que trava:** `teste_montagem.js` (152) · `teste_livro.js` (65).
 - **Status:** no ar desde 17/09/2026.
 - **História:** armadilha #26.
 
@@ -191,11 +191,11 @@
 - **Status:** no ar desde 17/09/2026.
 - **História:** armadilha #26.
 
-### R-EMB-02 · Embalar não exige a peça estar na fila
-- **Regra:** sem linha na `fila`, a embalagem grava e soma +1 do mesmo jeito, com `modo='estoque'`.
-- **Por quê:** é o que torna seguro limpar a fila velha sem travar a bancada.
-- **Exceções:** nenhuma. Isso **não** é defeito, embora pareça.
-- **Teste que trava:** `teste_montagem.js`.
+### R-EMB-02 · A persiana só embala se veio da Revisão (desde 21/11/2026)
+- **Regra:** a persiana (SKU de modelo com medida, `COALESCE(exige_medida,1)`; o SKU sem modelo conta como persiana) só embala se houver uma linha dela esperando na `fila` (`situacao='aguardando'`). Sem ela, `POST /api/montagem` responde 409 (`motivo:'sem_revisao'`), **nada grava** — nem `montagem`, nem o +1, nem a ordem do dia, nem a baixa de material — e a recusa vira uma linha `sem_revisao` em `montagem_evento`, com quem bipou. A ordem das recusas: login → SKU → **revisão** → kit → tempo. A tela avisa já no 1º bipe (*"Não passou pela Revisão"*), perguntando a fila de novo antes de recusar; quem decide é o servidor.
+- **Por quê:** decisão do dono em 21/11/2026, depois de uma persiana que ninguém revisou entrar no estoque: *"a tela de embalagem só pode seguir com alguma embalagem vindo da revisão"*. Até ali (desde 17/09/2026) embalar sem fila somava +1 com `modo='estoque'`, para limpar a fila velha não travar a bancada.
+- **Exceções:** kit, acessório e sob medida (modelo sem medida) não passam pela Revisão e embalam sem fila, como antes. A devolução reembalada entra pela fila (`modo='devolucao'`) e passa. **Não há liberação** (decisão do dono, *"sem exceção"*): a peça que sumiu da fila é revisada de novo. ⚠ **Por isso tirar da fila uma peça que existe tem consequência** — o "Tirar da fila" da Mesa de correções, o `limpar_fila.js` e o `ajustar_fila_embalagem.js` são para a peça que não existe; tirada por engano, ela volta revisando de novo ou desfazendo a correção na Mesa.
+- **Teste que trava:** `teste_montagem.js` (seção 10).
 - **Status:** no ar.
 
 ### R-EMB-03 · Só a embalagem de fila "hoje" abate a ordem do dia
@@ -245,7 +245,14 @@
 - **Por quê:** o espelho da R-REV-07, decidido pelo dono em 21/11/2026: o bipe duplo ou apressado fechava a embalagem sem a peça ter sido embalada de verdade.
 - **Exceções:** ⚠ **a frase do 409 serve às duas páginas** ("a embalagem NÃO foi gravada e o tempo recomeça: bipe o SKU agora e espere 45 s antes de bipar o kit e o SKU"): o tablet com a página antiga em cache já descartou a embalagem quando a lê. Na tela nova a embalagem fica de pé enquanto o servidor responde, o bipe nesse meio é ignorado, e o envio desiste em 20 s. ⚠ **a tela não recusa sozinha, ao contrário da Revisão**: quem decide é só o servidor. Uma tela com o número dela, no dia em que o `config` baixasse o mínimo, diria "continua" de uma embalagem já gravada, e o segundo bipe somaria +2. Vale para todo SKU, inclusive kit e acessório. A bancada do sob medida não entra.
 - **Teste que trava:** `teste_montagem.js` (seção 9).
-- **Status:** construída em 21/11/2026, falta subir (spec `EMBALAGEM-TEMPO-MINIMO`).
+- **Status:** no ar desde 21/11/2026 (PR #359, spec `EMBALAGEM-TEMPO-MINIMO`).
+
+### R-EMB-10 · "Cancelar embalagem" zera a embalagem em andamento
+- **Regra:** com uma embalagem aberta, o botão "Cancelar embalagem" (embaixo do aviso) zera tudo num toque, sem motivo e sem confirmação. **Nada grava**: nem `montagem`, nem o +1, nem a fila — a persiana continua em "Aguardando embalagem" (kit, acessório e sob medida nunca estiveram nela, e a frase não fala da lista). Fica uma linha `cancelada` em `montagem_evento`, com quem cancelou e os segundos (`POST /api/montagem/cancelar`, `embalagem.executar`, 401 sem login). O aviso "Embalagem cancelada" fica até o próximo bipe. Com o envio do bipe final no ar, o botão some.
+- **Por quê:** o dono, 21/11/2026: quem precisa largar a bancada para atender outra pessoa não tinha saída — a tela ficava presa na peça ("Termine a persiana atual"). O espelho da R-REV-08.
+- **Exceções:** sem conexão, a embalagem é zerada na tela do mesmo jeito (nada foi gravado), e só o registro do cancelamento se perde. Ao voltar, o tempo recomeça no 1º bipe (R-EMB-09).
+- **Teste que trava:** `teste_montagem.js` (seção 11).
+- **Status:** construída em 21/11/2026, falta subir.
 
 ---
 
@@ -529,8 +536,10 @@ Ficam aqui para virar trabalho, e não esquecimento.
   o `public/kit_bipe.js`, e duas réguas divergem no dia da troca (§4, #26)
 - ❌ Fazer a embalagem em modo teste consumir a fila REAL — era a dívida 1c, e a
   peça de verdade sumia quando os testes eram apagados (§4, armadilha #26)
-- ❌ "Consertar" a embalagem para exigir que a peça esteja na fila: a fila não é
-  obrigatória, é regra do §4, e é o que torna o `limpar_fila.js` seguro
+- ❌ Deixar a persiana embalar sem a linha dela na fila, ou criar uma liberação
+  "só desta vez": sem exceção, a peça é revisada de novo (R-EMB-02, 21/11/2026)
+- ❌ Tirar da fila uma peça que existe "para limpar": ela deixa de poder ser
+  embalada até ser revisada de novo (R-EMB-02)
 - ❌ Criar um campo separado para o código de barras da etiqueta do kit: ele é
   sempre o **Código do kit** salvo, senão o impresso e o bipe divergem (§4)
 - ❌ Decidir "cabe na etiqueta?" contando caracteres: 16 letras estreitas cabem

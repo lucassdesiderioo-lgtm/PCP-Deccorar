@@ -44,6 +44,9 @@
 <div class="links"><a class="link" href="/embalagem">Etiqueta de Venda</a><a class="link" href="/painel">Painel</a></div></header>
 <div class="wrap">
   <div class="banner" id="banner"></div>
+  <!-- CANCELAR A EMBALAGEM (21/11/2026): aparece so com uma embalagem aberta.
+       O espelho do "Cancelar revisao": nada grava, a peca continua na fila. -->
+  <div id="cancLin" style="display:none;text-align:center;margin:-4px 0 14px"><button type="button" id="cancEmb" style="padding:11px 20px;border-radius:9px;border:1px solid #c9d1db;background:transparent;color:#3b4552;font-size:14px;cursor:pointer">Cancelar embalagem</button></div>
   <input id="scan" autocomplete="off">
   <div class="stats" id="stats"></div>
   <div class="fila"><div class="ft">Aguardando embalagem</div><div id="filaLista"></div></div>
@@ -56,14 +59,17 @@
 <script src="/kit_bipe.js"></script>
 <script>
 const $=s=>document.querySelector(s);
-let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[];
+let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[], avisoFixo=false;
 async function carregarFila(){
   try{
-    FILA=await (await fetch('/api/fila')).json();
+    const lista=await (await fetch('/api/fila')).json();
+    if(!Array.isArray(lista)) return false;
+    FILA=lista;
     document.getElementById('filaLista').innerHTML = FILA.length
       ? FILA.map(function(f){ return '<div class="fi"><div><div class="fc">'+f.codigo+'</div><div style="font-size:12px;color:var(--muted)">'+(f.cor||'')+'</div></div><div class="fq">'+f.qtd+'</div></div>'; }).join('')
       : '<div style="color:var(--muted);font-size:14px">Nada aguardando. A revis&atilde;o ainda n&atilde;o liberou pe&ccedil;as.</div>';
-  }catch(e){}
+    return true;
+  }catch(e){ return false; }
 }
 setInterval(function(){ if(!emb) carregarFila(); },4000);
 async function load(){
@@ -71,7 +77,9 @@ async function load(){
   SKUS=await (await fetch('/api/skus')).json();
   KIT=(await (await fetch('/api/config/kit')).json()).kit;
   stats();
-  if(!emb) idle();
+  /* A recusa "Não passou pela Revisão" e o "Sem conexão" ficam ate o proximo
+     bipe (③ REVISAO): este redesenho de 4 s os apagava em menos de 4 s. */
+  if(!emb && !avisoFixo && !conferindo) idle();
 }
 async function stats(){
   const st=await (await fetch('/api/montagem/hoje')).json();
@@ -81,7 +89,9 @@ async function stats(){
 function fmt(s){ s=+s||0; const m=Math.floor(s/60); return (m?m+'m':'')+(s%60)+'s'; }
 function mmss(ms){ const t=Math.floor(ms/1000),m=Math.floor(t/60); return String(m).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); }
 function steps(){ return '<div class="steps"><span class="chip done">1 · SKU ✓</span><span class="chip '+(emb&&emb.kitOk?'done':'')+'">2 · Kit '+(emb&&emb.kitOk?'✓':'…')+'</span><span class="chip">3 · SKU final</span></div>'; }
-function banner(kind,title,sub,extra){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(extra||''); }
+function banner(kind,title,sub,extra){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(extra||''); mostrarCancelar(); }
+/* O botao acompanha o banner: so com uma embalagem aberta e fora do envio. */
+function mostrarCancelar(){ var l=document.getElementById('cancLin'); if(l) l.style.display=(emb && !emb.enviando)?'':'none'; }
 /* Descricao da peca em letra grande. Sai do formatador unico do /sku.js — a
    mesma frase da tela de Etiqueta de Venda, pra ninguem achar que sao medidas
    diferentes. SKU sem medida/cor no cadastro avisa em vermelho em vez de ficar
@@ -93,14 +103,86 @@ function pecaHtml(info){
 }
 function idle(){ emb=null; if(!KIT){ banner('err','Código do kit não cadastrado','Peça ao responsável para cadastrar o código do kit no <b>Admin → Cadastros</b>. Sem isso não dá pra conferir o kit na embalagem.'); return; } banner('','Pronto','Bipe o <b>SKU</b> da persiana pra começar a embalagem.'); }
 function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const t=$('#tm'); if(emb&&t) t.textContent=mmss(Date.now()-emb.inicio); },250); }
+/* CANCELAR A EMBALAGEM EM ANDAMENTO (21/11/2026), o espelho do "Cancelar
+   revisao" (R-REV-08): zera num toque, sem motivo. NADA foi gravado; o servidor
+   so guarda quem cancelou. A peca continua em "Aguardando embalagem". */
+async function cancelarEmb(){
+  const cur=emb; if(!cur || cur.enviando) return;
+  const seg=Math.round((Date.now()-cur.inicio)/1000);
+  clearInterval(tick); tick=null; emb=null; bipePerdido=null;
+  avisoFixo=true;
+  /* Kit, acessorio e sob medida nao passam pela fila (R-EMB-02): para eles nao
+     se fala da lista "Aguardando embalagem" (③ REVISAO). */
+  const resto=cur.persiana ? ' · nada foi gravado, e a peça continua em "Aguardando embalagem".' : ' · nada foi gravado.';
+  banner('','Embalagem cancelada', '<b>'+cur.codigo+'</b>'+resto+' Bipe o SKU para começar de novo.');
+  beep(true);
+  try{
+    const r=await (await fetch('/api/montagem/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({codigo:cur.codigo,segundos:seg,inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
+    /* sem a chave crua na tela (§20): "nao_logado" nao diz nada a quem embala */
+    if(r && r.erro && !emb){ avisoFixo=true; banner('err','Embalagem cancelada, sem registro', '<b>'+cur.codigo+'</b> · nada foi gravado, mas o cancelamento não ficou registrado. Se a tela pedir o PIN, entre de novo. Bipe o SKU para começar de novo.'); }
+  }catch(e){ /* sem conexao: a embalagem ja foi zerada na tela e nada foi gravado */ }
+  carregarFila();
+}
+document.getElementById('cancEmb').addEventListener('click', cancelarEmb);
+function abrir(info){
+  emb={codigo:info.codigo,cor:info.cor||'',peca:pecaHtml(info),inicio:Date.now(),kitOk:false,persiana:info.exige_medida!==0}; startTimer();
+  /* A CONFERENCIA DA PECA ACONTECE AQUI, e so aqui.
+     Depois de ensacada a persiana some dentro do saco preto e o unico jeito
+     de saber o que tem dentro passa a ser a etiqueta colada por fora. Este
+     e o ultimo momento em que alguem VE a peca — se a conferencia nao for
+     neste bipe, nao ha outro. */
+  banner('go','Embalando '+info.codigo, emb.peca
+    +'<div class="confira">Confira com a peça na bancada. Não bateu, <b>não embale</b>.</div>'
+    +'Prepare e depois <b>bipe o KIT</b>.<div class="timer" id="tm">00:00</div>'+steps()); beep(true);
+}
+/* "E persiana?" — a mesma regua do servidor (`exige_medida` do /api/skus):
+   kit, acessorio e sob medida nao passam pela Revisao. */
+function naoNaFila(info){
+  if(info.exige_medida===0) return false;
+  const c=String(info.codigo).toUpperCase();
+  return !FILA.some(f=>String(f.codigo||'').toUpperCase()===c && (+f.qtd||0)>0);
+}
+/* A lista "Aguardando embalagem" se atualiza a cada 4 s: antes de recusar, a
+   tela pergunta de novo — a peca pode ter saido da Revisao agora. O bipe
+   nesse meio e ignorado. */
+let conferindo=false, bipePerdido=null;
+async function conferirRevisao(info){
+  conferindo=true; bipePerdido=null;
+  banner('','Conferindo a fila da Revisão…','Aguarde: <b>'+info.codigo+'</b> não está na lista "Aguardando embalagem", e a tela está perguntando de novo.');
+  let leu=false;
+  try{ leu=await carregarFila(); }finally{ conferindo=false; }
+  if(emb) return;
+  /* SEM CONEXAO NAO E "SEM REVISAO" (③ REVISAO, §12): mandar a peca a Revisao
+     por falta de rede criaria uma segunda linha na fila para a mesma peca. */
+  if(!leu){ avisoFixo=true; banner('err','Sem conexão','Não deu para conferir a fila da Revisão. <b>Bipe o SKU de novo</b>; se repetir, confira o Wi-Fi.'+perdido()); beep(false); return; }
+  /* achou a peca: abre, e o bipe que nao valeu no meio aparece embaixo (③ r3) */
+  if(!naoNaFila(info)){ const nota=perdido(); abrir(info); if(nota) $('#banner').insertAdjacentHTML('beforeend', nota); return; }
+  semRevisao(info.codigo);
+}
+function semRevisao(cod){
+  avisoFixo=true;
+  banner('err','Não passou pela Revisão','Não há nenhuma <b>'+cod+'</b> esperando embalagem.'
+    +'<div class="confira">Leve a persiana para a <b>Revisão</b> e embale depois.</div>'+perdido()); beep(false);
+}
+/* O bipe que chegou durante a conferencia da fila nao valeu: o aviso final diz qual. */
+function perdido(){
+  const c=bipePerdido; bipePerdido=null;
+  return c ? '<div class="confira">O bipe de <b>'+c+'</b> chegou enquanto a tela conferia e <b>não valeu</b>: bipe de novo.</div>' : '';
+}
 function handle(code){
   code=(code||'').trim().toUpperCase(); if(!code) return;
   const now=Date.now(); if(last.c===code && now-last.t<700) return; last={c:code,t:now};
+  /* solta o aviso fixo so o bipe que passou do filtro de 700 ms (③ r3) */
+  avisoFixo=false;
   /* COM O ENVIO NO AR, O BIPE E IGNORADO (③ REVISAO, EMBALAGEM-TEMPO-MINIMO):
      a embalagem fica de pe ate o servidor responder. Antes ela era zerada
      antes do envio, e um bipe nesse meio abria uma embalagem nova escondida —
      e a recusa do tempo apagava o desenho dela. */
   if(emb && emb.enviando){ beep(false); return; }
+  /* O BIPE DURANTE A CONFERENCIA DA FILA DIZ QUE NAO VALEU (③ REVISAO): com
+     rede lenta ele se perdia so com o bipe grave. */
+  if(conferindo){ bipePerdido=code; banner('err','Bipe não valeu','A tela ainda está conferindo a fila da Revisão. <b>Bipe de novo</b> em instantes.'); beep(false); return; }
   // Kit: compara so letras/numeros. O leitor + teclado ABNT2 embaralha os
   // simbolos do link do Drive (: -> Ç, / -> ;), mas o miolo alfanumerico e o
   // mesmo. Assim bate tanto bipando o QR quanto digitando a URL limpa.
@@ -117,15 +199,10 @@ function handle(code){
   }
   const info=SKUS.find(s=>s.codigo.toUpperCase()===code);
   if(info){
-    if(!emb){ emb={codigo:info.codigo,cor:info.cor||'',peca:pecaHtml(info),inicio:Date.now(),kitOk:false}; startTimer();
-      /* A CONFERENCIA DA PECA ACONTECE AQUI, e so aqui.
-         Depois de ensacada a persiana some dentro do saco preto e o unico jeito
-         de saber o que tem dentro passa a ser a etiqueta colada por fora. Este
-         e o ultimo momento em que alguem VE a peca — se a conferencia nao for
-         neste bipe, nao ha outro. */
-      banner('go','Embalando '+info.codigo, emb.peca
-        +'<div class="confira">Confira com a peça na bancada. Não bateu, <b>não embale</b>.</div>'
-        +'Prepare e depois <b>bipe o KIT</b>.<div class="timer" id="tm">00:00</div>'+steps()); beep(true); return; }
+    /* A PERSIANA SO EMBALA SE VEIO DA REVISAO (R-EMB-02, 21/11/2026). A tela
+       avisa ja no 1o bipe, para ninguem embalar a peca a toa; quem decide e o
+       servidor, no bipe final. */
+    if(!emb){ if(naoNaFila(info)) conferirRevisao(info); else abrir(info); return; }
     if(emb.codigo.toUpperCase()===code){
       if(!emb.kitOk){ banner('err','⚠ FALTOU O KIT','Bipe o <b>kit</b> antes de finalizar '+emb.codigo+'.<div class="timer" id="tm">'+mmss(Date.now()-emb.inicio)+'</div>'+steps()); beep(false); return; }
       finish(); return;
@@ -147,7 +224,8 @@ function rapidoDemais(cur, r){
 }
 async function finish(){
   const cur=emb; if(!cur || cur.enviando) return;
-  cur.enviando=true;
+  bipePerdido=null;
+  cur.enviando=true; mostrarCancelar();
   const seg=Math.round((Date.now()-cur.inicio)/1000);
   try{
     /* O ENVIO TEM LIMITE DE TEMPO (③ REVISAO r2): com a embalagem de pe
@@ -170,8 +248,11 @@ async function finish(){
     /* A RECUSA DO SERVIDOR APARECE NA BANCADA. Antes a resposta era ignorada:
        um 404 de SKU ou uma falha de gravação saíam como "Embalada ✓", e a peça
        ia pra caixa sem existir no sistema. */
+    /* SEM REVISAO (R-EMB-02, 21/11/2026): a peca saiu da fila entre o 1o bipe
+       e o final (outra bancada embalou a ultima, alguem tirou da fila). */
+    if(r && r.motivo==='sem_revisao'){ semRevisao(cur.codigo); stats(); carregarFila(); return; }
     if(r && r.erro){ banner('err','Não deu pra embalar', r.erro); beep(false); stats(); return; }
-    banner('ok','Embalada ✓ ('+fmt(seg)+')', cur.codigo+' · kit conferido · foi pro estoque.'); beep(true); stats();
+    banner('ok','Embalada ✓ ('+fmt(seg)+')', cur.codigo+' · kit conferido · foi pro estoque.'); beep(true); stats(); carregarFila();
   }catch(e){
     /* A RESPOSTA PODE SE PERDER DEPOIS DA GRAVACAO (§12, ③ REVISAO r3): aqui
        rebipar soma +1 de novo. A frase diz isso, e o contador de hoje e
