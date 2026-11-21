@@ -95,6 +95,10 @@ const cfgSet = (k,v) => db.prepare("INSERT INTO config (chave,valor) VALUES (?,?
 const filaSit = id => db.prepare('SELECT situacao FROM fila WHERE id=?').get(id).situacao;
 const novaFila = (cod,modo,teste) => db.prepare("INSERT INTO fila (codigo,modo,teste) VALUES (?,?,?)").run(cod,modo,teste||0).lastInsertRowid;
 
+/* O MINIMO DE 45 s (EMBALAGEM-TEMPO-MINIMO, 21/11/2026) nasce no boot da rota.
+   As secoes 1 a 8 nao sao sobre tempo: o minimo fica em 0 ate a secao 9. */
+const minimoNoBoot = (db.prepare("SELECT valor FROM config WHERE chave='emb_minimo_seg'").get()||{}).valor;
+cfgSet('emb_minimo_seg','0');
 cfgSet('kit_codigo','KITENVIO2026');
 
 console.log('\n── 1. o SKU tem que existir (era a unica rota do fluxo que nao conferia) ──');
@@ -265,6 +269,70 @@ db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('SOBMEDIDA',0,92
   r8 = chamar('POST','/api/montagem',{codigo:'BK100100BEGE', kit_ok:1});
   eq('o SKU de modelo comum continua somando +1', db.prepare("SELECT estoque FROM skus WHERE codigo='BK100100BEGE'").get().estoque, 1);
   eq('   com a linha de embalagem no livro', movs('BK100100BEGE'), 1);
+}
+
+console.log('\n── 9. o tempo minimo da embalagem (EMBALAGEM-TEMPO-MINIMO, 21/11/2026) ──');
+/* Decisao do dono: o bipe que fecha a embalagem com menos de 45 s desde o
+   primeiro e RECUSADO, como a revisao abaixo de 15 s (R-REV-07). Nada grava —
+   nem a embalagem, nem o +1, nem a fila, nem a ordem do dia — e a embalagem
+   continua aberta na tela. A trava e do servidor. */
+eq('o boot semeia o minimo de 45 s no config', minimoNoBoot, '45');
+cfgSet('emb_minimo_seg','45');
+{
+  db.prepare("INSERT INTO skus (codigo,estoque) VALUES ('BK130130TEMPO',3)").run();
+  const fid = novaFila('BK130130TEMPO','hoje');
+  db.prepare("INSERT INTO producao (codigo,qtd) VALUES ('BK130130TEMPO',1)").run();
+  const prod = () => db.prepare("SELECT produzido FROM producao WHERE codigo='BK130130TEMPO'").get().produzido;
+  const movs = () => db.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE codigo='BK130130TEMPO'").get().n;
+  const evs = () => db.prepare("SELECT * FROM montagem_evento WHERE codigo='BK130130TEMPO' ORDER BY id").all();
+  const antesM = nMontagem(), antesMov = movs();
+
+  let r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:1, segundos:44});
+  eq('44 s → 409', r9.status, 409);
+  eq('   com o motivo rapido_demais', r9.body && r9.body.motivo, 'rapido_demais');
+  eq('   devolvendo o minimo que vale', r9.body && r9.body.minimo, 45);
+  eq('   e os segundos lidos', r9.body && r9.body.segundos, 44);
+  ok('   a frase diz que a embalagem continua', /embalagem continua/i.test((r9.body&&r9.body.erro)||''), JSON.stringify(r9.body));
+  eq('   NADA em montagem', nMontagem(), antesM);
+  eq('   o estoque NAO subiu', estoqueDe('BK130130TEMPO'), 3);
+  eq('   nenhuma linha no livro', movs(), antesMov);
+  eq('   a peca continua na fila', filaSit(fid), 'aguardando');
+  eq('   a ordem do dia nao andou', prod(), 0);
+  const e1 = evs();
+  eq('   a recusa fica registrada (montagem_evento)', e1.length, 1);
+  ok('   com o tipo, os segundos e quem fez', e1[0] && e1[0].tipo==='rapido_demais' && e1[0].segundos===44
+     && e1[0].usuario_id===1 && e1[0].usuario_nome==='Bancada', JSON.stringify(e1[0]));
+
+  r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:1});
+  eq('sem segundos no corpo (vale 0) → 409', r9.status, 409);
+  r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:1, segundos:'abc'});
+  eq('segundos que nao e numero → 409', r9.status, 409);
+  eq('   e o estoque continua 3', estoqueDe('BK130130TEMPO'), 3);
+
+  r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:0, segundos:10});
+  eq('sem o kit, a frase do kit vem antes da do tempo (400)', r9.status, 400);
+  r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:1, segundos:10}, null);
+  eq('sem login → 401, antes do tempo', r9.status, 401);
+
+  cfgSet('emb_minimo_seg','60');
+  r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:1, segundos:50});
+  eq('o minimo vem do config: com 60, 50 s → 409', r9.status, 409);
+  eq('   devolvendo 60', r9.body && r9.body.minimo, 60);
+  cfgSet('emb_minimo_seg','45');
+
+  r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:1, segundos:45});
+  eq('45 s exatos → 200', r9.status, 200);
+  eq('   o estoque sobe +1', estoqueDe('BK130130TEMPO'), 4);
+  eq('   a fila foi consumida', filaSit(fid), 'embalado');
+  eq('   a ordem do dia andou', prod(), 1);
+  eq('   e a embalagem aceita nao vira evento', evs().length, 4);
+
+  const tr = fs.readFileSync(path.join(__dirname,'teste_route.js'),'utf8');
+  ok('montagem_evento esta nas TABELAS do modo teste', /nome:'montagem_evento'/.test(tr));
+  const tela = fs.readFileSync(path.join(__dirname,'public','montagem.html'),'utf8');
+  ok('a tela trata a recusa rapido_demais', /rapido_demais/.test(tela));
+  ok('na recusa a tela reabre a embalagem (emb=cur) e nao decide sozinha',
+     /motivo==='rapido_demais'[\s\S]{0,400}emb=cur;\s*startTimer\(\)/.test(tela) && !/seg\s*<\s*EMB_MIN/.test(tela));
 }
 
 console.log('\n────────────────────────────────────────────');

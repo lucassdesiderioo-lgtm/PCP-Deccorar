@@ -132,6 +132,14 @@ function handle(code){
     : '<div style="font-size:12px;color:#8b97a5;margin-top:10px">Nenhum código de kit cadastrado — cadastre em <b>Admin → Cadastros</b>.</div>';
   banner('err','Código não reconhecido',code+' não é um SKU cadastrado nem o kit.'+dg); beep(false);
 }
+function rapidoDemais(cur, r){
+  var seg=(r&&typeof r.segundos==='number')?r.segundos:Math.round((Date.now()-cur.inicio)/1000);
+  var min=(r&&typeof r.minimo==='number')?r.minimo:45;
+  banner('err','Rápido demais ('+seg+' s, o mínimo é '+min+' s)', (cur.peca||'')
+    +'A embalagem <b>continua</b>, com o kit já conferido. Termine de embalar e <b>bipe o SKU de novo</b>.'
+    +'<div class="timer" id="tm">'+mmss(Date.now()-cur.inicio)+'</div>'+steps());
+  beep(false);
+}
 async function finish(){
   const cur=emb; clearInterval(tick); tick=null; emb=null;
   const seg=Math.round((Date.now()-cur.inicio)/1000);
@@ -140,6 +148,18 @@ async function finish(){
     /* A RECUSA DO SERVIDOR APARECE NA BANCADA. Antes a resposta era ignorada:
        um 404 de SKU ou uma falha de gravação saíam como "Embalada ✓", e a peça
        ia pra caixa sem existir no sistema. */
+    /* RAPIDO DEMAIS (EMBALAGEM-TEMPO-MINIMO, 21/11/2026): o servidor recusou
+       o bipe de fim abaixo do minimo (45 s). NADA foi gravado, e a embalagem
+       VOLTA a correr, com o kit ja conferido e o cronometro do mesmo inicio.
+       Quem decide e so o servidor: se a tela recusasse sozinha com um numero
+       dela, o dia em que o config baixasse o minimo a tela diria "continua"
+       de uma embalagem que o servidor gravou — e o segundo bipe somaria +2. */
+    if(r && r.motivo==='rapido_demais'){
+      /* Se outra persiana ja comecou enquanto a resposta vinha, ela nao e
+         atropelada: so se avisa que a anterior nao foi gravada. */
+      if(emb){ banner('err','A embalagem de '+cur.codigo+' NÃO foi gravada', r.erro||''); beep(false); return; }
+      emb=cur; startTimer(); rapidoDemais(cur, r); return;
+    }
     if(r && r.erro){ banner('err','Não deu pra embalar', r.erro); beep(false); stats(); return; }
     banner('ok','Embalada ✓ ('+fmt(seg)+')', cur.codigo+' · kit conferido · foi pro estoque.'); beep(true); stats();
   }catch(e){ banner('err','Falha de conexão',String(e)); beep(false); }

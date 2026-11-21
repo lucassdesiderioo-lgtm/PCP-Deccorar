@@ -6,6 +6,9 @@
 const KIT_BIPE = require('./public/kit_bipe.js');
 const ESTOQUE  = require('./estoque_dominio');
 const QUEM     = require('./quem');
+/* O tempo minimo da embalagem, em segundos (EMBALAGEM-TEMPO-MINIMO, 21/11/2026).
+   E so o padrao do boot: quem manda e config.emb_minimo_seg. */
+const EMB_MINIMO_PADRAO = 45;
 module.exports=function(app,db){
   /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
      registrada neste modulo passa pelo quem.js antes do handler — a de amanha
@@ -52,6 +55,23 @@ module.exports=function(app,db){
      entram no FIM, onde o SQLite as poe (§17). */
   for(const c of ['usuario_id INTEGER','usuario_nome TEXT','modo TEXT'])
     try{ db.exec('ALTER TABLE montagem ADD COLUMN '+c); }catch(e){}
+  /* O TEMPO MINIMO DA EMBALAGEM (spec EMBALAGEM-TEMPO-MINIMO, decisao do
+     dono de 21/11/2026). O bipe que fecha a embalagem com menos de
+     `config.emb_minimo_seg` (45) segundos desde o primeiro e RECUSADO, como a
+     revisao abaixo de 15 s (R-REV-07, revisao_route.js). O numero mora no
+     config para andar sem deploy; o boot so SEMEIA (quem mudou o valor nao o
+     ve voltar). Cada recusa vira uma linha em `montagem_evento`, com quem fez:
+     e o rastro do bipe rapido, que nao entra em `montagem`. */
+  db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('emb_minimo_seg',?)").run(String(EMB_MINIMO_PADRAO));
+  db.exec(`CREATE TABLE IF NOT EXISTS montagem_evento (id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo TEXT NOT NULL, codigo TEXT, segundos INTEGER, inicio TEXT, fim TEXT,
+    usuario_id INTEGER, usuario_nome TEXT,
+    data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')),
+    teste INTEGER DEFAULT 0)`);
+  function embMinimoSeg(){
+    const n = parseInt(cfg('emb_minimo_seg'), 10);
+    return Number.isFinite(n) && n >= 0 ? n : EMB_MINIMO_PADRAO;
+  }
   app.get('/api/config/kit',(req,res)=>{ const r=db.prepare("SELECT valor FROM config WHERE chave='kit_codigo'").get(); res.json({kit:r?r.valor:null}); });
   // Guarda o valor COMO VEIO (so trim) — o link do Drive e case-sensitive e
   // vira QR pro cliente. A conferencia na embalagem (kitBate/kitNorm) compara
@@ -267,6 +287,19 @@ module.exports=function(app,db){
     const kitLido=(req.body&&req.body.kit_codigo)||'';
     if(kitLido && kitCad && !KIT_BIPE.kitBate(kitLido,kitCad))
       return res.status(400).json({erro:'⚠ O código bipado não é o kit cadastrado. Confira o kit da caixa.'});
+    /* A BARREIRA DO TEMPO vale aqui, e nao so na tela: o tablet com a pagina
+       antiga em cache nao fura a regra. Vem DEPOIS do kit (faltar o kit e o
+       erro que a pessoa precisa ler primeiro) e ANTES de qualquer escrita:
+       nada grava, e a embalagem continua aberta na bancada. */
+    const seg=Math.round(+segundos||0), emin=embMinimoSeg();
+    if(seg<emin){
+      const txt=v=>v==null||v===''?null:String(v).slice(0,40);
+      try{ db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,inicio,fim,usuario_id,usuario_nome)
+        VALUES ('rapido_demais',?,?,?,?,?,?)`).run(cod,seg,txt(inicio),txt(fim),q.usuario_id,q.usuario_nome); }
+      catch(e){ console.error('[montagem] o registro do bipe rapido falhou (a recusa vale igual):', e.message); }
+      return res.status(409).json({erro:'Rápido demais ('+seg+' s, o mínimo é '+emin+' s) — a embalagem continua. Termine de embalar e bipe o SKU de novo.',
+        motivo:'rapido_demais', minimo:emin, segundos:seg});
+    }
 
     // Fila do MOMENTO: em modo teste só linha de teste, fora dele só linha real.
     const emTeste = cfg('modo_teste')==='1' ? 1 : 0;
@@ -274,7 +307,7 @@ module.exports=function(app,db){
     try{
       db.transaction(()=>{
         const mid=db.prepare("INSERT INTO montagem (codigo,inicio,fim,segundos,kit_ok,usuario_id,usuario_nome) VALUES (?,?,?,?,1,?,?)")
-          .run(cod,inicio,fim,Math.round(+segundos||0),q.usuario_id,q.usuario_nome).lastInsertRowid;
+          .run(cod,inicio,fim,seg,q.usuario_id,q.usuario_nome).lastInsertRowid;
         const f=db.prepare("SELECT id,modo FROM fila WHERE codigo=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod,emTeste);
         if(f){ db.prepare("UPDATE fila SET situacao='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(f.id); naFila=true; modo=f.modo; }
         /* O modo da fila fica na linha da embalagem (FICHAS-NO-CADASTRO-UNICO):
