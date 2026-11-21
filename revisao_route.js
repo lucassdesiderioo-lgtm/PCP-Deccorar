@@ -99,11 +99,13 @@ function candidata(db, usuarioId){
 function situacaoFila(db, revisaoId){
   const f = db.prepare('SELECT id, situacao FROM fila WHERE revisao_id=? ORDER BY id LIMIT 1').get(revisaoId);
   if(!f) return { fila:null, motivo:'fora_da_fila' };
+  if(f.situacao === 'defeito') return { fila:f, motivo:'defeito' };
   if(f.situacao !== 'aguardando') return { fila:f, motivo:'embalada' };
   return { fila:f, motivo:null };
 }
 const MSG = {
   embalada:       'Essa peça já foi embalada — a revisão não se desfaz mais pela bancada.',
+  defeito:        'Essa peça voltou da embalagem por defeito — confira no bloco "Voltaram da embalagem".',
   fora_da_fila:   'Essa peça já saiu da fila da embalagem — a revisão não se desfaz mais pela bancada.',
   nao_e_sua:      'Essa revisão é de outra pessoa. Cada um desfaz só a própria.',
   outro_dia:      'Só se desfaz a revisão de hoje.',
@@ -113,6 +115,7 @@ const MSG = {
 };
 
 const TEMPO = require('./tempo_operador');
+const DEFEITO = require('./defeito_dominio');
 const QUEM = require('./quem');
 module.exports=function(app,db){
   /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
@@ -219,6 +222,20 @@ module.exports=function(app,db){
 
   /* Saiu do server.js em 04/11/2026 sem mudar o SQL, para o teste alcancar:
      depois do desfazer, este numero tem que voltar ao de antes. */
+  /* AS PECAS QUE VOLTARAM DA EMBALAGEM POR DEFEITO (EMBALAGEM-DEFEITO-VOLTA,
+     R-EMB-11, 21/11/2026). O revisor confere: com defeito vai ao setor (vira a
+     peca com problema); sem defeito, a volta fecha e a peca e revisada de novo. */
+  DEFEITO.garantir(db);
+  app.get('/api/revisao/defeitos',(req,res)=> res.json({ abertas:DEFEITO.abertas(db), setores:DEFEITO.SETORES }));
+  app.post('/api/revisao/defeitos/:id/decidir',(req,res)=>{
+    const q=exigir(req,res); if(!q) return;
+    try{ res.json(Object.assign({ok:true}, db.transaction(()=>DEFEITO.decidir(db,req.params.id,req.body||{},q))())); }
+    catch(e){
+      if(e instanceof DEFEITO.Recusa) return res.status(e.status).json(Object.assign({erro:e.message},e.extra));
+      console.error('[revisao] decidir a volta por defeito falhou:', e);
+      res.status(500).json({erro:'Não deu para gravar a decisão: '+e.message+' — nada foi gravado.'});
+    }
+  });
   app.get('/api/revisao/hoje',(req,res)=> res.json(db.prepare(`SELECT codigo, COUNT(*) qtd, ROUND(AVG(segundos)) tmedio
   FROM revisao WHERE data=date('now','localtime') GROUP BY codigo ORDER BY qtd DESC`).all()));
 };

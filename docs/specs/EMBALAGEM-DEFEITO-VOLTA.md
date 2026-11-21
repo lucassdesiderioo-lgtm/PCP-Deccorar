@@ -1,10 +1,11 @@
 # EMBALAGEM-DEFEITO-VOLTA — a peça com defeito volta da embalagem para a revisão
 
-> **STATUS — 21/11/2026: RASCUNHO, esperando o dono.** Escrito a partir do pedido e
-> das três respostas de 21/11/2026 (conta na 104 como "achado na embalagem"; só
-> persiana; motivo obrigatório). As perguntas da §7 precisam de resposta antes do
-> "pode seguir". Uma fase. `REGRA` 🔴 (mexe na fila da embalagem, que é dado de
-> produção, e na regra R-EMB-02 que acabou de subir).
+> **STATUS — 21/11/2026: APROVADA E CONSTRUÍDA, falta subir.** O dono respondeu as
+> três perguntas do pedido (conta na 104 como "achado na embalagem"; só persiana;
+> motivo obrigatório) e aprovou as seis sugestões da §7 (*"pode seguir"*). Uma fase.
+> `REGRA` 🔴. Cartão **R-EMB-11** em `docs/regras/estoque.md`; linha em
+> `docs/DECISOES.md`. A conta da peça com problema passou a ter dono único
+> (`rejeicao_dominio.js`), usado pela Revisão e pela volta.
 
 ## 1. O pedido
 

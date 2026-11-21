@@ -3237,11 +3237,19 @@ async function carregarProb(){
     h+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)"><span style="font-family:ui-monospace,monospace;font-size:13px">'+d.porSku[j].codigo+'</span><b>'+d.porSku[j].qtd+'</b></div>';
   }
   h+='</div></div>';
+  /* ONDE FOI ACHADA (EMBALAGEM-DEFEITO-VOLTA): revisao e embalagem, separadas, e o setor */
+  var NOMEO={revisao:'Achado na revisão',embalagem:'Achado na embalagem'};
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:16px"><div><div class="sub" style="margin-bottom:8px">ONDE FOI ACHADA</div>';
+  (d.porOrigem||[]).forEach(function(o){ h+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)"><span>'+(NOMEO[o.origem]||o.origem)+'</span><b>'+o.qtd+'</b></div>'; });
+  h+='</div><div><div class="sub" style="margin-bottom:8px">SETOR RESPONSÁVEL</div>';
+  if(!(d.porSetor||[]).length) h+='<div style="color:var(--muted);padding:7px 0">Nenhum setor informado no período.</div>';
+  (d.porSetor||[]).forEach(function(o){ h+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)"><span>'+o.setor+'</span><b>'+o.qtd+'</b></div>'; });
+  h+='</div></div>';
   el.innerHTML=h;
-  var t='<table><thead><tr><th>Quando</th><th>SKU</th><th>Motivo</th><th>Quem</th><th>Obs</th></tr></thead><tbody>';
+  var t='<table><thead><tr><th>Quando</th><th>SKU</th><th>Motivo</th><th>Onde</th><th>Setor</th><th>Quem</th><th>Obs</th></tr></thead><tbody>';
   for(var k=0;k<d.lista.length;k++){
     var r=d.lista[k];
-    t+='<tr><td style="font-size:13px;color:var(--muted)">'+(r.criado_em||'').slice(5,16)+'</td><td><b>'+r.codigo+'</b></td><td>'+r.motivo+'</td><td style="color:var(--muted)">'+(r.usuario||'-')+'</td><td style="color:var(--muted);font-size:13px">'+(r.obs||'')+'</td></tr>';
+    t+='<tr><td style="font-size:13px;color:var(--muted)">'+(r.criado_em||'').slice(5,16)+'</td><td><b>'+r.codigo+'</b></td><td>'+r.motivo+'</td><td style="font-size:13px">'+(r.origem==='embalagem'?'embalagem':'revisão')+'</td><td style="font-size:13px">'+(r.setor||'—')+'</td><td style="color:var(--muted)">'+(r.usuario||'-')+'</td><td style="color:var(--muted);font-size:13px">'+(r.obs||'')+'</td></tr>';
   }
   document.getElementById('pbLista').innerHTML=t+'</tbody></table>';
 }

@@ -46,7 +46,10 @@
   <div class="banner" id="banner"></div>
   <!-- CANCELAR A EMBALAGEM (21/11/2026): aparece so com uma embalagem aberta.
        O espelho do "Cancelar revisao": nada grava, a peca continua na fila. -->
-  <div id="cancLin" style="display:none;text-align:center;margin:-4px 0 14px"><button type="button" id="cancEmb" style="padding:11px 20px;border-radius:9px;border:1px solid #c9d1db;background:transparent;color:#3b4552;font-size:14px;cursor:pointer">Cancelar embalagem</button></div>
+  <div id="cancLin" style="display:none;text-align:center;margin:-4px 0 14px"><button type="button" id="cancEmb" style="padding:11px 20px;border-radius:9px;border:1px solid #c9d1db;background:transparent;color:#3b4552;font-size:14px;cursor:pointer">Cancelar embalagem</button><button type="button" id="defBt" style="display:none;margin-left:10px;padding:11px 20px;border-radius:9px;border:1px solid #c62828;background:#fff;color:#c62828;font-size:14px;font-weight:700;cursor:pointer">Peça com defeito</button></div>
+  <!-- PECA COM DEFEITO (EMBALAGEM-DEFEITO-VOLTA, R-EMB-11, 21/11/2026): so persiana.
+       Quem embala decide sozinho, com motivo; a peca volta para a Revisao. -->
+  <div id="defPainel" style="display:none;border:1px solid #efb1ad;background:#fbe9e8;border-radius:14px;padding:18px;margin:0 0 14px"></div>
   <input id="scan" autocomplete="off">
   <div class="stats" id="stats"></div>
   <div class="fila"><div class="ft">Aguardando embalagem</div><div id="filaLista"></div></div>
@@ -92,7 +95,48 @@ function mmss(ms){ const t=Math.floor(ms/1000),m=Math.floor(t/60); return String
 function steps(){ return '<div class="steps"><span class="chip done">1 · SKU ✓</span><span class="chip '+(emb&&emb.kitOk?'done':'')+'">2 · Kit '+(emb&&emb.kitOk?'✓':'…')+'</span><span class="chip">3 · SKU final</span></div>'; }
 function banner(kind,title,sub,extra){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(extra||''); mostrarCancelar(); }
 /* O botao acompanha o banner: so com uma embalagem aberta e fora do envio. */
-function mostrarCancelar(){ var l=document.getElementById('cancLin'); if(l) l.style.display=(emb && !emb.enviando)?'':'none'; }
+function mostrarCancelar(){ var l=document.getElementById('cancLin'); if(l) l.style.display=(emb && !emb.enviando)?'':'none';
+  var d=document.getElementById('defBt'); if(d) d.style.display=(emb && !emb.enviando && emb.persiana)?'':'none';
+  if(!(emb && emb.persiana)) fecharDefeito(); }
+/* ── PECA COM DEFEITO: volta para a Revisao (R-EMB-11) ── */
+let MOTIVOS=null;
+function fecharDefeito(){ var p=document.getElementById('defPainel'); if(p){ p.style.display='none'; p.innerHTML=''; } }
+async function abrirDefeito(){
+  if(!emb || emb.enviando || !emb.persiana) return;
+  if(!MOTIVOS){ try{ MOTIVOS=(await (await fetch('/api/listas/rejeicao')).json()).map(x=>x.valor||x).filter(Boolean); }catch(e){ MOTIVOS=null; } }
+  var p=document.getElementById('defPainel');
+  if(!MOTIVOS || !MOTIVOS.length){ p.style.display=''; p.innerHTML='<b>Não deu para carregar os motivos.</b> Confira o Wi-Fi e toque de novo em "Peça com defeito".'; return; }
+  p.style.display='';
+  p.innerHTML='<div style="font-size:19px;font-weight:800;margin-bottom:4px">Peça com defeito — <span style="font-family:ui-monospace,monospace">'+emb.codigo+'</span></div>'
+    +'<div style="font-size:14px;color:#5a6472;margin-bottom:10px">Escolha o motivo. A peça <b>não é embalada</b> e volta para a Revisão.</div>'
+    +'<div id="defMot" style="display:flex;flex-wrap:wrap;gap:8px">'+MOTIVOS.map(function(m,i){ return '<button type="button" data-mot="'+i+'" style="padding:12px 16px;border-radius:9px;border:1px solid #c9d1db;background:#fff;font-size:15px;cursor:pointer">'+m.replace(/</g,'&lt;')+'</button>'; }).join('')+'</div>'
+    +'<input id="defObs" maxlength="500" placeholder="Observação (opcional)" style="width:100%;margin-top:10px;padding:12px;border-radius:9px;border:1px solid #c9d1db;font-size:15px;box-sizing:border-box">'
+    +'<div id="defErr" style="color:#c62828;font-weight:700;margin-top:8px"></div>'
+    +'<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap"><button type="button" id="defOk" disabled style="padding:13px 20px;border-radius:9px;border:0;background:#c62828;color:#fff;font-size:15px;font-weight:800;cursor:pointer;opacity:.5">Devolver à Revisão</button>'
+    +'<button type="button" id="defVolta" style="padding:13px 20px;border-radius:9px;border:1px solid #c9d1db;background:transparent;font-size:15px;cursor:pointer">Voltar à embalagem</button></div>';
+  var escolhido=null;
+  p.querySelectorAll('[data-mot]').forEach(function(b){ b.addEventListener('click',function(){
+    escolhido=MOTIVOS[+b.dataset.mot];
+    p.querySelectorAll('[data-mot]').forEach(function(x){ x.style.background='#fff'; x.style.borderColor='#c9d1db'; x.style.fontWeight=''; });
+    b.style.background='#fde2e0'; b.style.borderColor='#c62828'; b.style.fontWeight='800';
+    var ok=document.getElementById('defOk'); ok.disabled=false; ok.style.opacity='1'; }); });
+  document.getElementById('defVolta').addEventListener('click', function(){ fecharDefeito(); keep(); });
+  document.getElementById('defOk').addEventListener('click', function(){ if(escolhido) enviarDefeito(escolhido, document.getElementById('defObs').value); });
+}
+async function enviarDefeito(motivo, obs){
+  const cur=emb; if(!cur || cur.enviando) return;
+  const seg=Math.round((Date.now()-cur.inicio)/1000);
+  cur.enviando=true; mostrarCancelar();
+  var err=document.getElementById('defErr');
+  try{
+    const resp=await fetch('/api/montagem/defeito',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo:cur.codigo,motivo:motivo,obs:obs,segundos:seg})});
+    const r=await resp.json();
+    if(r && r.erro){ cur.enviando=false; mostrarCancelar(); if(err) err.textContent=r.erro; beep(false); return; }
+    clearInterval(tick); tick=null; emb=null; bipePerdido=null; fecharDefeito();
+    avisoFixo=true; banner('err','Peça devolvida à Revisão por defeito','<b>'+cur.codigo+'</b> · '+motivo.replace(/</g,'&lt;')+' · nada foi embalado nem entrou no estoque. Leve a peça para a Revisão.');
+    beep(true); stats(); carregarFila();
+  }catch(e){ cur.enviando=false; mostrarCancelar(); if(err) err.textContent='Sem conexão: a peça não foi devolvida. Confira o Wi-Fi e toque de novo.'; beep(false); }
+}
 /* Descricao da peca em letra grande. Sai do formatador unico do /sku.js — a
    mesma frase da tela de Etiqueta de Venda, pra ninguem achar que sao medidas
    diferentes. SKU sem medida/cor no cadastro avisa em vermelho em vez de ficar
@@ -126,6 +170,7 @@ async function cancelarEmb(){
   carregarFila();
 }
 document.getElementById('cancEmb').addEventListener('click', cancelarEmb);
+document.getElementById('defBt').addEventListener('click', abrirDefeito);
 function abrir(info){
   emb={codigo:info.codigo,cor:info.cor||'',peca:pecaHtml(info),inicio:Date.now(),kitOk:false,persiana:info.exige_medida!==0}; startTimer();
   /* A CONFERENCIA DA PECA ACONTECE AQUI, e so aqui.
@@ -270,7 +315,8 @@ const scan=$('#scan');
    alto; sem isto, focar de volta rolava a pagina ate ele e jogava pro topo
    quem tivesse descido pra usar qualquer coisa no fim. O keep existe pro
    BIPE cair no lugar certo, nao pra mexer no que a pessoa esta olhando. */
-const keep=()=>{ if(document.activeElement!==scan) scan.focus({preventScroll:true}); };
+/* o painel da peca com defeito tem campo proprio: o foco nao volta ao bipe enquanto se escreve nele */
+const keep=()=>{ var a=document.activeElement; if(a && a.closest && a.closest('#defPainel')) return; if(a!==scan) scan.focus({preventScroll:true}); };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
 document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input')) keep(); });
 scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; handle(v); } });
