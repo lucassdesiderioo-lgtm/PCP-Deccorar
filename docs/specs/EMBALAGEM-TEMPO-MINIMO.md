@@ -1,6 +1,8 @@
 # EMBALAGEM-TEMPO-MINIMO — o bipe que fecha a embalagem rápido demais é recusado
 
-> **STATUS — 21/11/2026: construída, falta subir.** Spec curta, aprovada pelo
+> **STATUS — 21/11/2026: NO AR** (PR #359; o dono fez o deploy e disse *"deu
+> tudo certo no deploy"*). Ainda não provado com dado real: o primeiro bipe de
+> fim recusado na bancada. Spec curta, aprovada pelo
 > dono na conversa de 21/11/2026 (*"sim, aprovo, pode seguir"*). Uma fase só.
 > Linha em `docs/DECISOES.md`, cartão **R-EMB-09** em `docs/regras/estoque.md`.
 

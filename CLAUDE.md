@@ -819,8 +819,10 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 > de pé enquanto o servidor responde (`emb.enviando`): o bipe nesse meio é
 > ignorado, e o envio desiste em 20 s (cai no "Falha de conexão") para a rede
 > pendurada não travar a bancada — e a falha de conexão avisa que a peça **pode
-> ter sido gravada** (confira o contador antes de embalar de novo). Construído,
-> falta subir.
+> ter sido gravada** (confira o contador antes de embalar de novo). ✅ **No ar
+> desde 21/11/2026** (PR #359): o dono fez o deploy e disse *"deu tudo certo no
+> deploy"*. ⚠️ **Ainda não provado com dado real:** o primeiro bipe de fim
+> recusado na bancada, com a embalagem reaberta e o contador sem subir.
 
 > ⚠️ **A FILA DA EMBALAGEM FOI ACERTADA PELA MESA DO FIM DO DIA 04/11/2026**
 > (linha em `docs/DECISOES.md`). `node ajustar_fila_embalagem.js` simula, e
