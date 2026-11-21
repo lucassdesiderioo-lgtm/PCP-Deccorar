@@ -240,6 +240,13 @@
 - **Teste que trava:** `teste_revisao.js` (seção 6, com a tabela de antes, sem a coluna; seção 8, sem login é 401) · `teste_montagem.js` (6-B; 6-C, sem login é 401 e nada muda — nem o saldo, nem o livro, nem a ordem do dia).
 - **Status:** em código em 26/10/2026. Desde 04/11/2026 a revisão (fase 1) e a embalagem (fase 2) leem quem fez pelo `quem.js` (dono único, spec `QUEM-FEZ-E-REVISAO`) e recusam sem login (401), antes de olhar SKU e kit; a linha do livro do +1 (`movimento_estoque`) grava o mesmo quem. A Etiqueta de Venda entrou na fase 3 (05/11/2026, cartão R-QUEM-01). ~~Nenhuma tela mostra ainda~~ — desde 08/11/2026 a 905 Minha produção e a aba Por pessoa da 904 mostram (`produtividade_dominio.js`, CLAUDE.md §21).
 
+### R-EMB-09 · Bipe que fecha a embalagem abaixo de 45 s é recusado, e a embalagem continua
+- **Regra:** o 3º bipe (o SKU de novo) com menos de `config.emb_minimo_seg` segundos (padrão **45**, editável sem deploy) desde o 1º bipe — o kit no meio conta — é **recusado pelo servidor**: `POST /api/montagem` responde 409 (`motivo:'rapido_demais'`, com `minimo` e `segundos`) e nada grava (nem `montagem`, nem o +1 no livro, nem a fila, nem a ordem do dia, nem a baixa de material). A recusa vira uma linha `rapido_demais` em `montagem_evento`, com quem bipou. A tela reabre a embalagem com o kit já conferido e o cronômetro do mesmo início; a pessoa termina e bipa de novo. A ordem das recusas: login → SKU → kit → tempo.
+- **Por quê:** o espelho da R-REV-07, decidido pelo dono em 21/11/2026: o bipe duplo ou apressado fechava a embalagem sem a peça ter sido embalada de verdade.
+- **Exceções:** ⚠ **a frase do 409 serve às duas páginas** ("a embalagem NÃO foi gravada e o tempo recomeça: bipe o SKU agora e espere 45 s antes de bipar o kit e o SKU"): o tablet com a página antiga em cache já descartou a embalagem quando a lê. Na tela nova a embalagem fica de pé enquanto o servidor responde, o bipe nesse meio é ignorado, e o envio desiste em 20 s. ⚠ **a tela não recusa sozinha, ao contrário da Revisão**: quem decide é só o servidor. Uma tela com o número dela, no dia em que o `config` baixasse o mínimo, diria "continua" de uma embalagem já gravada, e o segundo bipe somaria +2. Vale para todo SKU, inclusive kit e acessório. A bancada do sob medida não entra.
+- **Teste que trava:** `teste_montagem.js` (seção 9).
+- **Status:** construída em 21/11/2026, falta subir (spec `EMBALAGEM-TEMPO-MINIMO`).
+
 ---
 
 ## O kit e a etiqueta dele

@@ -96,6 +96,11 @@ function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const t=$('#t
 function handle(code){
   code=(code||'').trim().toUpperCase(); if(!code) return;
   const now=Date.now(); if(last.c===code && now-last.t<700) return; last={c:code,t:now};
+  /* COM O ENVIO NO AR, O BIPE E IGNORADO (③ REVISAO, EMBALAGEM-TEMPO-MINIMO):
+     a embalagem fica de pe ate o servidor responder. Antes ela era zerada
+     antes do envio, e um bipe nesse meio abria uma embalagem nova escondida —
+     e a recusa do tempo apagava o desenho dela. */
+  if(emb && emb.enviando){ beep(false); return; }
   // Kit: compara so letras/numeros. O leitor + teclado ABNT2 embaralha os
   // simbolos do link do Drive (: -> Ç, / -> ;), mas o miolo alfanumerico e o
   // mesmo. Assim bate tanto bipando o QR quanto digitando a URL limpa.
@@ -132,17 +137,50 @@ function handle(code){
     : '<div style="font-size:12px;color:#8b97a5;margin-top:10px">Nenhum código de kit cadastrado — cadastre em <b>Admin → Cadastros</b>.</div>';
   banner('err','Código não reconhecido',code+' não é um SKU cadastrado nem o kit.'+dg); beep(false);
 }
+function rapidoDemais(cur, r){
+  var seg=(r&&typeof r.segundos==='number')?r.segundos:Math.round((Date.now()-cur.inicio)/1000);
+  var min=(r&&typeof r.minimo==='number')?r.minimo:45;
+  banner('err','Rápido demais ('+seg+' s, o mínimo é '+min+' s)', (cur.peca||'')
+    +'A embalagem <b>continua</b>, com o kit já conferido. Termine de embalar e <b>bipe o SKU de novo</b>.'
+    +'<div class="timer" id="tm">'+mmss(Date.now()-cur.inicio)+'</div>'+steps());
+  beep(false);
+}
 async function finish(){
-  const cur=emb; clearInterval(tick); tick=null; emb=null;
+  const cur=emb; if(!cur || cur.enviando) return;
+  cur.enviando=true;
   const seg=Math.round((Date.now()-cur.inicio)/1000);
   try{
-    const r=await (await fetch('/api/montagem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo:cur.codigo,segundos:seg,kit_ok:cur.kitOk?1:0,kit_codigo:cur.kitCod||'',inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
+    /* O ENVIO TEM LIMITE DE TEMPO (③ REVISAO r2): com a embalagem de pe
+       durante o envio, um pedido pendurado no Wi-Fi da bancada ignoraria todo
+       bipe sem explicar. Em 20 s ele desiste e cai no "Falha de conexao". */
+    const ctl=(typeof AbortController==='function')?new AbortController():null;
+    const prazo=ctl?setTimeout(()=>ctl.abort(),20000):null;
+    let resp, r;
+    try{ resp=await fetch('/api/montagem',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl?ctl.signal:undefined,body:JSON.stringify({codigo:cur.codigo,segundos:seg,kit_ok:cur.kitOk?1:0,kit_codigo:cur.kitCod||'',inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})});
+         r=await resp.json(); }
+    finally{ if(prazo) clearTimeout(prazo); }
+    /* RAPIDO DEMAIS (EMBALAGEM-TEMPO-MINIMO, 21/11/2026): o servidor recusou
+       o bipe de fim abaixo do minimo (45 s). NADA foi gravado, e a MESMA
+       embalagem segue, com o kit ja conferido e o cronometro do mesmo inicio.
+       Quem decide e so o servidor: se a tela recusasse sozinha com um numero
+       dela, o dia em que o config baixasse o minimo a tela diria "continua"
+       de uma embalagem que o servidor gravou — e o segundo bipe somaria +2. */
+    if(r && r.motivo==='rapido_demais'){ cur.enviando=false; rapidoDemais(cur, r); return; }
+    clearInterval(tick); tick=null; emb=null;
     /* A RECUSA DO SERVIDOR APARECE NA BANCADA. Antes a resposta era ignorada:
        um 404 de SKU ou uma falha de gravação saíam como "Embalada ✓", e a peça
        ia pra caixa sem existir no sistema. */
     if(r && r.erro){ banner('err','Não deu pra embalar', r.erro); beep(false); stats(); return; }
     banner('ok','Embalada ✓ ('+fmt(seg)+')', cur.codigo+' · kit conferido · foi pro estoque.'); beep(true); stats();
-  }catch(e){ banner('err','Falha de conexão',String(e)); beep(false); }
+  }catch(e){
+    /* A RESPOSTA PODE SE PERDER DEPOIS DA GRAVACAO (§12, ③ REVISAO r3): aqui
+       rebipar soma +1 de novo. A frase diz isso, e o contador de hoje e
+       atualizado para a pessoa conferir antes de embalar outra vez. */
+    clearInterval(tick); tick=null; emb=null;
+    banner('err','Falha de conexão', 'A embalagem de <b>'+cur.codigo+'</b> pode ter sido gravada: confira o contador de hoje antes de embalar de novo.'
+      +'<div style="font-size:12px;color:#8b97a5;margin-top:8px">'+String(e&&e.name==='AbortError'?'o servidor não respondeu em 20 s':e)+'</div>');
+    beep(false); stats();
+  }
 }
 const scan=$('#scan');
 /* preventScroll: devolver o foco nao pode arrastar a tela. O #scan mora no

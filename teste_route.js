@@ -21,6 +21,9 @@ module.exports=function(app, db){
     {nome:'revisao_evento', pk:'id', rotulo:'revisao (canceladas e desfeitas)'},
     {nome:'producao',     pk:'id',   rotulo:'producao'},
     {nome:'montagem',     pk:'id',   rotulo:'embalagem'},
+    /* O bipe de fim da embalagem recusado por rapido demais (EMBALAGEM-TEMPO-MINIMO,
+       21/11/2026): a mesma razao do revisao_evento. */
+    {nome:'montagem_evento', pk:'id', rotulo:'embalagem (bipes recusados)'},
     {nome:'lote',         pk:'id',   rotulo:'expedicao'},
     // As pecas dentro da caixa (§5-B). Andam junto com o `lote`: apagar o
     // volume de teste e deixar os itens dele de pe criaria linha orfa, e o

@@ -240,7 +240,7 @@ const bate = etapa => ok('a soma do livro bate com o saldo — ' + etapa,
 
 bate('logo depois da abertura');
 
-chamar2('POST','/api/montagem',{codigo:'BK140140BEGE',segundos:30});
+chamar2('POST','/api/montagem',{codigo:'BK140140BEGE',segundos:60});
 eq('EMBALAR soma +1', saldo2('BK140140BEGE'), 3);
 bate('depois de embalar');
 
@@ -292,8 +292,8 @@ bate('depois do sob medida');
 console.log('\n── o modo teste, que e onde a soma quebraria calada ──');
 
 require('./util_modo_teste_antigo')(d2);   // aposentado: simula o banco que chegou ligado ao deploy
-chamar2('POST','/api/montagem',{codigo:'BK120120BEGE',segundos:10});
-chamar2('POST','/api/montagem',{codigo:'BK120120BEGE',segundos:10});
+chamar2('POST','/api/montagem',{codigo:'BK120120BEGE',segundos:60});
+chamar2('POST','/api/montagem',{codigo:'BK120120BEGE',segundos:60});
 eq('em modo teste a embalagem soma igual', saldo2('BK120120BEGE'), 6);
 eq('   e as linhas nascem marcadas teste=1',
    d2.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE teste=1").get().n, 2);
@@ -306,7 +306,7 @@ eq('   e as linhas de teste sumiram do livro',
 bate('depois de APAGAR os testes');
 
 require('./util_modo_teste_antigo')(d2);   // aposentado: simula o banco que chegou ligado ao deploy
-chamar2('POST','/api/montagem',{codigo:'BK120120BEGE',segundos:10});
+chamar2('POST','/api/montagem',{codigo:'BK120120BEGE',segundos:60});
 chamar2('POST','/api/teste/manter',{});
 eq('MANTER promove a producao de teste', saldo2('BK120120BEGE'), 5);
 eq('   e promove a linha do livro junto',
