@@ -33,10 +33,10 @@
  *     tela roda antes da busca de SKU, e todo bipe dele respondia "Bipe o SKU
  *     primeiro". Ninguem associaria isso a uma edicao no Admin.
  *
- * ⚠️ O QUE ESTE ARQUIVO TRAVA E QUE **NAO** E BUG (§4): embalar SEM a peca
- * estar na fila continua somando +1 no estoque, com `modo='estoque'`. A fila
- * nao e obrigatoria para embalar — e e isso que torna o `limpar_fila.js`
- * seguro. Quem "consertar" isso trava a bancada.
+ * ⚠️ DESDE 21/11/2026 A PERSIANA SO EMBALA SE VEIO DA REVISAO (R-EMB-02,
+ * secao 10): sem linha na fila e 409. Kit, acessorio e sob medida (modelo sem
+ * medida) embalam sem fila, como antes. Tirar da fila uma peca que existe
+ * passou a ter consequencia: ela precisa ser revisada de novo.
  *
  * Sobe um banco temporario e chama os handlers direto, com um `app` de
  * mentira. Nao abre porta, nao toca no banco de producao.
@@ -109,6 +109,9 @@ ok('a mensagem diz o codigo', /NAOEXISTE/.test((r.body&&r.body.erro)||''), JSON.
 eq('e NADA foi gravado em montagem (antes respondia ok:true e a peca sumia)', nMontagem(), antes);
 
 console.log('\n── 2. o kit (o bloqueio saiu da tela e virou trava de servidor) ──');
+/* Desde 21/11/2026 a persiana so embala vindo da revisao (secao 10): a peca
+   entra na fila antes, para a chamada chegar ao kit. */
+novaFila('BK140140BEGE','estoque'); novaFila('BK140140BEGE','estoque');
 antes = nMontagem();
 r = chamar('POST','/api/montagem',{codigo:'BK140140BEGE', kit_ok:0});
 eq('kit_ok falso → 400', r.status, 400);
@@ -146,12 +149,13 @@ eq('fila modo "estoque" NAO abate a ordem (armadilha #20)', db.prepare("SELECT p
 eq('mas vira estoque igual', estoqueDe('BK160160CINZA'), 7);
 eq('e a linha saiu da fila', filaSit(fEst), 'embalado');
 
-/* ⚠️ ISTO E REGRA, NAO BUG (§4): a fila nao e obrigatoria para embalar. E o que
-   torna `node limpar_fila.js` seguro — limpar a fila nao pode travar a bancada. */
+/* ⚠️ DESDE 21/11/2026 A PERSIANA SO EMBALA SE VEIO DA REVISAO (R-EMB-02,
+   decisao do dono; spec EMBALAGEM-SO-DA-REVISAO). Ate ali embalar sem fila
+   somava +1 — e foi assim que uma persiana nao revisada entrou no estoque. */
 r = chamar('POST','/api/montagem',{codigo:'BK160160CINZA', kit_ok:1});
-eq('SEM fila, embalar continua somando +1 (REGRA do §4, nao conserte)', estoqueDe('BK160160CINZA'), 8);
-eq('e a resposta diz que nao havia fila', r.body.naFila, false);
-eq('sem fila nao abate ordem: o modo vira "estoque"', db.prepare("SELECT produzido FROM producao WHERE codigo='BK160160CINZA'").get().produzido, 1);
+eq('SEM fila, a persiana e recusada (409)', r.status, 409);
+eq('e o estoque NAO sobe', estoqueDe('BK160160CINZA'), 7);
+eq('a ordem do dia nao anda', db.prepare("SELECT produzido FROM producao WHERE codigo='BK160160CINZA'").get().produzido, 1);
 
 console.log('\n── 4. as quatro escritas sao UMA transacao ──');
 console.log('     (o erro de SQL que aparece abaixo E O CASO: e o log que nao existia)');
@@ -169,9 +173,9 @@ console.log('\n── 5. divida 1c: modo teste nao come a fila REAL ──');
 const fReal = novaFila('BK140140BEGE','hoje',0);
 cfgSet('modo_teste','1');
 r = chamar('POST','/api/montagem',{codigo:'BK140140BEGE', kit_ok:1});
-eq('em modo teste a embalagem funciona', r.status, 200);
-eq('mas NAO consome a linha real da fila', filaSit(fReal), 'aguardando');
-eq('e a resposta diz que nao pegou fila', r.body.naFila, false);
+eq('em modo teste, so com a linha REAL na fila, a persiana e recusada (409)', r.status, 409);
+eq('e a linha real NAO e consumida', filaSit(fReal), 'aguardando');
+eq('a recusa e a da revisao: a fila de teste esta vazia', r.body && r.body.motivo, 'sem_revisao');
 const fTeste = novaFila('BK140140BEGE','hoje',1);
 r = chamar('POST','/api/montagem',{codigo:'BK140140BEGE', kit_ok:1});
 eq('a linha de TESTE, essa sim, e consumida', filaSit(fTeste), 'embalado');
@@ -261,6 +265,7 @@ db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('SOBMEDIDA',0,92
 {
   const movs = c => db.prepare('SELECT COUNT(*) n FROM movimento_estoque WHERE codigo=?').get(c).n;
   const ant = db.prepare('SELECT COUNT(*) n FROM montagem').get().n;
+  novaFila('SOBMEDIDA','hoje'); novaFila('BK100100BEGE','hoje');
   let r8 = chamar('POST','/api/montagem',{codigo:'SOBMEDIDA', kit_ok:1});
   eq('a embalagem do sob medida responde ok', r8.status, 200);
   eq('o saldo do sob medida continua zero', db.prepare("SELECT estoque FROM skus WHERE codigo='SOBMEDIDA'").get().estoque, 0);
@@ -363,6 +368,78 @@ cfgSet('emb_minimo_seg','45');
   const pegaErro = fin.slice(fin.indexOf('}catch(e){'));
   ok('a falha de conexao avisa que pode ter gravado e mostra o contador',
      /pode ter sido gravada/i.test(pegaErro) && /stats\(\)/.test(pegaErro.slice(0, 1200)));
+}
+
+console.log('\n── 10. a persiana so embala se veio da revisao (EMBALAGEM-SO-DA-REVISAO, 21/11/2026) ──');
+/* Decisao do dono: "a tela de embalagem so pode seguir com alguma embalagem
+   vindo da revisao". Vale SO para persiana (modelo com medida): kit,
+   acessorio e sob medida nao passam pela Revisao. Sem excecao: a peca que
+   sumiu da fila e revisada de novo. */
+{
+  cfgSet('emb_minimo_seg','0');
+  try{ db.exec('ALTER TABLE modelo ADD COLUMN exige_medida INTEGER DEFAULT 1'); }catch(e){}
+  db.exec("UPDATE modelo SET exige_medida=0 WHERE id=92");
+  db.exec("INSERT INTO modelo (id,nome,sob_medida,exige_medida) VALUES (93,'Acessório',0,0)");
+  db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('BK150150REV',0,91),('BK170170SEMMOD',0,NULL),('KIT32',0,93)").run();
+  const kit = db.prepare("SELECT valor FROM config WHERE chave='kit_codigo'").get().valor;
+  const corpo = c => ({codigo:c, segundos:60, kit_ok:1, kit_codigo:kit});
+  const livro = () => db.prepare('SELECT COUNT(*) n FROM movimento_estoque').get().n;
+  const ev0 = db.prepare("SELECT COALESCE(MAX(id),0) m FROM montagem_evento").get().m;
+  const evs = () => db.prepare("SELECT * FROM montagem_evento WHERE tipo='sem_revisao' AND id>? ORDER BY id").all(ev0);
+  db.prepare("INSERT INTO producao (codigo,qtd,produzido) VALUES ('BK150150REV',2,0)").run();
+  const prod = () => db.prepare("SELECT SUM(produzido) p FROM producao WHERE codigo='BK150150REV'").get().p;
+
+  const foto = () => JSON.stringify({m:nMontagem(), e:estoqueDe('BK150150REV'), l:livro(), p:prod()});
+  let a = foto();
+  let r10 = chamar('POST','/api/montagem',corpo('BK150150REV'),{id:5,nome:'Bia'});
+  eq('persiana sem fila → 409', r10.status, 409);
+  eq('   com o motivo sem_revisao', r10.body && r10.body.motivo, 'sem_revisao');
+  ok('   a frase manda levar para a Revisao e diz que nada gravou',
+     /Revisão/.test(r10.body&&r10.body.erro||'') && /NADA foi gravado/.test(r10.body&&r10.body.erro||''), JSON.stringify(r10.body));
+  eq('   nada mudou: embalagem, saldo, livro e ordem do dia', foto(), a);
+  const ev = evs();
+  eq('   a recusa vira uma linha em montagem_evento', ev.length, 1);
+  eq('   com quem bipou', ev[0] && ev[0].usuario_id, 5);
+
+  const fe = novaFila('BK150150REV','hoje');
+  db.prepare("UPDATE fila SET situacao='embalado' WHERE id=?").run(fe);
+  eq('linha da fila ja embalada nao conta → 409', chamar('POST','/api/montagem',corpo('BK150150REV')).status, 409);
+
+  /* a ordem: login → SKU → revisao → kit → tempo */
+  eq('sem login continua 401 (antes da revisao)', chamar('POST','/api/montagem',corpo('BK150150REV'),null).status, 401);
+  eq('SKU que nao existe continua 404', chamar('POST','/api/montagem',corpo('NAOEXISTE2')).status, 404);
+  r10 = chamar('POST','/api/montagem',{codigo:'BK150150REV', segundos:60, kit_ok:0});
+  eq('sem revisao E sem kit: a recusa e a da revisao', r10.body && r10.body.motivo, 'sem_revisao');
+  cfgSet('emb_minimo_seg','45');
+  r10 = chamar('POST','/api/montagem',{codigo:'BK150150REV', segundos:10, kit_ok:1, kit_codigo:kit});
+  eq('sem revisao E rapido demais: a recusa e a da revisao', r10.body && r10.body.motivo, 'sem_revisao');
+  cfgSet('emb_minimo_seg','0');
+
+  const f1 = novaFila('BK150150REV','hoje');
+  r10 = chamar('POST','/api/montagem',corpo('BK150150REV'));
+  eq('com a peca na fila → 200', r10.status, 200);
+  eq('   o estoque sobe +1', estoqueDe('BK150150REV'), 1);
+  eq('   a linha da fila e consumida', filaSit(f1), 'embalado');
+  eq('   a ordem do dia anda', prod(), 1);
+  eq('e a proxima, sem outra linha na fila, e recusada', chamar('POST','/api/montagem',corpo('BK150150REV')).status, 409);
+
+  const fd = novaFila('BK150150REV','devolucao');
+  r10 = chamar('POST','/api/montagem',corpo('BK150150REV'));
+  eq('a devolucao reembalada (entra pela fila) passa', r10.status, 200);
+  eq('   e a linha dela e consumida', filaSit(fd), 'embalado');
+
+  eq('SKU sem modelo conta como persiana → 409', chamar('POST','/api/montagem',corpo('BK170170SEMMOD')).status, 409);
+  r10 = chamar('POST','/api/montagem',corpo('KIT32'));
+  eq('kit/acessorio (modelo sem medida) embala sem fila', r10.status, 200);
+  eq('   e soma +1', estoqueDe('KIT32'), 1);
+  eq('sob medida (modelo sem medida) embala sem fila', chamar('POST','/api/montagem',corpo('SOBMEDIDA')).status, 200);
+  eq('e o kit nao vira evento de recusa', evs().length, 6);
+
+  const tela = fs.readFileSync(path.join(__dirname,'public','montagem.html'),'utf8');
+  ok('a tela trata a recusa sem_revisao', /sem_revisao/.test(tela));
+  ok('no 1o bipe a tela confere a fila (e pergunta de novo antes de recusar)',
+     /async function conferirRevisao/.test(tela) && /conferirRevisao[\s\S]{0,600}await carregarFila\(\)/.test(tela));
+  ok('a regra da tela e a mesma do servidor: so persiana (exige_medida)', /exige_medida===0\) return false/.test(tela));
 }
 
 console.log('\n────────────────────────────────────────────');

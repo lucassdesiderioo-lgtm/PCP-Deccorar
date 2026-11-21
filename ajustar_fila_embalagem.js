@@ -19,8 +19,9 @@
  *   `estoque` — não abate a ordem do dia (R-EMB-03), porque não se sabe de
  *   qual ordem a peça veio.
  * - Todo o resto da fila sai, de qualquer SKU — inclusive a que veio de
- *   devolução (perde o vínculo; a peça, se existir, embala igual: a fila não
- *   é obrigatória, R-EMB-02).
+ *   devolução (perde o vínculo). ⚠ Desde 21/11/2026 a persiana só embala vindo
+ *   da fila (R-EMB-02): a peça que existir e sair daqui precisa ser revisada de
+ *   novo.
  * - A linha `embalado` e a de teste não se tocam (R-EMB-07). Modo teste
  *   ligado: recusa.
  * - O SKU se acha pelas colunas, pela mesma régua do
@@ -99,7 +100,7 @@ if(require.main === module){
     console.log('\n  O resto sai: ' + L.resto.length + ' linha(s)' + (L.resto.length ? ' — ' +
       Object.keys(porSku).sort().map(c => c + ' ' + porSku[c]).join(' · ') : ''));
     const devol = L.resto.filter(l => l.modo === 'devolucao').length;
-    if(devol) console.log('  (' + devol + ' vieram de devolução: perdem o vínculo; a peça, se existir, embala igual)');
+    if(devol) console.log('  (' + devol + ' vieram de devolução: perdem o vínculo; a peça, se existir, só embala revisada de novo)');
     console.log('\n  O estoque não se mexe: a fila nunca somou +1.');
 
     if(!APLICAR){

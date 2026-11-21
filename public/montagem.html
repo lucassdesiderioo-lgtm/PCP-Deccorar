@@ -93,6 +93,40 @@ function pecaHtml(info){
 }
 function idle(){ emb=null; if(!KIT){ banner('err','Código do kit não cadastrado','Peça ao responsável para cadastrar o código do kit no <b>Admin → Cadastros</b>. Sem isso não dá pra conferir o kit na embalagem.'); return; } banner('','Pronto','Bipe o <b>SKU</b> da persiana pra começar a embalagem.'); }
 function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const t=$('#tm'); if(emb&&t) t.textContent=mmss(Date.now()-emb.inicio); },250); }
+function abrir(info){
+  emb={codigo:info.codigo,cor:info.cor||'',peca:pecaHtml(info),inicio:Date.now(),kitOk:false}; startTimer();
+  /* A CONFERENCIA DA PECA ACONTECE AQUI, e so aqui.
+     Depois de ensacada a persiana some dentro do saco preto e o unico jeito
+     de saber o que tem dentro passa a ser a etiqueta colada por fora. Este
+     e o ultimo momento em que alguem VE a peca — se a conferencia nao for
+     neste bipe, nao ha outro. */
+  banner('go','Embalando '+info.codigo, emb.peca
+    +'<div class="confira">Confira com a peça na bancada. Não bateu, <b>não embale</b>.</div>'
+    +'Prepare e depois <b>bipe o KIT</b>.<div class="timer" id="tm">00:00</div>'+steps()); beep(true);
+}
+/* "E persiana?" — a mesma regua do servidor (`exige_medida` do /api/skus):
+   kit, acessorio e sob medida nao passam pela Revisao. */
+function naoNaFila(info){
+  if(info.exige_medida===0) return false;
+  const c=String(info.codigo).toUpperCase();
+  return !FILA.some(f=>String(f.codigo||'').toUpperCase()===c && (+f.qtd||0)>0);
+}
+/* A lista "Aguardando embalagem" se atualiza a cada 4 s: antes de recusar, a
+   tela pergunta de novo — a peca pode ter saido da Revisao agora. O bipe
+   nesse meio e ignorado. */
+let conferindo=false;
+async function conferirRevisao(info){
+  if(conferindo){ beep(false); return; }
+  conferindo=true;
+  try{ await carregarFila(); }finally{ conferindo=false; }
+  if(emb) return;
+  if(!naoNaFila(info)){ abrir(info); return; }
+  semRevisao(info.codigo);
+}
+function semRevisao(cod){
+  banner('err','Não passou pela Revisão','Não há nenhuma <b>'+cod+'</b> esperando embalagem.'
+    +'<div class="confira">Leve a persiana para a <b>Revisão</b> e embale depois.</div>'); beep(false);
+}
 function handle(code){
   code=(code||'').trim().toUpperCase(); if(!code) return;
   const now=Date.now(); if(last.c===code && now-last.t<700) return; last={c:code,t:now};
@@ -117,15 +151,10 @@ function handle(code){
   }
   const info=SKUS.find(s=>s.codigo.toUpperCase()===code);
   if(info){
-    if(!emb){ emb={codigo:info.codigo,cor:info.cor||'',peca:pecaHtml(info),inicio:Date.now(),kitOk:false}; startTimer();
-      /* A CONFERENCIA DA PECA ACONTECE AQUI, e so aqui.
-         Depois de ensacada a persiana some dentro do saco preto e o unico jeito
-         de saber o que tem dentro passa a ser a etiqueta colada por fora. Este
-         e o ultimo momento em que alguem VE a peca — se a conferencia nao for
-         neste bipe, nao ha outro. */
-      banner('go','Embalando '+info.codigo, emb.peca
-        +'<div class="confira">Confira com a peça na bancada. Não bateu, <b>não embale</b>.</div>'
-        +'Prepare e depois <b>bipe o KIT</b>.<div class="timer" id="tm">00:00</div>'+steps()); beep(true); return; }
+    /* A PERSIANA SO EMBALA SE VEIO DA REVISAO (R-EMB-02, 21/11/2026). A tela
+       avisa ja no 1o bipe, para ninguem embalar a peca a toa; quem decide e o
+       servidor, no bipe final. */
+    if(!emb){ if(naoNaFila(info)) conferirRevisao(info); else abrir(info); return; }
     if(emb.codigo.toUpperCase()===code){
       if(!emb.kitOk){ banner('err','⚠ FALTOU O KIT','Bipe o <b>kit</b> antes de finalizar '+emb.codigo+'.<div class="timer" id="tm">'+mmss(Date.now()-emb.inicio)+'</div>'+steps()); beep(false); return; }
       finish(); return;
@@ -170,8 +199,11 @@ async function finish(){
     /* A RECUSA DO SERVIDOR APARECE NA BANCADA. Antes a resposta era ignorada:
        um 404 de SKU ou uma falha de gravação saíam como "Embalada ✓", e a peça
        ia pra caixa sem existir no sistema. */
+    /* SEM REVISAO (R-EMB-02, 21/11/2026): a peca saiu da fila entre o 1o bipe
+       e o final (outra bancada embalou a ultima, alguem tirou da fila). */
+    if(r && r.motivo==='sem_revisao'){ semRevisao(cur.codigo); stats(); carregarFila(); return; }
     if(r && r.erro){ banner('err','Não deu pra embalar', r.erro); beep(false); stats(); return; }
-    banner('ok','Embalada ✓ ('+fmt(seg)+')', cur.codigo+' · kit conferido · foi pro estoque.'); beep(true); stats();
+    banner('ok','Embalada ✓ ('+fmt(seg)+')', cur.codigo+' · kit conferido · foi pro estoque.'); beep(true); stats(); carregarFila();
   }catch(e){
     /* A RESPOSTA PODE SE PERDER DEPOIS DA GRAVACAO (§12, ③ REVISAO r3): aqui
        rebipar soma +1 de novo. A frase diz isso, e o contador de hoje e

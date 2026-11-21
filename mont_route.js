@@ -264,10 +264,22 @@ module.exports=function(app,db){
         consome linha real. Antes, embalar em teste prendia a peça REAL em
         'embalado', e ela sumia quando os testes fossem apagados.
 
-     ⚠️ O QUE **NÃO** MUDOU, E NÃO PODE MUDAR: embalar SEM a peça estar na fila
-     continua somando `+1`, com `modo='estoque'`. A fila não é obrigatória para
-     embalar (§4) — é isso que torna o `limpar_fila.js` seguro, e quem
-     "consertar" isso trava a bancada. Há caso travando. */
+     ⚠️ DESDE 21/11/2026 A PERSIANA SÓ EMBALA SE VEIO DA REVISÃO (R-EMB-02,
+     decisão do dono, spec EMBALAGEM-SO-DA-REVISAO). Até ali embalar sem fila
+     somava +1 com `modo='estoque'`, e uma persiana que ninguém revisou entrou
+     no estoque. Vale só para persiana (modelo com medida); kit, acessório e
+     sob medida não passam pela Revisão e embalam como antes. Sem exceção: a
+     peça que sumiu da fila é revisada de novo — e por isso tirar da fila uma
+     peça que existe passa a ter consequência (o `limpar_fila.js` e o "Tirar da
+     fila" da Mesa só para o que não existe). */
+  /* "E PERSIANA?" — modelo com medida (`COALESCE(exige_medida,1)`, a mesma
+     regua do /api/skus que a tela le). SKU sem modelo conta como persiana, e
+     banco sem a coluna (teste antigo) tambem: na duvida, exige a revisao. */
+  function exigeRevisao(cod){
+    try{ const r=db.prepare('SELECT COALESCE(m.exige_medida,1) e FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=?').get(cod);
+         return !r || r.e!==0; }
+    catch(e){ return true; }
+  }
   app.post('/api/montagem',(req,res)=>{
     /* QUEM EMBALOU vem do `quem.js` (QUEM-FEZ-E-REVISAO fase 2, 04/11/2026),
        o mesmo dono da revisao, e sem login NADA grava: antes, sem
@@ -282,6 +294,19 @@ module.exports=function(app,db){
       return res.status(404).json({erro:'SKU não cadastrado: '+cod+'. Cadastre no Admin antes de embalar.'});
     /* A frase é a MESMA da bancada de propósito: quem chamar a rota por fora
        recebe o que o operador leria na tela. */
+    /* A PERSIANA TEM QUE TER VINDO DA REVISAO. Vem antes do kit e do tempo:
+       sem revisao nao adianta conferir kit nem esperar os 45 s. A fila olhada
+       e a do momento (modo teste so a de teste), a mesma que a transacao
+       consome — e como o handler e sincrono, ninguem consome a linha entre
+       esta pergunta e a transacao. */
+    const emTeste = cfg('modo_teste')==='1' ? 1 : 0;
+    if(exigeRevisao(cod) && !db.prepare("SELECT 1 FROM fila WHERE UPPER(codigo)=? AND situacao='aguardando' AND COALESCE(teste,0)=? LIMIT 1").get(cod,emTeste)){
+      try{ db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,usuario_id,usuario_nome)
+        VALUES ('sem_revisao',?,?,?,?)`).run(cod,Math.round(+segundos||0),q.usuario_id,q.usuario_nome); }
+      catch(e){ console.error('[montagem] o registro da recusa sem revisao falhou (a recusa vale igual):', e.message); }
+      return res.status(409).json({erro:'⚠ '+cod+' não passou pela Revisão: não há nenhuma desta persiana esperando embalagem. NADA foi gravado. Leve a persiana para a Revisão e embale depois.',
+        motivo:'sem_revisao'});
+    }
     if(!kit_ok) return res.status(400).json({erro:'⚠ FALTOU O KIT — bipe o kit antes de finalizar '+cod+'.'});
     const kitCad=cfg('kit_codigo');
     const kitLido=(req.body&&req.body.kit_codigo)||'';
@@ -308,8 +333,7 @@ module.exports=function(app,db){
         motivo:'rapido_demais', minimo:emin, segundos:seg});
     }
 
-    // Fila do MOMENTO: em modo teste só linha de teste, fora dele só linha real.
-    const emTeste = cfg('modo_teste')==='1' ? 1 : 0;
+    // Fila do MOMENTO (emTeste, acima): em modo teste só linha de teste, fora dele só linha real.
     let naFila=false, modo='estoque', abatido=false;
     try{
       db.transaction(()=>{

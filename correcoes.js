@@ -533,7 +533,7 @@ const ACOES = {
           (dias === 0 ? 'Confira o carrinho da bancada antes: a peça pode estar lá esperando o kit. ' : '') +
           (f.modo === 'devolucao' ? 'Veio de uma devolução (peça que voltou do Mercado Livre para reembalar): tirar perde o ' +
             'vínculo, e a peça física continua na fábrica. ' : '') +
-          'O estoque não se mexe. Se a peça aparecer, embalar continua somando +1 — a fila não é obrigatória.'
+          'O estoque não se mexe. ⚠ Se a peça EXISTIR, ela deixa de poder ser embalada: só volta à fila revisada de novo, ou desfazendo esta correção (desde 21/11/2026 a persiana só embala vindo da Revisão).'
       };
     },
     executar(db, f){ db.prepare('DELETE FROM fila WHERE id=?').run(f.id); },

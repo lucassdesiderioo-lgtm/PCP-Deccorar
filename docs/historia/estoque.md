@@ -254,6 +254,11 @@ No modo vermelho, se o operador bipar um SKU que não está nos pedidos do dia:
 > embalagem deixa de abater a ordem do dia. Isso é o que torna
 > `node limpar_fila.js` seguro: limpar a fila não trava a bancada.
 >
+> ⚠️ **ATÉ 21/11/2026.** Desde então a **persiana** só embala com a linha dela na
+> fila (R-EMB-02, spec `EMBALAGEM-SO-DA-REVISAO`): uma persiana que ninguém
+> revisou tinha entrado no estoque. Kit, acessório e sob medida continuam como
+> acima.
+>
 > A fila acumula quando a revisão é lançada e a peça nunca é embalada — foi o que
 > aconteceu no período de testes, que deixou centenas de linhas sem peça física
 > atrás. O lugar de limpar é o **inventário**: zerado o estoque e contada a

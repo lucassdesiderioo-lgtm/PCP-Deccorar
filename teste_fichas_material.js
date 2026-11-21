@@ -67,9 +67,12 @@ const MAT = require('./material_dominio');
   r = await post('/api/componentes', { id:tubo, modo_saldo:'volume' }, ADM);
   ok('o material que sai pela ficha nao vira "por volume" pelo cadastro', r.status === 400);
 
+  /* Desde 21/11/2026 a persiana so embala vindo da revisao (R-EMB-02). */
+  const naFila = c => db.prepare("INSERT INTO fila (codigo,modo,teste) VALUES (?,'estoque',?)")
+    .run(c, (db.prepare("SELECT valor FROM config WHERE chave='modo_teste'").get()||{}).valor==='1' ? 1 : 0);
   secao('fase 4 · a baixa na embalagem');
   const antesT = saldo(tubo), antesP = saldo(paraf);
-  r = await post('/api/montagem', { codigo:'RT160', kit_ok:1, segundos:60 }, OPE);
+  naFila('RT160'); r = await post('/api/montagem', { codigo:'RT160', kit_ok:1, segundos:60 }, OPE);
   ok('a embalagem passa', r.status === 200, () => JSON.stringify(r.corpo));
   ok('o tubo (pela ficha) baixou o consumo: 1,60 m', Math.abs(saldo(tubo) - (antesT - 1.6)) < 1e-9, () => saldo(tubo));
   ok('o parafuso (pela contagem) NAO baixou', saldo(paraf) === antesP);
@@ -200,7 +203,7 @@ const MAT = require('./material_dominio');
   db.prepare("UPDATE componente SET como_sai='ficha' WHERE id=?").run(cola);
   fins(cola, '0.0004');
   const t0 = saldo(tubo), nExtra0 = db.prepare('SELECT COUNT(*) n FROM material_extra').get().n;
-  r = await post('/api/montagem', { codigo:'RT160', kit_ok:1, segundos:60 }, OPE);
+  naFila('RT160'); r = await post('/api/montagem', { codigo:'RT160', kit_ok:1, segundos:60 }, OPE);
   ok('o tubo baixa normalmente com uma linha de 0,0004 na ficha', r.status === 200 && Math.abs(saldo(tubo) - (t0 - 1.6)) < 1e-9, () => saldo(tubo));
   ok('e nao nasce linha de falha a cada embalagem', db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n === 0);
 
@@ -217,7 +220,7 @@ const MAT = require('./material_dominio');
   db.prepare('UPDATE ficha_formula SET ativo=0 WHERE componente_id=?').run(cola);
   fins(cola, '1 / (altura - 140)');
   const n4 = db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n;
-  r = await post('/api/montagem', { codigo:'RT160', kit_ok:1, segundos:60 }, OPE);
+  naFila('RT160'); r = await post('/api/montagem', { codigo:'RT160', kit_ok:1, segundos:60 }, OPE);
   const fx = db.prepare("SELECT * FROM material_extra WHERE origem='falha_baixa' ORDER BY id DESC LIMIT 1").get();
   ok('a embalagem passa e uma linha diz que a ficha nao deu a quantidade da Cola', r.status === 200 &&
     db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n === n4 + 1 && /Cola/.test(fx.motivo), () => JSON.stringify(fx));
@@ -226,7 +229,7 @@ const MAT = require('./material_dominio');
   db.exec("INSERT INTO skus (codigo,descricao,estoque,modelo_id,tem_ficha) VALUES ('RTSEM','sem medida',0,50,1)");
   db.pragma('foreign_keys = ON');
   const n5 = db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n;
-  r = await post('/api/montagem', { codigo:'RTSEM', kit_ok:1, segundos:60 }, OPE);
+  naFila('RTSEM'); r = await post('/api/montagem', { codigo:'RTSEM', kit_ok:1, segundos:60 }, OPE);
   ok('o SKU sem medida, com material pela ficha no modelo, tambem vira linha', r.status === 200 &&
     db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n === n5 + 1);
 
@@ -236,7 +239,7 @@ const MAT = require('./material_dominio');
   db.prepare('UPDATE ficha_formula SET ativo=0 WHERE componente_id=?').run(cola);
   fins(cola, 'altura - 200');
   const n6 = db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n;
-  r = await post('/api/montagem', { codigo:'RT160', kit_ok:1, segundos:60 }, OPE);
+  naFila('RT160'); r = await post('/api/montagem', { codigo:'RT160', kit_ok:1, segundos:60 }, OPE);
   ok('a formula que da NEGATIVO num material pela ficha vira linha, e nao some', r.status === 200 &&
     db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n === n6 + 1);
   db.prepare('UPDATE ficha_formula SET ativo=0 WHERE componente_id=?').run(cola);
@@ -245,7 +248,7 @@ const MAT = require('./material_dominio');
   db.pragma('foreign_keys = ON');
   fins(cola, '1');
   const n7 = db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n;
-  r = await post('/api/montagem', { codigo:'REV1', kit_ok:1, segundos:60 }, OPE);
+  naFila('REV1'); r = await post('/api/montagem', { codigo:'REV1', kit_ok:1, segundos:60 }, OPE);
   ok('o SKU de revenda (sem ficha) nao gera linha sobre a ficha do modelo', r.status === 200 &&
     db.prepare("SELECT COUNT(*) n FROM material_extra WHERE origem='falha_baixa'").get().n === n7);
   db.prepare('UPDATE ficha_formula SET ativo=0 WHERE componente_id=?').run(cola);
