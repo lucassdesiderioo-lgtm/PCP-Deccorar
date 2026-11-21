@@ -297,7 +297,12 @@ module.exports=function(app,db){
       try{ db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,inicio,fim,usuario_id,usuario_nome)
         VALUES ('rapido_demais',?,?,?,?,?,?)`).run(cod,seg,txt(inicio),txt(fim),q.usuario_id,q.usuario_nome); }
       catch(e){ console.error('[montagem] o registro do bipe rapido falhou (a recusa vale igual):', e.message); }
-      return res.status(409).json({erro:'Rápido demais ('+seg+' s, o mínimo é '+emin+' s) — a embalagem continua. Termine de embalar e bipe o SKU de novo.',
+      /* ⚠️ A FRASE VALE NAS DUAS PAGINAS (③ REVISAO). O tablet com a pagina
+         ANTIGA em cache ja descartou a embalagem quando le isto: "a embalagem
+         continua, bipe o SKU de novo" abria uma embalagem nova sem kit, e a
+         peca ia para o saco sem o +1. A pagina nova nao mostra esta frase —
+         ela desenha o proprio aviso e segue com a mesma embalagem. */
+      return res.status(409).json({erro:'Rápido demais ('+seg+' s, o mínimo é '+emin+' s) — a embalagem NÃO foi gravada. Termine de embalar a peça e bipe de novo o SKU, o kit e o SKU.',
         motivo:'rapido_demais', minimo:emin, segundos:seg});
     }
 

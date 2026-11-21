@@ -292,7 +292,14 @@ cfgSet('emb_minimo_seg','45');
   eq('   com o motivo rapido_demais', r9.body && r9.body.motivo, 'rapido_demais');
   eq('   devolvendo o minimo que vale', r9.body && r9.body.minimo, 45);
   eq('   e os segundos lidos', r9.body && r9.body.segundos, 44);
-  ok('   a frase diz que a embalagem continua', /embalagem continua/i.test((r9.body&&r9.body.erro)||''), JSON.stringify(r9.body));
+  /* ③ REVISAO (achado 1, confirmado no navegador): a frase do servidor e o que
+     o tablet com a PAGINA ANTIGA em cache mostra — e la a embalagem ja foi
+     descartada. "A embalagem continua... bipe o SKU de novo" fazia abrir uma
+     embalagem nova sem kit, e a peca ia para o saco sem o +1. A frase tem que
+     valer nas duas paginas. */
+  ok('   a frase diz que NADA foi gravado e manda refazer SKU, kit e SKU',
+     /não foi gravada/i.test((r9.body&&r9.body.erro)||'') && /SKU, o kit e o SKU/.test((r9.body&&r9.body.erro)||'')
+     && !/embalagem continua/i.test((r9.body&&r9.body.erro)||''), JSON.stringify(r9.body));
   eq('   NADA em montagem', nMontagem(), antesM);
   eq('   o estoque NAO subiu', estoqueDe('BK130130TEMPO'), 3);
   eq('   nenhuma linha no livro', movs(), antesMov);
@@ -331,8 +338,16 @@ cfgSet('emb_minimo_seg','45');
   ok('montagem_evento esta nas TABELAS do modo teste', /nome:'montagem_evento'/.test(tr));
   const tela = fs.readFileSync(path.join(__dirname,'public','montagem.html'),'utf8');
   ok('a tela trata a recusa rapido_demais', /rapido_demais/.test(tela));
-  ok('na recusa a tela reabre a embalagem (emb=cur) e nao decide sozinha',
-     /motivo==='rapido_demais'[\s\S]{0,400}emb=cur;\s*startTimer\(\)/.test(tela) && !/seg\s*<\s*EMB_MIN/.test(tela));
+  /* ③ REVISAO (achado 2, confirmado no navegador): o bipe durante a resposta
+     abria uma embalagem nova escondida, e o aviso da recusa apagava o desenho
+     dela. A embalagem fica de pe ate a resposta, e o bipe nesse meio e ignorado. */
+  const fin = tela.slice(tela.indexOf('async function finish()'));
+  ok('a embalagem NAO e zerada antes da resposta do servidor',
+     fin.indexOf("fetch('/api/montagem'") > 0 && fin.indexOf('emb=null') > fin.indexOf("fetch('/api/montagem'"));
+  ok('o bipe com o envio no ar e ignorado (emb.enviando)', /emb\s*&&\s*emb\.enviando/.test(tela));
+  ok('nao existe mais o aviso que apagava a embalagem nova', !/A embalagem de '\+cur\.codigo\+' NÃO foi gravada/.test(tela));
+  ok('na recusa a tela segue com a mesma embalagem e nao decide sozinha',
+     /motivo==='rapido_demais'[\s\S]{0,300}rapidoDemais\(cur/.test(tela) && !/seg\s*<\s*EMB_MIN/.test(tela));
 }
 
 console.log('\n────────────────────────────────────────────');

@@ -34,6 +34,17 @@ o servidor. Se a tela recusasse com um número dela, no dia em que o
 `config` baixasse o mínimo ela diria "continua" de uma embalagem que o servidor
 gravou — e o segundo bipe somaria +2 no estoque.
 
+## O que a ③ REVISÃO mudou (21/11/2026)
+
+- **A frase do 409 vale nas duas páginas**: "a embalagem NÃO foi gravada…
+  bipe de novo o SKU, o kit e o SKU". O tablet com a página antiga em cache
+  descarta a embalagem antes de enviar; a frase "a embalagem continua" fazia
+  ensacar a peça sem o +1 (confirmado no navegador). **No deploy, recarregar os
+  tablets da Embalagem.**
+- **A tela nova não zera a embalagem antes da resposta** (`emb.enviando`), e o
+  bipe nesse meio é ignorado: antes ele abria uma embalagem nova escondida, que
+  o aviso da recusa apagava da tela.
+
 ## Fica de fora
 
 A bancada do sob medida; "cancelar" e "desfazer" na Embalagem; tela para
