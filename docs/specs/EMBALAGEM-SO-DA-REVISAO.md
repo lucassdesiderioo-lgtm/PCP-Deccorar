@@ -1,6 +1,8 @@
 # EMBALAGEM-SO-DA-REVISAO — a persiana só embala se veio da Revisão
 
-> **STATUS — 21/11/2026: construída, falta subir.** Spec curta, aprovada pelo
+> **STATUS — 21/11/2026: NO AR** (PR #360; o dono fez o deploy e disse *"deu
+> tudo certo no deploy"*). Ainda não provado com dado real: a primeira persiana
+> recusada na bancada. Spec curta, aprovada pelo
 > dono na conversa de 21/11/2026 (*"1- só persiana 2- sem exceção"*, *"pode
 > seguir"*). Uma fase só. Linha em `docs/DECISOES.md`; muda o cartão
 > **R-EMB-02** em `docs/regras/estoque.md`.

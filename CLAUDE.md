@@ -840,13 +840,16 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 > da fila" da Mesa, o `limpar_fila.js` e o `ajustar_fila_embalagem.js` são para
 > a peça que não existe (tirada por engano, volta revisando de novo ou
 > desfazendo na Mesa). **Teste ou script que embala persiana põe a peça na fila
-> antes.** Construído, falta subir.
+> antes.** ✅ **No ar desde 21/11/2026** (PR #360): o dono fez o deploy e disse
+> *"deu tudo certo no deploy"*. ⚠️ **Ainda não provado com dado real:** a
+> primeira persiana recusada na bancada por não ter vindo da Revisão.
 >
 > ⚠️ **"CANCELAR EMBALAGEM" (21/11/2026, AJUSTE, cartão R-EMB-10)**: o espelho do
 > "Cancelar revisão". Com a embalagem aberta, um toque zera tudo; **nada grava**
 > e a peça continua em "Aguardando embalagem". Fica só a linha `cancelada` em
 > `montagem_evento`, com quem cancelou (`POST /api/montagem/cancelar`, com linha
-> própria no `permDaRota`). Construído, falta subir.
+> própria no `permDaRota`). ✅ **No ar desde 21/11/2026** (PR #360). ⚠️ **Ainda
+> não provado com dado real:** o primeiro cancelamento de verdade na bancada.
 
 > ⚠️ **A FILA DA EMBALAGEM FOI ACERTADA PELA MESA DO FIM DO DIA 04/11/2026**
 > (linha em `docs/DECISOES.md`). `node ajustar_fila_embalagem.js` simula, e

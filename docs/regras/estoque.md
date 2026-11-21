@@ -252,7 +252,7 @@
 - **Por quê:** o dono, 21/11/2026: quem precisa largar a bancada para atender outra pessoa não tinha saída — a tela ficava presa na peça ("Termine a persiana atual"). O espelho da R-REV-08.
 - **Exceções:** sem conexão, a embalagem é zerada na tela do mesmo jeito (nada foi gravado), e só o registro do cancelamento se perde. Ao voltar, o tempo recomeça no 1º bipe (R-EMB-09).
 - **Teste que trava:** `teste_montagem.js` (seção 11).
-- **Status:** construída em 21/11/2026, falta subir.
+- **Status:** no ar desde 21/11/2026 (PR #360).
 
 ---
 
