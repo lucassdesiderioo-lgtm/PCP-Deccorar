@@ -55,6 +55,8 @@ eq('sem login: sem média', TEMPO.doBipe(db,'revisao',null,'A',35,null).mediana,
 eq('a embalagem tem a conta dela', TEMPO.doBipe(db,'montagem',1,'A',60,null).mediana, null);
 ok('atividade desconhecida não vira zero calado', (()=>{ try{ TEMPO.doBipe(db,'corte',1,'A',1,null); return false; }catch(e){ return true; } })());
 eq('o seguro não derruba o bipe', TEMPO.seguro(db,'corte',1,'A',1,null), null);
+{ const velho = new Database(':memory:'); velho.exec('CREATE TABLE revisao (id INTEGER PRIMARY KEY, codigo TEXT, segundos INTEGER)');
+  eq('consulta que falha (banco sem a coluna) vira null, e não "primeira peça"', TEMPO.seguro(velho,'revisao',1,'A',30,null), null); }
 
 console.log('\n2. As rotas devolvem o tempo');
 { // Revisão

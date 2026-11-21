@@ -26,7 +26,10 @@ function tempos(db, tabela, uid, codigo, excluirId){
       AND data >= date('now','localtime','-${JANELA_DIAS} days')`
     + (codigo ? ' AND UPPER(codigo)=?' : '');
   const args = [uid, excluirId == null ? -1 : excluirId]; if(codigo) args.push(String(codigo).toUpperCase());
-  try{ return db.prepare(sql).all(...args).map(r => +r.s); }catch(e){ return []; }
+  /* SEM catch aqui (③ REVISÃO): a consulta que falha sobe até o `seguro`, que
+     loga e devolve null. Engolida, ela virava lista vazia — "primeira peça" para
+     quem tem 200 no mês, calado. */
+  return db.prepare(sql).all(...args).map(r => +r.s);
 }
 
 /* { segundos, mediana, base:'sku'|'geral'|null, n, aviso:'parabens'|'melhorar'|null } */
