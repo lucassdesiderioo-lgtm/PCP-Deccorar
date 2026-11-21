@@ -155,10 +155,10 @@ async function finish(){
        bipe sem explicar. Em 20 s ele desiste e cai no "Falha de conexao". */
     const ctl=(typeof AbortController==='function')?new AbortController():null;
     const prazo=ctl?setTimeout(()=>ctl.abort(),20000):null;
-    let resp;
-    try{ resp=await fetch('/api/montagem',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl?ctl.signal:undefined,body:JSON.stringify({codigo:cur.codigo,segundos:seg,kit_ok:cur.kitOk?1:0,kit_codigo:cur.kitCod||'',inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})}); }
+    let resp, r;
+    try{ resp=await fetch('/api/montagem',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl?ctl.signal:undefined,body:JSON.stringify({codigo:cur.codigo,segundos:seg,kit_ok:cur.kitOk?1:0,kit_codigo:cur.kitCod||'',inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})});
+         r=await resp.json(); }
     finally{ if(prazo) clearTimeout(prazo); }
-    const r=await resp.json();
     /* RAPIDO DEMAIS (EMBALAGEM-TEMPO-MINIMO, 21/11/2026): o servidor recusou
        o bipe de fim abaixo do minimo (45 s). NADA foi gravado, e a MESMA
        embalagem segue, com o kit ja conferido e o cronometro do mesmo inicio.
@@ -172,7 +172,15 @@ async function finish(){
        ia pra caixa sem existir no sistema. */
     if(r && r.erro){ banner('err','Não deu pra embalar', r.erro); beep(false); stats(); return; }
     banner('ok','Embalada ✓ ('+fmt(seg)+')', cur.codigo+' · kit conferido · foi pro estoque.'); beep(true); stats();
-  }catch(e){ clearInterval(tick); tick=null; emb=null; banner('err','Falha de conexão',String(e)); beep(false); }
+  }catch(e){
+    /* A RESPOSTA PODE SE PERDER DEPOIS DA GRAVACAO (§12, ③ REVISAO r3): aqui
+       rebipar soma +1 de novo. A frase diz isso, e o contador de hoje e
+       atualizado para a pessoa conferir antes de embalar outra vez. */
+    clearInterval(tick); tick=null; emb=null;
+    banner('err','Falha de conexão', 'A embalagem de <b>'+cur.codigo+'</b> pode ter sido gravada: confira o contador de hoje antes de embalar de novo.'
+      +'<div style="font-size:12px;color:#8b97a5;margin-top:8px">'+String(e&&e.name==='AbortError'?'o servidor não respondeu em 20 s':e)+'</div>');
+    beep(false); stats();
+  }
 }
 const scan=$('#scan');
 /* preventScroll: devolver o foco nao pode arrastar a tela. O #scan mora no

@@ -299,7 +299,7 @@ cfgSet('emb_minimo_seg','45');
      valer nas duas paginas. */
   ok('   a frase diz que NADA foi gravado e manda refazer SKU, kit e SKU',
      /não foi gravada/i.test((r9.body&&r9.body.erro)||'') && /bipe o SKU agora/.test((r9.body&&r9.body.erro)||'')
-     && /só depois[^.]*o kit e o SKU/.test((r9.body&&r9.body.erro)||'')
+     && /espere 45 s antes de bipar o kit e o SKU/.test((r9.body&&r9.body.erro)||'')
      && !/embalagem continua/i.test((r9.body&&r9.body.erro)||''), JSON.stringify(r9.body));
   eq('   NADA em montagem', nMontagem(), antesM);
   eq('   o estoque NAO subiu', estoqueDe('BK130130TEMPO'), 3);
@@ -353,6 +353,16 @@ cfgSet('emb_minimo_seg','45');
      embalagem presa para sempre (todo bipe ignorado). E o envio tem limite de
      tempo: pendurado, cai no "Falha de conexao" em vez de travar a bancada. */
   ok('o envio tem limite de tempo (AbortController)', /AbortController[\s\S]{0,200}abort\(\)/.test(fin) && /signal:/.test(fin));
+  /* ③ REVISAO r3: o limite cobre tambem a leitura da resposta, e e cancelado
+     depois dela — sem o clearTimeout, o abort dispararia 20 s depois de toda
+     embalagem que deu certo. E a falha de conexao avisa que a peca PODE ter
+     sido gravada (a resposta se perde depois da gravacao, §12): rebipar
+     somaria +1 duas vezes. */
+  ok('a leitura da resposta fica dentro do limite, e o limite e cancelado',
+     /resp\.json\(\);\s*\}\s*finally\{\s*if\(prazo\)\s*clearTimeout\(prazo\);\s*\}/.test(fin));
+  const pegaErro = fin.slice(fin.indexOf('}catch(e){'));
+  ok('a falha de conexao avisa que pode ter gravado e mostra o contador',
+     /pode ter sido gravada/i.test(pegaErro) && /stats\(\)/.test(pegaErro.slice(0, 1200)));
 }
 
 console.log('\n────────────────────────────────────────────');

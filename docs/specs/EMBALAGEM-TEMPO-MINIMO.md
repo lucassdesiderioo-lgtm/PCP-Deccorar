@@ -37,15 +37,14 @@ gravou — e o segundo bipe somaria +2 no estoque.
 ## O que a ③ REVISÃO mudou (21/11/2026)
 
 - **A frase do 409 vale nas duas páginas**: "a embalagem NÃO foi gravada e o
-  tempo recomeça: bipe o SKU agora, termine de embalar e só depois bipe o kit e
-  o SKU" (na página antiga o cronômetro recomeça no SKU; refazer os três bipes
+  tempo recomeça: bipe o SKU agora e espere 45 s antes de bipar o kit e o SKU" (na página antiga o cronômetro recomeça no SKU; refazer os três bipes
   de uma vez levaria outra recusa). O tablet com a página antiga em cache
   descarta a embalagem antes de enviar; a frase "a embalagem continua" fazia
   ensacar a peça sem o +1 (confirmado no navegador). **No deploy, recarregar os
   tablets da Embalagem.**
 - **A tela nova não zera a embalagem antes da resposta** (`emb.enviando`), e o
   bipe nesse meio é ignorado: antes ele abria uma embalagem nova escondida, que
-  o aviso da recusa apagava da tela. O envio desiste em 20 s ("Falha de conexão"), para a rede pendurada não travar a bancada.
+  o aviso da recusa apagava da tela. O envio desiste em 20 s ("Falha de conexão"), para a rede pendurada não travar a bancada, e a falha de conexão avisa que a peça pode ter sido gravada e atualiza o contador do dia (rebipar somaria +1 de novo).
 
 ## Fica de fora
 

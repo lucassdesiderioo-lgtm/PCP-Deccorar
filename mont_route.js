@@ -304,7 +304,7 @@ module.exports=function(app,db){
          SKU: refazer os tres bipes de uma vez levaria outra recusa (③ r2). A
          pagina nova nao mostra esta frase —
          ela desenha o proprio aviso e segue com a mesma embalagem. */
-      return res.status(409).json({erro:'Rápido demais ('+seg+' s, o mínimo é '+emin+' s) — a embalagem NÃO foi gravada e o tempo recomeça: bipe o SKU agora, termine de embalar e só depois bipe o kit e o SKU.',
+      return res.status(409).json({erro:'Rápido demais ('+seg+' s, o mínimo é '+emin+' s) — a embalagem NÃO foi gravada e o tempo recomeça: bipe o SKU agora e espere '+emin+' s antes de bipar o kit e o SKU.',
         motivo:'rapido_demais', minimo:emin, segundos:seg});
     }
 
