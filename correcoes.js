@@ -517,6 +517,8 @@ const ACOES = {
       return f;
     },
     valePara(db, f){
+      if(f.situacao === 'defeito')
+        return 'esta peça voltou da embalagem por defeito — a decisão é na Revisão, no bloco "Voltaram da embalagem"';
       if(f.situacao !== 'aguardando')
         return 'esta peça já foi embalada e virou estoque — a linha é história, não se tira';
       return true;

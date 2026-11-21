@@ -267,7 +267,7 @@
 - **Regra:** com a embalagem aberta, "Peça com defeito" (só persiana, a régua da R-EMB-02). Quem embala decide sozinho, com motivo obrigatório da lista da Revisão (`listas` tipo `rejeicao`). **Nada embala e nada soma**; a linha `aguardando` mais antiga do SKU passa a `defeito` (não é apagada) e nasce a volta em `embalagem_defeito`, com quem achou (`POST /api/montagem/defeito`, `embalagem.executar`, 401 sem login). Na Revisão, o bloco "Voltaram da embalagem por defeito" (`GET /api/revisao/defeitos`, `revisao.executar`): **"Tem defeito"** escolhe o setor (lista fixa: Corte de tecido · Corte de tubo e base · Kit de comando · Montagem · Outro) e grava a peça com problema (`rejeicao`, `origem='embalagem'`, `setor`), que vira material extra; **"Não tem defeito"** só fecha a volta, e a peça é revisada de novo pelos dois bipes (`POST /api/revisao/defeitos/:id/decidir`, `revisao.rejeitar`). A 104 separa "achado na revisão" e "achado na embalagem", com o setor. `defeito_dominio.js` é o dono da volta, e `rejeicao_dominio.js` o da peça com problema.
 - **Por quê:** o dono, 21/11/2026: quem embala e acha defeito embalava assim mesmo (a peça virava estoque) ou levava de volta na mão, com a fila dizendo que ela esperava embalagem.
 - **Exceções:** kit, acessório e sob medida não têm o botão. Quem achou pode conferir a própria volta. Decidida não se decide de novo (409). A volta parada fica só na 101.
-- **Teste que trava:** `teste_defeito_volta.js` (42).
+- **Teste que trava:** `teste_defeito_volta.js` (47).
 - **Status:** construído em 21/11/2026, falta subir.
 ---
 

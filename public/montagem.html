@@ -119,7 +119,7 @@ async function abrirDefeito(){
     escolhido=MOTIVOS[+b.dataset.mot];
     p.querySelectorAll('[data-mot]').forEach(function(x){ x.style.background='#fff'; x.style.borderColor='#c9d1db'; x.style.fontWeight=''; });
     b.style.background='#fde2e0'; b.style.borderColor='#c62828'; b.style.fontWeight='800';
-    var ok=document.getElementById('defOk'); ok.disabled=false; ok.style.opacity='1'; }); });
+    var ok=document.getElementById('defOk'); ok.disabled=false; ok.style.opacity='1'; keep(); }); });
   document.getElementById('defVolta').addEventListener('click', function(){ fecharDefeito(); keep(); });
   document.getElementById('defOk').addEventListener('click', function(){ if(escolhido) enviarDefeito(escolhido, document.getElementById('defObs').value); });
 }
@@ -132,7 +132,7 @@ async function enviarDefeito(motivo, obs){
     const resp=await fetch('/api/montagem/defeito',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo:cur.codigo,motivo:motivo,obs:obs,segundos:seg})});
     const r=await resp.json();
     if(r && r.erro){ cur.enviando=false; mostrarCancelar(); if(err) err.textContent=r.erro; beep(false); return; }
-    clearInterval(tick); tick=null; emb=null; bipePerdido=null; fecharDefeito();
+    clearInterval(tick); tick=null; emb=null; bipePerdido=null; fecharDefeito(); keep();
     avisoFixo=true; banner('err','Peça devolvida à Revisão por defeito','<b>'+cur.codigo+'</b> · '+motivo.replace(/</g,'&lt;')+' · nada foi embalado nem entrou no estoque. Leve a peça para a Revisão.');
     beep(true); stats(); carregarFila();
   }catch(e){ cur.enviando=false; mostrarCancelar(); if(err) err.textContent='Sem conexão: a peça não foi devolvida. Confira o Wi-Fi e toque de novo.'; beep(false); }
@@ -316,7 +316,7 @@ const scan=$('#scan');
    quem tivesse descido pra usar qualquer coisa no fim. O keep existe pro
    BIPE cair no lugar certo, nao pra mexer no que a pessoa esta olhando. */
 /* o painel da peca com defeito tem campo proprio: o foco nao volta ao bipe enquanto se escreve nele */
-const keep=()=>{ var a=document.activeElement; if(a && a.closest && a.closest('#defPainel')) return; if(a!==scan) scan.focus({preventScroll:true}); };
+const keep=()=>{ var a=document.activeElement; if(a && a.id==='defObs') return; if(a!==scan) scan.focus({preventScroll:true}); };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
 document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input')) keep(); });
 scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; handle(v); } });

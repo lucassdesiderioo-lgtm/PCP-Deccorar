@@ -350,7 +350,7 @@ document.getElementById('btModo').addEventListener('click',function(){
    O revisor confere a peca: com defeito escolhe o setor (vira peca com
    problema); sem defeito a volta fecha e a peca e revisada de novo pelos dois
    bipes. Quem decide e o servidor; aqui so se desenha. */
-var VOLTA={abertas:[],setores:[]}, voltaAberta=null, voltaEnviando=false;
+var VOLTA={abertas:[],setores:[]}, voltaAberta=null, voltaEnviando=false, VOLTA_MSG='';
 function haTempo(m){ m=+m||0; if(m<60) return 'há '+m+' min'; if(m<1440) return 'há '+Math.floor(m/60)+' h'; var d=Math.floor(m/1440); return 'há '+d+(d===1?' dia':' dias'); }
 function escV(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 async function voltaCarregar(){
@@ -360,9 +360,11 @@ async function voltaCarregar(){
 }
 function voltaDesenhar(){
   var el=document.getElementById('volta'); var L=(VOLTA&&VOLTA.abertas)||[];
-  if(!L.length){ el.style.display='none'; el.innerHTML=''; return; }
+  var avisoV=VOLTA_MSG?'<div style="background:#fff;border:1px solid #d8dee6;border-radius:10px;padding:10px;margin-bottom:8px">'+VOLTA_MSG+'</div>':'';
+  if(!L.length){ if(avisoV){ el.style.display=''; el.innerHTML=avisoV; } else { el.style.display='none'; el.innerHTML=''; } return; }
   var h='<div style="border:2px solid #c62828;background:#fbe9e8;border-radius:14px;padding:14px">'
-    +'<div style="font-size:18px;font-weight:800;color:#c62828;margin-bottom:8px">Voltaram da embalagem por defeito ('+L.length+')</div>';
+    +avisoV+'<div style="font-size:18px;font-weight:800;color:#c62828;margin-bottom:8px">Voltaram da embalagem por defeito ('+L.length+')</div>'
+    +'<div style="font-size:13px;color:#5a6472;margin-bottom:4px">Quem decide é quem tem a permissão de registrar peça com problema.</div>';
   L.forEach(function(v){
     var med=(v.largura_cm&&v.altura_cm)?(v.largura_cm+' × '+v.altura_cm+' '+(v.cor_codigo||v.cor||'')):'';
     h+='<div style="background:#fff;border:1px solid #efb1ad;border-radius:10px;padding:12px;margin-top:8px">'
@@ -390,13 +392,20 @@ async function voltaDecidir(id, corpo){
     voltaEnviando=false;
     if(r && r.erro){ var e=document.querySelector('.vErr[data-id="'+id+'"]'); if(e) e.textContent=r.erro; beep(false); return; }
     voltaAberta=null;
-    if(corpo.decisao==='defeito'){ var sn=((VOLTA.setores||[]).find(function(s){ return s.chave===corpo.setor; })||{}).nome||''; banner('err','Enviada ao setor: '+escV(sn), escV(v.codigo)+' · '+escV(v.motivo)+' · registrada como peça com problema.'); }
-    else banner('ok','Sem defeito', escV(v.codigo)+' · <b>revise a peça de novo</b> (bipe o código duas vezes) para ela voltar à fila da embalagem.');
+    /* com uma revisao aberta, o aviso nao escreve por cima dela (③ REVISAO): o
+       resultado fica no proprio bloco */
+    var msg;
+    if(corpo.decisao==='defeito'){ var sn=((VOLTA.setores||[]).find(function(s){ return s.chave===corpo.setor; })||{}).nome||'';
+      msg=escV(v.codigo)+' · '+escV(v.motivo)+' · registrada como peça com problema.';
+      if(!emRev){ banner('err','Enviada ao setor: '+escV(sn), msg); } else VOLTA_MSG='Enviada ao setor '+escV(sn)+': '+msg; }
+    else { msg=escV(v.codigo)+' · <b>revise a peça de novo</b> (bipe o código duas vezes) para ela voltar à fila da embalagem.';
+      if(!emRev){ banner('ok','Sem defeito', msg); } else VOLTA_MSG='Sem defeito: '+msg; }
     beep(true); voltaCarregar();
   }catch(e){ voltaEnviando=false; var e2=document.querySelector('.vErr[data-id="'+id+'"]'); if(e2) e2.textContent='Sem conexão: nada foi gravado. Toque de novo.'; beep(false); }
 }
 document.addEventListener('click',function(e){
   var t=e.target.closest('.vTem,.vSem,.vSetor,.vVolta'); if(!t) return;
+  VOLTA_MSG='';
   if(t.classList.contains('vTem')){ voltaAberta=+t.dataset.id; voltaDesenhar(); return; }
   if(t.classList.contains('vVolta')){ voltaAberta=null; voltaDesenhar(); return; }
   if(t.classList.contains('vSem')){ voltaDecidir(+t.dataset.id,{decisao:'sem_defeito'}); return; }

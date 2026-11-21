@@ -23,7 +23,7 @@ const db = new Database(path.join(tmp, 't.db'));
 db.exec(`
   CREATE TABLE skus (codigo TEXT PRIMARY KEY, descricao TEXT DEFAULT '', cor TEXT DEFAULT '', cor_codigo TEXT,
     estoque INTEGER DEFAULT 0, alvo INTEGER DEFAULT 0, modelo_id INTEGER, largura_cm INTEGER, altura_cm INTEGER);
-  CREATE TABLE modelo (id INTEGER PRIMARY KEY, nome TEXT, exige_medida INTEGER DEFAULT 1, sob_medida INTEGER DEFAULT 0);
+  CREATE TABLE modelo (id INTEGER PRIMARY KEY, codigo TEXT, nome TEXT, exige_medida INTEGER DEFAULT 1, sob_medida INTEGER DEFAULT 0);
   CREATE TABLE fila (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT,
     modo TEXT DEFAULT 'hoje', situacao TEXT DEFAULT 'aguardando',
     revisado_em TEXT DEFAULT (datetime('now','localtime')), embalado_em TEXT,
@@ -39,6 +39,10 @@ db.exec(`
     ('BK140140BEGE',3,1,140,140,'BEGE'),('KIT32',2,2,NULL,NULL,NULL);
 `);
 require('./estoque_dominio').garantirSchema(db);
+/* O material extra da peca com problema (§24): a ficha pede o Compras inteiro,
+   entao o teste escuta a chamada ao dono dele, que e o que importa aqui. */
+const ME = require('./material_extra_dominio'), extras = [];
+ME.registrarRevisao = (d, a) => { extras.push(a); return { id:extras.length }; };
 
 const rotas = {};
 const app = { locals:{}, get(p,h){ rotas['GET '+p]=h; }, post(p,h){ rotas['POST '+p]=h; }, delete(p,h){ rotas['DELETE '+p]=h; } };
@@ -111,6 +115,7 @@ eq('quem achou também confere (Q4): 200', r.status, 200);
 const rj = db.prepare('SELECT * FROM rejeicao WHERE id=?').get(r.body.rejeicao_id);
 ok('vira peça com problema achada na embalagem, com o setor', rj && rj.origem === 'embalagem' && rj.setor === 'Corte de tecido' && rj.motivo === MOT && rj.usuario_id === 1);
 ok('…com as duas observações', rj && /risco no tecido/.test(rj.obs) && /manchado/.test(rj.obs));
+ok('…e vira material extra a decidir na 106 (③ REVISÃO)', extras.some(a => a.referencia === 'rejeicao:' + (rj && rj.id) && a.sku === 'BK140140BEGE'));
 eq('a volta sai do bloco', chamar('GET', '/api/revisao/defeitos').body.abertas.length, 0);
 r = chamar('POST', '/api/revisao/defeitos/:id/decidir', { decisao:'sem_defeito' }, RUI, { id:vol.id });
 eq('decidida não se decide de novo: 409', r.status, 409);
@@ -157,6 +162,12 @@ ok('a 101 mostra o bloco das voltas e decide pela rota', /Voltaram da embalagem 
 ok('os botões de decidir levam data-perm', (tela101.match(/data-perm="revisao\.rejeitar"/g) || []).length >= 2);
 const tr = fs.readFileSync(path.join(__dirname, 'teste_route.js'), 'utf8');
 ok('a tabela nova está na lista do modo teste', /nome:'embalagem_defeito'/.test(tr));
+/* ③ REVISÃO: o foco volta ao bipe depois de devolver, e só o campo de observação o segura */
+ok('a 102 devolve o foco ao bipe depois de devolver à Revisão', /fecharDefeito\(\);[^\n]*keep\(\)/.test(tela102));
+ok('só o campo de observação segura o foco, não os botões do painel', /a\.id==='defObs'/.test(tela102) && !/closest\('#defPainel'\)\) return/.test(tela102));
+ok('a 101 não escreve por cima da revisão em andamento', /if\(!emRev\)\{[^}]*banner\('err','Enviada ao setor/.test(tela101));
+const cor = fs.readFileSync(path.join(__dirname, 'correcoes.js'), 'utf8');
+ok('a Mesa não chama de "embalada" a linha que voltou por defeito', /situacao === 'defeito'/.test(cor));
 
 db.close(); fs.rmSync(tmp, { recursive:true, force:true });
 console.log('\n' + (falhas ? falhas + ' de ' + n + ' FALHARAM' : 'todos os ' + n + ' passaram'));
