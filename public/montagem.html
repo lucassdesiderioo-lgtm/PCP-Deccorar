@@ -150,7 +150,15 @@ async function finish(){
   cur.enviando=true;
   const seg=Math.round((Date.now()-cur.inicio)/1000);
   try{
-    const r=await (await fetch('/api/montagem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo:cur.codigo,segundos:seg,kit_ok:cur.kitOk?1:0,kit_codigo:cur.kitCod||'',inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
+    /* O ENVIO TEM LIMITE DE TEMPO (③ REVISAO r2): com a embalagem de pe
+       durante o envio, um pedido pendurado no Wi-Fi da bancada ignoraria todo
+       bipe sem explicar. Em 20 s ele desiste e cai no "Falha de conexao". */
+    const ctl=(typeof AbortController==='function')?new AbortController():null;
+    const prazo=ctl?setTimeout(()=>ctl.abort(),20000):null;
+    let resp;
+    try{ resp=await fetch('/api/montagem',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl?ctl.signal:undefined,body:JSON.stringify({codigo:cur.codigo,segundos:seg,kit_ok:cur.kitOk?1:0,kit_codigo:cur.kitCod||'',inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})}); }
+    finally{ if(prazo) clearTimeout(prazo); }
+    const r=await resp.json();
     /* RAPIDO DEMAIS (EMBALAGEM-TEMPO-MINIMO, 21/11/2026): o servidor recusou
        o bipe de fim abaixo do minimo (45 s). NADA foi gravado, e a MESMA
        embalagem segue, com o kit ja conferido e o cronometro do mesmo inicio.

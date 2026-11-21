@@ -300,9 +300,11 @@ module.exports=function(app,db){
       /* ⚠️ A FRASE VALE NAS DUAS PAGINAS (③ REVISAO). O tablet com a pagina
          ANTIGA em cache ja descartou a embalagem quando le isto: "a embalagem
          continua, bipe o SKU de novo" abria uma embalagem nova sem kit, e a
-         peca ia para o saco sem o +1. A pagina nova nao mostra esta frase —
+         peca ia para o saco sem o +1. E la o cronometro recomeca no bipe do
+         SKU: refazer os tres bipes de uma vez levaria outra recusa (③ r2). A
+         pagina nova nao mostra esta frase —
          ela desenha o proprio aviso e segue com a mesma embalagem. */
-      return res.status(409).json({erro:'Rápido demais ('+seg+' s, o mínimo é '+emin+' s) — a embalagem NÃO foi gravada. Termine de embalar a peça e bipe de novo o SKU, o kit e o SKU.',
+      return res.status(409).json({erro:'Rápido demais ('+seg+' s, o mínimo é '+emin+' s) — a embalagem NÃO foi gravada e o tempo recomeça: bipe o SKU agora, termine de embalar e só depois bipe o kit e o SKU.',
         motivo:'rapido_demais', minimo:emin, segundos:seg});
     }
 

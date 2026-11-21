@@ -298,7 +298,8 @@ cfgSet('emb_minimo_seg','45');
      embalagem nova sem kit, e a peca ia para o saco sem o +1. A frase tem que
      valer nas duas paginas. */
   ok('   a frase diz que NADA foi gravado e manda refazer SKU, kit e SKU',
-     /não foi gravada/i.test((r9.body&&r9.body.erro)||'') && /SKU, o kit e o SKU/.test((r9.body&&r9.body.erro)||'')
+     /não foi gravada/i.test((r9.body&&r9.body.erro)||'') && /bipe o SKU agora/.test((r9.body&&r9.body.erro)||'')
+     && /só depois[^.]*o kit e o SKU/.test((r9.body&&r9.body.erro)||'')
      && !/embalagem continua/i.test((r9.body&&r9.body.erro)||''), JSON.stringify(r9.body));
   eq('   NADA em montagem', nMontagem(), antesM);
   eq('   o estoque NAO subiu', estoqueDe('BK130130TEMPO'), 3);
@@ -347,7 +348,11 @@ cfgSet('emb_minimo_seg','45');
   ok('o bipe com o envio no ar e ignorado (emb.enviando)', /emb\s*&&\s*emb\.enviando/.test(tela));
   ok('nao existe mais o aviso que apagava a embalagem nova', !/A embalagem de '\+cur\.codigo\+' NÃO foi gravada/.test(tela));
   ok('na recusa a tela segue com a mesma embalagem e nao decide sozinha',
-     /motivo==='rapido_demais'[\s\S]{0,300}rapidoDemais\(cur/.test(tela) && !/seg\s*<\s*EMB_MIN/.test(tela));
+     /motivo==='rapido_demais'\)\{\s*cur\.enviando=false;\s*rapidoDemais\(cur/.test(tela) && !/seg\s*<\s*EMB_MIN/.test(tela));
+  /* ③ REVISAO r2: sem o cur.enviando=false a primeira recusa deixava a
+     embalagem presa para sempre (todo bipe ignorado). E o envio tem limite de
+     tempo: pendurado, cai no "Falha de conexao" em vez de travar a bancada. */
+  ok('o envio tem limite de tempo (AbortController)', /AbortController[\s\S]{0,200}abort\(\)/.test(fin) && /signal:/.test(fin));
 }
 
 console.log('\n────────────────────────────────────────────');
