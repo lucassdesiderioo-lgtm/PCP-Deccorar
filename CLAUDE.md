@@ -856,7 +856,8 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 > 21/11/2026): o redesenho de 4 s trocava o "Embalada ✓" por "Pronto" em menos
 > de 1 s, e quem não lia a tempo podia embalar a peça de novo. O "Embalada ✓",
 > o "Não deu pra embalar" e o "Falha de conexão" usam o mesmo `avisoFixo` dos
-> outros avisos. `teste_montagem.js` (seção 12). Construído, falta subir.
+> outros avisos. `teste_montagem.js` (seção 12). ✅ No ar desde 21/11/2026 (PR #361): o
+> dono fez o deploy e disse *"deu tudo certo no deploy"*.
 >
 > ⚠️ **AO TERMINAR A PEÇA, A PESSOA VÊ O TEMPO DELA AO LADO DA PRÓPRIA MEDIANA
 > (21/11/2026)** — spec `TEMPO-NA-BANCADA`, cartão R-TEM-01, linha em
@@ -869,7 +870,9 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 > `public/tempo_bancada.js`); a linha sem id do login não conta para ninguém; e a
 > conta que falhar não derruba o bipe (`tempo:null`). **Tela nova que mede tempo
 > do operador entra no `ATIVIDADES` do `tempo_operador.js` e usa o
-> `tempoBancada`.** Construído, falta subir.
+> `tempoBancada`.** ✅ **No ar desde 21/11/2026** (PR #361): o dono fez o deploy e disse
+> *"deu tudo certo no deploy"*. ⚠️ **Ainda não provado com dado real:** as barras
+> e o aviso aparecendo para alguém da bancada com as peças dela dos últimos 30 dias.
 
 > ⚠️ **A FILA DA EMBALAGEM FOI ACERTADA PELA MESA DO FIM DO DIA 04/11/2026**
 > (linha em `docs/DECISOES.md`). `node ajustar_fila_embalagem.js` simula, e

@@ -260,7 +260,7 @@
 - **Vale para as próximas telas:** toda tela nova que mede o tempo de uma atividade do operador registra a atividade no `tempo_operador.js` (`ATIVIDADES`), devolve `tempo` no bipe que fecha a peça e desenha com o `tempoBancada`.
 - **Exceções:** o sob medida (bancada 6xx) fica de fora até spec própria; o tablet com a página antiga ignora o campo até ser recarregado; a conta que falhar não derruba o bipe (vai ao log, `tempo:null`).
 - **Teste que trava:** `teste_tempo_operador.js` (28) e `teste_montagem.js` (seção 13).
-- **Status:** construído em 21/11/2026, falta subir.
+- **Status:** no ar desde 21/11/2026 (PR #361). Ainda não provado com dado real: a primeira pessoa da bancada vendo as barras com as peças dela.
 
 ---
 
