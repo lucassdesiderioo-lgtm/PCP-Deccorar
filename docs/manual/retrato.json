@@ -88,6 +88,7 @@
   "R-EMB-08": "a41323c92d2bf4ce",
   "R-EMB-09": "54022b475e77c8f7",
   "R-EMB-10": "754dc6056b8f74df",
+  "R-EMB-11": "e28dc370c68d3cf5",
   "R-EST-01": "6cb7de19b6e17f38",
   "R-EST-02": "50fcc9282e44164a",
   "R-EST-03": "044d524d09846887",
@@ -315,7 +316,7 @@
   "R-SMX-03": "bee8abeb288ffdd0",
   "R-SMX-04": "41be51711be75b4f",
   "R-SMX-05": "0496de5819fbffba",
-  "R-TEM-01": "f3a2f3f51befae9b",
+  "R-TEM-01": "fc5cf3c7c63539e6",
   "R-URG-01": "01fd9216f36e2cfb",
   "R-URG-02": "e88c40a1019b0bf3",
   "R-VAL-01": "a481ffd1c1c39a27",
@@ -350,7 +351,9 @@
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
     "21/11/2026 — ficha criada em rascunho",
-    "21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com \"Parabéns!\" ou \"Você pode melhorar\". Só você vê o seu."
+    "21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com \"Parabéns!\" ou \"Você pode melhorar\". Só você vê o seu.",
+    "22/11/2026 — O tempo ao lado da sua média está no ar na bancada desde 21/11/2026.",
+    "22/11/2026 — Entrou o bloco \"Voltaram da embalagem por defeito\": a persiana que quem embala devolveu aparece aqui com o motivo e quem achou. \"Tem defeito\" escolhe o setor responsável e a peça vira peça com problema; \"Não tem defeito\" fecha a volta e a peça é revisada de novo pelos dois bipes (a peça de devolução volta direto à fila da embalagem). A revisão daquela peça deixa de contar."
    ],
    "situacao": "rascunho"
   },
@@ -364,7 +367,9 @@
     "21/11/2026 — A persiana só embala se veio da Revisão: sem ela esperando na fila, o bipe final é recusado e nada é gravado; a peça volta para a Revisão. Kit, acessório e sob medida embalam como antes.",
     "21/11/2026 — O bipe que fecha a embalagem antes do tempo mínimo da embalagem (contado desde o primeiro bipe) é recusado, nada é gravado e a embalagem continua aberta na tela.",
     "21/11/2026 — Entrou o botão \"Cancelar embalagem\": zera a embalagem em andamento sem gravar nada; a persiana continua aguardando embalagem.",
-    "21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com \"Parabéns!\" ou \"Você pode melhorar\". Só você vê o seu."
+    "21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com \"Parabéns!\" ou \"Você pode melhorar\". Só você vê o seu.",
+    "22/11/2026 — O tempo ao lado da sua média está no ar na bancada desde 21/11/2026.",
+    "22/11/2026 — Entrou o botão \"Peça com defeito\", só para persiana e com a embalagem aberta: escolhe-se o motivo e a peça volta para a Revisão; nada é embalado e nada entra no estoque."
    ],
    "situacao": "rascunho"
   },
@@ -383,7 +388,8 @@
    "acoes": [],
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
-    "21/11/2026 — ficha criada em rascunho"
+    "21/11/2026 — ficha criada em rascunho",
+    "22/11/2026 — A lista separa a peça com problema achada na Revisão da achada na Embalagem, com o setor responsável; na achada na Embalagem, a coluna Quem diz quem achou e quem conferiu."
    ],
    "situacao": "rascunho"
   },

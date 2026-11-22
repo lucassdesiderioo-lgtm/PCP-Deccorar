@@ -748,6 +748,7 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 | R-EMB-08 | A revisão e a embalagem gravam quem fez (`usuario_id`, `usuario_nome`) |
 | R-EMB-09 | Bipe que fecha a embalagem abaixo de 45 s (`config.emb_minimo_seg`) é recusado pelo servidor, e a embalagem continua (21/11/2026) |
 | R-EMB-10 | "Cancelar embalagem" zera a embalagem em andamento; nada grava e a peça continua na fila (21/11/2026) |
+| R-EMB-11 | A persiana com defeito volta da Embalagem para a Revisão: quem embala marca com motivo, nada soma; o revisor manda ao setor ou revisa de novo (21/11/2026) |
 | R-TEM-01 | Ao terminar a peça, duas barras ("Agora" e a mediana da própria pessoa no SKU, 30 dias) e "Parabéns!" ou "Você pode melhorar"; vale para toda tela nova que medir tempo do operador (21/11/2026) |
 | R-KIT-01 | Trocar o código do kit exige `confirmar` (servidor) |
 | R-KIT-02 | O código do kit não pode ser SKU de persiana |
@@ -761,7 +762,7 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 `ordem_dia.js`, `modo_route.js` ou `st_route.js`: `node teste_ordem_dia.js`. No
 `kit_pdf.js`, no card do kit, no `kit_etiqueta.js`, no `qr.js` ou no
 `barras.js`: `node teste_kit.js` e `node teste_qr.js` (e, no `barras.js`, também
-`cd tecido && npm test`). Na revisão: `node teste_revisao.js`. No tempo da bancada (`tempo_operador.js`, `public/tempo_bancada.js`, o `tempo` da resposta da Revisão e da Embalagem): `node teste_tempo_operador.js`.
+`cd tecido && npm test`). Na revisão: `node teste_revisao.js`. No tempo da bancada (`tempo_operador.js`, `public/tempo_bancada.js`, o `tempo` da resposta da Revisão e da Embalagem): `node teste_tempo_operador.js`. Na peça com defeito que volta da Embalagem (`defeito_dominio.js`, `rejeicao_dominio.js`, o botão da 102, o bloco da 101, a 104): `node teste_defeito_volta.js`.
 
 > ⚠️ **A REVISÃO RECUSA O BIPE RÁPIDO, CANCELA E DESFAZ (04/11/2026)** — fase 1
 > da spec `QUEM-FEZ-E-REVISAO`, cartões R-REV-07 a R-REV-09. O bipe duplo
@@ -857,7 +858,8 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 > 21/11/2026): o redesenho de 4 s trocava o "Embalada ✓" por "Pronto" em menos
 > de 1 s, e quem não lia a tempo podia embalar a peça de novo. O "Embalada ✓",
 > o "Não deu pra embalar" e o "Falha de conexão" usam o mesmo `avisoFixo` dos
-> outros avisos. `teste_montagem.js` (seção 12). Construído, falta subir.
+> outros avisos. `teste_montagem.js` (seção 12). ✅ No ar desde 21/11/2026 (PR #361): o
+> dono fez o deploy e disse *"deu tudo certo no deploy"*.
 >
 > ⚠️ **AO TERMINAR A PEÇA, A PESSOA VÊ O TEMPO DELA AO LADO DA PRÓPRIA MEDIANA
 > (21/11/2026)** — spec `TEMPO-NA-BANCADA`, cartão R-TEM-01, linha em
@@ -870,7 +872,43 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 > `public/tempo_bancada.js`); a linha sem id do login não conta para ninguém; e a
 > conta que falhar não derruba o bipe (`tempo:null`). **Tela nova que mede tempo
 > do operador entra no `ATIVIDADES` do `tempo_operador.js` e usa o
-> `tempoBancada`.** Construído, falta subir.
+> `tempoBancada`.** ✅ **No ar desde 21/11/2026** (PR #361): o dono fez o deploy e disse
+> *"deu tudo certo no deploy"*. ⚠️ **Ainda não provado com dado real:** as barras
+> e o aviso aparecendo para alguém da bancada com as peças dela dos últimos 30 dias.
+
+> ⚠️ **A PERSIANA COM DEFEITO VOLTA DA EMBALAGEM PARA A REVISÃO (21/11/2026)** —
+> spec `EMBALAGEM-DEFEITO-VOLTA`, cartão R-EMB-11, linha em `docs/DECISOES.md`.
+> Com a embalagem aberta, **"Peça com defeito"** (só persiana): quem embala decide
+> sozinho, com motivo obrigatório da mesma lista da Revisão. O que parece bug e não é:
+> - **nada embala e nada soma**, e a linha da fila **não é apagada**: passa à
+>   situação `defeito` (rastro de onde a peça estava). Sem linha `aguardando`, a
+>   persiana não embala de novo (R-EMB-02);
+> - **"não tem defeito" NÃO devolve a peça à fila**: a volta fecha e a peça é
+>   **revisada de novo** pelos dois bipes — uma porta só para a fila. ⚠️ **A
+>   exceção é a peça de DEVOLUÇÃO** (fila modo `devolucao`, que nunca teve revisão):
+>   sem defeito, a mesma linha volta a `aguardando`, com o modo, e embala como
+>   devolução (decisão do dono, 22/11/2026). **"Tem
+>   defeito"** escolhe o setor de uma lista fixa (`defeito_dominio.SETORES`) e grava
+>   a peça com problema de sempre (`rejeicao`, `origem='embalagem'`, com o setor),
+>   que vira material extra na 106;
+> - **quem achou pode conferir** a própria volta (decisão do dono); a volta parada
+>   fica só no bloco da 101, não na 204;
+> - **a peça com problema tem um dono só desde aqui** (`rejeicao_dominio.js`): o
+>   `POST /api/rejeicao` da Revisão e a volta confirmada passam por ele; a linha de
+>   antes, sem `origem`, conta como achada na revisão na 104;
+> - ⚠️ **a revisão da peça devolvida É APAGADA ao marcar** (decisão do dono,
+>   22/11/2026), como no "Desfazer última": sem isso a tela vermelha dava a ordem
+>   por cumprida com a peça com defeito, e o "sem defeito" contava duas vezes. O
+>   rastro fica em `revisao_evento` (`devolvida_embalagem`) e na volta
+>   (`revisao_id`, `revisado_por`, `revisao_segundos`); o revisor perde aquela
+>   peça na produtividade e na mediana. A revisão de antes dele **não** vira a
+>   "última" para desfazer, e o desfazer diz que a peça voltou por defeito.
+> - ⚠️ **a peça que volta é a linha MAIS ANTIGA da fila do SKU** (decisão do
+>   dono, 22/11/2026): com duas iguais na fila, a revisão apagada pode ser a de
+>   outra pessoa, e a de devolução pode voltar no lugar da comum. Fica assim até
+>   cada persiana ter identificação própria — não "conserte" escolhendo outra.
+> `defeito_dominio.js` é o dono único da volta (tabela `embalagem_defeito`, no modo
+> teste). Construído, falta subir.
 
 > ⚠️ **A FILA DA EMBALAGEM FOI ACERTADA PELA MESA DO FIM DO DIA 04/11/2026**
 > (linha em `docs/DECISOES.md`). `node ajustar_fila_embalagem.js` simula, e
@@ -3621,7 +3659,7 @@ logado"*. Linhas em `docs/DECISOES.md`.
 > recusado na bancada, um desfazer de verdade e a primeira sessão nova gravada
 > em `sessao`. Prova que não foi feita se escreve como não feita.
 
-**Rode `node teste_quem.js` (313) ao criar QUALQUER rota de escrita, mexer no
+**Rode `node teste_quem.js` (315) ao criar QUALQUER rota de escrita, mexer no
 `quem.js` ou num `require` de módulo de rotas.** Ele sobe os módulos na ordem do
 `server.js` e chama cada escrita sem login; rota nova que não passa pelo `quem.js`
 reprova no mesmo minuto em que é escrita.
@@ -3902,7 +3940,7 @@ guarda o saldo é a coluna, o movimento é só a história dela.
 (04/11/2026, conferência v2), `revisao_evento` (04/11/2026, a revisão
 cancelada, recusada e desfeita — QUEM-FEZ-E-REVISAO), `lote_reimpressao`
 (05/11/2026, cada reimpressão da etiqueta de venda, com quem),
-`montagem_evento` (21/11/2026, o bipe de fim da embalagem recusado por rápido demais), `volume_material`, `volume_evento`, `contagem_material` (+ `_item` e `_linha`),
+`montagem_evento` (21/11/2026, o bipe de fim da embalagem recusado por rápido demais), `embalagem_defeito` (21/11/2026, a peça devolvida à Revisão por defeito), `volume_material`, `volume_evento`, `contagem_material` (+ `_item` e `_linha`),
 `nota_compra` (+ `_item`), `pagamento_parcela` e `compra_anexo` (07/11/2026,
 COMPRAS-E-RECEBIMENTO — a `dfe_documento` fica fora: a nota apagada não se baixa de
 novo), `material_extra` (11/11/2026, FICHAS-NO-CADASTRO-UNICO; a linha da recusa
@@ -4322,7 +4360,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). ~~**Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa~~ — **fechado em 08/11/2026**: a 905 Minha produção e a aba Por pessoa da 904 (§21) · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (27 casos), `teste_carga.js` (67), `teste_divergencia.js` (70) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (86), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (378), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (158), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (87), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (313), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (84), `teste_impressos.js` (42), `teste_quantidade.js` (42), `teste_casos_reais.js` (85), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (67), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (67), `teste_menu.js` (43), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (109), `teste_501_so_compra.js` (93), `teste_custo_historico.js` (15), `teste_parametros.js` (113), `teste_gravar_nf_da_nota.js` (28), `teste_pendencias_caminho.js` (78), `teste_fichas_material.js` (64), `teste_pendencias_menu.js` (49), `teste_pendencias_sobmedida.js` (67), `teste_roteiro.js` (25), `teste_diagnosticar_diferenca_telas.js` (27), `teste_tempo_operador.js` (28); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (27 casos), `teste_carga.js` (67), `teste_divergencia.js` (70) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (86), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (378), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (158), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (87), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (316), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (84), `teste_impressos.js` (42), `teste_quantidade.js` (42), `teste_casos_reais.js` (85), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (67), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (67), `teste_menu.js` (43), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (109), `teste_501_so_compra.js` (93), `teste_custo_historico.js` (15), `teste_parametros.js` (113), `teste_gravar_nf_da_nota.js` (28), `teste_pendencias_caminho.js` (78), `teste_fichas_material.js` (64), `teste_pendencias_menu.js` (49), `teste_pendencias_sobmedida.js` (67), `teste_roteiro.js` (25), `teste_diagnosticar_diferenca_telas.js` (27), `teste_tempo_operador.js` (28), `teste_defeito_volta.js` (65); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |

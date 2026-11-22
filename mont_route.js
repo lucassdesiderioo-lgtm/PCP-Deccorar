@@ -7,6 +7,7 @@ const KIT_BIPE = require('./public/kit_bipe.js');
 const ESTOQUE  = require('./estoque_dominio');
 const QUEM     = require('./quem');
 const TEMPO    = require('./tempo_operador');
+const DEFEITO  = require('./defeito_dominio');
 /* O tempo minimo da embalagem, em segundos (EMBALAGEM-TEMPO-MINIMO, 21/11/2026).
    E so o padrao do boot: quem manda e config.emb_minimo_seg. */
 const EMB_MINIMO_PADRAO = 45;
@@ -434,6 +435,22 @@ module.exports=function(app,db){
     db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,inicio,fim,usuario_id,usuario_nome)
       VALUES ('cancelada',?,?,?,?,?,?)`).run(cod,Math.round(+b.segundos||0),txt(b.inicio),txt(b.fim),q.usuario_id,q.usuario_nome);
     res.json({ok:true});
+  });
+  /* A PECA COM DEFEITO VOLTA PARA A REVISAO (EMBALAGEM-DEFEITO-VOLTA, R-EMB-11,
+     21/11/2026). Quem embala decide sozinho, com motivo. Nada embala e nada
+     soma; a linha da fila sai de 'aguardando' (defeito_dominio, dono unico). */
+  DEFEITO.garantir(db);
+  app.post('/api/montagem/defeito',(req,res)=>{
+    const q=QUEM.exigir(req,res); if(!q) return;
+    const emTeste = cfg('modo_teste')==='1' ? 1 : 0;
+    try{
+      const r=db.transaction(()=>DEFEITO.marcar(db,req.body||{},q,emTeste))();
+      res.json(Object.assign({ok:true},r));
+    }catch(e){
+      if(e instanceof DEFEITO.Recusa) return res.status(e.status).json(Object.assign({erro:e.message},e.extra));
+      console.error('[montagem] POST /api/montagem/defeito falhou:', e);
+      res.status(500).json({erro:'Não deu para devolver a peça à Revisão: '+e.message+' — NADA foi gravado.'});
+    }
   });
   app.get('/api/fila',(req,res)=>{
     /* A MESMA REGUA DA TRAVA DO POST (③ REVISAO): so a fila do momento (modo

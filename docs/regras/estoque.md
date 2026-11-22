@@ -260,8 +260,15 @@
 - **Vale para as próximas telas:** toda tela nova que mede o tempo de uma atividade do operador registra a atividade no `tempo_operador.js` (`ATIVIDADES`), devolve `tempo` no bipe que fecha a peça e desenha com o `tempoBancada`.
 - **Exceções:** o sob medida (bancada 6xx) fica de fora até spec própria; o tablet com a página antiga ignora o campo até ser recarregado; a conta que falhar não derruba o bipe (vai ao log, `tempo:null`).
 - **Teste que trava:** `teste_tempo_operador.js` (28) e `teste_montagem.js` (seção 13).
-- **Status:** construído em 21/11/2026, falta subir.
+- **Status:** no ar desde 21/11/2026 (PR #361). Ainda não provado com dado real: a primeira pessoa da bancada vendo as barras com as peças dela.
 
+
+### R-EMB-11 · A persiana com defeito volta da Embalagem para a Revisão
+- **Regra:** com a embalagem aberta, "Peça com defeito" (só persiana, a régua da R-EMB-02). Quem embala decide sozinho, com motivo obrigatório da lista da Revisão (`listas` tipo `rejeicao`). **Nada embala e nada soma**; a linha `aguardando` mais antiga do SKU passa a `defeito` (não é apagada) e nasce a volta em `embalagem_defeito`, com quem achou (`POST /api/montagem/defeito`, `embalagem.executar`, 401 sem login). Na Revisão, o bloco "Voltaram da embalagem por defeito" (`GET /api/revisao/defeitos`, `revisao.executar`): **"Tem defeito"** escolhe o setor (lista fixa: Corte de tecido · Corte de tubo e base · Kit de comando · Montagem · Outro) e grava a peça com problema (`rejeicao`, `origem='embalagem'`, `setor`), que vira material extra; **"Não tem defeito"** só fecha a volta, e a peça é revisada de novo pelos dois bipes (`POST /api/revisao/defeitos/:id/decidir`, `revisao.rejeitar`) — menos a peça de **devolução** (fila modo `devolucao`), que volta direto a `aguardando` com o modo. **Ao marcar, a revisão daquela peça é apagada** (deixa de contar na tela vermelha, na produtividade e na mediana), com o rastro em `revisao_evento` e na volta. A 104 separa "achado na revisão" e "achado na embalagem", com o setor, e na linha achada na embalagem a coluna Quem diz quem achou e quem conferiu (o dono, 21/11/2026). `defeito_dominio.js` é o dono da volta, e `rejeicao_dominio.js` o da peça com problema.
+- **Por quê:** o dono, 21/11/2026: quem embala e acha defeito embalava assim mesmo (a peça virava estoque) ou levava de volta na mão, com a fila dizendo que ela esperava embalagem.
+- **Exceções:** kit, acessório e sob medida não têm o botão. A devolução sem defeito volta direto à fila (22/11/2026). A peça que volta é a linha mais antiga da fila do SKU, e a revisão apagada é a dela, até cada persiana ter identificação (decisão do dono, 22/11/2026). Quem achou pode conferir a própria volta. Decidida não se decide de novo (409). A volta parada fica só na 101.
+- **Teste que trava:** `teste_defeito_volta.js` (65).
+- **Status:** construído em 21/11/2026, falta subir.
 ---
 
 ## O kit e a etiqueta dele
