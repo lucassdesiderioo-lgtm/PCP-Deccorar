@@ -38,6 +38,7 @@ bipa o SKU → "Peça com defeito"  "Voltaram da embalagem"
                                                                  ──▶  sem defeito:
                                                                       revisa de novo (2 bipes)
                                                                       e volta à fila da embalagem
+                                                                      (a devolução volta direto)
 ```
 
 ## 3. A regra
@@ -139,7 +140,8 @@ Nenhuma tela, aba ou módulo novo.
   `sem_revisao`.
 - Na Revisão: a volta aparece no bloco; "tem defeito" grava a `rejeicao` com a origem
   e o setor (e o material extra); "não tem defeito" fecha a volta, e só a revisão nova
-  põe a peça na fila.
+  põe a peça na fila — menos a peça de devolução, que volta direto. Ao marcar, a
+  revisão da peça é apagada, e o desfazer não pega a revisão de antes.
 - Na 104: as duas origens contadas separadas.
 - `teste_montagem.js`, `teste_revisao.js`, `teste_livro.js`, `teste_quem.js` e
   `teste_fichas_material.js` passando sem mudar o esperado.
