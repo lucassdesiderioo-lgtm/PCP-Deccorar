@@ -3659,7 +3659,7 @@ logado"*. Linhas em `docs/DECISOES.md`.
 > recusado na bancada, um desfazer de verdade e a primeira sessão nova gravada
 > em `sessao`. Prova que não foi feita se escreve como não feita.
 
-**Rode `node teste_quem.js` (315) ao criar QUALQUER rota de escrita, mexer no
+**Rode `node teste_quem.js` (316) ao criar QUALQUER rota de escrita, mexer no
 `quem.js` ou num `require` de módulo de rotas.** Ele sobe os módulos na ordem do
 `server.js` e chama cada escrita sem login; rota nova que não passa pelo `quem.js`
 reprova no mesmo minuto em que é escrita.
