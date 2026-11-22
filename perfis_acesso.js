@@ -130,6 +130,11 @@ const NASCERAM_DEPOIS = ['coleta.horario',   // HORARIOS-DE-COLETA, 05/11/2026
      Sai da comparacao pelo nome; que so o Admin Geral a recebe e travado no
      teste_fichas_material.js. */
   'material.extra',
+  /* O MANUAL (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026): as duas chaves
+     nascem so para o Admin Geral (R-ALC-06), sem backfill — o dono marca
+     `manual.ler` nos setores na fase 2. Saem da comparacao pelo nome; que
+     nenhum setor as recebe e travado no teste_manual.js (C7). */
+  'manual.ler', 'manual.ver_todas',
   /* O MODO TESTE FOI APOSENTADO (11/11/2026): a chave saiu do registro e a 903
      do mapa. Sai da comparacao pelo nome (como a 203); que ninguem mais liga o
      modo e travado no teste_tarja_modo_teste.js e no teste_regras_estoque.js. */

@@ -26,7 +26,13 @@ lá a cada vez, porque ela pode mudar. Em geral, ela pede:
 - descobriu armadilha → `CLAUDE.md`;
 - resolveu dívida → riscar na §14, com data;
 - trabalhou numa spec → STATUS da spec **e** o índice em `docs/specs/README.md`;
-- terminou a spec inteira → a spec vai para `docs/arquivo/`.
+- terminou a spec inteira → a spec vai para `docs/arquivo/`;
+- mexeu em tela, botão, número mostrado ou regra que a tela aplica → a ficha da
+  tela em `docs/manual/`, com a linha datada em "Mudanças", e `node
+  manual_retrato.js` regravado (spec MANUAL-DO-SISTEMA). Confira: a tela do
+  diff tem a ficha mexida? a ação nova tem linha em "Botões e ações"? o cartão
+  mudado tem a ficha que o cita mexida? o `docs/manual/retrato.json` está no
+  diff? Rode `node teste_manual.js`: ele acusa o que faltou.
 
 ## O que conferir
 

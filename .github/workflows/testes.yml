@@ -201,6 +201,7 @@ jobs:
                       /admin/materiais /admin/fornecedores /admin/almoxarifados \
                       /admin/recebimento-retido /admin/notas /admin/certificado /contagem-material \
                       /coleta-horarios /minha-producao /relatorios /material-extra /material-extra.html /parametros /parametros.html \
+                      /manual /manual.html \
                       /sobmedida /sobmedida/corte /sobmedida/cadastros \
                       /sobmedida/telas/corte.html; do
             confere "$tela" 302
@@ -209,6 +210,7 @@ jobs:
           # API = 401. Ela nao redireciona: quem chama API espera resposta, e
           # um 302 aqui faria o leitor da bancada receber HTML de login.
           confere /api/skus 401
+          confere /api/manual/minhas 401
           confere /sobmedida/api/eu 401
 
           # E o login abre, senao ninguem entra.

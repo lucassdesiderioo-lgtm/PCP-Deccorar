@@ -95,8 +95,24 @@ function textoHtml(src){
   return out;
 }
 
+/* Em .md (as fichas de docs/manual/, spec MANUAL-DO-SISTEMA): o arquivo
+   inteiro e texto que o time le na 907 e no "?". Linha a linha, fora o
+   cabecalho (--- ... ---), que e dado. */
+function textoMd(src){
+  const out = [];
+  let dentroCab = false, k = 0;
+  for(const t of String(src).split('\n')){
+    k++;
+    if(k === 1 && /^---\s*$/.test(t)){ dentroCab = true; continue; }
+    if(dentroCab){ if(/^---\s*$/.test(t)) dentroCab = false; continue; }
+    if(t.trim()) out.push({linha: k, texto: t});
+  }
+  return out;
+}
+
 function textoVisivel(arquivo, src){
+  if(/\.md$/i.test(arquivo)) return textoMd(src);
   return /\.html?$/i.test(arquivo) ? textoHtml(src) : literaisJs(src, 1);
 }
 
-module.exports = {textoVisivel, literaisJs, textoHtml};
+module.exports = {textoVisivel, literaisJs, textoHtml, textoMd};
