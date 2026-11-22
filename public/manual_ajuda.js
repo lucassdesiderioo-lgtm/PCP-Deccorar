@@ -60,7 +60,6 @@
     var fl = s.fluxo || {};
     var fluxo = '<div class="mfFluxo"><div><span class="mfRot">Recebe de</span> ' + chips(fl.recebe_de, 'nenhuma tela manda para esta') + '</div>'
       + '<div><span class="mfRot">Manda para</span> ' + chips(fl.manda_para, 'nenhuma tela') + '</div>'
-      + (fl.outros && fl.outros.length ? '<div><span class="mfRot">Também usa</span> ' + fl.outros.map(function(x){ return '<span class="mfChip cinza">' + esc(x) + '</span>'; }).join(' ') + '</div>' : '')
       + (fl.extra ? '<p>' + texto(fl.extra) + '</p>' : '') + '</div>';
     h += secao('Onde entra no fluxo', fluxo);
     var bot = itens(s.botoes);
@@ -97,7 +96,7 @@
     + '.mfLista{margin:0;padding-left:18px}.mfLista li{margin:0 0 6px;line-height:1.45}.mfVazio{color:#8b97a5}.mfNota{color:#5a6472;font-size:12px;margin:6px 0 0}'
     + '.mfFluxo>div{margin:0 0 6px;line-height:1.9}.mfRot{color:#5a6472;font-size:12px;text-transform:uppercase;letter-spacing:.3px;margin-right:6px}'
     + '.mfChip{display:inline-block;border:1px solid #1565c0;color:#1565c0;border-radius:999px;padding:2px 10px;text-decoration:none;font-size:13px;margin:0 4px 4px 0;white-space:nowrap}'
-    + '.mfChip b{margin-right:4px}.mfChip.fora{border-color:#d8dee6;color:#5a6472}.mfChip.cinza{border-color:#d8dee6;color:#5a6472;border-style:dashed}.mfSo{color:#8b97a5;font-size:12px;font-weight:400}'
+    + '.mfChip b{margin-right:4px}.mfChip.fora{border-color:#d8dee6;color:#5a6472}.mfSo{color:#8b97a5;font-size:12px;font-weight:400}'
     + '.mfAcoes{margin-top:8px}.mfLink a{color:#1565c0;font-weight:700;text-decoration:none}.mfTermo{color:#1565c0;text-decoration:underline dotted}';
   function estilo(){
     if(document.getElementById('mfCss')) return;

@@ -204,7 +204,8 @@ const JARGAO = [
   [/\b[\w-]+\.(?:js|html)\b/, 'nome de arquivo'],
   [/\/api\//, '/api/'],
   [/\bSELECT\b/, 'SQL'],
-  [/\bR-[A-Z]{2,5}-\d{2}\b/, 'código de cartão']
+  [/\bR-[A-Z]{2,5}-\d{2}\b/, 'código de cartão'],
+  [/\b[a-z]+_[a-z0-9_]+\b/, 'nome de tabela ou coluna']
 ];
 function jargaoNoCorpo(f){
   const txt = String((f && f.corpo) || '');
@@ -318,9 +319,11 @@ function fluxoDe(tela, telas, opera){
   const porN = {}; telas.forEach(t => { porN[t.n] = t; });
   const ref = n => ({ n, nome:(porN[n] || {}).nome || String(n), opera: !!opera(porN[n]) });
   const manda = (tela.liga || []).filter(x => typeof x === 'number' && porN[x]).map(ref);
-  const outros = (tela.liga || []).filter(x => typeof x !== 'number').map(String);
+  /* As STRINGS do `liga` ('skus', 'lote', 'venda_futura (planilha do ML)') são
+     nome de tabela, escritas para quem edita o mapa (R-ORG-07). Não chegam à
+     ficha: só as telas numeradas (③ REVISÃO, 22/11/2026). */
   const recebe = telas.filter(t => t.n !== tela.n && (t.liga || []).some(x => x === tela.n)).map(t => ref(t.n));
-  return { recebe_de: recebe, manda_para: manda, outros };
+  return { recebe_de: recebe, manda_para: manda };
 }
 /* ctx: { L, telas, opera(tela) → bool, valorDe(chave) → string|null } */
 function montar(n, ctx){

@@ -113,6 +113,14 @@ fichas.forEach(f => { const j = MAN.jargaoNoCorpo(f); if(j.length) jargao.push(f
 ok('A10 o corpo da ficha não tem R$, nome de arquivo .js/.html, /api/, SELECT nem código de cartão', !jargao.length, lista(jargao));
 ok('   o detector pega cada um', ['custa R$ 10', 'veja o parse.js', 'abra o operador.html', 'chame /api/skus', 'rode SELECT * FROM x', 'o cartão R-EST-01 diz'].every(t => MAN.jargaoNoCorpo({ corpo:t }).length === 1));
 ok('   e deixa passar texto de fábrica', MAN.jargaoNoCorpo({ corpo:'A peça entra na fila depois de revisada. O selo diz Coleta.' }).length === 0);
+ok('   e pega nome de tabela ou coluna com sublinhado (venda_futura, pendencias_dia)', ['a tabela venda_futura', 'grava em pendencias_dia'].every(t => MAN.jargaoNoCorpo({ corpo:t }).length === 1));
+/* ③ REVISÃO (22/11/2026): o `liga` do mapa traz nome de tabela ('skus', 'lote',
+   'venda_futura (planilha do ML)') — escrito para quem edita. A ficha montada
+   não leva NENHUMA string do liga: só as telas numeradas. */
+const vazou = fichas.map(f => { const fl = MAN.montar(f.n, { L, telas: MAN.telasTodas(), opera: () => true }).secoes.fluxo;
+  return fl.outros || /\b(skus|lote|saida|venda_futura|usuarios|setores|componente|pendencias_dia|docs\/manual|config)\b/.test(JSON.stringify([fl.recebe_de, fl.manda_para])) ? f.n : null; }).filter(Boolean);
+ok('A10-B nenhuma string do liga do mapa chega à ficha montada (não há "Também usa" com nome de tabela)', !vazou.length, lista(vazou));
+ok('   e o desenho do "?" não tem o "Também usa"', !/Tamb[ée]m usa/.test(fs.readFileSync(path.join(__dirname, 'public', 'manual_ajuda.js'), 'utf8')));
 
 /* lê = uma linha de código (sem comentário) com readFileSync/readdirSync/existsSync E "manual" no caminho */
 const leitores = fs.readdirSync(__dirname).filter(f => /\.js$/.test(f) && f !== 'manual.js' && !/^teste_/.test(f))
