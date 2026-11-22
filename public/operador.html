@@ -370,7 +370,7 @@ function voltaDesenhar(){
     h+='<div style="background:#fff;border:1px solid #efb1ad;border-radius:10px;padding:12px;margin-top:8px">'
       +'<div style="font-size:17px;font-weight:800">'+escV(v.codigo)+(med?' <span style="font-weight:600;color:#5a6472">· '+escV(med)+'</span>':'')+'</div>'
       +'<div style="margin-top:2px"><b>'+escV(v.motivo)+'</b>'+(v.obs?' — '+escV(v.obs):'')+'</div>'
-      +'<div style="font-size:13px;color:#5a6472;margin-top:2px">achou: '+escV(v.achou_por||'—')+' · '+haTempo(v.ha_min)+'</div>';
+      +'<div style="font-size:13px;color:#5a6472;margin-top:2px">achou: '+escV(v.achou_por||'—')+' · '+haTempo(v.ha_min)+(v.modo==='devolucao'?' · <b>peça de devolução</b>':'')+'</div>';
     if(voltaAberta===v.id){
       h+='<div style="margin-top:10px;font-weight:700">Qual setor é o responsável?</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">'
         +VOLTA.setores.map(function(s){ return '<button type="button" class="vSetor" data-id="'+v.id+'" data-s="'+s.chave+'" style="padding:12px 16px;border-radius:9px;border:1px solid #c62828;background:#fff;color:#c62828;font-size:15px;font-weight:700;cursor:pointer">'+escV(s.nome)+'</button>'; }).join('')
@@ -398,7 +398,8 @@ async function voltaDecidir(id, corpo){
     if(corpo.decisao==='defeito'){ var sn=((VOLTA.setores||[]).find(function(s){ return s.chave===corpo.setor; })||{}).nome||'';
       msg=escV(v.codigo)+' · '+escV(v.motivo)+' · registrada como peça com problema.';
       if(!emRev){ banner('err','Enviada ao setor: '+escV(sn), msg); } else VOLTA_MSG='Enviada ao setor '+escV(sn)+': '+msg; }
-    else { msg=escV(v.codigo)+' · <b>revise a peça de novo</b> (bipe o código duas vezes) para ela voltar à fila da embalagem.';
+    else { msg=r.volta_fila ? escV(v.codigo)+' · peça de devolução: <b>voltou direto à fila da embalagem</b>, não precisa revisar de novo.'
+                           : escV(v.codigo)+' · <b>revise a peça de novo</b> (bipe o código duas vezes) para ela voltar à fila da embalagem.';
       if(!emRev){ banner('ok','Sem defeito', msg); } else VOLTA_MSG='Sem defeito: '+msg; }
     beep(true); voltaCarregar();
   }catch(e){ voltaEnviando=false; var e2=document.querySelector('.vErr[data-id="'+id+'"]'); if(e2) e2.textContent='Sem conexão: nada foi gravado. Toque de novo.'; beep(false); }

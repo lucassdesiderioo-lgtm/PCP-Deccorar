@@ -6,6 +6,13 @@
 > `REGRA` 🔴. Cartão **R-EMB-11** em `docs/regras/estoque.md`; linha em
 > `docs/DECISOES.md`. A conta da peça com problema passou a ter dono único
 > (`rejeicao_dominio.js`), usado pela Revisão e pela volta.
+>
+> **22/11/2026, duas decisões do dono na ③ REVISÃO** (*"segue as duas sugestões"*):
+> (1) ao marcar o defeito, **a revisão daquela peça é apagada** (como no "Desfazer
+> última"), com o rastro em `revisao_evento` e na volta — a tela vermelha dava a
+> ordem por cumprida e o "sem defeito" contava duas vezes; (2) a peça de
+> **devolução** sem defeito **volta direto à fila**, com o modo, sem revisar de
+> novo (§3, caminho 2).
 
 ## 1. O pedido
 
@@ -65,7 +72,13 @@ bipa o SKU → "Peça com defeito"  "Voltaram da embalagem"
      extra a decidir" na 106, como a peça com problema da Revisão já vira (§24).
   2. **"Não tem defeito"**: a volta é fechada com quem decidiu, e a peça **é revisada
      de novo pelos dois bipes**, como qualquer outra. É a revisão nova que a põe de
-     volta na fila da embalagem — uma porta só para a fila (§7, Q2).
+     volta na fila da embalagem — uma porta só para a fila (§7, Q2). **Exceção
+     (22/11/2026):** a peça de devolução (fila modo `devolucao`) nunca teve revisão,
+     e revisada de novo perderia a devolução; sem defeito, ela volta direto a
+     esperar embalagem, com o modo.
+- **Ao marcar o defeito, a revisão daquela peça deixa de contar (22/11/2026):** a
+  linha de `revisao` é apagada, como no "Desfazer última", com o rastro em
+  `revisao_evento` e na volta (quem revisou, os segundos).
 - Quem achou o defeito na embalagem **pode** ser o mesmo que confere na revisão? Ver
   §7, Q4.
 

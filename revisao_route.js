@@ -94,7 +94,18 @@ function candidata(db, usuarioId){
   if(!r) return null;
   const jaDesfez = db.prepare(`SELECT 1 FROM revisao_evento WHERE tipo='desfeita' AND usuario_id=? AND revisao_id>?`).get(usuarioId, r.id);
   if(jaDesfez) return null;
+  /* A revisão mais nova desta pessoa voltou da embalagem por defeito e foi
+     apagada (22/11/2026): a de antes NÃO vira a "última" — seria a pilha de
+     desfazer por outra porta. */
+  try{
+    const dev = db.prepare(`SELECT 1 FROM embalagem_defeito WHERE revisado_por_id=? AND revisao_id>?`).get(usuarioId, r.id);
+    if(dev) return null;
+  }catch(e){}
   return r;
+}
+function devolvidaHoje(db, usuarioId){
+  try{ return !!db.prepare(`SELECT 1 FROM embalagem_defeito WHERE revisado_por_id=? AND date(achou_em)=date('now','localtime')`).get(usuarioId); }
+  catch(e){ return false; }
 }
 function situacaoFila(db, revisaoId){
   const f = db.prepare('SELECT id, situacao FROM fila WHERE revisao_id=? ORDER BY id LIMIT 1').get(revisaoId);
@@ -196,7 +207,7 @@ module.exports=function(app,db){
       if(!c||c.id!==alvo.id) return recusa(409,'nao_e_a_ultima');
     } else {
       const c=candidata(db,q.usuario_id);
-      if(!c) return recusa(409,'nada');
+      if(!c) return recusa(409,devolvidaHoje(db,q.usuario_id)?'defeito':'nada');
       alvo=db.prepare('SELECT * FROM revisao WHERE id=?').get(c.id);
     }
     /* Numa transacao so: a copia, a revisao e a fila. Se a linha da fila nao

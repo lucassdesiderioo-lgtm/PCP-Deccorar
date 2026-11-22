@@ -9,7 +9,19 @@
  *              - 'defeito'     → vira a peça com problema (rejeicao_dominio), com
  *                                a origem 'embalagem' e o setor responsável;
  *              - 'sem_defeito' → a volta fecha, e a peça é REVISADA DE NOVO pelos
- *                                dois bipes: só a revisão nova a põe na fila.
+ *                                dois bipes: só a revisão nova a põe na fila —
+ *                                MENOS a peça de devolução (fila modo 'devolucao',
+ *                                que nunca teve revisão): ela volta direto a
+ *                                'aguardando', com o modo, para embalar como
+ *                                devolução (decisão do dono, 22/11/2026).
+ *
+ * ⚠️ A REVISÃO DA PEÇA DEVOLVIDA DEIXA DE CONTAR (decisão do dono, 22/11/2026):
+ *    ao marcar, a linha de `revisao` daquela peça (fila.revisao_id) é APAGADA,
+ *    como no "Desfazer última" — sem isso a tela vermelha dava a ordem por
+ *    cumprida com a peça com defeito, e o "sem defeito" contava duas vezes. O
+ *    rastro fica em `revisao_evento` ('devolvida_embalagem', com quem embalava)
+ *    e na própria volta (revisao_id, revisado_por, revisao_segundos). O revisor
+ *    perde aquela peça na produtividade e na mediana.
  *
  * ⚠️ NÃO MEXE NO ESTOQUE (a peça com defeito nunca somou) e não apaga a linha
  *    da fila: ela é o rastro de onde a peça estava.
@@ -33,7 +45,11 @@ function garantir(db){
     codigo TEXT NOT NULL, fila_id INTEGER, modo TEXT, motivo TEXT NOT NULL, obs TEXT, segundos INTEGER,
     achou_por_id INTEGER, achou_por TEXT, achou_em TEXT DEFAULT (datetime('now','localtime')),
     decisao TEXT, setor TEXT, decisao_obs TEXT, decidido_por_id INTEGER, decidido_por TEXT, decidido_em TEXT,
-    rejeicao_id INTEGER, teste INTEGER DEFAULT 0)`);
+    rejeicao_id INTEGER, teste INTEGER DEFAULT 0, revisao_id INTEGER, revisado_por_id INTEGER,
+    revisado_por TEXT, revisao_segundos INTEGER)`);
+  /* As colunas da revisão apagada (22/11/2026): no fim, para o banco que já tinha a tabela (§17). */
+  for(const c of ['revisao_id INTEGER','revisado_por_id INTEGER','revisado_por TEXT','revisao_segundos INTEGER'])
+    try{ db.exec('ALTER TABLE embalagem_defeito ADD COLUMN ' + c); }catch(e){}
 }
 
 /* A persiana é a régua da R-EMB-02: modelo com medida; SKU sem modelo conta como persiana. */
@@ -65,12 +81,25 @@ function marcar(db, d, quem, emTeste){
   if(!motivoValido(db, motivo)) throw new Recusa(400, 'Esse motivo não está na lista. Escolha um da lista.', { motivo:'motivo_invalido' });
   if(!db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(cod)) throw new Recusa(404, 'SKU não cadastrado: ' + cod);
   if(!ehPersiana(db, cod)) throw new Recusa(400, cod + ' não é persiana: kit, acessório e sob medida não voltam para a Revisão.', { motivo:'nao_persiana' });
-  const f = db.prepare("SELECT id, modo FROM fila WHERE UPPER(codigo)=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod, emTeste ? 1 : 0);
+  const f = db.prepare("SELECT * FROM fila WHERE UPPER(codigo)=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod, emTeste ? 1 : 0);
   if(!f) throw new Recusa(409, 'Não há nenhuma ' + cod + ' esperando embalagem: ela não pode voltar para a Revisão por aqui.', { motivo:'sem_revisao' });
   db.prepare("UPDATE fila SET situacao='defeito' WHERE id=?").run(f.id);
-  const id = db.prepare(`INSERT INTO embalagem_defeito (codigo,fila_id,modo,motivo,obs,segundos,achou_por_id,achou_por)
-    VALUES (?,?,?,?,?,?,?,?)`).run(cod, f.id, f.modo || null, motivo, txt(d.obs, 500), Math.round(+d.segundos || 0),
-      quem.usuario_id, quem.usuario_nome).lastInsertRowid;
+  /* A revisão daquela peça deixa de contar (a linha da fila sabe de qual nasceu). */
+  let rv = null;
+  if(f.revisao_id != null){
+    rv = db.prepare('SELECT * FROM revisao WHERE id=?').get(f.revisao_id) || null;
+    if(rv){
+      db.prepare(`INSERT INTO revisao_evento (tipo,revisao_id,codigo,segundos,modo,inicio,fim,usuario_id,usuario_nome)
+        VALUES ('devolvida_embalagem',?,?,?,?,?,?,?,?)`).run(rv.id, rv.codigo, rv.segundos, rv.modo,
+        rv.inicio, rv.fim, quem.usuario_id, quem.usuario_nome);
+      db.prepare('DELETE FROM revisao WHERE id=?').run(rv.id);
+    }
+  }
+  const id = db.prepare(`INSERT INTO embalagem_defeito (codigo,fila_id,modo,motivo,obs,segundos,achou_por_id,achou_por,
+      revisao_id,revisado_por_id,revisado_por,revisao_segundos)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(cod, f.id, f.modo || null, motivo, txt(d.obs, 500), Math.round(+d.segundos || 0),
+      quem.usuario_id, quem.usuario_nome, rv ? rv.id : null, rv ? rv.usuario_id : null, rv ? rv.usuario_nome : null,
+      rv ? rv.segundos : null).lastInsertRowid;
   try{ db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,usuario_id,usuario_nome) VALUES ('defeito',?,?,?,?)`)
     .run(cod, Math.round(+d.segundos || 0), quem.usuario_id, quem.usuario_nome); }catch(e){}
   return { id, fila_id:f.id };
@@ -78,7 +107,7 @@ function marcar(db, d, quem, emTeste){
 
 /* As voltas abertas, a mais antiga em cima, com a medida e a cor para o revisor. */
 function abertas(db){
-  return db.prepare(`SELECT d.id, d.codigo, d.motivo, d.obs, d.achou_por, d.achou_em,
+  return db.prepare(`SELECT d.id, d.codigo, d.modo, d.motivo, d.obs, d.achou_por, d.achou_em,
       CAST((julianday('now','localtime') - julianday(d.achou_em)) * 1440 AS INTEGER) AS ha_min,
       s.largura_cm, s.altura_cm, s.cor_codigo, s.cor
     FROM embalagem_defeito d LEFT JOIN skus s ON s.codigo=d.codigo
@@ -101,10 +130,15 @@ function decidir(db, id, b, quem){
     rejeicao_id = REJ.registrar(db, { codigo:d.codigo, motivo:d.motivo, obs:[d.obs, txt(b.obs, 500)].filter(Boolean).join(' — ') || null,
       segundos:d.segundos, modo:d.modo, origem:'embalagem', setor:s.nome }, quem);
   }
+  /* A peça de devolução nunca teve revisão: sem defeito, volta direto a esperar
+     embalagem, com o modo dela (senão, revisada de novo, perderia a devolução). */
+  let volta_fila = false;
+  if(decisao === 'sem_defeito' && d.modo === 'devolucao' && d.fila_id != null)
+    volta_fila = db.prepare("UPDATE fila SET situacao='aguardando' WHERE id=? AND situacao='defeito'").run(d.fila_id).changes === 1;
   db.prepare(`UPDATE embalagem_defeito SET decisao=?, setor=?, decisao_obs=?, decidido_por_id=?, decidido_por=?,
     decidido_em=datetime('now','localtime'), rejeicao_id=? WHERE id=?`)
     .run(decisao, setor, txt(b.obs, 500), quem.usuario_id, quem.usuario_nome, rejeicao_id, d.id);
-  return { id:d.id, decisao, setor, rejeicao_id, codigo:d.codigo };
+  return { id:d.id, decisao, setor, rejeicao_id, codigo:d.codigo, volta_fila };
 }
 
 module.exports = { SETORES, Recusa, garantir, ehPersiana, marcar, abertas, decidir };

@@ -105,6 +105,13 @@ ok('os setores vêm da lista fixa', r.body.setores.map(s => s.chave).join(',') =
 r = chamar('POST', '/api/revisao/desfazer', {}, RUI);
 ok('o desfazer da revisão diz que a peça voltou por defeito', r.status >= 400 && /defeito/.test(r.body.erro || ''), JSON.stringify(r.body));
 
+console.log('\n── 2-B. a revisão da peça devolvida deixa de contar (decisão do dono, 22/11/2026) ──');
+eq('a revisão daquela peça sai da conta do dia', db.prepare("SELECT COUNT(*) c FROM revisao WHERE codigo='BK140140BEGE'").get().c, 0);
+{ const v1 = db.prepare('SELECT * FROM embalagem_defeito WHERE id=?').get(vol.id);
+ok('…e a volta guarda quem revisou, pelo id', v1.revisao_id != null && v1.revisado_por_id === 2 && v1.revisado_por === 'Rui' && v1.revisao_segundos === 30, JSON.stringify(v1));
+ok('…e o rastro fica em revisao_evento', !!db.prepare("SELECT 1 FROM revisao_evento WHERE tipo='devolvida_embalagem' AND revisao_id=? AND usuario_id=1").get(v1.revisao_id)); }
+ok('a tela vermelha conta pela mesma régua (revisão modo hoje do dia), e a do ordem_dia é essa', /FROM revisao\s+WHERE data=date\('now','localtime'\) AND modo='hoje'/.test(fs.readFileSync(path.join(__dirname,'ordem_dia.js'),'utf8')));
+
 console.log('\n── 3. "tem defeito": vai ao setor ──');
 r = chamar('POST', '/api/revisao/defeitos/:id/decidir', { decisao:'defeito' }, RUI, { id:vol.id });
 eq('sem setor: 400', r.status, 400);
@@ -134,6 +141,22 @@ revisar();
 r = chamar('POST', '/api/montagem', { codigo:'BK140140BEGE', kit_ok:1, kit_codigo:KIT, segundos:60 });
 ok('revisada de novo, ela embala e soma +1', r.body && r.body.ok && est('BK140140BEGE') === e0 + 1, JSON.stringify(r.body));
 ok('o livro continua batendo', livroOk());
+
+console.log('\n── 4-B. a peça de devolução "sem defeito" volta direto à fila (decisão do dono, 22/11/2026) ──');
+{
+  const fd = db.prepare("INSERT INTO fila (codigo,modo) VALUES ('BK140140BEGE','devolucao')").run().lastInsertRowid;
+  r = chamar('POST', '/api/montagem/defeito', { codigo:'BK140140BEGE', motivo:MOT, segundos:10 }, ANA);
+  eq('a devolução também volta para a Revisão', db.prepare('SELECT situacao FROM fila WHERE id=?').get(fd).situacao, 'defeito');
+  const vd = db.prepare('SELECT * FROM embalagem_defeito ORDER BY id DESC').get();
+  eq('…marcada como devolução', vd.modo, 'devolucao');
+  r = chamar('POST', '/api/revisao/defeitos/:id/decidir', { decisao:'sem_defeito' }, RUI, { id:vd.id });
+  ok('sem defeito: a resposta diz que voltou à fila', r.status === 200 && r.body.volta_fila === true, JSON.stringify(r.body));
+  eq('…a MESMA linha volta a esperar, com o modo de devolução', db.prepare("SELECT situacao||'/'||modo s FROM fila WHERE id=?").get(fd).s, 'aguardando/devolucao');
+  const m1 = nMont();
+  r = chamar('POST', '/api/montagem', { codigo:'BK140140BEGE', kit_ok:1, kit_codigo:KIT, segundos:60 });
+  ok('…e embala como devolução', r.body && r.body.ok && db.prepare('SELECT modo FROM montagem ORDER BY id DESC').get().modo === 'devolucao' && nMont() === m1 + 1, JSON.stringify(r.body));
+  ok('o livro continua batendo', livroOk());
+}
 r = chamar('POST', '/api/revisao/defeitos/:id/decidir', { decisao:'talvez' }, RUI, { id:999 });
 eq('volta que não existe: 404', r.status, 404);
 
