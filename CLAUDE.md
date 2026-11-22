@@ -902,6 +902,10 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 >   (`revisao_id`, `revisado_por`, `revisao_segundos`); o revisor perde aquela
 >   peça na produtividade e na mediana. A revisão de antes dele **não** vira a
 >   "última" para desfazer, e o desfazer diz que a peça voltou por defeito.
+> - ⚠️ **a peça que volta é a linha MAIS ANTIGA da fila do SKU** (decisão do
+>   dono, 22/11/2026): com duas iguais na fila, a revisão apagada pode ser a de
+>   outra pessoa, e a de devolução pode voltar no lugar da comum. Fica assim até
+>   cada persiana ter identificação própria — não "conserte" escolhendo outra.
 > `defeito_dominio.js` é o dono único da volta (tabela `embalagem_defeito`, no modo
 > teste). Construído, falta subir.
 
