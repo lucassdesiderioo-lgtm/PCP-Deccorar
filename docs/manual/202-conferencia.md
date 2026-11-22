@@ -21,3 +21,4 @@ parametros: conf_carregamento
 
 ## Mudanças
 - 21/11/2026 — ficha criada em rascunho
+- 19/11/2026 — A caixa que saiu sem ninguém conferir e é fechada depois pelo acerto das caixas não conferidas tem o estoque baixado nesse acerto, uma vez só, como se tivesse sido conferida aqui.

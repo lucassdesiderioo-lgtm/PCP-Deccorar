@@ -21,3 +21,4 @@ parametros:
 
 ## Mudanças
 - 21/11/2026 — ficha criada em rascunho
+- 19/11/2026 — O fechamento das caixas que saíram sem conferência passa a baixar o estoque da caixa que nunca baixou; a data de corte é no máximo ontem; a venda cancelada e a caixa de várias persianas com item cancelado ficam de fora.

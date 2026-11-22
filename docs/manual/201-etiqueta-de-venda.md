@@ -21,3 +21,4 @@ parametros:
 
 ## Mudanças
 - 21/11/2026 — ficha criada em rascunho
+- 19/11/2026 — A etiqueta continua só reservando a peça. A caixa que saiu da fábrica sem passar pela Conferência passa a ter o estoque baixado quando o acerto das caixas não conferidas é feito, uma vez só.
