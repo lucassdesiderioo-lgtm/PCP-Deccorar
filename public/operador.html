@@ -166,7 +166,7 @@ async function loadStats(){
 }
 function fmt(seg){ seg=+seg||0; const m=Math.floor(seg/60),s=seg%60; return (m?m+'m':'')+s+'s'; }
 function mmss(ms){ const t=Math.floor(ms/1000),m=Math.floor(t/60),s=t%60; return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); }
-function banner(kind,title,sub,timer){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(timer?'<div class="timer" id="timer">00:00</div>':''); }
+function banner(kind,title,sub,timer,extra){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(timer?'<div class="timer" id="timer">00:00</div>':'')+(extra||''); }
 function toggle(codigo){
   codigo=(codigo||'').trim().toUpperCase(); if(!codigo) return;
   if(!emRev){ const info=skuInfo(codigo);
@@ -245,7 +245,7 @@ async function finish(){
       emRev=cur; renderTiles(); abrirRev(cur); rapidoDemais(seg, r.minimo); return;
     }
     if(r.erro){ banner('err','Erro',r.erro); beep(false); return; }
-    banner('ok','Revisada ✓ ('+fmt(seg)+')', cur.codigo+' · liberada para a EMBALAGEM');
+    banner('ok','Revisada ✓ ('+fmt(seg)+')', cur.codigo+' · liberada para a EMBALAGEM', false, (window.tempoBancada?tempoBancada(r.tempo):''));
     beep(true); load();
     await lerUltima(); mostrarDesfazer();
   }catch(e){ banner('err','Falha de conexão',String(e)); beep(false); }
@@ -432,5 +432,5 @@ async function avisoStatus(){
 }
 setInterval(avisoStatus,20000);
 
-</script><script src="/nav.js"></script>
+</script><script src="/tempo_bancada.js"></script><script src="/nav.js"></script>
 </body></html>

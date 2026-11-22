@@ -29,10 +29,11 @@
  *   - Nao apaga a linha `embalado`: aquilo e historia de peca que JA foi
  *     embalada e virou estoque. Some so o que esta `aguardando`.
  *   - Nao mexe em estoque. A fila nunca somou +1; apagar nao pode descontar.
- *   - Nao impede embalar depois. `POST /api/montagem` (mont_route.js) consome a
- *     linha da fila QUANDO ELA EXISTE e funciona sem ela: grava a embalagem e
- *     soma +1 igual. O que muda e o `modo`, que passa a ser 'estoque' — entao a
- *     embalagem deixa de abater a ordem do dia (`producao.produzido`).
+ *   - ⚠️ DESDE 21/11/2026 ELE IMPEDE EMBALAR A PERSIANA QUE EXISTIR (R-EMB-02):
+ *     `POST /api/montagem` so aceita a persiana com linha `aguardando` na fila.
+ *     A persiana real que estiver no carrinho e for apagada aqui so embala
+ *     revisada de novo. Kit, acessorio e sob medida (modelo sem medida)
+ *     continuam embalando sem fila. Rode so para o que nao existe.
  */
 const fs = require('fs');
 const path = require('path');

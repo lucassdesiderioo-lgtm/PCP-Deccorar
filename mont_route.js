@@ -6,6 +6,10 @@
 const KIT_BIPE = require('./public/kit_bipe.js');
 const ESTOQUE  = require('./estoque_dominio');
 const QUEM     = require('./quem');
+const TEMPO    = require('./tempo_operador');
+/* O tempo minimo da embalagem, em segundos (EMBALAGEM-TEMPO-MINIMO, 21/11/2026).
+   E so o padrao do boot: quem manda e config.emb_minimo_seg. */
+const EMB_MINIMO_PADRAO = 45;
 module.exports=function(app,db){
   /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
      registrada neste modulo passa pelo quem.js antes do handler — a de amanha
@@ -52,6 +56,23 @@ module.exports=function(app,db){
      entram no FIM, onde o SQLite as poe (§17). */
   for(const c of ['usuario_id INTEGER','usuario_nome TEXT','modo TEXT'])
     try{ db.exec('ALTER TABLE montagem ADD COLUMN '+c); }catch(e){}
+  /* O TEMPO MINIMO DA EMBALAGEM (spec EMBALAGEM-TEMPO-MINIMO, decisao do
+     dono de 21/11/2026). O bipe que fecha a embalagem com menos de
+     `config.emb_minimo_seg` (45) segundos desde o primeiro e RECUSADO, como a
+     revisao abaixo de 15 s (R-REV-07, revisao_route.js). O numero mora no
+     config para andar sem deploy; o boot so SEMEIA (quem mudou o valor nao o
+     ve voltar). Cada recusa vira uma linha em `montagem_evento`, com quem fez:
+     e o rastro do bipe rapido, que nao entra em `montagem`. */
+  db.prepare("INSERT OR IGNORE INTO config (chave,valor) VALUES ('emb_minimo_seg',?)").run(String(EMB_MINIMO_PADRAO));
+  db.exec(`CREATE TABLE IF NOT EXISTS montagem_evento (id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo TEXT NOT NULL, codigo TEXT, segundos INTEGER, inicio TEXT, fim TEXT,
+    usuario_id INTEGER, usuario_nome TEXT,
+    data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')),
+    teste INTEGER DEFAULT 0)`);
+  function embMinimoSeg(){
+    const n = parseInt(cfg('emb_minimo_seg'), 10);
+    return Number.isFinite(n) && n >= 0 ? n : EMB_MINIMO_PADRAO;
+  }
   app.get('/api/config/kit',(req,res)=>{ const r=db.prepare("SELECT valor FROM config WHERE chave='kit_codigo'").get(); res.json({kit:r?r.valor:null}); });
   // Guarda o valor COMO VEIO (so trim) — o link do Drive e case-sensitive e
   // vira QR pro cliente. A conferencia na embalagem (kitBate/kitNorm) compara
@@ -244,10 +265,22 @@ module.exports=function(app,db){
         consome linha real. Antes, embalar em teste prendia a peça REAL em
         'embalado', e ela sumia quando os testes fossem apagados.
 
-     ⚠️ O QUE **NÃO** MUDOU, E NÃO PODE MUDAR: embalar SEM a peça estar na fila
-     continua somando `+1`, com `modo='estoque'`. A fila não é obrigatória para
-     embalar (§4) — é isso que torna o `limpar_fila.js` seguro, e quem
-     "consertar" isso trava a bancada. Há caso travando. */
+     ⚠️ DESDE 21/11/2026 A PERSIANA SÓ EMBALA SE VEIO DA REVISÃO (R-EMB-02,
+     decisão do dono, spec EMBALAGEM-SO-DA-REVISAO). Até ali embalar sem fila
+     somava +1 com `modo='estoque'`, e uma persiana que ninguém revisou entrou
+     no estoque. Vale só para persiana (modelo com medida); kit, acessório e
+     sob medida não passam pela Revisão e embalam como antes. Sem exceção: a
+     peça que sumiu da fila é revisada de novo — e por isso tirar da fila uma
+     peça que existe passa a ter consequência (o `limpar_fila.js` e o "Tirar da
+     fila" da Mesa só para o que não existe). */
+  /* "E PERSIANA?" — modelo com medida (`COALESCE(exige_medida,1)`, a mesma
+     regua do /api/skus que a tela le). SKU sem modelo conta como persiana, e
+     banco sem a coluna (teste antigo) tambem: na duvida, exige a revisao. */
+  function exigeRevisao(cod){
+    try{ const r=db.prepare('SELECT COALESCE(m.exige_medida,1) e FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=?').get(cod);
+         return !r || r.e!==0; }
+    catch(e){ return true; }
+  }
   app.post('/api/montagem',(req,res)=>{
     /* QUEM EMBALOU vem do `quem.js` (QUEM-FEZ-E-REVISAO fase 2, 04/11/2026),
        o mesmo dono da revisao, e sem login NADA grava: antes, sem
@@ -262,20 +295,56 @@ module.exports=function(app,db){
       return res.status(404).json({erro:'SKU não cadastrado: '+cod+'. Cadastre no Admin antes de embalar.'});
     /* A frase é a MESMA da bancada de propósito: quem chamar a rota por fora
        recebe o que o operador leria na tela. */
+    /* A PERSIANA TEM QUE TER VINDO DA REVISAO. Vem antes do kit e do tempo:
+       sem revisao nao adianta conferir kit nem esperar os 45 s. A fila olhada
+       e a do momento (modo teste so a de teste), a mesma que a transacao
+       consome — e como o handler e sincrono, ninguem consome a linha entre
+       esta pergunta e a transacao. */
+    const emTeste = cfg('modo_teste')==='1' ? 1 : 0;
+    if(exigeRevisao(cod) && !db.prepare("SELECT 1 FROM fila WHERE UPPER(codigo)=? AND situacao='aguardando' AND COALESCE(teste,0)=? LIMIT 1").get(cod,emTeste)){
+      try{ db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,usuario_id,usuario_nome)
+        VALUES ('sem_revisao',?,?,?,?)`).run(cod,Math.round(+segundos||0),q.usuario_id,q.usuario_nome); }
+      catch(e){ console.error('[montagem] o registro da recusa sem revisao falhou (a recusa vale igual):', e.message); }
+      return res.status(409).json({erro:'⚠ '+cod+' não passou pela Revisão: não há nenhuma desta persiana esperando embalagem. NADA foi gravado. Leve a persiana para a Revisão e embale depois.',
+        motivo:'sem_revisao'});
+    }
     if(!kit_ok) return res.status(400).json({erro:'⚠ FALTOU O KIT — bipe o kit antes de finalizar '+cod+'.'});
     const kitCad=cfg('kit_codigo');
     const kitLido=(req.body&&req.body.kit_codigo)||'';
     if(kitLido && kitCad && !KIT_BIPE.kitBate(kitLido,kitCad))
       return res.status(400).json({erro:'⚠ O código bipado não é o kit cadastrado. Confira o kit da caixa.'});
+    /* A BARREIRA DO TEMPO vale aqui, e nao so na tela: o tablet com a pagina
+       antiga em cache nao fura a regra. Vem DEPOIS do kit (faltar o kit e o
+       erro que a pessoa precisa ler primeiro) e ANTES de qualquer escrita:
+       nada grava, e a embalagem continua aberta na bancada. */
+    const seg=Math.round(+segundos||0), emin=embMinimoSeg();
+    if(seg<emin){
+      const txt=v=>v==null||v===''?null:String(v).slice(0,40);
+      try{ db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,inicio,fim,usuario_id,usuario_nome)
+        VALUES ('rapido_demais',?,?,?,?,?,?)`).run(cod,seg,txt(inicio),txt(fim),q.usuario_id,q.usuario_nome); }
+      catch(e){ console.error('[montagem] o registro do bipe rapido falhou (a recusa vale igual):', e.message); }
+      /* ⚠️ A FRASE VALE NAS DUAS PAGINAS (③ REVISAO). O tablet com a pagina
+         ANTIGA em cache ja descartou a embalagem quando le isto: "a embalagem
+         continua, bipe o SKU de novo" abria uma embalagem nova sem kit, e a
+         peca ia para o saco sem o +1. E la o cronometro recomeca no bipe do
+         SKU: refazer os tres bipes de uma vez levaria outra recusa (③ r2). A
+         pagina nova nao mostra esta frase —
+         ela desenha o proprio aviso e segue com a mesma embalagem. */
+      return res.status(409).json({erro:'Rápido demais ('+seg+' s, o mínimo é '+emin+' s) — a embalagem NÃO foi gravada e o tempo recomeça: bipe o SKU agora e espere '+emin+' s antes de bipar o kit e o SKU.',
+        motivo:'rapido_demais', minimo:emin, segundos:seg});
+    }
 
-    // Fila do MOMENTO: em modo teste só linha de teste, fora dele só linha real.
-    const emTeste = cfg('modo_teste')==='1' ? 1 : 0;
-    let naFila=false, modo='estoque', abatido=false;
+    // Fila do MOMENTO (emTeste, acima): em modo teste só linha de teste, fora dele só linha real.
+    let naFila=false, modo='estoque', abatido=false, novo=null;
     try{
       db.transaction(()=>{
         const mid=db.prepare("INSERT INTO montagem (codigo,inicio,fim,segundos,kit_ok,usuario_id,usuario_nome) VALUES (?,?,?,?,1,?,?)")
-          .run(cod,inicio,fim,Math.round(+segundos||0),q.usuario_id,q.usuario_nome).lastInsertRowid;
-        const f=db.prepare("SELECT id,modo FROM fila WHERE codigo=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod,emTeste);
+          .run(cod,inicio,fim,seg,q.usuario_id,q.usuario_nome).lastInsertRowid;
+        novo=mid;
+        /* ⚠️ A MESMA REGUA DA TRAVA (UPPER), ③ REVISAO: com comparacao exata aqui,
+           uma linha em minuscula passava na trava e nunca era consumida —
+           e autorizava +1 para sempre. */
+        const f=db.prepare("SELECT id,modo FROM fila WHERE UPPER(codigo)=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod,emTeste);
         if(f){ db.prepare("UPDATE fila SET situacao='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(f.id); naFila=true; modo=f.modo; }
         /* O modo da fila fica na linha da embalagem (FICHAS-NO-CADASTRO-UNICO):
            o "consumido por operacao" nao conta a devolucao reembalada. */
@@ -348,12 +417,32 @@ module.exports=function(app,db){
     }
     const est=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(cod);
     const prog=db.prepare("SELECT COUNT(*) n FROM montagem WHERE data=date('now','localtime')").get();
-    res.json({ok:true,total_hoje:prog.n,naFila:naFila,abatido:abatido,estoque:est?est.estoque:0});
+    /* TEMPO-NA-BANCADA (R-TEM-01): o tempo desta peça ao lado da mediana de quem a fez. */
+    const tempo=TEMPO.seguro(db,'montagem',q.usuario_id,cod,seg,novo);
+    res.json({ok:true,total_hoje:prog.n,naFila:naFila,abatido:abatido,estoque:est?est.estoque:0,tempo});
+  });
+  /* CANCELAR A EMBALAGEM EM ANDAMENTO (21/11/2026): o espelho do "Cancelar
+     revisao" (R-REV-08). Quem precisa largar a bancada zera a embalagem na
+     tela; aqui so fica o rastro — quem, quando, quantos segundos. NADA grava:
+     nem montagem, nem +1, nem a fila (a peca continua esperando embalagem). */
+  app.post('/api/montagem/cancelar',(req,res)=>{
+    const q=QUEM.exigir(req,res); if(!q) return;
+    const b=req.body||{};
+    const cod=String(b.codigo||'').trim().toUpperCase().slice(0,80);
+    if(!cod) return res.status(400).json({erro:'codigo'});
+    const txt=v=>v==null||v===''?null:String(v).slice(0,40);
+    db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,inicio,fim,usuario_id,usuario_nome)
+      VALUES ('cancelada',?,?,?,?,?,?)`).run(cod,Math.round(+b.segundos||0),txt(b.inicio),txt(b.fim),q.usuario_id,q.usuario_nome);
+    res.json({ok:true});
   });
   app.get('/api/fila',(req,res)=>{
-    res.json(db.prepare(`SELECT f.codigo, s.cor, COUNT(*) qtd, MIN(f.revisado_em) desde
-      FROM fila f LEFT JOIN skus s ON s.codigo=f.codigo
-      WHERE f.situacao='aguardando' GROUP BY f.codigo ORDER BY desde`).all());
+    /* A MESMA REGUA DA TRAVA DO POST (③ REVISAO): so a fila do momento (modo
+       teste so a de teste) e o codigo em maiuscula. Antes a lista mostrava a
+       linha de teste e abria a embalagem que o servidor recusava no fim. */
+    const emTeste = cfg('modo_teste')==='1' ? 1 : 0;
+    res.json(db.prepare(`SELECT UPPER(f.codigo) codigo, s.cor, COUNT(*) qtd, MIN(f.revisado_em) desde
+      FROM fila f LEFT JOIN skus s ON s.codigo=UPPER(f.codigo)
+      WHERE f.situacao='aguardando' AND COALESCE(f.teste,0)=? GROUP BY UPPER(f.codigo) ORDER BY desde`).all(emTeste));
   });
   app.get('/api/montagem/hoje',(req,res)=> res.json(db.prepare("SELECT codigo, COUNT(*) qtd, ROUND(AVG(segundos)) tmedio FROM montagem WHERE data=date('now','localtime') GROUP BY codigo ORDER BY qtd DESC").all()));
 };

@@ -33,10 +33,10 @@
  *     tela roda antes da busca de SKU, e todo bipe dele respondia "Bipe o SKU
  *     primeiro". Ninguem associaria isso a uma edicao no Admin.
  *
- * ⚠️ O QUE ESTE ARQUIVO TRAVA E QUE **NAO** E BUG (§4): embalar SEM a peca
- * estar na fila continua somando +1 no estoque, com `modo='estoque'`. A fila
- * nao e obrigatoria para embalar — e e isso que torna o `limpar_fila.js`
- * seguro. Quem "consertar" isso trava a bancada.
+ * ⚠️ DESDE 21/11/2026 A PERSIANA SO EMBALA SE VEIO DA REVISAO (R-EMB-02,
+ * secao 10): sem linha na fila e 409. Kit, acessorio e sob medida (modelo sem
+ * medida) embalam sem fila, como antes. Tirar da fila uma peca que existe
+ * passou a ter consequencia: ela precisa ser revisada de novo.
  *
  * Sobe um banco temporario e chama os handlers direto, com um `app` de
  * mentira. Nao abre porta, nao toca no banco de producao.
@@ -95,6 +95,10 @@ const cfgSet = (k,v) => db.prepare("INSERT INTO config (chave,valor) VALUES (?,?
 const filaSit = id => db.prepare('SELECT situacao FROM fila WHERE id=?').get(id).situacao;
 const novaFila = (cod,modo,teste) => db.prepare("INSERT INTO fila (codigo,modo,teste) VALUES (?,?,?)").run(cod,modo,teste||0).lastInsertRowid;
 
+/* O MINIMO DE 45 s (EMBALAGEM-TEMPO-MINIMO, 21/11/2026) nasce no boot da rota.
+   As secoes 1 a 8 nao sao sobre tempo: o minimo fica em 0 ate a secao 9. */
+const minimoNoBoot = (db.prepare("SELECT valor FROM config WHERE chave='emb_minimo_seg'").get()||{}).valor;
+cfgSet('emb_minimo_seg','0');
 cfgSet('kit_codigo','KITENVIO2026');
 
 console.log('\n── 1. o SKU tem que existir (era a unica rota do fluxo que nao conferia) ──');
@@ -105,6 +109,9 @@ ok('a mensagem diz o codigo', /NAOEXISTE/.test((r.body&&r.body.erro)||''), JSON.
 eq('e NADA foi gravado em montagem (antes respondia ok:true e a peca sumia)', nMontagem(), antes);
 
 console.log('\n── 2. o kit (o bloqueio saiu da tela e virou trava de servidor) ──');
+/* Desde 21/11/2026 a persiana so embala vindo da revisao (secao 10): a peca
+   entra na fila antes, para a chamada chegar ao kit. */
+novaFila('BK140140BEGE','estoque'); novaFila('BK140140BEGE','estoque');
 antes = nMontagem();
 r = chamar('POST','/api/montagem',{codigo:'BK140140BEGE', kit_ok:0});
 eq('kit_ok falso → 400', r.status, 400);
@@ -127,7 +134,7 @@ r = chamar('POST','/api/montagem',{codigo:'BK140140BEGE', kit_ok:1});
 eq('sem o campo, a chamada passa (tablet com pagina velha nao trava)', r.status, 200);
 eq('e soma normalmente', estoqueDe('BK140140BEGE'), 2);
 
-console.log('\n── 3. a fila, e o que NAO e bug (§4) ──');
+console.log('\n── 3. a fila (desde 21/11/2026 a persiana so embala vindo dela) ──');
 const fHoje = novaFila('BK160160CINZA','hoje');
 db.prepare("INSERT INTO producao (codigo,qtd,produzido) VALUES ('BK160160CINZA',3,0)").run();
 r = chamar('POST','/api/montagem',{codigo:'BK160160CINZA', kit_ok:1});
@@ -142,12 +149,13 @@ eq('fila modo "estoque" NAO abate a ordem (armadilha #20)', db.prepare("SELECT p
 eq('mas vira estoque igual', estoqueDe('BK160160CINZA'), 7);
 eq('e a linha saiu da fila', filaSit(fEst), 'embalado');
 
-/* ⚠️ ISTO E REGRA, NAO BUG (§4): a fila nao e obrigatoria para embalar. E o que
-   torna `node limpar_fila.js` seguro — limpar a fila nao pode travar a bancada. */
+/* ⚠️ DESDE 21/11/2026 A PERSIANA SO EMBALA SE VEIO DA REVISAO (R-EMB-02,
+   decisao do dono; spec EMBALAGEM-SO-DA-REVISAO). Ate ali embalar sem fila
+   somava +1 — e foi assim que uma persiana nao revisada entrou no estoque. */
 r = chamar('POST','/api/montagem',{codigo:'BK160160CINZA', kit_ok:1});
-eq('SEM fila, embalar continua somando +1 (REGRA do §4, nao conserte)', estoqueDe('BK160160CINZA'), 8);
-eq('e a resposta diz que nao havia fila', r.body.naFila, false);
-eq('sem fila nao abate ordem: o modo vira "estoque"', db.prepare("SELECT produzido FROM producao WHERE codigo='BK160160CINZA'").get().produzido, 1);
+eq('SEM fila, a persiana e recusada (409)', r.status, 409);
+eq('e o estoque NAO sobe', estoqueDe('BK160160CINZA'), 7);
+eq('a ordem do dia nao anda', db.prepare("SELECT produzido FROM producao WHERE codigo='BK160160CINZA'").get().produzido, 1);
 
 console.log('\n── 4. as quatro escritas sao UMA transacao ──');
 console.log('     (o erro de SQL que aparece abaixo E O CASO: e o log que nao existia)');
@@ -165,9 +173,9 @@ console.log('\n── 5. divida 1c: modo teste nao come a fila REAL ──');
 const fReal = novaFila('BK140140BEGE','hoje',0);
 cfgSet('modo_teste','1');
 r = chamar('POST','/api/montagem',{codigo:'BK140140BEGE', kit_ok:1});
-eq('em modo teste a embalagem funciona', r.status, 200);
-eq('mas NAO consome a linha real da fila', filaSit(fReal), 'aguardando');
-eq('e a resposta diz que nao pegou fila', r.body.naFila, false);
+eq('em modo teste, so com a linha REAL na fila, a persiana e recusada (409)', r.status, 409);
+eq('e a linha real NAO e consumida', filaSit(fReal), 'aguardando');
+eq('a recusa e a da revisao: a fila de teste esta vazia', r.body && r.body.motivo, 'sem_revisao');
 const fTeste = novaFila('BK140140BEGE','hoje',1);
 r = chamar('POST','/api/montagem',{codigo:'BK140140BEGE', kit_ok:1});
 eq('a linha de TESTE, essa sim, e consumida', filaSit(fTeste), 'embalado');
@@ -257,6 +265,7 @@ db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('SOBMEDIDA',0,92
 {
   const movs = c => db.prepare('SELECT COUNT(*) n FROM movimento_estoque WHERE codigo=?').get(c).n;
   const ant = db.prepare('SELECT COUNT(*) n FROM montagem').get().n;
+  novaFila('SOBMEDIDA','hoje'); novaFila('BK100100BEGE','hoje');
   let r8 = chamar('POST','/api/montagem',{codigo:'SOBMEDIDA', kit_ok:1});
   eq('a embalagem do sob medida responde ok', r8.status, 200);
   eq('o saldo do sob medida continua zero', db.prepare("SELECT estoque FROM skus WHERE codigo='SOBMEDIDA'").get().estoque, 0);
@@ -265,6 +274,260 @@ db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('SOBMEDIDA',0,92
   r8 = chamar('POST','/api/montagem',{codigo:'BK100100BEGE', kit_ok:1});
   eq('o SKU de modelo comum continua somando +1', db.prepare("SELECT estoque FROM skus WHERE codigo='BK100100BEGE'").get().estoque, 1);
   eq('   com a linha de embalagem no livro', movs('BK100100BEGE'), 1);
+}
+
+console.log('\n── 9. o tempo minimo da embalagem (EMBALAGEM-TEMPO-MINIMO, 21/11/2026) ──');
+/* Decisao do dono: o bipe que fecha a embalagem com menos de 45 s desde o
+   primeiro e RECUSADO, como a revisao abaixo de 15 s (R-REV-07). Nada grava —
+   nem a embalagem, nem o +1, nem a fila, nem a ordem do dia — e a embalagem
+   continua aberta na tela. A trava e do servidor. */
+eq('o boot semeia o minimo de 45 s no config', minimoNoBoot, '45');
+cfgSet('emb_minimo_seg','45');
+{
+  db.prepare("INSERT INTO skus (codigo,estoque) VALUES ('BK130130TEMPO',3)").run();
+  const fid = novaFila('BK130130TEMPO','hoje');
+  db.prepare("INSERT INTO producao (codigo,qtd) VALUES ('BK130130TEMPO',1)").run();
+  const prod = () => db.prepare("SELECT produzido FROM producao WHERE codigo='BK130130TEMPO'").get().produzido;
+  const movs = () => db.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE codigo='BK130130TEMPO'").get().n;
+  const evs = () => db.prepare("SELECT * FROM montagem_evento WHERE codigo='BK130130TEMPO' ORDER BY id").all();
+  const antesM = nMontagem(), antesMov = movs();
+
+  let r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:1, segundos:44});
+  eq('44 s → 409', r9.status, 409);
+  eq('   com o motivo rapido_demais', r9.body && r9.body.motivo, 'rapido_demais');
+  eq('   devolvendo o minimo que vale', r9.body && r9.body.minimo, 45);
+  eq('   e os segundos lidos', r9.body && r9.body.segundos, 44);
+  /* ③ REVISAO (achado 1, confirmado no navegador): a frase do servidor e o que
+     o tablet com a PAGINA ANTIGA em cache mostra — e la a embalagem ja foi
+     descartada. "A embalagem continua... bipe o SKU de novo" fazia abrir uma
+     embalagem nova sem kit, e a peca ia para o saco sem o +1. A frase tem que
+     valer nas duas paginas. */
+  ok('   a frase diz que NADA foi gravado e manda refazer SKU, kit e SKU',
+     /não foi gravada/i.test((r9.body&&r9.body.erro)||'') && /bipe o SKU agora/.test((r9.body&&r9.body.erro)||'')
+     && /espere 45 s antes de bipar o kit e o SKU/.test((r9.body&&r9.body.erro)||'')
+     && !/embalagem continua/i.test((r9.body&&r9.body.erro)||''), JSON.stringify(r9.body));
+  eq('   NADA em montagem', nMontagem(), antesM);
+  eq('   o estoque NAO subiu', estoqueDe('BK130130TEMPO'), 3);
+  eq('   nenhuma linha no livro', movs(), antesMov);
+  eq('   a peca continua na fila', filaSit(fid), 'aguardando');
+  eq('   a ordem do dia nao andou', prod(), 0);
+  const e1 = evs();
+  eq('   a recusa fica registrada (montagem_evento)', e1.length, 1);
+  ok('   com o tipo, os segundos e quem fez', e1[0] && e1[0].tipo==='rapido_demais' && e1[0].segundos===44
+     && e1[0].usuario_id===1 && e1[0].usuario_nome==='Bancada', JSON.stringify(e1[0]));
+
+  r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:1});
+  eq('sem segundos no corpo (vale 0) → 409', r9.status, 409);
+  r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:1, segundos:'abc'});
+  eq('segundos que nao e numero → 409', r9.status, 409);
+  eq('   e o estoque continua 3', estoqueDe('BK130130TEMPO'), 3);
+
+  r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:0, segundos:10});
+  eq('sem o kit, a frase do kit vem antes da do tempo (400)', r9.status, 400);
+  r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:1, segundos:10}, null);
+  eq('sem login → 401, antes do tempo', r9.status, 401);
+
+  cfgSet('emb_minimo_seg','60');
+  r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:1, segundos:50});
+  eq('o minimo vem do config: com 60, 50 s → 409', r9.status, 409);
+  eq('   devolvendo 60', r9.body && r9.body.minimo, 60);
+  cfgSet('emb_minimo_seg','45');
+
+  r9 = chamar('POST','/api/montagem',{codigo:'BK130130TEMPO', kit_ok:1, segundos:45});
+  eq('45 s exatos → 200', r9.status, 200);
+  eq('   o estoque sobe +1', estoqueDe('BK130130TEMPO'), 4);
+  eq('   a fila foi consumida', filaSit(fid), 'embalado');
+  eq('   a ordem do dia andou', prod(), 1);
+  eq('   e a embalagem aceita nao vira evento', evs().length, 4);
+
+  const tr = fs.readFileSync(path.join(__dirname,'teste_route.js'),'utf8');
+  ok('montagem_evento esta nas TABELAS do modo teste', /nome:'montagem_evento'/.test(tr));
+  const tela = fs.readFileSync(path.join(__dirname,'public','montagem.html'),'utf8');
+  ok('a tela trata a recusa rapido_demais', /rapido_demais/.test(tela));
+  /* ③ REVISAO (achado 2, confirmado no navegador): o bipe durante a resposta
+     abria uma embalagem nova escondida, e o aviso da recusa apagava o desenho
+     dela. A embalagem fica de pe ate a resposta, e o bipe nesse meio e ignorado. */
+  const fin = tela.slice(tela.indexOf('async function finish()'));
+  ok('a embalagem NAO e zerada antes da resposta do servidor',
+     fin.indexOf("fetch('/api/montagem'") > 0 && fin.indexOf('emb=null') > fin.indexOf("fetch('/api/montagem'"));
+  ok('o bipe com o envio no ar e ignorado (emb.enviando)', /emb\s*&&\s*emb\.enviando/.test(tela));
+  ok('nao existe mais o aviso que apagava a embalagem nova', !/A embalagem de '\+cur\.codigo\+' NÃO foi gravada/.test(tela));
+  ok('na recusa a tela segue com a mesma embalagem e nao decide sozinha',
+     /motivo==='rapido_demais'\)\{\s*cur\.enviando=false;\s*rapidoDemais\(cur/.test(tela) && !/seg\s*<\s*EMB_MIN/.test(tela));
+  /* ③ REVISAO r2: sem o cur.enviando=false a primeira recusa deixava a
+     embalagem presa para sempre (todo bipe ignorado). E o envio tem limite de
+     tempo: pendurado, cai no "Falha de conexao" em vez de travar a bancada. */
+  ok('o envio tem limite de tempo (AbortController)', /AbortController[\s\S]{0,200}abort\(\)/.test(fin) && /signal:/.test(fin));
+  /* ③ REVISAO r3: o limite cobre tambem a leitura da resposta, e e cancelado
+     depois dela — sem o clearTimeout, o abort dispararia 20 s depois de toda
+     embalagem que deu certo. E a falha de conexao avisa que a peca PODE ter
+     sido gravada (a resposta se perde depois da gravacao, §12): rebipar
+     somaria +1 duas vezes. */
+  ok('a leitura da resposta fica dentro do limite, e o limite e cancelado',
+     /resp\.json\(\);\s*\}\s*finally\{\s*if\(prazo\)\s*clearTimeout\(prazo\);\s*\}/.test(fin));
+  const pegaErro = fin.slice(fin.indexOf('}catch(e){'));
+  ok('a falha de conexao avisa que pode ter gravado e mostra o contador',
+     /pode ter sido gravada/i.test(pegaErro) && /stats\(\)/.test(pegaErro.slice(0, 1200)));
+}
+
+console.log('\n── 10. a persiana so embala se veio da revisao (EMBALAGEM-SO-DA-REVISAO, 21/11/2026) ──');
+/* Decisao do dono: "a tela de embalagem so pode seguir com alguma embalagem
+   vindo da revisao". Vale SO para persiana (modelo com medida): kit,
+   acessorio e sob medida nao passam pela Revisao. Sem excecao: a peca que
+   sumiu da fila e revisada de novo. */
+{
+  cfgSet('emb_minimo_seg','0');
+  try{ db.exec('ALTER TABLE modelo ADD COLUMN exige_medida INTEGER DEFAULT 1'); }catch(e){}
+  db.exec("UPDATE modelo SET exige_medida=0 WHERE id=92");
+  db.exec("INSERT INTO modelo (id,nome,sob_medida,exige_medida) VALUES (93,'Acessório',0,0)");
+  db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('BK150150REV',0,91),('BK170170SEMMOD',0,NULL),('KIT32',0,93)").run();
+  const kit = db.prepare("SELECT valor FROM config WHERE chave='kit_codigo'").get().valor;
+  const corpo = c => ({codigo:c, segundos:60, kit_ok:1, kit_codigo:kit});
+  const livro = () => db.prepare('SELECT COUNT(*) n FROM movimento_estoque').get().n;
+  const ev0 = db.prepare("SELECT COALESCE(MAX(id),0) m FROM montagem_evento").get().m;
+  const evs = () => db.prepare("SELECT * FROM montagem_evento WHERE tipo='sem_revisao' AND id>? ORDER BY id").all(ev0);
+  db.prepare("INSERT INTO producao (codigo,qtd,produzido) VALUES ('BK150150REV',2,0)").run();
+  const prod = () => db.prepare("SELECT SUM(produzido) p FROM producao WHERE codigo='BK150150REV'").get().p;
+
+  const foto = () => JSON.stringify({m:nMontagem(), e:estoqueDe('BK150150REV'), l:livro(), p:prod()});
+  let a = foto();
+  let r10 = chamar('POST','/api/montagem',corpo('BK150150REV'),{id:5,nome:'Bia'});
+  eq('persiana sem fila → 409', r10.status, 409);
+  eq('   com o motivo sem_revisao', r10.body && r10.body.motivo, 'sem_revisao');
+  ok('   a frase manda levar para a Revisao e diz que nada gravou',
+     /Revisão/.test(r10.body&&r10.body.erro||'') && /NADA foi gravado/.test(r10.body&&r10.body.erro||''), JSON.stringify(r10.body));
+  eq('   nada mudou: embalagem, saldo, livro e ordem do dia', foto(), a);
+  const ev = evs();
+  eq('   a recusa vira uma linha em montagem_evento', ev.length, 1);
+  eq('   com quem bipou', ev[0] && ev[0].usuario_id, 5);
+
+  const fe = novaFila('BK150150REV','hoje');
+  db.prepare("UPDATE fila SET situacao='embalado' WHERE id=?").run(fe);
+  eq('linha da fila ja embalada nao conta → 409', chamar('POST','/api/montagem',corpo('BK150150REV')).status, 409);
+
+  /* a ordem: login → SKU → revisao → kit → tempo */
+  eq('sem login continua 401 (antes da revisao)', chamar('POST','/api/montagem',corpo('BK150150REV'),null).status, 401);
+  eq('SKU que nao existe continua 404', chamar('POST','/api/montagem',corpo('NAOEXISTE2')).status, 404);
+  r10 = chamar('POST','/api/montagem',{codigo:'BK150150REV', segundos:60, kit_ok:0});
+  eq('sem revisao E sem kit: a recusa e a da revisao', r10.body && r10.body.motivo, 'sem_revisao');
+  cfgSet('emb_minimo_seg','45');
+  r10 = chamar('POST','/api/montagem',{codigo:'BK150150REV', segundos:10, kit_ok:1, kit_codigo:kit});
+  eq('sem revisao E rapido demais: a recusa e a da revisao', r10.body && r10.body.motivo, 'sem_revisao');
+  cfgSet('emb_minimo_seg','0');
+
+  const f1 = novaFila('BK150150REV','hoje');
+  r10 = chamar('POST','/api/montagem',corpo('BK150150REV'));
+  eq('com a peca na fila → 200', r10.status, 200);
+  eq('   o estoque sobe +1', estoqueDe('BK150150REV'), 1);
+  eq('   a linha da fila e consumida', filaSit(f1), 'embalado');
+  eq('   a ordem do dia anda', prod(), 1);
+  eq('e a proxima, sem outra linha na fila, e recusada', chamar('POST','/api/montagem',corpo('BK150150REV')).status, 409);
+
+  const fd = novaFila('BK150150REV','devolucao');
+  r10 = chamar('POST','/api/montagem',corpo('BK150150REV'));
+  eq('a devolucao reembalada (entra pela fila) passa', r10.status, 200);
+  eq('   e a linha dela e consumida', filaSit(fd), 'embalado');
+
+  eq('SKU sem modelo conta como persiana → 409', chamar('POST','/api/montagem',corpo('BK170170SEMMOD')).status, 409);
+  r10 = chamar('POST','/api/montagem',corpo('KIT32'));
+  eq('kit/acessorio (modelo sem medida) embala sem fila', r10.status, 200);
+  eq('   e soma +1', estoqueDe('KIT32'), 1);
+  eq('sob medida (modelo sem medida) embala sem fila', chamar('POST','/api/montagem',corpo('SOBMEDIDA')).status, 200);
+  eq('e o kit nao vira evento de recusa', evs().length, 6);
+
+  /* ③ REVISAO: a trava perguntava em maiuscula e a transacao consumia com
+     comparacao exata — uma linha em minuscula autorizava +1 para sempre. */
+  db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('BK190190MIN',0,91)").run();
+  const fmin = db.prepare("INSERT INTO fila (codigo,modo) VALUES ('bk190190min','estoque')").run().lastInsertRowid;
+  eq('linha da fila em minuscula: a primeira embala', chamar('POST','/api/montagem',corpo('BK190190MIN')).status, 200);
+  eq('   e a linha e consumida', filaSit(fmin), 'embalado');
+  eq('   e a segunda, sem outra linha, e recusada', chamar('POST','/api/montagem',corpo('BK190190MIN')).status, 409);
+  eq('   o estoque subiu so 1', estoqueDe('BK190190MIN'), 1);
+
+  const tela = fs.readFileSync(path.join(__dirname,'public','montagem.html'),'utf8');
+  ok('a tela trata a recusa sem_revisao', /sem_revisao/.test(tela));
+  ok('no 1o bipe a tela confere a fila (e pergunta de novo antes de recusar)',
+     /async function conferirRevisao/.test(tela) && /conferirRevisao[\s\S]{0,600}await carregarFila\(\)/.test(tela));
+  ok('sem conexao a tela diz "Sem conexão", e nao "Não passou pela Revisão" (③)',
+     /if\(!leu\)\{\s*avisoFixo=true;\s*banner\('err','Sem conexão'/.test(tela) && /catch\(e\)\{ return false; \}/.test(tela));
+  /* ③ REVISAO r2 (testador de tela): a lista e a trava com a mesma regua; o
+     aviso fica ate o proximo bipe; o bipe durante a conferencia diz que nao valeu. */
+  db.prepare("INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('BK200200TST',0,91)").run();
+  db.prepare("INSERT INTO fila (codigo,modo,teste) VALUES ('BK200200TST','estoque',1)").run();
+  db.prepare("INSERT INTO fila (codigo,modo) VALUES ('bk210210lst','estoque')").run();
+  const lista = chamar('GET','/api/fila').body;
+  ok('a lista "Aguardando" nao mostra a linha de teste (a trava nao a aceita)', !lista.some(f => f.codigo === 'BK200200TST'), JSON.stringify(lista));
+  ok('a lista devolve o codigo em maiuscula, como a trava compara', lista.some(f => f.codigo === 'BK210210LST'));
+  ok('o aviso sem revisao e o "Sem conexão" nao sao apagados pelo redesenho de 4 s',
+     /if\(!emb && !avisoFixo && !conferindo\) idle\(\)/.test(tela) && /function semRevisao\(cod\)\{\s*avisoFixo=true/.test(tela) && /avisoFixo=true; banner\('err','Sem conexão'/.test(tela));
+  ok('e o proximo bipe solta o aviso', /now-last\.t<700\) return; last=\{c:code,t:now\};[\s\S]{0,120}avisoFixo=false;/.test(tela));
+  ok('o bipe durante a conferencia diz que nao valeu (e o aviso final repete)',
+     /if\(conferindo\)\{ bipePerdido=code; banner\('err','Bipe não valeu'/.test(tela) && /function perdido\(\)/.test(tela));
+  ok('o bipe perdido de uma conferencia nao sobra para a embalagem seguinte (③ r3)',
+     /if\(!naoNaFila\(info\)\)\{ const nota=perdido\(\); abrir\(info\); if\(nota\) \$\('#banner'\)\.insertAdjacentHTML/.test(tela) && /cur\.enviando\) return;\s*bipePerdido=null;/.test(tela));
+  ok('a regra da tela e a mesma do servidor: so persiana (exige_medida)', /exige_medida===0\) return false/.test(tela));
+}
+
+console.log('\n── 11. cancelar a embalagem em andamento (21/11/2026) ──');
+/* O espelho do "Cancelar revisao" (R-REV-08): quem precisa largar a bancada
+   zera a embalagem num toque. Nada grava — nem montagem, nem +1, nem a fila —,
+   e fica o evento `cancelada` em montagem_evento, com quem cancelou. */
+{
+  const h = rotas['POST /api/montagem/cancelar'];
+  ok('a rota de cancelar existe', typeof h === 'function');
+  if(h){
+    const fc = novaFila('BK150150REV','estoque');
+    const foto = () => JSON.stringify({m:nMontagem(), e:estoqueDe('BK150150REV'), f:filaSit(fc),
+      l:db.prepare('SELECT COUNT(*) n FROM movimento_estoque').get().n});
+    const a = foto();
+    const ev = () => db.prepare("SELECT * FROM montagem_evento WHERE tipo='cancelada' ORDER BY id").all();
+    eq('sem login → 401', chamar('POST','/api/montagem/cancelar',{codigo:'BK150150REV', segundos:12},null).status, 401);
+    eq('   e nada vira evento', ev().length, 0);
+    eq('sem codigo → 400', chamar('POST','/api/montagem/cancelar',{}).status, 400);
+    const r11 = chamar('POST','/api/montagem/cancelar',{codigo:'bk150150rev', segundos:12.4},{id:9,nome:'Rita'});
+    eq('cancelar → 200', r11.status, 200);
+    eq('   nada mudou: embalagem, saldo, fila e livro', foto(), a);
+    const e = ev();
+    eq('   fica uma linha "cancelada" em montagem_evento', e.length, 1);
+    eq('   com o codigo em maiuscula', e[0] && e[0].codigo, 'BK150150REV');
+    eq('   com os segundos', e[0] && e[0].segundos, 12);
+    eq('   e com quem cancelou', e[0] && e[0].usuario_id, 9);
+  }
+  const ac = fs.readFileSync(path.join(__dirname,'acesso.js'),'utf8');
+  ok('a rota tem linha propria no permDaRota (embalagem.executar)', /eq\('\/api\/montagem\/cancelar'\)\)\s*return\s*'embalagem\.executar'/.test(ac));
+  const tela = fs.readFileSync(path.join(__dirname,'public','montagem.html'),'utf8');
+  ok('a tela tem o botao "Cancelar embalagem"', /Cancelar embalagem/.test(tela) && /function cancelarEmb\(/.test(tela));
+  const fc2 = tela.slice(tela.indexOf('function cancelarEmb('), tela.indexOf('function cancelarEmb(') + 1500);
+  ok('cancelar zera a embalagem e chama a rota', /emb=null/.test(fc2) && /\/api\/montagem\/cancelar/.test(fc2));
+  ok('o aviso do cancelamento fica ate o proximo bipe', /avisoFixo=true/.test(fc2));
+  ok('com o envio no ar nao se cancela', /enviando\) return/.test(fc2));
+  ok('kit e sob medida nao ouvem "continua em Aguardando embalagem" (③)', /persiana:info\.exige_medida!==0/.test(tela) && /cur\.persiana \?/.test(fc2));
+  ok('a recusa do registro nao mostra a chave crua (③)', !/r\.erro\+'\)/.test(fc2));
+}
+
+console.log('\n── 12. o resultado do bipe final fica na tela até o próximo bipe (21/11/2026) ──');
+/* O redesenho de 4 s (load -> idle) trocava o "Embalada ✓" por "Pronto" em
+   menos de 1 s: quem não leu a tempo podia embalar a peça de novo (+1 duas
+   vezes). O mesmo para "Não deu pra embalar" e "Falha de conexão". */
+{
+  const tela = fs.readFileSync(path.join(__dirname,'public','montagem.html'),'utf8');
+  ok('"Embalada ✓" fica até o próximo bipe', /avisoFixo=true;\s*banner\('ok','Embalada ✓/.test(tela));
+  ok('"Não deu pra embalar" fica até o próximo bipe', /avisoFixo=true;\s*banner\('err','Não deu pra embalar'/.test(tela));
+  ok('"Falha de conexão" fica até o próximo bipe', /avisoFixo=true;\s*banner\('err','Falha de conexão'/.test(tela));
+}
+
+console.log('\n── 13. o tempo da peça ao lado da mediana de quem embalou (TEMPO-NA-BANCADA) ──');
+{
+  cfgSet('emb_minimo_seg','0');
+  const PEPE={id:77,nome:'Pepe'};
+  const emb = seg => { novaFila('BK140140BEGE','estoque');
+    return chamar('POST','/api/montagem',{codigo:'BK140140BEGE', kit_ok:1, kit_codigo:(db.prepare("SELECT valor FROM config WHERE chave='kit_codigo'").get()||{}).valor, segundos:seg}, PEPE).body; };
+  let b = emb(60);
+  ok('a primeira embalagem da pessoa volta sem média', b && b.ok && b.tempo && b.tempo.segundos===60 && b.tempo.mediana===null, JSON.stringify(b));
+  b = emb(70);
+  ok('a segunda compara com a primeira, e acima dela é "melhorar"', b.tempo.mediana===60 && b.tempo.aviso==='melhorar', JSON.stringify(b.tempo));
+  b = emb(50);
+  ok('abaixo da mediana é "parabéns"', b.tempo.mediana===65 && b.tempo.aviso==='parabens', JSON.stringify(b.tempo));
 }
 
 console.log('\n────────────────────────────────────────────');
