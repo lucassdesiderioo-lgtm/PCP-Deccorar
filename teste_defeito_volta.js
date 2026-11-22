@@ -112,6 +112,32 @@ ok('…e a volta guarda quem revisou, pelo id', v1.revisao_id != null && v1.revi
 ok('…e o rastro fica em revisao_evento', !!db.prepare("SELECT 1 FROM revisao_evento WHERE tipo='devolvida_embalagem' AND revisao_id=? AND usuario_id=1").get(v1.revisao_id)); }
 ok('a tela vermelha conta pela mesma régua (revisão modo hoje do dia), e a do ordem_dia é essa', /FROM revisao\s+WHERE data=date\('now','localtime'\) AND modo='hoje'/.test(fs.readFileSync(path.join(__dirname,'ordem_dia.js'),'utf8')));
 
+console.log('\n── 2-C. depois da devolução, o desfazer não pega a revisão de antes (③ REVISÃO) ──');
+{
+  db.prepare("INSERT OR IGNORE INTO skus (codigo,estoque,modelo_id,largura_cm,altura_cm,cor_codigo) VALUES ('BK160140BEGE',0,1,160,140,'BEGE')").run();
+  const LEO = { id:3, nome:'Leo' };
+  chamar('POST', '/api/revisao', { codigo:'BK160140BEGE', segundos:30 }, LEO);
+  chamar('POST', '/api/revisao', { codigo:'BK140140BEGE', segundos:30 }, LEO);
+  const nX = db.prepare("SELECT COUNT(*) c FROM revisao WHERE usuario_id=3").get().c;
+  chamar('POST', '/api/montagem/defeito', { codigo:'BK140140BEGE', motivo:MOT, segundos:10 }, ANA);
+  let u = chamar('GET', '/api/revisao/ultima', {}, LEO).body.desfazer;
+  ok('a tela é avisada do porquê (não some calado)', u && u.pode === false && u.motivo === 'defeito' && /defeito/.test(u.erro || ''), JSON.stringify(u));
+  r = chamar('POST', '/api/revisao/desfazer', {}, LEO);
+  ok('o desfazer recusa dizendo que a peça voltou por defeito', r.status === 409 && r.body.motivo === 'defeito', JSON.stringify(r.body));
+  eq('…e a revisão de antes (BK160140BEGE) continua lá', db.prepare("SELECT COUNT(*) c FROM revisao WHERE usuario_id=3").get().c, nX - 1);
+  // revisa outra peça depois: a devolução de antes não manda mais
+  chamar('POST', '/api/revisao', { codigo:'BK160140BEGE', segundos:30 }, LEO);
+  u = chamar('GET', '/api/revisao/ultima', {}, LEO).body.desfazer;
+  ok('revisou de novo: a última volta a se desfazer', u && u.pode === true && u.codigo === 'BK160140BEGE', JSON.stringify(u));
+  r = chamar('POST', '/api/revisao/desfazer', {}, LEO);
+  eq('…e desfaz', r.status, 200);
+  r = chamar('POST', '/api/revisao/desfazer', {}, LEO);
+  ok('depois de desfazer, a mensagem é a de sempre, e não "voltou por defeito"', r.status === 409 && r.body.motivo !== 'defeito', JSON.stringify(r.body));
+  // limpa a peça do Leo da fila para não mexer nas seções de baixo
+  db.prepare("UPDATE fila SET situacao='embalado' WHERE codigo='BK160140BEGE' AND situacao='aguardando'").run();
+  db.prepare("UPDATE embalagem_defeito SET decisao='sem_defeito' WHERE revisado_por_id=3").run();
+}
+
 console.log('\n── 3. "tem defeito": vai ao setor ──');
 r = chamar('POST', '/api/revisao/defeitos/:id/decidir', { decisao:'defeito' }, RUI, { id:vol.id });
 eq('sem setor: 400', r.status, 400);

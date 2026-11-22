@@ -103,9 +103,18 @@ function candidata(db, usuarioId){
   }catch(e){}
   return r;
 }
+/* A ÚLTIMA coisa desta pessoa hoje foi ter a revisão apagada por defeito? Só
+   então o desfazer diz "voltou por defeito": a revisão dela de depois, ou um
+   desfazer de depois, já é outra história (③ REVISÃO). */
 function devolvidaHoje(db, usuarioId){
-  try{ return !!db.prepare(`SELECT 1 FROM embalagem_defeito WHERE revisado_por_id=? AND date(achou_em)=date('now','localtime')`).get(usuarioId); }
-  catch(e){ return false; }
+  try{
+    const dev = db.prepare(`SELECT MAX(revisao_id) m FROM embalagem_defeito WHERE revisado_por_id=?
+      AND date(achou_em)=date('now','localtime')`).get(usuarioId).m;
+    if(dev == null) return false;
+    const rev = db.prepare(`SELECT MAX(id) m FROM revisao WHERE usuario_id=? AND data=date('now','localtime')`).get(usuarioId).m;
+    const desf = db.prepare(`SELECT MAX(revisao_id) m FROM revisao_evento WHERE tipo='desfeita' AND usuario_id=?`).get(usuarioId).m;
+    return dev > (rev || 0) && dev > (desf || 0);
+  }catch(e){ return false; }
 }
 function situacaoFila(db, revisaoId){
   const f = db.prepare('SELECT id, situacao FROM fila WHERE revisao_id=? ORDER BY id LIMIT 1').get(revisaoId);
@@ -188,6 +197,10 @@ module.exports=function(app,db){
       const s=situacaoFila(db,c.id);
       desfazer={revisao_id:c.id,codigo:c.codigo,segundos:c.segundos,modo:c.modo,ha_seg:Math.max(0,c.ha_seg||0),
         pode:!s.motivo,motivo:s.motivo,erro:s.motivo?MSG[s.motivo]:null};
+    } else if(devolvidaHoje(db,q.usuario_id)){
+      /* a última revisão voltou da embalagem por defeito e foi apagada: a tela
+         diz o porquê em vez de o botão sumir calado */
+      desfazer={pode:false,motivo:'defeito',erro:MSG.defeito};
     }
     res.json({minimo_seg:minimoSeg(db),desfazer});
   });
