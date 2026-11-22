@@ -180,6 +180,10 @@ const srv = app.listen(0, async () => {
     secao('D5. o "?" aparece para quem tem manual.ler e some para quem não tem');
     let E = await abrir(EDVALDO, '/operador'); await E.p.waitForTimeout(900);
     ok('na 101, o Edvaldo (manual.ler) vê o "?" na barra, ao lado do ☰ Menu', await E.p.isVisible('#manualAjuda'), await E.p.locator('#sessBar').textContent().catch(() => ''));
+    /* ③ REVISÃO, 2ª rodada: o Admin Geral é quem vê o "?" no deploy da fase 1 — e para ele o /api/telas/minhas manda `perms` vazio */
+    const Lu = await abrir(LUCAS, '/operador'); await Lu.p.waitForTimeout(900);
+    ok('   e o Lucas (Admin Geral, sem a chave escrita) também vê o "?", pelo admin_geral da resposta', await Lu.p.isVisible('#manualAjuda') && Lu.pedidos.some(u => /\/api\/manual\/ficha\/aqui/.test(u)));
+    await Lu.ctx.close();
     const Bi = await abrir(BIA, '/embalagem'); await Bi.p.waitForTimeout(900);
     ok('na 201, a Bia (sem manual.ler) NÃO vê o "?" — a rota devolve 403 e o botão não nasce', (await Bi.p.locator('#manualAjuda').count()) === 0);
     ok('   e a tela dela nem pergunta a ficha: nenhum pedido a /api/manual (sem 403 no console da bancada, ③ REVISÃO)', !Bi.pedidos.some(u => /\/api\/manual/.test(u)), Bi.pedidos.filter(u => /\/api\/manual/.test(u)));
@@ -204,6 +208,9 @@ const srv = app.listen(0, async () => {
     ok('clicar no "?" abre o painel com "201 · Etiqueta de Venda"', await Dv.p.isVisible('#manualPainel') && /Etiqueta de Venda/.test(await texto(Dv.p, '#manualPainel')) && /201/.test(await texto(Dv.p, '#manualPainel')), await texto(Dv.p, '#manualPainel'));
     ok('   nenhuma janela nova foi aberta', Dv.ctx.pages().length === paginasAntes);
     ok('   o painel é filho direto do <body> (fora de qualquer card que a tela redesenhe)', await Dv.p.evaluate(() => document.getElementById('manualPainel').parentElement === document.body));
+    /* ③ REVISÃO (22/11/2026): alvo de toque da bancada — 44 px no mínimo (DESIGN.md §4) */
+    const alvos = await Dv.p.evaluate(() => Array.from(document.querySelectorAll('#manualPainel .mfChip, #manualPainel .mfLink a, #manualFechar')).map(e => ({ t:e.className || e.id, h:Math.round(e.getBoundingClientRect().height) })));
+    ok('   os chips, o "Abrir o manual" e o ✕ do painel têm pelo menos 44 px de altura (alvo de toque)', alvos.length > 0 && alvos.every(a => a.h >= 44), JSON.stringify(alvos.filter(a => a.h < 44)));
     /* A ETIQUETA DE VENDA PUXA O BIPE DE VOLTA ("o bipe não pode ficar sem
        dono", embalagem.html): com o painel aberto, o campo de bipe continua
        com o foco, e o leitor continua funcionando. O painel é leitura. */

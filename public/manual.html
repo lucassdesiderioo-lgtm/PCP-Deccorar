@@ -138,7 +138,7 @@ async function mostrarMapa(){
 async function mostrarGlossario(){
   var el=document.getElementById('conteudo');
   if(!D.glo){ var r=await jget('/api/manual/glossario'); D.glo=r.s===200?(r.j.termos||[]):[]; }
-  el.innerHTML='<div class="card"><h2>Glossário</h2><dl class="glo">'+D.glo.map(function(t){ return '<dt id="termo-'+esc(t.termo.toLowerCase().replace(/[^a-z0-9]+/g,'-'))+'">'+esc(t.termo)+'</dt><dd>'+esc(t.texto)+'</dd>'; }).join('')+'</dl></div>';
+  el.innerHTML='<div class="card"><h2>Glossário</h2><dl class="glo">'+D.glo.map(function(t){ return '<dt id="termo-'+esc(MANUAL_FICHA.apelidoTermo(t.termo))+'">'+esc(t.termo)+'</dt><dd>'+esc(t.texto)+'</dd>'; }).join('')+'</dl></div>';
 }
 
 /* ── o que mudou ────────────────────────────────────────────────────────── */

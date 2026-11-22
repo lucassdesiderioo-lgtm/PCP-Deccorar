@@ -242,7 +242,7 @@ const troca = (dir, arq, de, para) => fs.writeFileSync(path.join(dir, 'manual', 
 d = pastaFalsa();   // B10: corpo mudado + só o TEXTO da última linha editado
 troca(d, '101-revisao.md', 'Revisar a peça.', 'Revisar a peça com calma.'); troca(d, '101-revisao.md', '- 20/11/2026 — ficha escrita', '- 20/11/2026 — ficha escrita e revista');
 rec = MAN.confrontar(R0, MAN.retratoDe(leFalsa(d)), leFalsa(d));
-ok('B10 editar só o texto da última linha de "Mudanças" NÃO é linha nova: corpo mudado é RECUSADO', rec.length === 1 && /101/.test(rec[0]), rec);
+ok('B10 editar só o texto da última linha de "Mudanças" NÃO é linha nova: corpo mudado é RECUSADO', rec.length >= 1 && rec.every(r => /101/.test(r)) && rec.some(r => /texto mudou/.test(r)), rec);
 d = pastaFalsa();   // B11: linha nova com data ANTERIOR à última (a regra mudou em 19/11, a ficha nasceu em 20/11)
 troca(d, '101-revisao.md', 'Revisar a peça.', 'Revisar a peça com calma.'); troca(d, '101-revisao.md', '- 20/11/2026 — ficha escrita', '- 20/11/2026 — ficha escrita\n- 19/11/2026 — a regra do estoque mudou');
 rec = MAN.confrontar(R0, MAN.retratoDe(leFalsa(d)), leFalsa(d));
@@ -259,6 +259,15 @@ ok('B13 ficha que já tem história e não está no retrato é RECUSADA (a entra
 ok('   e a ficha nova de verdade (uma linha em "Mudanças") entra sem estar no retrato', (() => { const dd = pastaFalsa();
   fs.writeFileSync(path.join(dd, 'manual', '103-nova.md'), fs.readFileSync(path.join(dd, 'manual', '101-revisao.md'), 'utf8').replace('tela: 101', 'tela: 103').replace('titulo: Revisão', 'titulo: Nova'));
   const r = MAN.confrontar(R0, MAN.retratoDe(leFalsa(dd, { 101:[], 102:[], 103:[] })), leFalsa(dd, { 101:[], 102:[], 103:[] })); fs.rmSync(dd, { recursive:true, force:true }); return r.length === 0; })());
+/* B15 (③ REVISÃO, 2ª rodada): com o corpo igual, apagar ou trocar uma linha de
+   "Mudanças" é recusado — em duas rodadas o corpo mudaria sem linha que o explique */
+d = pastaFalsa(); troca(d, '101-revisao.md', '- 20/11/2026 — ficha escrita', '- 20/11/2026 — ficha escrita, com calma');
+rec = MAN.confrontar(R0, MAN.retratoDe(leFalsa(d)), leFalsa(d));
+ok('B15 trocar o texto de uma linha de "Mudanças" que já estava no retrato é RECUSADO, mesmo com o corpo igual', rec.length === 1 && /101/.test(rec[0]) && /linha/.test(rec[0]), rec);
+fs.rmSync(d, { recursive:true, force:true }); d = pastaFalsa(); troca(d, '101-revisao.md', '- 20/11/2026 — ficha escrita', '- 19/11/2026 — outra coisa');
+rec = MAN.confrontar(R0, MAN.retratoDe(leFalsa(d)), leFalsa(d));
+ok('   e apagar uma linha (mesmo pondo outra no lugar) também', rec.length === 1 && /101/.test(rec[0]), rec);
+fs.rmSync(d, { recursive:true, force:true }); d = pastaFalsa();
 rec = MAN.confrontar(null, MAN.retratoDe(leFalsa(d)), leFalsa(d));   // B14: sem retrato
 ok('B14 sem retrato antigo é RECUSADO (o primeiro retrato aconteceu em 21/11/2026), a não ser que se peça o primeiro de propósito', rec.length === 1 && /primeiro/.test(rec[0]) && MAN.confrontar(null, MAN.retratoDe(leFalsa(d)), leFalsa(d), { primeiro:true }).length === 0, rec);
 ok('   e o manual_retrato.js sem retrato.json recusa, e com --primeiro-retrato grava', (() => { const dd = pastaFalsa();
@@ -291,6 +300,14 @@ ok('   o desenho do "?" não escreve a chave do config (sem o replace de "_" por
 /* ③ REVISÃO: o apelido do sob medida acha a tela, e o [[Termo]] aponta o termo */
 ok('A12 /sobmedida/inicio (apelido da 601) acha a 601 pela rota, como /sobmedida', (MAN.telaPorRota('/sobmedida/inicio') || {}).n === 601 && (MAN.telaPorRota('/sobmedida') || {}).n === 601 && MAN.telaPorRota('/sobmedida/nada') === null);
 ok('   o [[Termo]] da ficha leva ao próprio termo no glossário (#termo=…), não ao topo', /#termo=/.test(fs.readFileSync(path.join(__dirname, 'public', 'manual_ajuda.js'), 'utf8')) && /termo=/.test(fs.readFileSync(path.join(__dirname, 'public', 'manual.html'), 'utf8')));
+/* ③ REVISÃO, 2ª rodada: o apelido do termo tem UMA régua (exportada pelo manual_ajuda.js e usada pela 907), e roda sobre o texto cru */
+ok('   o apelido do termo é uma régua só: a 907 usa o apelidoTermo do manual_ajuda.js, e o termo com & não vira "amp"', (() => {
+  const aj = fs.readFileSync(path.join(__dirname, 'public', 'manual_ajuda.js'), 'utf8'), ht = fs.readFileSync(path.join(__dirname, 'public', 'manual.html'), 'utf8');
+  const w = { }; const ctx = { window:w, document:{ getElementById:() => null, addEventListener:() => {}, createElement:() => ({ style:{}, setAttribute:() => {}, addEventListener:() => {} }) }, location:{ pathname:'/x' }, fetch:() => new Promise(() => {}), setInterval:() => 0, clearInterval:() => {}, setTimeout:() => 0, Promise };
+  try{ require('vm').runInNewContext(aj, ctx); }catch(e){ return false; }
+  const F = w.MANUAL_FICHA; if(!F || typeof F.apelidoTermo !== 'function') return false;
+  return F.apelidoTermo('Etiqueta & NF') === 'etiqueta-nf' && /MANUAL_FICHA\.apelidoTermo/.test(ht) && !/toLowerCase\(\)\.replace\(\/\[\^a-z0-9\]\+\/g,'-'\)/.test(ht) && F.texto('veja [[Etiqueta & NF]]').indexOf('#termo=etiqueta-nf') > 0;
+})());
 [d0, dS, dR, d].forEach(x => fs.rmSync(x, { recursive:true, force:true }));
 
 /* ═════════════════════════════════════════════════════════════════════════ */

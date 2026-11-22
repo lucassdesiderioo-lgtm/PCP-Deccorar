@@ -24,7 +24,13 @@
   /* [[Termo]] vira link para o glossário da 907; o texto fica como está */
   /* [[Termo]] leva ao próprio termo no glossário da 907 (o id do <dt> é "termo-" + o mesmo apelido) */
   function apelidoTermo(t){ return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
-  function texto(s){ return esc(s).replace(/\[\[([^\]]+)\]\]/g, function(m, t){ return '<a class="mfTermo" href="/manual#termo=' + apelidoTermo(t) + '">' + t + '</a>'; }); }
+  /* o apelido sai do texto CRU (antes do esc), e esta é a única régua — a 907 usa a mesma (③ REVISÃO, 2ª rodada) */
+  function texto(s){
+    return String(s == null ? '' : s).split(/(\[\[[^\]]+\]\])/).map(function(p){
+      var m = /^\[\[([^\]]+)\]\]$/.exec(p);
+      return m ? '<a class="mfTermo" href="/manual#termo=' + apelidoTermo(m[1]) + '">' + esc(m[1]) + '</a>' : esc(p);
+    }).join('');
+  }
   function itens(lista){
     if(!lista || !lista.length) return '';
     return '<ul class="mfLista">' + lista.map(function(i){
@@ -97,14 +103,15 @@
     + '.mfSec{margin:0 0 14px}.mfSec h3{margin:0 0 6px;font-size:14px;text-transform:uppercase;letter-spacing:.4px;color:#5a6472}'
     + '.mfLista{margin:0;padding-left:18px}.mfLista li{margin:0 0 6px;line-height:1.45}.mfVazio{color:#8b97a5}.mfNota{color:#5a6472;font-size:12px;margin:6px 0 0}'
     + '.mfFluxo>div{margin:0 0 6px;line-height:1.9}.mfRot{color:#5a6472;font-size:12px;text-transform:uppercase;letter-spacing:.3px;margin-right:6px}'
-    + '.mfChip{display:inline-block;border:1px solid #1565c0;color:#1565c0;border-radius:999px;padding:2px 10px;text-decoration:none;font-size:13px;margin:0 4px 4px 0;white-space:nowrap}'
-    + '.mfChip b{margin-right:4px}.mfChip.fora{border-color:#d8dee6;color:#5a6472}.mfSo{color:#8b97a5;font-size:12px;font-weight:400}'
-    + '.mfAcoes{margin-top:8px}.mfLink a{color:#1565c0;font-weight:700;text-decoration:none}.mfTermo{color:#1565c0;text-decoration:underline dotted}';
+    /* chips e link com 44 px de altura: alvo de toque da bancada (DESIGN.md §4; ③ REVISÃO, 22/11/2026) */
+    + '.mfChip{display:inline-flex;align-items:center;min-height:44px;border:1px solid #1565c0;color:#1565c0;border-radius:999px;padding:0 14px;text-decoration:none;font-size:13px;margin:0 6px 6px 0;white-space:nowrap}'
+    + '.mfChip b{margin-right:4px}.mfChip.fora{border-color:#d8dee6;color:#5a6472}.mfSo{color:#5a6472;font-size:12px;font-weight:400}'
+    + '.mfAcoes{margin-top:8px}.mfLink a{display:inline-flex;align-items:center;min-height:44px;color:#1565c0;font-weight:700;text-decoration:none}.mfTermo{color:#1565c0;text-decoration:underline dotted}';
   function estilo(){
     if(document.getElementById('mfCss')) return;
     var st = document.createElement('style'); st.id = 'mfCss'; st.textContent = CSS; document.head.appendChild(st);
   }
-  window.MANUAL_FICHA = { html: fichaHtml, estilo: estilo, esc: esc, texto: texto, nomeModulo: nomeModulo, nomeNivel: nomeNivel };
+  window.MANUAL_FICHA = { html: fichaHtml, estilo: estilo, esc: esc, texto: texto, apelidoTermo: apelidoTermo, nomeModulo: nomeModulo, nomeNivel: nomeNivel };
 
   /* ── o "?" na barra de sessão ─────────────────────────────────────────── */
   if(window.__manualAjuda || location.pathname.indexOf('/login') === 0) return;

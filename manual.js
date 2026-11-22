@@ -329,6 +329,11 @@ function confrontar(antigo, novo, L, opts){
     }
     const nova = linhaNova(linhasDe(af), nf.linhas);
     const ultima = (nf.linhas || []).slice(-1)[0] || 'nenhuma';
+    /* a linha é registro: a que estava no retrato e sumiu (apagada ou com o
+       texto trocado) é recusa, com o corpo igual ou não — senão em duas rodadas
+       o corpo mudaria sem linha que o explicasse (③ REVISÃO, 2ª rodada) */
+    const sumiram = linhasDe(af).filter(l => (nf.linhas || []).indexOf(l) < 0);
+    if(sumiram.length) rec.push('ficha ' + nomeDe(n) + ': a linha de "Mudanças" "' + sumiram[0] + '" foi apagada ou trocada — a linha é registro; para corrigir, acrescente outra');
     if((af.corpo !== nf.corpo || af.situacao !== nf.situacao) && !nova)
       rec.push('ficha ' + nomeDe(n) + ': o texto mudou e não há linha nova em "Mudanças" (a última ainda é "' + ultima + '")');
     const novasAcoes = (nf.acoes || []).filter(c => (af.acoes || []).indexOf(c) < 0);
