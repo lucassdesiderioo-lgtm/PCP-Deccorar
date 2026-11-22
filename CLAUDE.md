@@ -6063,7 +6063,7 @@ leitor de `docs/manual/` (1); e, na ③ REVISÃO de 22/11/2026, o segredo
 viajando no `montar` (1), a assinatura só pela última linha (3), o
 apelido sem resolver (1), o "Também usa" de volta (1), a linha de "Mudanças"
 apagada ou trocada passando (2), o apelido do termo em duas réguas (1), as
-ações do sob medida em dobro (1) e o "?" lendo o `MENU` (1). **`node teste_manual_tela.js` (55, num Chromium; sem
+ações do sob medida em dobro (2) e o "?" lendo o `MENU` (1). **`node teste_manual_tela.js` (55, num Chromium; sem
 navegador diz PULADO) ao mexer na 907, no `manual_ajuda.js` ou nas barras** —
 o foco no ✕ (2), a chave do config como rótulo (1), o cinza claro no
 mapa (1), a busca filtrando em "Todas" (1), o pedido da ficha sem a chave
