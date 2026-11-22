@@ -59,7 +59,7 @@ function carregarMenu(){
   }
   fetch('/api/telas/minhas',{credentials:'same-origin'})
     .then(function(r){ return r.json(); })
-    .then(function(d){ MENU.telas=d||{}; desenharMenu(); })
+    .then(function(d){ MENU.telas=d||{}; window.TELAS_MINHAS=d||{}; desenharMenu(); })   // o MENU daqui vive no IIFE; o "?" do manual lê o global nomeado
     .catch(function(){ if(MENU.painel) MENU.painel.innerHTML='<div class="mnVazio">Não deu para carregar as telas.</div>'; });
 }
 

@@ -107,6 +107,14 @@ prontas.forEach(f => acoesPorTela(f.n).forEach(a => { if(!MAN.citaAcao(f, a)) se
 ok('A9 toda ação (permissão com `tela: n`) tem o rótulo citado em "Botões e ações" da ficha pronta', !semBotao.length, lista(semBotao));
 ok('   a conta das ações lê o permissoes.js (101 tem Revisar peças e Devolver peça à produção)', acoesPorTela(101).map(a => a.chave).sort().join(',') === 'revisao.executar,revisao.rejeitar', JSON.stringify(acoesPorTela(101)));
 ok('   e no sob medida lê o TELA_DA_CHAVE (602 tem plano.calcular)', acoesPorTela(602).some(a => a.chave === 'sobmedida.plano.calcular' && a.rotulo));
+/* ③ REVISÃO (testador-tela): o permissoes.js já traz as chaves do sob medida com a tela; o laço do TELA_DA_CHAVE não pode repeti-las */
+const repetidas = MAN.telasTodas().map(t => { const ch = acoesPorTela(t.n).map(a => a.chave); return ch.length !== new Set(ch).size ? t.n + ' (' + ch.length + ')' : null; }).filter(Boolean);
+ok('   cada ação aparece UMA vez por tela (a 602 tinha 12, 6 repetidas; a 601 e a 605, 2)', !repetidas.length && acoesPorTela(602).length === 6 && acoesPorTela(601).length === 1, lista(repetidas));
+/* ③ REVISÃO (testador-tela): o "?" lê um global NOMEADO que os dois nav.js gravam — o MENU do sob medida vive dentro de um IIFE, e o "?" nunca nascia lá */
+ok('A13 os dois nav.js guardam a resposta do /api/telas/minhas em window.TELAS_MINHAS, e o "?" lê só ela (nunca o MENU)', (() => {
+  const a = fs.readFileSync(path.join(__dirname, 'public', 'nav.js'), 'utf8'), b = fs.readFileSync(path.join(__dirname, 'tecido', 'public', 'nav.js'), 'utf8'), c = fs.readFileSync(path.join(__dirname, 'public', 'manual_ajuda.js'), 'utf8');
+  return /window\.TELAS_MINHAS\s*=\s*d/.test(a) && /window\.TELAS_MINHAS\s*=\s*d/.test(b) && /window\.TELAS_MINHAS/.test(c) && !/window\.MENU/.test(c);
+})());
 
 const jargao = [];
 fichas.forEach(f => { const j = MAN.jargaoNoCorpo(f); if(j.length) jargao.push(f.n + ': ' + j.join(' | ')); });

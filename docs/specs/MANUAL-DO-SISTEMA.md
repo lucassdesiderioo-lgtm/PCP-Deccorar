@@ -6,7 +6,7 @@ Situação: EM CONSTRUÇÃO · aprovada pelo dono em 21/11/2026 ("pode seguir, m
 Criada em: 21/11/2026
 Última atualização: 22/11/2026 (③ REVISÃO da fase 1)
 Fase atual: 1 construída, falta subir — a fundação: 907, "?", seis rotas, 53 fichas em
-            rascunho, glossário, retrato, teste_manual.js (110) e teste_manual_tela.js (53).
+            rascunho, glossário, retrato, teste_manual.js (115) e teste_manual_tela.js (55).
             ⚠️ NÃO é apresentada ao time antes da fase 2 (§10). Próxima: fase 2.
 Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐
 Divergências na construção (valem sobre o texto da spec):
@@ -34,6 +34,12 @@ Divergências na construção (valem sobre o texto da spec):
        o bipe de volta); [[Termo]] abre o glossário no termo (#termo=); a busca em
        "Todas as telas" alcança o que a chave dá; o mapa mede o nome contra a caixa e
        escreve a tela não operada em #5a6472.
+  D-C10 (2ª rodada e testador de tela) a linha de "Mudanças" que estava no retrato e
+       sumiu ou mudou é recusa mesmo com o corpo igual (a linha é registro); o apelido do
+       termo é uma régua só (MANUAL_FICHA.apelidoTermo, sobre o texto cru); o "?" lê o
+       global window.TELAS_MINHAS que os dois nav.js gravam (o MENU do sob medida vive num
+       IIFE, e o "?" não nascia lá); as ações do sob medida entram uma vez (o permissoes.js
+       já as traz com a tela); chips e link do painel com 44 px (DESIGN.md §4).
   D-C3 o "?" não toma o foco: na bancada a tela puxa o bipe de volta ("o bipe não
        pode ficar sem dono", Etiqueta de Venda), e o painel é leitura — o leitor
        continua funcionando com ele aberto; fechar devolve o foco a quem o tinha.

@@ -182,13 +182,15 @@
   }
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape'){ var p = document.getElementById('manualPainel'); if(p && !p.hidden) fechar(); } });
 
-  /* SÓ PERGUNTA A FICHA QUEM TEM A CHAVE (③ REVISÃO, 22/11/2026): o nav.js já
-     guarda em MENU.telas a resposta do /api/telas/minhas (as permissões da
-     pessoa, e se é Admin Geral). Sem `manual.ler` o portão responderia 403 em
-     toda tela de toda pessoa — ruído no console da bancada inteira até o dia em
-     que a chave for marcada. Espera a resposta até 10 s; sem ela, não pergunta. */
+  /* SÓ PERGUNTA A FICHA QUEM TEM A CHAVE (③ REVISÃO, 22/11/2026): os dois nav.js
+     guardam em window.TELAS_MINHAS a resposta do /api/telas/minhas (as
+     permissões da pessoa, e se é Admin Geral). Sem `manual.ler` o portão
+     responderia 403 em toda tela de toda pessoa — ruído no console da bancada
+     inteira até o dia em que a chave for marcada. Espera a resposta até 10 s;
+     sem ela, não pergunta. ⚠️ É um global NOMEADO, e não o MENU do nav.js: o do
+     sob medida vive dentro de um IIFE, e lendo o MENU o "?" nunca nascia lá. */
   function temChave(){
-    var m = window.MENU && window.MENU.telas;
+    var m = window.TELAS_MINHAS;
     if(!m) return null;
     return !!(m.admin_geral || (m.perms || []).indexOf('manual.ler') >= 0);
   }

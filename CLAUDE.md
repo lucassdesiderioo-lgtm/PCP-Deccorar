@@ -5997,7 +5997,11 @@ O que parece bug e não é:
   linha de qualquer data conta, duas do mesmo dia contam, e editar a última não
   conta. **Sem `retrato.json` é recusa** (o primeiro retrato aconteceu em
   21/11/2026; `--primeiro-retrato` grava um do zero de propósito), e a ficha
-  com história que não está no retrato também: a entrada foi apagada.
+  com história que não está no retrato também: a entrada foi apagada. **E a
+  linha que estava no retrato e sumiu (apagada ou com o texto trocado) é
+  recusa, com o corpo igual ou não** (2ª rodada): a linha é registro — em duas
+  rodadas o corpo mudaria sem linha que o explicasse; para corrigir uma linha,
+  acrescenta-se outra.
 - **A ficha não tem R$, nome de arquivo, rota, SQL, código de cartão nem nome
   de tabela** no corpo (os cartões vão no cabeçalho; o detector pega
   `venda_futura`), e a Regra B do §20 vale nela: o `teste_linguagem.js` passou
@@ -6014,10 +6018,20 @@ O que parece bug e não é:
   `montar` e a rota não os deixam viajar mesmo assim (`parametroPermitido`) —
   o `parametroExiste` só sabe que a palavra aparece no código.
 - **O "?" só pergunta a ficha a quem tem `manual.ler`** (ou ao Admin Geral), pela
-  resposta do `/api/telas/minhas` que o `nav.js` guarda em `MENU.telas` (③
-  REVISÃO): sem a chave, nenhum pedido — a primeira versão disparava um 403 no
-  console de toda tela de toda pessoa até o dono marcar a chave. Sem a chave a
-  rota continua 403 e o botão não nasce.
+  resposta do `/api/telas/minhas` que **os dois `nav.js` guardam em
+  `window.TELAS_MINHAS`** (③ REVISÃO): sem a chave, nenhum pedido — a primeira
+  versão disparava um 403 no console de toda tela de toda pessoa até o dono
+  marcar a chave. Sem a chave a rota continua 403 e o botão não nasce. ⚠️ **É
+  UM GLOBAL NOMEADO, E NÃO O `MENU` DO `nav.js`**: o `MENU` do sob medida vive
+  dentro de um IIFE, e a versão que lia `window.MENU` fazia o "?" nunca nascer
+  no `/sobmedida` — nem para o Admin Geral (o testador de tela achou; a regra
+  inerte da dívida 18). O `teste_manual_tela.js` não sobe o sob medida: a prova
+  de lá é o A13 do `teste_manual.js` (os dois `nav.js` gravam o global) e a
+  conferência na tela.
+- **As ações do sob medida entram UMA vez na ficha**: o `permissoes.js` da raiz
+  já traz `sobmedida.<chave>` com a tela, e o laço do `TELA_DA_CHAVE` do
+  `acoesDaTela` as repetia — a 602 saía com 12 ações, 6 em dobro (testador de
+  tela). O retrato guarda a lista das ações, e foi regravado.
 - **O "?" não toma o foco, e o ✕ do painel também não** (③ REVISÃO): na 101,
   102, 201 e 202 a tela puxa o bipe de volta ("o bipe não pode ficar sem
   dono"), mas a 251 Receber peça e a 303 Inventário não puxam — com o foco no
@@ -6026,12 +6040,19 @@ O que parece bug e não é:
   aba nova, §12) e fecha devolvendo o foco a quem o tinha.
 - **O "Onde entra no fluxo" é gerado do `liga`**; a ficha pode trazer uma frase
   a mais, nunca substituí-lo. O `[[Termo]]` abre o glossário da 907 **no
-  próprio termo** (`#termo=…`), e o apelido `/sobmedida/inicio` acha a 601.
+  próprio termo** (`#termo=…`), e o apelido `/sobmedida/inicio` acha a 601. O
+  apelido do termo é **uma régua só** (`MANUAL_FICHA.apelidoTermo`, que a 907
+  usa no id do `<dt>`) e sai do texto **cru**, antes do escape — rodando sobre o
+  texto escapado, "Etiqueta & NF" virava `etiqueta-amp-nf` no link e
+  `etiqueta-nf` no glossário (2ª rodada).
 - **Na 907, o mapa MEDE o nome da tela contra a caixa** (nunca conta letras,
   §12), a tela não operada é escrita em `#5a6472` (5,5:1 — o cinza de antes
-  dava 2,7:1), e a busca em "Todas as telas" alcança o que a chave dá.
+  dava 2,7:1), e a busca em "Todas as telas" alcança o que a chave dá. **No
+  painel do "?", os chips, o "Abrir o manual" e o ✕ têm 44 px** (o alvo de
+  toque do `DESIGN.md` §4; saíam com 31). ⚠️ O botão "?" segue a altura dos
+  outros botões da barra de sessão (36 px): mudar é da barra, não do manual.
 
-**Rode `node teste_manual.js` (110) ao mexer em qualquer ficha, cartão, no
+**Rode `node teste_manual.js` (115) ao mexer em qualquer ficha, cartão, no
 `manual.js`, no `manual_route.js`, no `manual_retrato.js`, no `permissoes.js`
 ou nos dois mapas de telas** — oito defeitos foram reintroduzidos um a um, e
 cada um reprova: a 907 sem ficha (3 casos), cartão inexistente citado (1), texto
@@ -6040,7 +6061,9 @@ mudado sem a linha de "Mudanças" (2), a ficha inteira a quem não opera (2), o
 `teste_cobertura.js`), cartão mudado sem regravar o retrato (2) e um segundo
 leitor de `docs/manual/` (1); e, na ③ REVISÃO de 22/11/2026, o segredo
 viajando no `montar` (1), a assinatura só pela última linha (3), o
-apelido sem resolver (1) e o "Também usa" de volta (1). **`node teste_manual_tela.js` (53, num Chromium; sem
+apelido sem resolver (1), o "Também usa" de volta (1), a linha de "Mudanças"
+apagada ou trocada passando (2), o apelido do termo em duas réguas (1), as
+ações do sob medida em dobro (1) e o "?" lendo o `MENU` (1). **`node teste_manual_tela.js` (55, num Chromium; sem
 navegador diz PULADO) ao mexer na 907, no `manual_ajuda.js` ou nas barras** —
 o foco no ✕ (2), a chave do config como rótulo (1), o cinza claro no
 mapa (1), a busca filtrando em "Todas" (1), o pedido da ficha sem a chave

@@ -625,7 +625,6 @@
   },
   "601": {
    "acoes": [
-    "sobmedida.modulo.entrar",
     "sobmedida.modulo.entrar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
@@ -637,16 +636,10 @@
   "602": {
    "acoes": [
     "sobmedida.corte.aprovar_correcao",
-    "sobmedida.corte.aprovar_correcao",
-    "sobmedida.corte.gerir",
     "sobmedida.corte.gerir",
     "sobmedida.corte.pedir_correcao",
-    "sobmedida.corte.pedir_correcao",
-    "sobmedida.parametro.ler",
     "sobmedida.parametro.ler",
     "sobmedida.plano.calcular",
-    "sobmedida.plano.calcular",
-    "sobmedida.plano.confirmar",
     "sobmedida.plano.confirmar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
@@ -658,16 +651,10 @@
   "603": {
    "acoes": [
     "sobmedida.sobra.aprovar_descarte",
-    "sobmedida.sobra.aprovar_descarte",
-    "sobmedida.sobra.corrigir",
     "sobmedida.sobra.corrigir",
     "sobmedida.sobra.criar",
-    "sobmedida.sobra.criar",
-    "sobmedida.sobra.descartar",
     "sobmedida.sobra.descartar",
     "sobmedida.sobra.ler",
-    "sobmedida.sobra.ler",
-    "sobmedida.sobra.propor",
     "sobmedida.sobra.propor"
    ],
    "corpo": "da39a3ee5e6b4b0d",
@@ -679,16 +666,10 @@
   "604": {
    "acoes": [
     "sobmedida.endereco.criar",
-    "sobmedida.endereco.criar",
-    "sobmedida.rolo.ajustar",
     "sobmedida.rolo.ajustar",
     "sobmedida.rolo.encerrar",
-    "sobmedida.rolo.encerrar",
-    "sobmedida.rolo.entrada",
     "sobmedida.rolo.entrada",
     "sobmedida.rolo.ler",
-    "sobmedida.rolo.ler",
-    "sobmedida.rolo.nota",
     "sobmedida.rolo.nota"
    ],
    "corpo": "da39a3ee5e6b4b0d",
@@ -699,7 +680,6 @@
   },
   "605": {
    "acoes": [
-    "sobmedida.etiqueta.imprimir",
     "sobmedida.etiqueta.imprimir"
    ],
    "corpo": "da39a3ee5e6b4b0d",
@@ -711,8 +691,6 @@
   "606": {
    "acoes": [
     "sobmedida.cadastro.editar",
-    "sobmedida.cadastro.editar",
-    "sobmedida.cadastro.ler",
     "sobmedida.cadastro.ler"
    ],
    "corpo": "da39a3ee5e6b4b0d",
@@ -724,8 +702,6 @@
   "607": {
    "acoes": [
     "sobmedida.custo.ver",
-    "sobmedida.custo.ver",
-    "sobmedida.painel.ler",
     "sobmedida.painel.ler"
    ],
    "corpo": "da39a3ee5e6b4b0d",
@@ -736,7 +712,6 @@
   },
   "608": {
    "acoes": [
-    "sobmedida.catalogo.editar",
     "sobmedida.catalogo.editar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
@@ -748,8 +723,6 @@
   "609": {
    "acoes": [
     "sobmedida.catalogo.ler",
-    "sobmedida.catalogo.ler",
-    "sobmedida.preco.ver",
     "sobmedida.preco.ver"
    ],
    "corpo": "da39a3ee5e6b4b0d",
@@ -761,10 +734,7 @@
   "610": {
    "acoes": [
     "sobmedida.credito.editar",
-    "sobmedida.credito.editar",
     "sobmedida.revenda.editar",
-    "sobmedida.revenda.editar",
-    "sobmedida.revenda.ler",
     "sobmedida.revenda.ler"
    ],
    "corpo": "da39a3ee5e6b4b0d",
@@ -776,16 +746,10 @@
   "611": {
    "acoes": [
     "sobmedida.pedido.aprovar",
-    "sobmedida.pedido.aprovar",
-    "sobmedida.pedido.aprovar_qualquer",
     "sobmedida.pedido.aprovar_qualquer",
     "sobmedida.pedido.cancelar",
-    "sobmedida.pedido.cancelar",
-    "sobmedida.pedido.lancar",
     "sobmedida.pedido.lancar",
     "sobmedida.pedido.ler",
-    "sobmedida.pedido.ler",
-    "sobmedida.pedido.prazo",
     "sobmedida.pedido.prazo"
    ],
    "corpo": "da39a3ee5e6b4b0d",
@@ -797,8 +761,6 @@
   "612": {
    "acoes": [
     "sobmedida.etiqueta_producao.imprimir",
-    "sobmedida.etiqueta_producao.imprimir",
-    "sobmedida.etiqueta_producao.ler",
     "sobmedida.etiqueta_producao.ler"
    ],
    "corpo": "da39a3ee5e6b4b0d",
@@ -813,8 +775,6 @@
     "sobmedida.embalagem",
     "sobmedida.montagem",
     "sobmedida.producao.bipar",
-    "sobmedida.producao.bipar",
-    "sobmedida.producao.pendencia",
     "sobmedida.producao.pendencia",
     "sobmedida.revisao",
     "sobmedida.serralheria"
@@ -844,10 +804,7 @@
   "616": {
    "acoes": [
     "sobmedida.boleto.aprovar_baixa",
-    "sobmedida.boleto.aprovar_baixa",
     "sobmedida.boleto.editar",
-    "sobmedida.boleto.editar",
-    "sobmedida.boleto.ler",
     "sobmedida.boleto.ler"
    ],
    "corpo": "da39a3ee5e6b4b0d",
@@ -904,7 +861,6 @@
   },
   "906": {
    "acoes": [
-    "sobmedida.parametro.editar",
     "sobmedida.parametro.editar"
    ],
    "corpo": "da39a3ee5e6b4b0d",

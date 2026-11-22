@@ -72,6 +72,8 @@ function acoesDaTela(n){
     const CH = require('./tecido/nucleo/permissoes').CHAVES;
     for(const [k, tela] of Object.entries(T.TELA_DA_CHAVE || {})){
       if(tela !== n) continue;
+      /* o permissoes.js da raiz já traz `sobmedida.<chave>` com a tela: não repetir (③ REVISÃO, 22/11/2026) */
+      if(out.some(x => x.chave === 'sobmedida.' + k)) continue;
       const c = CH.find(x => x.chave === k);
       out.push({ chave:'sobmedida.' + k, rotulo:(c && c.nome) || k, desc:'', sensivel:false });
     }

@@ -114,6 +114,8 @@ function estiloDasPermissoes(d){
   document.head.appendChild(st);
   fetch('/api/telas/minhas',{credentials:'same-origin'}).then(function(r){ return r.json(); }).then(function(d){
     MENU.telas=d||{};
+    window.TELAS_MINHAS=d||{};   // o global nomeado que o "?" do manual lê (manual_ajuda.js) — nas duas barras
+
     st.textContent=estiloDasPermissoes(MENU.telas);
     desenharMenu();
   }).catch(function(){});
