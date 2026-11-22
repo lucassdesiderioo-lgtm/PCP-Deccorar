@@ -75,6 +75,8 @@
   <button class="esc dev" onclick="location.href='/devolucao'">DEVOLUÇÕES<small>Peças que voltaram do Mercado Livre</small></button>
 </div>
 <div class="wrap">
+  <!-- AS PECAS QUE VOLTARAM DA EMBALAGEM POR DEFEITO (EMBALAGEM-DEFEITO-VOLTA, R-EMB-11) -->
+  <div id="volta" style="display:none;margin-bottom:14px"></div>
   <div class="banner" id="banner"></div>
   <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters"
    spellcheck="false" inputmode="text" placeholder="bipe aqui">
@@ -344,6 +346,73 @@ document.getElementById('btModo').addEventListener('click',function(){
   if(m==='hoje'||m==='estoque') setModo(m);
   else document.getElementById('escolha').style.display='flex';
 })();
+/* ── VOLTARAM DA EMBALAGEM POR DEFEITO (R-EMB-11, 21/11/2026) ──
+   O revisor confere a peca: com defeito escolhe o setor (vira peca com
+   problema); sem defeito a volta fecha e a peca e revisada de novo pelos dois
+   bipes. Quem decide e o servidor; aqui so se desenha. */
+var VOLTA={abertas:[],setores:[]}, voltaAberta=null, voltaEnviando=false, VOLTA_MSG='';
+function haTempo(m){ m=+m||0; if(m<60) return 'há '+m+' min'; if(m<1440) return 'há '+Math.floor(m/60)+' h'; var d=Math.floor(m/1440); return 'há '+d+(d===1?' dia':' dias'); }
+function escV(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+async function voltaCarregar(){
+  if(voltaAberta!==null || voltaEnviando) return;   /* nao redesenha no meio de uma escolha (§12) */
+  try{ var r=await fetch('/api/revisao/defeitos'); if(!r.ok) return; VOLTA=await r.json(); }catch(e){ return; }
+  voltaDesenhar();
+}
+function voltaDesenhar(){
+  var el=document.getElementById('volta'); var L=(VOLTA&&VOLTA.abertas)||[];
+  var avisoV=VOLTA_MSG?'<div style="background:#fff;border:1px solid #d8dee6;border-radius:10px;padding:10px;margin-bottom:8px">'+VOLTA_MSG+'</div>':'';
+  if(!L.length){ if(avisoV){ el.style.display=''; el.innerHTML=avisoV; } else { el.style.display='none'; el.innerHTML=''; } return; }
+  var h='<div style="border:2px solid #c62828;background:#fbe9e8;border-radius:14px;padding:14px">'
+    +avisoV+'<div style="font-size:18px;font-weight:800;color:#c62828;margin-bottom:8px">Voltaram da embalagem por defeito ('+L.length+')</div>'
+    +'<div style="font-size:13px;color:#5a6472;margin-bottom:4px">Quem decide é quem tem a permissão de registrar peça com problema.</div>';
+  L.forEach(function(v){
+    var med=(v.largura_cm&&v.altura_cm)?(v.largura_cm+' × '+v.altura_cm+' '+(v.cor_codigo||v.cor||'')):'';
+    h+='<div style="background:#fff;border:1px solid #efb1ad;border-radius:10px;padding:12px;margin-top:8px">'
+      +'<div style="font-size:17px;font-weight:800">'+escV(v.codigo)+(med?' <span style="font-weight:600;color:#5a6472">· '+escV(med)+'</span>':'')+'</div>'
+      +'<div style="margin-top:2px"><b>'+escV(v.motivo)+'</b>'+(v.obs?' — '+escV(v.obs):'')+'</div>'
+      +'<div style="font-size:13px;color:#5a6472;margin-top:2px">achou: '+escV(v.achou_por||'—')+' · '+haTempo(v.ha_min)+(v.modo==='devolucao'?' · <b>peça de devolução</b>':'')+'</div>';
+    if(voltaAberta===v.id){
+      h+='<div style="margin-top:10px;font-weight:700">Qual setor é o responsável?</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">'
+        +VOLTA.setores.map(function(s){ return '<button type="button" class="vSetor" data-id="'+v.id+'" data-s="'+s.chave+'" style="padding:12px 16px;border-radius:9px;border:1px solid #c62828;background:#fff;color:#c62828;font-size:15px;font-weight:700;cursor:pointer">'+escV(s.nome)+'</button>'; }).join('')
+        +'<button type="button" class="vVolta" style="padding:12px 16px;border-radius:9px;border:1px solid #c9d1db;background:transparent;font-size:15px;cursor:pointer">Voltar</button></div>';
+    } else {
+      h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">'
+        +'<button type="button" class="vTem" data-perm="revisao.rejeitar" data-id="'+v.id+'" style="padding:12px 16px;border-radius:9px;border:0;background:#c62828;color:#fff;font-size:15px;font-weight:800;cursor:pointer">Tem defeito — enviar ao setor</button>'
+        +'<button type="button" class="vSem" data-perm="revisao.rejeitar" data-id="'+v.id+'" style="padding:12px 16px;border-radius:9px;border:1px solid #2e7d32;background:#fff;color:#2e7d32;font-size:15px;font-weight:700;cursor:pointer">Não tem defeito</button></div>';
+    }
+    h+='<div class="vErr" data-id="'+v.id+'" style="color:#c62828;font-weight:700;margin-top:6px"></div></div>';
+  });
+  el.innerHTML=h+'</div>'; el.style.display='';
+}
+async function voltaDecidir(id, corpo){
+  if(voltaEnviando) return; voltaEnviando=true;
+  var v=(VOLTA.abertas||[]).find(function(x){ return x.id===id; })||{};
+  try{
+    var r=await (await fetch('/api/revisao/defeitos/'+id+'/decidir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)})).json();
+    voltaEnviando=false;
+    if(r && r.erro){ var e=document.querySelector('.vErr[data-id="'+id+'"]'); if(e) e.textContent=r.erro; beep(false); return; }
+    voltaAberta=null;
+    /* com uma revisao aberta, o aviso nao escreve por cima dela (③ REVISAO): o
+       resultado fica no proprio bloco */
+    var msg;
+    if(corpo.decisao==='defeito'){ var sn=((VOLTA.setores||[]).find(function(s){ return s.chave===corpo.setor; })||{}).nome||'';
+      msg=escV(v.codigo)+' · '+escV(v.motivo)+' · registrada como peça com problema.';
+      if(!emRev){ banner('err','Enviada ao setor: '+escV(sn), msg); } else VOLTA_MSG='Enviada ao setor '+escV(sn)+': '+msg; }
+    else { msg=r.volta_fila ? escV(v.codigo)+' · peça de devolução: <b>voltou direto à fila da embalagem</b>, não precisa revisar de novo.'
+                           : escV(v.codigo)+' · <b>revise a peça de novo</b> (bipe o código duas vezes) para ela voltar à fila da embalagem.';
+      if(!emRev){ banner('ok','Sem defeito', msg); } else VOLTA_MSG='Sem defeito: '+msg; }
+    beep(true); voltaCarregar();
+  }catch(e){ voltaEnviando=false; var e2=document.querySelector('.vErr[data-id="'+id+'"]'); if(e2) e2.textContent='Sem conexão: nada foi gravado. Toque de novo.'; beep(false); }
+}
+document.addEventListener('click',function(e){
+  var t=e.target.closest('.vTem,.vSem,.vSetor,.vVolta'); if(!t) return;
+  VOLTA_MSG='';
+  if(t.classList.contains('vTem')){ voltaAberta=+t.dataset.id; voltaDesenhar(); return; }
+  if(t.classList.contains('vVolta')){ voltaAberta=null; voltaDesenhar(); return; }
+  if(t.classList.contains('vSem')){ voltaDecidir(+t.dataset.id,{decisao:'sem_defeito'}); return; }
+  if(t.classList.contains('vSetor')){ voltaDecidir(+t.dataset.id,{decisao:'defeito',setor:t.dataset.s}); return; }
+});
+voltaCarregar(); setInterval(voltaCarregar, 15000);
 /* AUTO_REFRESH_OP */ setInterval(()=>{ if(!emRev&&MODO) load(); }, 3000);
 var RJMOT=[];
 async function rjCarregar(){

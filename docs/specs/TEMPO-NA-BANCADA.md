@@ -1,6 +1,6 @@
 # TEMPO-NA-BANCADA — a pessoa vê o tempo da peça ao lado da própria mediana
 
-> **STATUS — 21/11/2026: APROVADA E CONSTRUÍDA, falta subir.** O dono escolheu a
+> **STATUS — 21/11/2026: NO AR** (PR #361; o dono fez o deploy e disse *"deu tudo certo no deploy"*). Ainda não provado com dado real.** O dono escolheu a
 > **opção B** (duas barras), a **mediana da própria pessoa no SKU, 30 dias**, **só a
 > própria pessoa vê**, e acrescentou o aviso: **"Parabéns!"** no tempo da mediana ou
 > abaixo, **"Você pode melhorar"** acima (*"pode seguir"*). Uma fase. `REGRA` 🟡.

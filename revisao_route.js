@@ -94,16 +94,38 @@ function candidata(db, usuarioId){
   if(!r) return null;
   const jaDesfez = db.prepare(`SELECT 1 FROM revisao_evento WHERE tipo='desfeita' AND usuario_id=? AND revisao_id>?`).get(usuarioId, r.id);
   if(jaDesfez) return null;
+  /* A revisão mais nova desta pessoa voltou da embalagem por defeito e foi
+     apagada (22/11/2026): a de antes NÃO vira a "última" — seria a pilha de
+     desfazer por outra porta. */
+  try{
+    const dev = db.prepare(`SELECT 1 FROM embalagem_defeito WHERE revisado_por_id=? AND revisao_id>?`).get(usuarioId, r.id);
+    if(dev) return null;
+  }catch(e){}
   return r;
+}
+/* A ÚLTIMA coisa desta pessoa hoje foi ter a revisão apagada por defeito? Só
+   então o desfazer diz "voltou por defeito": a revisão dela de depois, ou um
+   desfazer de depois, já é outra história (③ REVISÃO). */
+function devolvidaHoje(db, usuarioId){
+  try{
+    const dev = db.prepare(`SELECT MAX(revisao_id) m FROM embalagem_defeito WHERE revisado_por_id=?
+      AND date(achou_em)=date('now','localtime')`).get(usuarioId).m;
+    if(dev == null) return false;
+    const rev = db.prepare(`SELECT MAX(id) m FROM revisao WHERE usuario_id=? AND data=date('now','localtime')`).get(usuarioId).m;
+    const desf = db.prepare(`SELECT MAX(revisao_id) m FROM revisao_evento WHERE tipo='desfeita' AND usuario_id=?`).get(usuarioId).m;
+    return dev > (rev || 0) && dev > (desf || 0);
+  }catch(e){ return false; }
 }
 function situacaoFila(db, revisaoId){
   const f = db.prepare('SELECT id, situacao FROM fila WHERE revisao_id=? ORDER BY id LIMIT 1').get(revisaoId);
   if(!f) return { fila:null, motivo:'fora_da_fila' };
+  if(f.situacao === 'defeito') return { fila:f, motivo:'defeito' };
   if(f.situacao !== 'aguardando') return { fila:f, motivo:'embalada' };
   return { fila:f, motivo:null };
 }
 const MSG = {
   embalada:       'Essa peça já foi embalada — a revisão não se desfaz mais pela bancada.',
+  defeito:        'Essa peça voltou da embalagem por defeito — confira no bloco "Voltaram da embalagem".',
   fora_da_fila:   'Essa peça já saiu da fila da embalagem — a revisão não se desfaz mais pela bancada.',
   nao_e_sua:      'Essa revisão é de outra pessoa. Cada um desfaz só a própria.',
   outro_dia:      'Só se desfaz a revisão de hoje.',
@@ -113,6 +135,7 @@ const MSG = {
 };
 
 const TEMPO = require('./tempo_operador');
+const DEFEITO = require('./defeito_dominio');
 const QUEM = require('./quem');
 module.exports=function(app,db){
   /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
@@ -174,6 +197,10 @@ module.exports=function(app,db){
       const s=situacaoFila(db,c.id);
       desfazer={revisao_id:c.id,codigo:c.codigo,segundos:c.segundos,modo:c.modo,ha_seg:Math.max(0,c.ha_seg||0),
         pode:!s.motivo,motivo:s.motivo,erro:s.motivo?MSG[s.motivo]:null};
+    } else if(devolvidaHoje(db,q.usuario_id)){
+      /* a última revisão voltou da embalagem por defeito e foi apagada: a tela
+         diz o porquê em vez de o botão sumir calado */
+      desfazer={pode:false,motivo:'defeito',erro:MSG.defeito};
     }
     res.json({minimo_seg:minimoSeg(db),desfazer});
   });
@@ -193,7 +220,7 @@ module.exports=function(app,db){
       if(!c||c.id!==alvo.id) return recusa(409,'nao_e_a_ultima');
     } else {
       const c=candidata(db,q.usuario_id);
-      if(!c) return recusa(409,'nada');
+      if(!c) return recusa(409,devolvidaHoje(db,q.usuario_id)?'defeito':'nada');
       alvo=db.prepare('SELECT * FROM revisao WHERE id=?').get(c.id);
     }
     /* Numa transacao so: a copia, a revisao e a fila. Se a linha da fila nao
@@ -219,6 +246,20 @@ module.exports=function(app,db){
 
   /* Saiu do server.js em 04/11/2026 sem mudar o SQL, para o teste alcancar:
      depois do desfazer, este numero tem que voltar ao de antes. */
+  /* AS PECAS QUE VOLTARAM DA EMBALAGEM POR DEFEITO (EMBALAGEM-DEFEITO-VOLTA,
+     R-EMB-11, 21/11/2026). O revisor confere: com defeito vai ao setor (vira a
+     peca com problema); sem defeito, a volta fecha e a peca e revisada de novo. */
+  DEFEITO.garantir(db);
+  app.get('/api/revisao/defeitos',(req,res)=> res.json({ abertas:DEFEITO.abertas(db), setores:DEFEITO.SETORES }));
+  app.post('/api/revisao/defeitos/:id/decidir',(req,res)=>{
+    const q=exigir(req,res); if(!q) return;
+    try{ res.json(Object.assign({ok:true}, db.transaction(()=>DEFEITO.decidir(db,req.params.id,req.body||{},q))())); }
+    catch(e){
+      if(e instanceof DEFEITO.Recusa) return res.status(e.status).json(Object.assign({erro:e.message},e.extra));
+      console.error('[revisao] decidir a volta por defeito falhou:', e);
+      res.status(500).json({erro:'Não deu para gravar a decisão: '+e.message+' — nada foi gravado.'});
+    }
+  });
   app.get('/api/revisao/hoje',(req,res)=> res.json(db.prepare(`SELECT codigo, COUNT(*) qtd, ROUND(AVG(segundos)) tmedio
   FROM revisao WHERE data=date('now','localtime') GROUP BY codigo ORDER BY qtd DESC`).all()));
 };

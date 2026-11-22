@@ -116,9 +116,11 @@ try{
   }
 }catch(e){}
 
-const jaEmbaladas = db.prepare("SELECT COUNT(*) c FROM fila WHERE situacao<>'aguardando'").get().c;
+const jaEmbaladas = db.prepare("SELECT COUNT(*) c FROM fila WHERE situacao='embalado'").get().c;
+const voltaram = db.prepare("SELECT COUNT(*) c FROM fila WHERE situacao='defeito'").get().c;
 console.log('');
 console.log('  Ficam intactas: ' + jaEmbaladas + ' linha(s) ja embalada(s) — historia de peca que virou estoque.');
+if(voltaram) console.log('  E ' + voltaram + ' linha(s) de peca que voltou da embalagem por defeito — decide-se na Revisao.');
 console.log('  O estoque nao e tocado: a fila nunca somou +1, entao apagar nao desconta.');
 
 if(!CONFIRMAR){

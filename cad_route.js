@@ -6,10 +6,12 @@ module.exports=function(app,db){
   app = QUEM.portao(app, { auditar:'cadastro' });   // a linha nao tem autor: quem fez vai na auditoria
 
   db.exec("CREATE TABLE IF NOT EXISTS listas (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, valor TEXT, ordem INTEGER DEFAULT 0, ativo INTEGER DEFAULT 1)");
-  db.exec("CREATE TABLE IF NOT EXISTS rejeicao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, motivo TEXT, obs TEXT, segundos INTEGER, modo TEXT, usuario TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, usuario_id INTEGER)");
+  db.exec("CREATE TABLE IF NOT EXISTS rejeicao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, motivo TEXT, obs TEXT, segundos INTEGER, modo TEXT, usuario TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, usuario_id INTEGER, origem TEXT, setor TEXT)");
   /* QUEM-FEZ-E-REVISAO (04/11/2026): a "Peca com problema" ja gravava o NOME
      em `usuario` (fica, e historia e ha tela lendo); o id entra ao lado. */
   try{ db.exec('ALTER TABLE rejeicao ADD COLUMN usuario_id INTEGER'); }catch(e){}
+  /* De onde veio a peca com problema e o setor responsavel (EMBALAGEM-DEFEITO-VOLTA, 21/11/2026). */
+  require('./rejeicao_dominio').garantir(db);
 
   const seed=(tipo,vals)=>{
     const n=db.prepare('SELECT COUNT(*) c FROM listas WHERE tipo=?').get(tipo).c;
@@ -73,23 +75,10 @@ module.exports=function(app,db){
     const b=req.body||{};
     const cod=(b.codigo||'').trim().toUpperCase();
     if(!cod||!b.motivo) return res.status(400).json({erro:'faltam dados'});
-    /* A PECA COM PROBLEMA VIRA "MATERIAL EXTRA A DECIDIR" (FICHAS-NO-CADASTRO-UNICO
-       §3-G): ela volta para a producao e nao baixa material sozinha; o
-       Supervisor diz no fim do dia se precisou de material (tela 106). Na
-       mesma transacao: problema registrado sem a linha seria a decisao que
-       nunca chega. A peca sob medida do PCP (sem ficha aqui) nao entra. */
-    db.transaction(()=>{
-      const rid=db.prepare('INSERT INTO rejeicao (codigo,motivo,obs,segundos,modo,usuario,usuario_id) VALUES (?,?,?,?,?,?,?)')
-        .run(cod,b.motivo,b.obs||null,Math.round(+b.segundos||0),b.modo||null,q.usuario_nome,q.usuario_id).lastInsertRowid;
-      let sm=false;
-      try{ const m=db.prepare('SELECT COALESCE(m.sob_medida,0) s FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id WHERE s.codigo=?').get(cod); sm=!!(m&&m.s); }catch(e){ sm=false; }
-      /* ⚠️ O MATERIAL EXTRA NAO TRAVA A BANCADA (#6): num ponto de salvamento
-         proprio; falhou (banco sem a tabela, ficha que estoura), vai ao log e a
-         peca com problema fica registrada do mesmo jeito. */
-      if(!sm) try{ db.transaction(()=>require('./material_extra_dominio').registrarRevisao(db,{sku:cod, referencia:'rejeicao:'+rid,
-        motivo:b.motivo+(b.obs?' — '+b.obs:''), quem:{id:q.usuario_id, nome:q.usuario_nome}}))(); }
-      catch(e){ console.error('[rejeicao] o material extra de '+cod+' nao gravou (a peca com problema ficou registrada):', e.message); }
-    })();
+    /* A conta mora no rejeicao_dominio.js (dono unico): a peca com problema da
+       Revisao e a que volta da Embalagem por defeito passam pelo mesmo lugar. */
+    db.transaction(()=>require('./rejeicao_dominio').registrar(db,{codigo:cod,motivo:b.motivo,obs:b.obs,
+      segundos:b.segundos,modo:b.modo,origem:'revisao'},q))();
     res.json({ok:true});
   });
 
@@ -101,7 +90,14 @@ module.exports=function(app,db){
     res.json({
       porMotivo: db.prepare('SELECT motivo, COUNT(*) qtd FROM rejeicao WHERE '+w+' GROUP BY motivo ORDER BY qtd DESC').all(...p),
       porSku: db.prepare('SELECT codigo, COUNT(*) qtd FROM rejeicao WHERE '+w+' GROUP BY codigo ORDER BY qtd DESC LIMIT 15').all(...p),
-      lista: db.prepare('SELECT * FROM rejeicao WHERE '+w+' ORDER BY id DESC LIMIT 100').all(...p),
+      /* Onde a peca com problema foi achada (EMBALAGEM-DEFEITO-VOLTA): a linha de
+         antes, sem origem, e da Revisao — era a unica porta. */
+      porOrigem: db.prepare("SELECT CASE WHEN origem='embalagem' THEN 'embalagem' ELSE 'revisao' END origem, COUNT(*) qtd FROM rejeicao WHERE "+w+" GROUP BY 1 ORDER BY 1 DESC").all(...p),
+      porSetor: db.prepare("SELECT setor, COUNT(*) qtd FROM rejeicao WHERE "+w+" AND setor IS NOT NULL GROUP BY setor ORDER BY qtd DESC").all(...p),
+      /* A peca achada na embalagem diz QUEM ACHOU, ao lado de quem conferiu na
+         Revisao (o dono, 21/11/2026). O banco sem a tabela da volta cai na lista simples. */
+      lista: (()=>{ try{ return db.prepare('SELECT r.*, d.achou_por FROM rejeicao r LEFT JOIN embalagem_defeito d ON d.rejeicao_id=r.id WHERE '+w.replace(/\bdata\b/g,'r.data')+' ORDER BY r.id DESC LIMIT 100').all(...p); }
+        catch(e){ return db.prepare('SELECT * FROM rejeicao WHERE '+w+' ORDER BY id DESC LIMIT 100').all(...p); } })(),
       total: db.prepare('SELECT COUNT(*) c FROM rejeicao WHERE '+w).get(...p).c
     });
   });
