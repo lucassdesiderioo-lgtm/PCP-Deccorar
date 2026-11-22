@@ -5982,35 +5982,72 @@ O que parece bug e não é:
   o valor de hoje de cada parâmetro (`config`, a cada pedido). As fichas são
   lidas **no boot** (§12): editou, reinicia.
 - ⚠️ **O RETRATO É O QUE FAZ A RÉGUA SER TESTE, E NÃO PAPEL.** `retrato.json`
-  guarda a impressão digital do corpo de cada ficha, a última linha de
+  guarda a impressão digital do corpo de cada ficha, **a lista das linhas** de
   "Mudanças", a situação e as ações da tela, e a impressão de cada cartão de
   `docs/regras/` citado. Texto, cartão ou ação que mudou sem linha nova em
   "Mudanças" é **recusado** pelo `manual_retrato.js`, e o `teste_manual.js`
   exige que o retrato bata com os arquivos. **Não se regrava para o teste
   passar** — a linha é o que a 907 mostra em "O que mudou". Mudar só o
   cabeçalho, ou só acrescentar uma linha em "Mudanças", não pede linha.
-- **A ficha não tem R$, nome de arquivo, rota, SQL nem código de cartão** no
-  corpo (os cartões vão no cabeçalho), e a Regra B do §20 vale nela: o
-  `teste_linguagem.js` passou a varrer `docs/manual/`.
-- **O "?" não toma o foco, e na bancada o bipe continua com ele.** A Etiqueta
-  de Venda puxa o foco de volta ("o bipe não pode ficar sem dono"); o painel é
-  leitura, abre na mesma página (nunca em aba nova, §12) e fecha devolvendo o
-  foco a quem o tinha. Sem `manual.ler` a rota é 403 e o botão não nasce.
+  ⚠️ **"LINHA NOVA" É A LISTA DE ANTES INTEIRA MAIS PELO MENOS UMA** (③ REVISÃO,
+  22/11/2026): a primeira versão comparava só a linha de data mais recente, e
+  por isso editar o texto dela passava por linha nova, e a linha legítima
+  datada pelo dia da regra (19/11, o passivo que dá a baixa) numa ficha nascida
+  em 21/11 era recusada — foi o que aconteceu ao mesclar o `main`. Hoje a
+  linha de qualquer data conta, duas do mesmo dia contam, e editar a última não
+  conta. **Sem `retrato.json` é recusa** (o primeiro retrato aconteceu em
+  21/11/2026; `--primeiro-retrato` grava um do zero de propósito), e a ficha
+  com história que não está no retrato também: a entrada foi apagada.
+- **A ficha não tem R$, nome de arquivo, rota, SQL, código de cartão nem nome
+  de tabela** no corpo (os cartões vão no cabeçalho; o detector pega
+  `venda_futura`), e a Regra B do §20 vale nela: o `teste_linguagem.js` passou
+  a varrer `docs/manual/`. ⚠️ **As STRINGS do `liga` do mapa (`'skus'`,
+  `'lote'`) NÃO chegam à ficha** (③ REVISÃO): são nome de tabela, escritas para
+  quem edita o mapa (R-ORG-07); o "Onde entra no fluxo" leva só as telas
+  numeradas. O "Também usa" da primeira versão escrevia `skus` para o operador.
+- **O parâmetro tem NOME na ficha** (`parametros: rev_minimo_seg = Tempo mínimo
+  da revisão (segundos)`, ③ REVISÃO): a chave do `config` é o que o código lê,
+  o nome é o que a tela escreve — a primeira versão escrevia "rev minimo seg",
+  chave de banco em tela (§19). Parâmetro sem nome reprova o `validar`. ⚠️ **E
+  O SEGREDO DA `config` NUNCA É PARÂMETRO**: `backup_token` (o que protege o
+  `/baixar-backup`), senha e chave cifrada são recusados pelo `validar`, e o
+  `montar` e a rota não os deixam viajar mesmo assim (`parametroPermitido`) —
+  o `parametroExiste` só sabe que a palavra aparece no código.
+- **O "?" só pergunta a ficha a quem tem `manual.ler`** (ou ao Admin Geral), pela
+  resposta do `/api/telas/minhas` que o `nav.js` guarda em `MENU.telas` (③
+  REVISÃO): sem a chave, nenhum pedido — a primeira versão disparava um 403 no
+  console de toda tela de toda pessoa até o dono marcar a chave. Sem a chave a
+  rota continua 403 e o botão não nasce.
+- **O "?" não toma o foco, e o ✕ do painel também não** (③ REVISÃO): na 101,
+  102, 201 e 202 a tela puxa o bipe de volta ("o bipe não pode ficar sem
+  dono"), mas a 251 Receber peça e a 303 Inventário não puxam — com o foco no
+  ✕, o bipe seguinte caía no botão e o Enter do leitor fechava o painel com o
+  código perdido, calado. O painel é leitura, abre na mesma página (nunca em
+  aba nova, §12) e fecha devolvendo o foco a quem o tinha.
 - **O "Onde entra no fluxo" é gerado do `liga`**; a ficha pode trazer uma frase
-  a mais, nunca substituí-lo.
+  a mais, nunca substituí-lo. O `[[Termo]]` abre o glossário da 907 **no
+  próprio termo** (`#termo=…`), e o apelido `/sobmedida/inicio` acha a 601.
+- **Na 907, o mapa MEDE o nome da tela contra a caixa** (nunca conta letras,
+  §12), a tela não operada é escrita em `#5a6472` (5,5:1 — o cinza de antes
+  dava 2,7:1), e a busca em "Todas as telas" alcança o que a chave dá.
 
-**Rode `node teste_manual.js` (89) ao mexer em qualquer ficha, cartão, no
+**Rode `node teste_manual.js` (110) ao mexer em qualquer ficha, cartão, no
 `manual.js`, no `manual_route.js`, no `manual_retrato.js`, no `permissoes.js`
 ou nos dois mapas de telas** — oito defeitos foram reintroduzidos um a um, e
 cada um reprova: a 907 sem ficha (3 casos), cartão inexistente citado (1), texto
 mudado sem a linha de "Mudanças" (2), a ficha inteira a quem não opera (2), o
 "todas" sem exigir a chave (3), o `permDaRota` sem as linhas (1, mais 1 no
 `teste_cobertura.js`), cartão mudado sem regravar o retrato (2) e um segundo
-leitor de `docs/manual/` (1). **`node teste_manual_tela.js` (44, num Chromium; sem
-navegador diz PULADO) ao mexer na 907, no `manual_ajuda.js` ou nas barras; e
-`node manual_retrato.js` depois de escrever a linha de "Mudanças".** Também
-`teste_mapa`, `teste_lugar`, `teste_cobertura`, `teste_acesso`, `teste_menu`,
-`teste_linguagem` e `cd tecido && npm test` ganharam a 907.
+leitor de `docs/manual/` (1); e, na ③ REVISÃO de 22/11/2026, o segredo
+viajando no `montar` (1), a assinatura só pela última linha (3), o
+apelido sem resolver (1) e o "Também usa" de volta (1). **`node teste_manual_tela.js` (53, num Chromium; sem
+navegador diz PULADO) ao mexer na 907, no `manual_ajuda.js` ou nas barras** —
+o foco no ✕ (2), a chave do config como rótulo (1), o cinza claro no
+mapa (1), a busca filtrando em "Todas" (1), o pedido da ficha sem a chave
+(1) e o nome cortado sem medir (1) reprovam; **e `node manual_retrato.js`
+depois de escrever a linha de "Mudanças".** Também `teste_mapa`, `teste_lugar`,
+`teste_cobertura`, `teste_acesso`, `teste_menu`, `teste_linguagem` e `cd tecido
+&& npm test` ganharam a 907.
 
 ⚠️ **Construído, falta subir.** Ainda não provado com dado real: a 907 aberta
 pelo dono no servidor com as 53 em rascunho e o mapa; `/manual` dando 302 sem
