@@ -75,14 +75,15 @@ const EDVALDO = pessoa('Edvaldo Revisao', ['Operador / Revisão'], ['manual.ler'
 const BIA = pessoa('Bia Embalagem', ['Operador / Embalagem']);                       // SEM manual.ler
 const DAVI = pessoa('Davi Expedicao', ['Operador / Expedição'], ['manual.ler']);
 const SERGIO = pessoa('Sergio Supervisor', ['Supervisor'], ['manual.ler', 'manual.ver_todas']);
+const CARLA = pessoa('Carla Estoque', ['Operador / Controle de Estoque'], ['manual.ler']);   // a 303 Inventário
 db.prepare("DELETE FROM config WHERE chave='nivel_pessoa_1'").run(); AC.migrarNiveis();
-[LUCAS, EDVALDO, BIA, DAVI, SERGIO].forEach(id => AC.sincronizarAreas(id));
+[LUCAS, EDVALDO, BIA, DAVI, SERGIO, CARLA].forEach(id => AC.sincronizarAreas(id));
 
 app.get('/api/auth/eu', (req, res) => res.json(req.usuario ? { logado:true, nome:req.usuario.nome, destino:{} } : { logado:false }));
 app.get('/api/teste/ativo', (req, res) => res.json({ ativo:false }));
 require('./admin_telas')(app, db);
 require('./manual_route')(app, db);
-['manual', 'operador', 'embalagem', 'carregamento'].forEach(t => app.get('/' + t, (req, res) => res.sendFile(path.join(__dirname, 'public', t + '.html'))));
+['manual', 'operador', 'embalagem', 'carregamento', 'devolucao', 'inventario'].forEach(t => app.get('/' + t, (req, res) => res.sendFile(path.join(__dirname, 'public', t + '.html'))));
 app.use(express.static(path.join(__dirname, 'public')));
 /* o resto da API: as telas da bancada pedem suas listas; aqui elas ficam vazias */
 app.use('/api', (req, res) => res.json({}));
@@ -106,8 +107,9 @@ const srv = app.listen(0, async () => {
       await ctx.addCookies([{ name:'quem', value:String(quem), url:B }]);
       const p = await ctx.newPage();
       const erros = []; p.on('pageerror', e => erros.push(e.message));
+      const pedidos = []; p.on('request', r => pedidos.push(r.url()));
       await p.goto(B + url); await p.waitForTimeout(900);
-      return { p, ctx, erros };
+      return { p, ctx, erros, pedidos };
     }
     const texto = async (p, sel) => (await p.textContent(sel)) || '';
     const rolaDeLado = p => p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
@@ -120,12 +122,25 @@ const srv = app.listen(0, async () => {
     ok('   agrupadas pelo módulo (Produção) e sem tela do Admin', /PRODUÇÃO|Produção/.test(lista) && !/Pendências|Estoque/.test(lista), lista);
     ok('   o botão "Todas as telas" não aparece para ele', await A.p.isHidden('#btTodas'));
     ok('   e a tela abre no mapa, com as telas dele em azul e as outras em cinza', (await A.p.locator('#conteudo svg .mapaNo').count()) === 53 && (await A.p.locator('#conteudo svg rect[stroke="#1565c0"]').count()) === (await A.p.locator('#lista a.tela').count()));
+    /* ③ REVISÃO (22/11/2026): o nome é MEDIDO contra a caixa, e a tela não
+       operada tem contraste de leitura (#5a6472 sobre #f4f6f8 = 5,5:1) */
+    const mapa = await A.p.evaluate(() => Array.from(document.querySelectorAll('#conteudo svg .mapaNo')).map(g => { const t = g.querySelector('text'), r = g.querySelector('rect'); return { n:g.getAttribute('data-n'), larg:t.getComputedTextLength(), caixa:+r.getAttribute('width'), fill:t.getAttribute('fill'), op:r.getAttribute('stroke') === '#1565c0', nome:t.querySelector('.mapaNome').textContent }; }));
+    ok('   nenhum nome passa da caixa (medido, não contado em letras)', mapa.every(x => x.larg <= x.caixa - 20), JSON.stringify(mapa.filter(x => x.larg > x.caixa - 20)));
+    ok('   o nome que cabe não é cortado (a 252 "Devoluções — em andamento" cabe inteira ou termina em "…" só se não couber)', mapa.every(x => !/…$/.test(x.nome) || x.larg > x.caixa - 40), JSON.stringify(mapa.filter(x => /…$/.test(x.nome))));
+    ok('   a tela não operada é escrita em #5a6472, nunca no cinza claro', mapa.filter(x => !x.op).every(x => x.fill === '#5a6472') && mapa.some(x => !x.op));
     const errosD1 = A.erros.slice();
     await A.ctx.close();
     let S = await abrir(SERGIO, '/manual');
     ok('o Sergio (Supervisor + ver_todas) vê o botão "Todas as telas"', await S.p.isVisible('#btTodas'));
     await S.p.click('#btTodas'); await S.p.waitForTimeout(700);
     ok('   e, clicando, a lista passa a ter as 53 telas, as que ele não opera em cinza', (await S.p.locator('#lista a.tela').count()) === 53 && (await S.p.locator('#lista a.tela.fora').count()) > 0, await S.p.locator('#lista a.tela').count());
+    /* ③ REVISÃO: em "Todas as telas" a busca alcança o que a chave dá */
+    await S.p.fill('#busca', 'Conferência'); await S.p.waitForTimeout(600);
+    let resS = await texto(S.p, '#conteudo');
+    ok('   e em "Todas as telas" a busca acha a 202 Conferência, que ele não opera', /202\s*Conferência/.test(resS), resS);
+    await S.p.goto(B + '/manual#termo=pack-id'); await S.p.waitForTimeout(800);
+    ok('   #termo=pack-id abre o glossário no próprio termo (o [[Termo]] da ficha), marcado', await S.p.evaluate(() => { const dt = document.getElementById('termo-pack-id'); return !!dt && dt.classList.contains('alvo') && document.getElementById('lkGlo').classList.contains('on'); }));
+    await S.ctx.close();
 
     /* ═════ D2 ═════ */
     secao('D2. a busca');
@@ -156,7 +171,7 @@ const srv = app.listen(0, async () => {
     ok('a 101 (rascunho) mostra a tarja "Ficha ainda não escrita"', /ainda não escrita/.test(res), res);
     ok('   e mesmo assim o fluxo gerado (manda para a 102 Embalagem, recebe da 105 Painel)', /Manda para/.test(res) && /102\s*Embalagem/.test(res) && /105\s*Painel/.test(res), res);
     ok('   e as ações da tela pelo registro: Revisar peças e Devolver peça à produção', /Revisar peças/.test(res) && /Devolver peça à produção/.test(res), res);
-    ok('   e o número de hoje do parâmetro (rev minimo seg = 15), lido do config', /rev minimo seg/.test(res) && /15/.test(res), res);
+    ok('   e o número de hoje do parâmetro, pelo NOME da ficha ("Tempo mínimo da revisão" = 15), lido do config — nunca a chave do config', /Tempo mínimo da revisão/.test(res) && /15/.test(res) && !/rev minimo seg|rev_minimo_seg/.test(res), res);
     ok('   a 102, que ele não opera, aparece no fluxo marcada "(você não opera)"', /102\s*Embalagem\s*\(você não opera\)/.test(res), res);
     const errosD4 = A.erros.slice();
     await A.ctx.close();
@@ -167,7 +182,18 @@ const srv = app.listen(0, async () => {
     ok('na 101, o Edvaldo (manual.ler) vê o "?" na barra, ao lado do ☰ Menu', await E.p.isVisible('#manualAjuda'), await E.p.locator('#sessBar').textContent().catch(() => ''));
     const Bi = await abrir(BIA, '/embalagem'); await Bi.p.waitForTimeout(900);
     ok('na 201, a Bia (sem manual.ler) NÃO vê o "?" — a rota devolve 403 e o botão não nasce', (await Bi.p.locator('#manualAjuda').count()) === 0);
+    ok('   e a tela dela nem pergunta a ficha: nenhum pedido a /api/manual (sem 403 no console da bancada, ③ REVISÃO)', !Bi.pedidos.some(u => /\/api\/manual/.test(u)), Bi.pedidos.filter(u => /\/api\/manual/.test(u)));
+    ok('   (e a do Edvaldo, que tem a chave, perguntou)', E.pedidos.some(u => /\/api\/manual\/ficha\/aqui/.test(u)));
     await Bi.ctx.close();
+    /* ③ REVISÃO (22/11/2026): na 251 e na 303 a tela não puxa o bipe de volta;
+       o "?" não pode levar o foco ao ✕, senão o bipe seguinte cai no botão */
+    for(const [quem, url, campo, nome] of [[EDVALDO, '/devolucao', 'dvCod', '251 Receber peça'], [CARLA, '/inventario', 'scan', '303 Inventário']]){
+      const F = await abrir(quem, url); await F.p.waitForTimeout(900);
+      const tem = (await F.p.locator('#manualAjuda').count()) === 1;
+      if(tem){ await F.p.focus('#' + campo); await F.p.click('#manualAjuda'); await F.p.waitForTimeout(500); }
+      ok('na ' + nome + ', o "?" abre o painel e o foco FICA no campo de bipe (#' + campo + '), não no ✕', tem && await F.p.isVisible('#manualPainel') && await F.p.evaluate(c => document.activeElement && document.activeElement.id === c, campo), tem ? await F.p.evaluate(() => document.activeElement && document.activeElement.id) : 'sem o "?"');
+      await F.ctx.close();
+    }
 
     /* ═════ D6 ═════ */
     secao('D6. o "?" abre a ficha na mesma página e devolve o foco ao bipe');

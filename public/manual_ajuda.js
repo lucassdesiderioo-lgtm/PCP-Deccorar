@@ -22,7 +22,9 @@
   if(typeof window === 'undefined') return;
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
   /* [[Termo]] vira link para o glossário da 907; o texto fica como está */
-  function texto(s){ return esc(s).replace(/\[\[([^\]]+)\]\]/g, function(m, t){ return '<a class="mfTermo" href="/manual#glossario">' + t + '</a>'; }); }
+  /* [[Termo]] leva ao próprio termo no glossário da 907 (o id do <dt> é "termo-" + o mesmo apelido) */
+  function apelidoTermo(t){ return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
+  function texto(s){ return esc(s).replace(/\[\[([^\]]+)\]\]/g, function(m, t){ return '<a class="mfTermo" href="/manual#termo=' + apelidoTermo(t) + '">' + t + '</a>'; }); }
   function itens(lista){
     if(!lista || !lista.length) return '';
     return '<ul class="mfLista">' + lista.map(function(i){
@@ -40,7 +42,6 @@
   function secao(titulo, corpo, vazio){
     return '<section class="mfSec"><h3>' + esc(titulo) + '</h3>' + (corpo || '<p class="mfVazio">' + esc(vazio || 'ainda não escrito') + '</p>') + '</section>';
   }
-  function rotuloParam(c){ return String(c || '').replace(/_/g, ' '); }
 
   /* A FICHA INTEIRA, em HTML. `f` é a resposta de /api/manual/ficha/:n. */
   function fichaHtml(f, opts){
@@ -72,7 +73,8 @@
     h += secao('O que a tela mostra', itens(s.mostra));
     if(f.parametros && f.parametros.length){
       h += '<section class="mfSec"><h3>Os números de hoje</h3><ul class="mfLista">' + f.parametros.map(function(p){
-        return '<li><b>' + esc(rotuloParam(p.chave)) + '</b> — ' + (p.valor == null || p.valor === '' ? '<span class="mfVazio">sem valor gravado</span>' : esc(p.valor)) + '</li>';
+        /* o nome vem da ficha (chave = Nome); a chave do config nunca é escrita na tela (③ REVISÃO) */
+        return '<li><b>' + esc(p.rotulo || 'parâmetro sem nome na ficha') + '</b> — ' + (p.valor == null || p.valor === '' ? '<span class="mfVazio">sem valor gravado</span>' : esc(p.valor)) + '</li>';
       }).join('') + '</ul><p class="mfNota">Lidos agora da configuração do sistema. Mudou lá, muda aqui.</p></section>';
     }
     h += secao('Por que a tela faz isso', itens(s.porque));
@@ -147,7 +149,11 @@
     p.hidden = false;
     if(b) b.setAttribute('aria-expanded', 'true');
     var f = document.getElementById('manualFechar');
-    if(f){ f.onclick = fechar; try{ f.focus(); }catch(e){} }
+    /* O ✕ NÃO RECEBE O FOCO (③ REVISÃO, 22/11/2026): na 251 e na 303 a tela não
+       puxa o bipe de volta, e o bipe seguinte caía no botão — o Enter do
+       leitor fechava o painel e o código sumia calado. O foco fica onde
+       estava; Esc e o ✕ continuam fechando. */
+    if(f){ f.onclick = fechar; }
   }
   function desenhar(onde){
     if(document.getElementById('manualAjuda')) return;
@@ -169,8 +175,23 @@
   }
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape'){ var p = document.getElementById('manualPainel'); if(p && !p.hidden) fechar(); } });
 
-  fetch('/api/manual/ficha/aqui?rota=' + encodeURIComponent(rota), { credentials:'same-origin' })
-    .then(function(r){ return r.status === 200 ? r.json() : null; })
+  /* SÓ PERGUNTA A FICHA QUEM TEM A CHAVE (③ REVISÃO, 22/11/2026): o nav.js já
+     guarda em MENU.telas a resposta do /api/telas/minhas (as permissões da
+     pessoa, e se é Admin Geral). Sem `manual.ler` o portão responderia 403 em
+     toda tela de toda pessoa — ruído no console da bancada inteira até o dia em
+     que a chave for marcada. Espera a resposta até 10 s; sem ela, não pergunta. */
+  function temChave(){
+    var m = window.MENU && window.MENU.telas;
+    if(!m) return null;
+    return !!(m.admin_geral || (m.perms || []).indexOf('manual.ler') >= 0);
+  }
+  var espera = 0;
+  var aguarda = new Promise(function(res){
+    (function olha(){ var t = temChave(); if(t !== null) return res(t); if(++espera > 40) return res(false); setTimeout(olha, 250); })();
+  });
+  aguarda.then(function(pode){ if(!pode) return null;
+    return fetch('/api/manual/ficha/aqui?rota=' + encodeURIComponent(rota), { credentials:'same-origin' }); })
+    .then(function(r){ return r && r.status === 200 ? r.json() : null; })
     .then(function(f){
       if(!f || f.opera === false) return;   // sem permissão, ou tela fora do mapa: nada a desenhar
       ficha = f;

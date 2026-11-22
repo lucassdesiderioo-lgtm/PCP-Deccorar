@@ -49,7 +49,19 @@ function telasTodas(){
   return out.sort((a, b) => a.n - b.n);
 }
 function telaPorNumero(n){ return telasTodas().find(t => t.n === +n) || null; }
-function telaPorRota(rota){ const r = String(rota || '').replace(/\/+$/, '') || '/'; return telasTodas().find(t => t.rota === r) || null; }
+function telaPorRota(rota){
+  const r = String(rota || '').replace(/\/+$/, '') || '/';
+  const t = telasTodas().find(x => x.rota === r);
+  if(t) return t;
+  /* o apelido do sob medida (`/sobmedida/inicio` é a 601) acha a tela dele (③ REVISÃO, 22/11/2026) */
+  try{
+    const TSM = require('./tecido/nucleo/telas').TELAS;
+    const m = /^\/sobmedida(\/.*)?$/.exec(r);
+    const a = m ? TSM[m[1] || '/'] : null;
+    if(a && a.apelido) return telasTodas().find(x => x.n === a.numero) || null;
+  }catch(e){}
+  return null;
+}
 
 /* ── as ações (permissões) penduradas em cada tela ─────────────────────── */
 function acoesDaTela(n){
@@ -77,7 +89,7 @@ const RE_MUDANCA = /^-\s*(\d{2})\/(\d{2})\/(\d{4})\s*[—–-]\s*(.+?)\s*$/;
 function dataIso(d, m, a){ return a + '-' + m + '-' + d; }
 
 function parseFicha(arquivo, src){
-  const f = { arquivo, n:0, titulo:'', situacao:'', atualizada_em:'', cartoes:[], parametros:[], secoes:{}, ordemSecoes:[], corpo:'', termos:[], erros:[] };
+  const f = { arquivo, n:0, titulo:'', situacao:'', atualizada_em:'', cartoes:[], parametros:[], rotulos:{}, secoes:{}, ordemSecoes:[], corpo:'', termos:[], erros:[] };
   const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(src);
   if(!m){ f.erros.push(arquivo + ': sem cabeçalho (--- … ---)'); return f; }
   for(const linha of m[1].split(/\r?\n/)){
@@ -88,7 +100,18 @@ function parseFicha(arquivo, src){
     else if(k === 'situacao') f.situacao = v;
     else if(k === 'atualizada_em') f.atualizada_em = v;
     else if(k === 'cartoes') f.cartoes = v ? v.split(',').map(s => s.trim()).filter(Boolean) : [];
-    else if(k === 'parametros') f.parametros = v ? v.split(',').map(s => s.trim()).filter(Boolean) : [];
+    else if(k === 'parametros'){
+      /* `chave = Nome para quem lê` (③ REVISÃO, 22/11/2026): a chave do config
+         é o que o código lê; o nome é o que a tela escreve. A chave sozinha
+         chegava à tela como "rev minimo seg" — chave de banco em tela. */
+      f.parametros = []; f.rotulos = {};
+      (v ? v.split(',') : []).map(s => s.trim()).filter(Boolean).forEach(s => {
+        const pm = /^([a-z0-9_]+)\s*(?:=\s*(.+?))?$/i.exec(s);
+        const chave = pm ? pm[1] : s;
+        f.parametros.push(chave);
+        if(pm && pm[2]) f.rotulos[chave] = pm[2].trim();
+      });
+    }
   }
   const corpoTodo = m[2] || '';
   // as seções: "## Nome" até o próximo "## "
@@ -197,6 +220,13 @@ function parametroExiste(chave, set){
   const m = /^(.+_)([a-z]{3})$/.exec(chave);
   return !!(m && set.has(m[1]));
 }
+/* O SEGREDO DA CONFIG NUNCA É PARÂMETRO DE FICHA (③ REVISÃO, 22/11/2026). A
+   `config` guarda o `backup_token` — o que protege o /baixar-backup, que entrega
+   o banco inteiro —, e `parametroExiste` só sabe que a palavra aparece no
+   código. Duas trancas: o `validar` reprova a ficha que o lista, e o `montar`
+   não o deixa viajar mesmo assim. */
+const SEGREDO = /token|senha|secret|segredo|cifrad|_pin\b|^pin_|chave_/i;
+function parametroPermitido(chave){ return !!chave && !SEGREDO.test(String(chave)); }
 
 /* ── o que não entra numa ficha ────────────────────────────────────────── */
 const JARGAO = [
@@ -226,6 +256,8 @@ function validar(L){
     if(!['pronta', 'rascunho'].includes(f.situacao)) probs.push(id + ': situacao tem que ser pronta ou rascunho');
     if(!/^\d{4}-\d{2}-\d{2}$/.test(f.atualizada_em || '')) probs.push(id + ': atualizada_em fora do formato aaaa-mm-dd');
     if(!f.secoes.mudancas.length) probs.push(id + ': sem linha em "Mudanças"');
+    (f.parametros || []).filter(c => !parametroPermitido(c)).forEach(c => probs.push(id + ': o parâmetro ' + c + ' é segredo, e não entra numa ficha'));
+    (f.parametros || []).filter(c => !(f.rotulos || {})[c]).forEach(c => probs.push(id + ': o parâmetro ' + c + ' não tem nome para quem lê — escreva "' + c + ' = Nome do parâmetro" em parametros:'));
     const invalidas = f.secoes.mudancas.filter(m => m.invalida);
     if(invalidas.length) probs.push(id + ': linha de "Mudanças" fora do formato "- dd/mm/aaaa — texto": ' + invalidas[0].texto);
     const ultima = f.secoes.mudancas.filter(m => m.iso).map(m => m.iso).sort().pop();
@@ -246,11 +278,21 @@ function ordenado(o){
   if(o && typeof o === 'object'){ const r = {}; Object.keys(o).sort().forEach(k => { r[k] = ordenado(o[k]); }); return r; }
   return o;
 }
-function assinaturaMudanca(f){
-  const ms = f.secoes.mudancas.filter(m => m.iso);
-  if(!ms.length) return '';
-  const u = ms.slice().sort((a, b) => a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0).pop();
-  return u.data + ' — ' + u.texto;
+/* As linhas datadas de "Mudanças", na ordem do arquivo. O retrato guarda a LISTA
+   inteira — e não só a mais recente —, porque "linha nova" é: toda linha de
+   antes continua lá e há pelo menos uma a mais. Guardar só a última deixava
+   passar o texto da última editado no lugar de uma linha nova, e recusava a
+   linha legítima datada pelo dia da regra (19/11) numa ficha nascida em 21/11
+   (③ REVISÃO, 22/11/2026). */
+function linhasMudanca(f){
+  return f.secoes.mudancas.filter(m => m.iso).map(m => m.data + ' — ' + m.texto);
+}
+function linhaNova(antes, depois){
+  antes = antes || []; depois = depois || [];
+  if(depois.length <= antes.length) return false;
+  const sobra = depois.slice();
+  for(const l of antes){ const i = sobra.indexOf(l); if(i < 0) return false; sobra.splice(i, 1); }
+  return true;
 }
 function retratoDe(L){
   const cards = cartoesTexto(L.pastaRegras);
@@ -258,25 +300,39 @@ function retratoDe(L){
   const fichas = {};
   for(const f of L.fichas.values()){
     f.cartoes.forEach(c => citados.add(c));
-    fichas[f.n] = { corpo: impressao(f.corpo), mudanca: assinaturaMudanca(f), situacao: f.situacao,
+    fichas[f.n] = { corpo: impressao(f.corpo), linhas: linhasMudanca(f), situacao: f.situacao,
       acoes: acoesDe(L, f.n).map(a => a.chave).sort() };
   }
   const cartoes = {};
   Array.from(citados).sort().forEach(c => { if(cards.has(c)) cartoes[c] = impressao(cards.get(c)); });
   return ordenado({ cartoes, fichas });
 }
-/* As recusas: o que mudou sem a linha que o explica (B2 a B4, B7 da spec). */
-function confrontar(antigo, novo, L){
+/* As recusas: o que mudou sem a linha que o explica (B2 a B4, B7 e B10 a B14).
+   `opts.primeiro`: gravar um retrato do zero, de propósito — o primeiro
+   aconteceu em 21/11/2026; sem a opção, retrato ausente é recusa, porque apagar
+   o arquivo seria o jeito de passar por cima de toda a régua. */
+function confrontar(antigo, novo, L, opts){
   const rec = [];
-  if(!antigo || !antigo.fichas) return rec;
+  opts = opts || {};
+  if(!antigo || !antigo.fichas){
+    if(!opts.primeiro) rec.push('não há retrato antigo (retrato.json): o primeiro retrato aconteceu em 21/11/2026 — para gravar um do zero, de propósito, rode com --primeiro-retrato');
+    return rec;
+  }
   const nomeDe = n => { const f = L && L.fichas.get(+n); return n + (f ? ' ' + f.titulo : ''); };
+  /* o retrato de antes de 22/11/2026 guardava só a última linha (`mudanca`) */
+  const linhasDe = af => af.linhas || (af.mudanca ? [af.mudanca] : []);
   for(const [n, nf] of Object.entries(novo.fichas || {})){
-    const af = antigo.fichas[n]; if(!af) continue;   // ficha nova: o A6 cobra a primeira linha
-    const mesmaLinha = af.mudanca === nf.mudanca;
-    if((af.corpo !== nf.corpo || af.situacao !== nf.situacao) && mesmaLinha)
-      rec.push('ficha ' + nomeDe(n) + ': o texto mudou e não há linha nova em "Mudanças" (a última ainda é "' + (nf.mudanca || 'nenhuma') + '")');
+    const af = antigo.fichas[n];
+    if(!af){   // ficha nova nasce com UMA linha ("ficha criada"); com história, a entrada foi apagada do retrato
+      if((nf.linhas || []).length > 1) rec.push('ficha ' + nomeDe(n) + ' não está no retrato e já tem ' + nf.linhas.length + ' linhas em "Mudanças": a entrada dela foi apagada do retrato — volte-a');
+      continue;
+    }
+    const nova = linhaNova(linhasDe(af), nf.linhas);
+    const ultima = (nf.linhas || []).slice(-1)[0] || 'nenhuma';
+    if((af.corpo !== nf.corpo || af.situacao !== nf.situacao) && !nova)
+      rec.push('ficha ' + nomeDe(n) + ': o texto mudou e não há linha nova em "Mudanças" (a última ainda é "' + ultima + '")');
     const novasAcoes = (nf.acoes || []).filter(c => (af.acoes || []).indexOf(c) < 0);
-    if(novasAcoes.length && mesmaLinha)
+    if(novasAcoes.length && !nova)
       rec.push('ficha ' + nomeDe(n) + ': ação nova na tela (' + novasAcoes.join(', ') + ') e nenhuma linha nova em "Mudanças"');
   }
   for(const [c, h] of Object.entries(novo.cartoes || {})){
@@ -284,7 +340,7 @@ function confrontar(antigo, novo, L){
     for(const f of (L ? Array.from(L.fichas.values()) : [])){
       if(f.cartoes.indexOf(c) < 0) continue;
       const af = antigo.fichas[f.n], nf = novo.fichas[f.n];
-      if(af && nf && af.mudanca === nf.mudanca)
+      if(af && nf && !linhaNova(linhasDe(af), nf.linhas))
         rec.push('cartão ' + c + ' mudou e a ficha ' + nomeDe(f.n) + ' que o cita não ganhou linha em "Mudanças"');
     }
   }
@@ -345,7 +401,7 @@ function montar(n, ctx){
       mudancas: f ? f.secoes.mudancas.filter(m => m.iso).map(m => ({ data:m.data, iso:m.iso, texto:m.texto })).sort((a, b) => a.iso < b.iso ? 1 : -1) : []
     },
     acoes,
-    parametros: (f ? f.parametros : []).map(c => ({ chave:c, valor: ctx.valorDe ? ctx.valorDe(c) : null }))
+    parametros: (f ? f.parametros : []).filter(parametroPermitido).map(c => ({ chave:c, rotulo:(f.rotulos || {})[c] || null, valor: ctx.valorDe ? ctx.valorDe(c) : null }))
   });
   return out;
 }
@@ -365,6 +421,6 @@ function mudancasRecentes(L, telas, dias){
 }
 
 module.exports = { PASTA_MANUAL, PASTA_REGRAS, SECOES, telasTodas, telaPorNumero, telaPorRota, acoesDaTela, acoesDe, lerTudo, parseFicha, parseGlossario,
-  cartoesTexto, cartoesExistentes, chavesDeConfigNoCodigo, parametroExiste, jargaoNoCorpo, citaAcao, validar,
-  impressao, retratoDe, confrontar, diferencas, lerRetrato, gravarRetrato, montar, resumo, fluxoDe, itens, mudancasRecentes, normaliza,
+  cartoesTexto, cartoesExistentes, chavesDeConfigNoCodigo, parametroExiste, parametroPermitido, jargaoNoCorpo, citaAcao, validar,
+  impressao, linhasMudanca, linhaNova, retratoDe, confrontar, diferencas, lerRetrato, gravarRetrato, montar, resumo, fluxoDe, itens, mudancasRecentes, normaliza,
   modulos: () => MO.MODULOS.map(m => ({ chave:m.chave, nome:m.nome })), blocos: () => MO.BLOCOS };

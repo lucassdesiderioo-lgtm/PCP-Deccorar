@@ -79,16 +79,18 @@
   "R-COR-06": "1f20da268078d144",
   "R-COR-07": "37fe295fd852527a",
   "R-EMB-01": "22ad1a743cbde25d",
-  "R-EMB-02": "89e71a0b2691f9cb",
+  "R-EMB-02": "e12038f15c20049f",
   "R-EMB-03": "0487bf1945cd1e83",
   "R-EMB-04": "32ce706aa0f191b3",
   "R-EMB-05": "5a0e9832fea40533",
   "R-EMB-06": "a991245752354381",
   "R-EMB-07": "25b34fdd830acc26",
   "R-EMB-08": "a41323c92d2bf4ce",
+  "R-EMB-09": "54022b475e77c8f7",
+  "R-EMB-10": "754dc6056b8f74df",
   "R-EST-01": "6cb7de19b6e17f38",
-  "R-EST-02": "c95c16660a216f09",
-  "R-EST-03": "a2620da295876b63",
+  "R-EST-02": "50fcc9282e44164a",
+  "R-EST-03": "044d524d09846887",
   "R-EST-04": "d4801e4580c371b0",
   "R-EST-05": "afaf2cbb6b6faa4a",
   "R-EST-06": "8d8d8df2cb612b79",
@@ -138,7 +140,7 @@
   "R-MOD-03": "8d002883b5443344",
   "R-MOD-04": "2a9f5cfcfa8eafce",
   "R-PAS-01": "af1caf77aa2e5e06",
-  "R-PAS-02": "cddead269782685a",
+  "R-PAS-02": "303670e5b1a46ca2",
   "R-PDF-01": "9696768e5cdb107f",
   "R-PDF-02": "acdbcdc32dfb9cd8",
   "R-PDF-03": "5a1ceb96b98c1d6c",
@@ -313,6 +315,7 @@
   "R-SMX-03": "bee8abeb288ffdd0",
   "R-SMX-04": "41be51711be75b4f",
   "R-SMX-05": "0496de5819fbffba",
+  "R-TEM-01": "f3a2f3f51befae9b",
   "R-URG-01": "01fd9216f36e2cfb",
   "R-URG-02": "e88c40a1019b0bf3",
   "R-VAL-01": "a481ffd1c1c39a27",
@@ -345,7 +348,10 @@
     "revisao.rejeitar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com \"Parabéns!\" ou \"Você pode melhorar\". Só você vê o seu."
+   ],
    "situacao": "rascunho"
   },
   "102": {
@@ -353,7 +359,13 @@
     "embalagem.executar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "21/11/2026 — A persiana só embala se veio da Revisão: sem ela esperando na fila, o bipe final é recusado e nada é gravado; a peça volta para a Revisão. Kit, acessório e sob medida embalam como antes.",
+    "21/11/2026 — O bipe que fecha a embalagem antes do tempo mínimo da embalagem (contado desde o primeiro bipe) é recusado, nada é gravado e a embalagem continua aberta na tela.",
+    "21/11/2026 — Entrou o botão \"Cancelar embalagem\": zera a embalagem em andamento sem gravar nada; a persiana continua aguardando embalagem.",
+    "21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com \"Parabéns!\" ou \"Você pode melhorar\". Só você vê o seu."
+   ],
    "situacao": "rascunho"
   },
   "103": {
@@ -362,13 +374,17 @@
     "producao.lancar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "104": {
    "acoes": [],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "105": {
@@ -376,7 +392,9 @@
     "painel.ver"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "106": {
@@ -384,7 +402,9 @@
     "material.extra"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "201": {
@@ -392,7 +412,10 @@
     "etiqueta.emitir"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "19/11/2026 — A etiqueta continua só reservando a peça. A caixa que saiu da fábrica sem passar pela Conferência passa a ter o estoque baixado quando o acerto das caixas não conferidas é feito, uma vez só."
+   ],
    "situacao": "rascunho"
   },
   "202": {
@@ -402,7 +425,10 @@
     "saida.liberar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "19/11/2026 — A caixa que saiu sem ninguém conferir e é fechada depois pelo acerto das caixas não conferidas tem o estoque baixado nesse acerto, uma vez só, como se tivesse sido conferida aqui."
+   ],
    "situacao": "rascunho"
   },
   "204": {
@@ -411,7 +437,9 @@
     "pacote.assinar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "205": {
@@ -419,7 +447,10 @@
     "correcao.executar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "19/11/2026 — O fechamento das caixas que saíram sem conferência passa a baixar o estoque da caixa que nunca baixou; a data de corte é no máximo ontem; a venda cancelada e a caixa de várias persianas com item cancelado ficam de fora."
+   ],
    "situacao": "rascunho"
   },
   "206": {
@@ -428,7 +459,9 @@
     "horarios.editar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "251": {
@@ -436,7 +469,9 @@
     "devolucao.registrar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "252": {
@@ -447,7 +482,9 @@
     "devolucao.valores"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "253": {
@@ -455,7 +492,9 @@
     "devolucao.baixar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "301": {
@@ -465,7 +504,9 @@
     "estoque.aprovar_ajuste"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "302": {
@@ -476,7 +517,9 @@
     "contagem.resolver"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "303": {
@@ -486,7 +529,9 @@
     "contagem.recontar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "401": {
@@ -495,7 +540,9 @@
     "planilha.importar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "402": {
@@ -505,13 +552,17 @@
     "sku.excluir"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "403": {
    "acoes": [],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "404": {
@@ -519,7 +570,9 @@
     "custo.ver"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "501": {
@@ -533,7 +586,9 @@
     "preco.lancar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "502": {
@@ -543,7 +598,9 @@
     "pedido.ver"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "503": {
@@ -551,7 +608,9 @@
     "volume.movimentar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "504": {
@@ -559,7 +618,9 @@
     "contagem.aprovar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "601": {
@@ -568,7 +629,9 @@
     "sobmedida.modulo.entrar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "602": {
@@ -587,7 +650,9 @@
     "sobmedida.plano.confirmar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "603": {
@@ -606,7 +671,9 @@
     "sobmedida.sobra.propor"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "604": {
@@ -625,7 +692,9 @@
     "sobmedida.rolo.nota"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "605": {
@@ -634,7 +703,9 @@
     "sobmedida.etiqueta.imprimir"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "606": {
@@ -645,7 +716,9 @@
     "sobmedida.cadastro.ler"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "607": {
@@ -656,7 +729,9 @@
     "sobmedida.painel.ler"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "608": {
@@ -665,7 +740,9 @@
     "sobmedida.catalogo.editar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "609": {
@@ -676,7 +753,9 @@
     "sobmedida.preco.ver"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "610": {
@@ -689,7 +768,9 @@
     "sobmedida.revenda.ler"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "611": {
@@ -708,7 +789,9 @@
     "sobmedida.pedido.prazo"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "612": {
@@ -719,7 +802,9 @@
     "sobmedida.etiqueta_producao.ler"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "613": {
@@ -735,19 +820,25 @@
     "sobmedida.serralheria"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "614": {
    "acoes": [],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "615": {
    "acoes": [],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "616": {
@@ -760,7 +851,9 @@
     "sobmedida.boleto.ler"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "901": {
@@ -770,7 +863,9 @@
     "setores.gerenciar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "902": {
@@ -780,7 +875,9 @@
     "listas.editar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "904": {
@@ -790,7 +887,9 @@
     "relatorios.ver"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "905": {
@@ -798,7 +897,9 @@
     "produtividade.propria"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "906": {
@@ -807,7 +908,9 @@
     "sobmedida.parametro.editar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "907": {
@@ -816,7 +919,9 @@
     "manual.ver_todas"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "1101": {
@@ -824,7 +929,9 @@
     "componente.cadastrar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "1102": {
@@ -832,7 +939,9 @@
     "fornecedor.cadastrar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "1103": {
@@ -840,7 +949,9 @@
     "almoxarifado.cadastrar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "1201": {
@@ -848,7 +959,9 @@
     "recebimento.liberar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "1301": {
@@ -856,7 +969,9 @@
     "nota.lancar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   },
   "1302": {
@@ -864,7 +979,9 @@
     "certificado.gerenciar"
    ],
    "corpo": "da39a3ee5e6b4b0d",
-   "mudanca": "21/11/2026 — ficha criada em rascunho",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
    "situacao": "rascunho"
   }
  }

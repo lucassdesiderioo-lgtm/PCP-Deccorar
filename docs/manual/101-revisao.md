@@ -4,7 +4,7 @@ titulo: Revisão
 situacao: rascunho
 atualizada_em: 2026-11-21
 cartoes: R-EST-01, R-REV-01, R-REV-02, R-REV-03, R-REV-04, R-REV-05, R-REV-06, R-REV-07, R-REV-08, R-REV-09, R-TEM-01
-parametros: rev_minimo_seg
+parametros: rev_minimo_seg = Tempo mínimo da revisão (segundos)
 ---
 
 ## Para que serve
@@ -21,4 +21,4 @@ parametros: rev_minimo_seg
 
 ## Mudanças
 - 21/11/2026 — ficha criada em rascunho
-- 21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças daquele SKU nos últimos 30 dias), com "Parabéns!" ou "Você pode melhorar". Só você vê o seu.
+- 21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com "Parabéns!" ou "Você pode melhorar". Só você vê o seu.

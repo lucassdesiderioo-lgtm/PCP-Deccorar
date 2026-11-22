@@ -4,7 +4,7 @@ titulo: Parâmetros
 situacao: rascunho
 atualizada_em: 2026-11-21
 cartoes: 
-parametros: conf_carregamento
+parametros: conf_carregamento = Segundo bipe na Conferência (1 = ligado)
 ---
 
 ## Para que serve

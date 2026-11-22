@@ -36,6 +36,7 @@ module.exports = function(app, db){
   const porN = {}; telas.forEach(t => { porN[t.n] = t; });
 
   function valorDe(chave){
+    if(!MAN.parametroPermitido(chave)) return null;   // o segredo da config nunca viaja (③ REVISÃO)
     try{ const r = db.prepare('SELECT valor FROM config WHERE chave=?').get(chave); return r ? r.valor : null; }catch(e){ return null; }
   }
   /* o que esta pessoa alcança: as telas que opera e se vê todas */

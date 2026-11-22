@@ -3,12 +3,15 @@
  * mudou não veio com a linha datada em "Mudanças" (spec MANUAL-DO-SISTEMA,
  * §3.3 regra 9 e §8.1 B).
  *
- *   node manual_retrato.js          regrava, ou recusa dizendo o quê
+ *   node manual_retrato.js                      regrava, ou recusa dizendo o quê
+ *   node manual_retrato.js --primeiro-retrato   grava um do zero (sem retrato.json é recusa)
  *
  * O retrato guarda, por ficha, a impressão digital do corpo (tudo menos a
- * seção "Mudanças"), a última linha de "Mudanças", a situação e as ações da
- * tela; e, por cartão de docs/regras/ citado em alguma ficha, a impressão
- * digital do cartão. O teste_manual.js exige que ele bata com os arquivos.
+ * seção "Mudanças"), a LISTA das linhas de "Mudanças", a situação e as ações
+ * da tela; e, por cartão de docs/regras/ citado em alguma ficha, a impressão
+ * digital do cartão. "Linha nova" é a lista de antes inteira mais pelo menos
+ * uma (③ REVISÃO, 22/11/2026). O teste_manual.js exige que ele bata com os
+ * arquivos.
  *
  * ⚠️ ELE NÃO SE REGRAVA PARA O TESTE PASSAR. Quem muda o texto de uma ficha,
  * a regra de um cartão que ela cita ou pendura um botão novo na tela escreve
@@ -29,7 +32,7 @@ function rodar(opts){
   saida.problemas = saida.problemas.concat(MAN.validar(L));
   const antigo = MAN.lerRetrato(L.pastaManual);
   const novo = MAN.retratoDe(L);
-  saida.recusas = MAN.confrontar(antigo, novo, L);
+  saida.recusas = MAN.confrontar(antigo, novo, L, { primeiro: !!opts.primeiro });
   if(saida.recusas.length || saida.problemas.length){
     if(!opts.calado){
       if(saida.problemas.length){ console.log('\nA FICHA ESTÁ FORA DO FORMATO (' + saida.problemas.length + '):'); saida.problemas.forEach(p => console.log('  · ' + p)); }
@@ -50,7 +53,7 @@ function rodar(opts){
 }
 
 if(require.main === module){
-  const s = rodar({});
+  const s = rodar({ primeiro: process.argv.indexOf('--primeiro-retrato') >= 0 });
   process.exit(s.recusas.length || s.problemas.length ? 1 : 0);
 }
 module.exports = { rodar };

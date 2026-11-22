@@ -232,9 +232,66 @@ let saida = RETRATO.rodar({ pastaManual:path.join(dS, 'manual'), pastaRegras:pat
 ok('   manual_retrato.js RECUSA regravar quando falta a linha, e o arquivo fica como estava', saida.recusas.length === 1 && JSON.stringify(JSON.parse(fs.readFileSync(path.join(dS, 'manual', 'retrato.json'), 'utf8'))) === JSON.stringify(RS), saida.recusas);
 fs.writeFileSync(path.join(dS, 'manual', '101-revisao.md'), fs.readFileSync(path.join(dS, 'manual', '101-revisao.md'), 'utf8').replace('## Mudanças\n', '## Mudanças\n- 21/11/2026 — devagar\n'));
 saida = RETRATO.rodar({ pastaManual:path.join(dS, 'manual'), pastaRegras:path.join(dS, 'regras'), acoes:{ 101:[{ chave:'revisao.executar', rotulo:'Revisar peças' }], 102:[] }, calado:true });
-ok('   e grava quando a linha veio', saida.recusas.length === 0 && saida.gravou && JSON.parse(fs.readFileSync(path.join(dS, 'manual', 'retrato.json'), 'utf8')).fichas['101'].mudanca.indexOf('21/11/2026') === 0, saida);
+ok('   e grava quando a linha veio', saida.recusas.length === 0 && saida.gravou && JSON.parse(fs.readFileSync(path.join(dS, 'manual', 'retrato.json'), 'utf8')).fichas['101'].linhas.some(l => l.indexOf('21/11/2026') === 0), saida);
 ok('   o retrato é gravado com as chaves em ordem (o diff do git fica legível)', (() => { const t = fs.readFileSync(path.join(dS, 'manual', 'retrato.json'), 'utf8'); return t.indexOf('"101"') < t.indexOf('"102"') && t.indexOf('"cartoes"') < t.indexOf('"fichas"'); })());
-[d0, dS, dR].forEach(x => fs.rmSync(x, { recursive:true, force:true }));
+
+/* ③ REVISÃO (22/11/2026): "linha nova" é a lista de antes continuar inteira com
+   pelo menos uma a mais — e não "a linha de data mais recente mudou". Os quatro
+   furos da assinatura antiga, um a um. */
+const troca = (dir, arq, de, para) => fs.writeFileSync(path.join(dir, 'manual', arq), fs.readFileSync(path.join(dir, 'manual', arq), 'utf8').replace(de, para));
+d = pastaFalsa();   // B10: corpo mudado + só o TEXTO da última linha editado
+troca(d, '101-revisao.md', 'Revisar a peça.', 'Revisar a peça com calma.'); troca(d, '101-revisao.md', '- 20/11/2026 — ficha escrita', '- 20/11/2026 — ficha escrita e revista');
+rec = MAN.confrontar(R0, MAN.retratoDe(leFalsa(d)), leFalsa(d));
+ok('B10 editar só o texto da última linha de "Mudanças" NÃO é linha nova: corpo mudado é RECUSADO', rec.length === 1 && /101/.test(rec[0]), rec);
+d = pastaFalsa();   // B11: linha nova com data ANTERIOR à última (a regra mudou em 19/11, a ficha nasceu em 20/11)
+troca(d, '101-revisao.md', 'Revisar a peça.', 'Revisar a peça com calma.'); troca(d, '101-revisao.md', '- 20/11/2026 — ficha escrita', '- 20/11/2026 — ficha escrita\n- 19/11/2026 — a regra do estoque mudou');
+rec = MAN.confrontar(R0, MAN.retratoDe(leFalsa(d)), leFalsa(d));
+ok('B11 linha nova com data anterior à última CONTA como linha nova (a data é a da regra, não a de hoje)', rec.length === 0, rec);
+d = pastaFalsa();   // B12: duas linhas no mesmo dia
+troca(d, '101-revisao.md', 'Revisar a peça.', 'Revisar a peça com calma.'); troca(d, '101-revisao.md', '- 20/11/2026 — ficha escrita', '- 20/11/2026 — ficha escrita\n- 20/11/2026 — a frase ficou mais clara');
+rec = MAN.confrontar(R0, MAN.retratoDe(leFalsa(d)), leFalsa(d));
+ok('B12 a segunda linha do mesmo dia conta como linha nova (ficha criada e escrita em 21/11)', rec.length === 0, rec);
+d = pastaFalsa();   // B13: a entrada da ficha apagada do retrato (a ficha já tem história: duas linhas)
+troca(d, '101-revisao.md', 'Revisar a peça.', 'Revisar a peça com calma.'); troca(d, '101-revisao.md', '- 20/11/2026 — ficha escrita', '- 20/11/2026 — ficha escrita\n- 21/11/2026 — a frase ficou mais clara');
+const Rsem = JSON.parse(JSON.stringify(R0)); delete Rsem.fichas['101'];
+rec = MAN.confrontar(Rsem, MAN.retratoDe(leFalsa(d)), leFalsa(d));
+ok('B13 ficha que já tem história e não está no retrato é RECUSADA (a entrada foi apagada): só a ficha nova, com uma linha, entra sem antigo', rec.length === 1 && /101/.test(rec[0]) && /retrato/.test(rec[0]), rec);
+ok('   e a ficha nova de verdade (uma linha em "Mudanças") entra sem estar no retrato', (() => { const dd = pastaFalsa();
+  fs.writeFileSync(path.join(dd, 'manual', '103-nova.md'), fs.readFileSync(path.join(dd, 'manual', '101-revisao.md'), 'utf8').replace('tela: 101', 'tela: 103').replace('titulo: Revisão', 'titulo: Nova'));
+  const r = MAN.confrontar(R0, MAN.retratoDe(leFalsa(dd, { 101:[], 102:[], 103:[] })), leFalsa(dd, { 101:[], 102:[], 103:[] })); fs.rmSync(dd, { recursive:true, force:true }); return r.length === 0; })());
+rec = MAN.confrontar(null, MAN.retratoDe(leFalsa(d)), leFalsa(d));   // B14: sem retrato
+ok('B14 sem retrato antigo é RECUSADO (o primeiro retrato aconteceu em 21/11/2026), a não ser que se peça o primeiro de propósito', rec.length === 1 && /primeiro/.test(rec[0]) && MAN.confrontar(null, MAN.retratoDe(leFalsa(d)), leFalsa(d), { primeiro:true }).length === 0, rec);
+ok('   e o manual_retrato.js sem retrato.json recusa, e com --primeiro-retrato grava', (() => { const dd = pastaFalsa();
+  const s1 = RETRATO.rodar({ pastaManual:path.join(dd, 'manual'), pastaRegras:path.join(dd, 'regras'), acoes:{ 101:[], 102:[] }, calado:true });
+  const s2 = RETRATO.rodar({ pastaManual:path.join(dd, 'manual'), pastaRegras:path.join(dd, 'regras'), acoes:{ 101:[], 102:[] }, calado:true, primeiro:true });
+  fs.rmSync(dd, { recursive:true, force:true }); return s1.recusas.length === 1 && !s1.gravou && s2.recusas.length === 0 && s2.gravou; })());
+ok('   o retrato guarda a lista inteira das linhas de "Mudanças", na ordem do arquivo', Array.isArray(R0.fichas['101'].linhas) && R0.fichas['101'].linhas.length === 1 && /^20\/11\/2026 — ficha escrita$/.test(R0.fichas['101'].linhas[0]));
+
+/* ③ REVISÃO (22/11/2026): o segredo da `config` (o token do backup) nunca é
+   parâmetro de ficha — nem pela validação, nem pelo montar, nem pela rota. */
+ok('A8-B backup_token, senha e chave cifrada não são parâmetro permitido; os de fábrica são', !MAN.parametroPermitido('backup_token') && !MAN.parametroPermitido('senha_cifrada') && !MAN.parametroPermitido('x_token') && !MAN.parametroPermitido('session_secret')
+  && MAN.parametroPermitido('rev_minimo_seg') && MAN.parametroPermitido('kit_codigo') && MAN.parametroPermitido('devol_prazo_ambar'));
+d = pastaFalsa(); troca(d, '101-revisao.md', 'parametros: ', 'parametros: rev_minimo_seg, backup_token');
+probs = MAN.validar(leFalsa(d));
+ok('   a ficha que lista backup_token REPROVA no validar, dizendo a chave', probs.some(p => /101/.test(p) && /backup_token/.test(p)), probs);
+ok('   e mesmo assim o montar não o deixa viajar (segunda tranca)', (() => { const m = MAN.montar(101, { L:leFalsa(d), telas:MAN.telasTodas(), opera:() => true, valorDe:() => 'SEGREDO' });
+  return m.parametros.some(p => p.chave === 'rev_minimo_seg' && p.valor === 'SEGREDO') && m.parametros.every(p => p.chave !== 'backup_token'); })());
+/* ③ REVISÃO (22/11/2026): a chave do config não é nome para quem lê. A ficha
+   escreve `chave = Nome`, o montar devolve o nome, e a tela escreve só ele. */
+const semNome = fichas.filter(f => f.parametros.some(c => !f.rotulos[c])).map(f => f.n);
+ok('A8-C todo parâmetro das fichas tem nome para quem lê (chave = Nome no cabeçalho)', !semNome.length, lista(semNome));
+ok('   o montar devolve o nome ao lado da chave (a 101: "Tempo mínimo da revisão")', (() => { const m = MAN.montar(101, { L, telas:MAN.telasTodas(), opera:() => true, valorDe:() => '15' });
+  return m.parametros.some(p => p.chave === 'rev_minimo_seg' && /Tempo mínimo da revisão/.test(p.rotulo || '')); })());
+d = pastaFalsa(); troca(d, '101-revisao.md', 'parametros: ', 'parametros: rev_minimo_seg');
+probs = MAN.validar(leFalsa(d));
+ok('   o parâmetro sem nome REPROVA no validar, dizendo como escrever', probs.some(p => /101/.test(p) && /rev_minimo_seg/.test(p) && /Nome/.test(p)), probs);
+fs.rmSync(d, { recursive:true, force:true }); d = pastaFalsa(); troca(d, '101-revisao.md', 'parametros: ', 'parametros: rev_minimo_seg = Tempo mínimo da revisão (segundos)');
+ok('   e com o nome passa, e o nome chega ao montar', MAN.validar(leFalsa(d)).length === 0 && MAN.montar(101, { L:leFalsa(d), telas:MAN.telasTodas(), opera:() => true }).parametros[0].rotulo === 'Tempo mínimo da revisão (segundos)');
+ok('   o desenho do "?" não escreve a chave do config (sem o replace de "_" por espaço)', !/replace\(\/_\/g/.test(fs.readFileSync(path.join(__dirname, 'public', 'manual_ajuda.js'), 'utf8')));
+/* ③ REVISÃO: o apelido do sob medida acha a tela, e o [[Termo]] aponta o termo */
+ok('A12 /sobmedida/inicio (apelido da 601) acha a 601 pela rota, como /sobmedida', (MAN.telaPorRota('/sobmedida/inicio') || {}).n === 601 && (MAN.telaPorRota('/sobmedida') || {}).n === 601 && MAN.telaPorRota('/sobmedida/nada') === null);
+ok('   o [[Termo]] da ficha leva ao próprio termo no glossário (#termo=…), não ao topo', /#termo=/.test(fs.readFileSync(path.join(__dirname, 'public', 'manual_ajuda.js'), 'utf8')) && /termo=/.test(fs.readFileSync(path.join(__dirname, 'public', 'manual.html'), 'utf8')));
+[d0, dS, dR, d].forEach(x => fs.rmSync(x, { recursive:true, force:true }));
 
 /* ═════════════════════════════════════════════════════════════════════════ */
 console.log('\n── C. as rotas e o acesso — a conta do portão, D7 e D8 ──');

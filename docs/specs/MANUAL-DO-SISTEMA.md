@@ -4,17 +4,36 @@
 STATUS
 Situação: EM CONSTRUÇÃO · aprovada pelo dono em 21/11/2026 ("pode seguir, monte o PLANO da fase 1")
 Criada em: 21/11/2026
-Última atualização: 21/11/2026
+Última atualização: 22/11/2026 (③ REVISÃO da fase 1)
 Fase atual: 1 construída, falta subir — a fundação: 907, "?", seis rotas, 53 fichas em
-            rascunho, glossário, retrato, teste_manual.js (89) e teste_manual_tela.js (44).
+            rascunho, glossário, retrato, teste_manual.js (110) e teste_manual_tela.js (53).
             ⚠️ NÃO é apresentada ao time antes da fase 2 (§10). Próxima: fase 2.
 Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐
 Divergências na construção (valem sobre o texto da spec):
   D-C1 o retrato fotografa o CARTÃO INTEIRO (título, regra, exceções, teste, status),
        e não só a linha "Regra:" — mudar a exceção de um cartão também cobra a linha
        na ficha. É mais estrito que a §3.3 regra 9 escrevia, e no mesmo sentido.
-  D-C2 a "última linha de Mudanças" que o retrato compara é a DATA E O TEXTO da linha
-       mais recente, e não só a data: duas mudanças no mesmo dia exigem duas linhas.
+  D-C2 o retrato guarda a LISTA inteira das linhas de "Mudanças", e "linha nova" é a
+       lista de antes continuar inteira com pelo menos uma a mais (③ REVISÃO de
+       22/11/2026; a primeira versão comparava data e texto da linha mais recente, e
+       editar o texto dela passava por linha nova, e a linha datada pelo dia da regra
+       numa ficha mais nova era recusada). Duas linhas no mesmo dia contam. Sem
+       retrato.json é recusa (--primeiro-retrato grava um do zero de propósito), e a
+       ficha com mais de uma linha que não está no retrato também (entrada apagada).
+  D-C6 a ficha de tela que a pessoa não opera volta {n, nome, modulo, bloco, nivel,
+       opera:false}, e o mapa traz bloco, nivel, situacao e sobmedida de toda tela: são
+       os rótulos públicos do mapa de telas, os mesmos do ☰ Menu — nenhuma seção,
+       ação, SKU, cliente ou valor. A §6 e os casos C2/C5 leem-se assim.
+  D-C7 o parâmetro tem NOME na ficha: `parametros: chave = Nome para quem lê`; a chave
+       sozinha reprova (chave de banco em tela). O segredo da config (backup_token,
+       senha, chave cifrada) nunca é parâmetro: reprova e não viaja. (§3.3 regra 7)
+  D-C8 o "Onde entra no fluxo" leva só as telas numeradas do `liga`: as strings do
+       mapa ('skus', 'lote') são nome de tabela e não chegam à ficha. Não há "Também usa".
+  D-C9 o "?" só pergunta a ficha a quem tem manual.ler (pelo /api/telas/minhas que o
+       nav.js guarda); o ✕ do painel não recebe o foco (na 251 e na 303 a tela não puxa
+       o bipe de volta); [[Termo]] abre o glossário no termo (#termo=); a busca em
+       "Todas as telas" alcança o que a chave dá; o mapa mede o nome contra a caixa e
+       escreve a tela não operada em #5a6472.
   D-C3 o "?" não toma o foco: na bancada a tela puxa o bipe de volta ("o bipe não
        pode ficar sem dono", Etiqueta de Venda), e o painel é leitura — o leitor
        continua funcionando com ele aberto; fechar devolve o foco a quem o tinha.
@@ -323,7 +342,7 @@ e na varredura do `teste_cobertura.js`.
 | `GET /api/manual/minhas` | as fichas das telas da pessoa (cabeçalho, seções, ações com rótulo, parâmetros com o valor de hoje, ligações), na ordem do menu | `manual.ler` |
 | `GET /api/manual/todas` | o manual inteiro | `manual.ver_todas` |
 | `GET /api/manual/ficha/:n` | a ficha da tela `n` se a pessoa a opera ou tem `manual.ver_todas`; senão **só** `{n, nome, modulo, nivel, opera:false}` | `manual.ler` |
-| `GET /api/manual/mapa` | as telas (todas, só nome e módulo) e as ligações; marca quais a pessoa opera | `manual.ler` |
+| `GET /api/manual/mapa` | as telas (todas, só os rótulos do mapa: nome, módulo, bloco, nível, situação da ficha) e as ligações; marca quais a pessoa opera | `manual.ler` |
 | `GET /api/manual/glossario` | o glossário | `manual.ler` |
 | `GET /api/manual/mudancas` | as linhas de "Mudanças" das fichas da pessoa, últimos 30 dias, cada uma com a tela | `manual.ler` |
 
@@ -424,10 +443,10 @@ mentira, como o `teste_skus.js`)
 | # | Caso | O que trava |
 |---|---|---|
 | C1 | `/api/manual/minhas` devolve exatamente as fichas das telas que `telasDe` devolve para a pessoa — a conta do portão, pessoa a pessoa com o banco de exemplo do `perfis_acesso.js` | uma segunda régua (#12) |
-| C2 | `/api/manual/ficha/:n` de tela que a pessoa não opera volta **só** `{n, nome, modulo, nivel, opera:false}` — nenhuma seção, nenhuma ação | D7 |
+| C2 | `/api/manual/ficha/:n` de tela que a pessoa não opera volta **só** `{n, nome, modulo, bloco, nivel, opera:false}` — nenhuma seção, nenhuma ação (D-C6) | D7 |
 | C3 | `/api/manual/ficha/:n` de tela que opera volta a ficha com as ações (rótulo e desc da permissão) e os parâmetros com o **valor de hoje** do `config` | o número vivo |
 | C4 | `/api/manual/todas` é 403 sem `manual.ver_todas`, mesmo para quem opera todas as telas; com a chave, volta as 53 | D8 |
-| C5 | `/api/manual/mapa` volta todas as telas só com nome e módulo, as ligações do `liga`, e `opera:true` só nas da pessoa | o mapa não vaza texto |
+| C5 | `/api/manual/mapa` volta todas as telas só com os rótulos do mapa (nome, módulo, bloco, nível, situação), as ligações do `liga`, e `opera:true` só nas da pessoa (D-C6) | o mapa não vaza texto |
 | C6 | `/api/manual/mudancas` volta as linhas de "Mudanças" dos últimos 30 dias **só das telas da pessoa**, mais recentes em cima, e cada linha diz a tela | o "O que mudou" segue D7 |
 | C7 | sem login, as seis rotas são 401; o Admin Geral passa por nível (#29) | a porta |
 | C8 | quem é Operação com `manual.ler` não vê o sob medida que não opera, e quem está só num setor de bancada do sob medida vê as fichas 6xx que o portão de lá deixa | a conta de lá, não a chave escrita (§22) |

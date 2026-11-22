@@ -42,6 +42,7 @@
   .res a{color:var(--blue);font-weight:700;text-decoration:none}
   .res .onde{font-size:12px;color:var(--muted)}
   .glo dt{font-weight:800;margin:10px 0 2px}.glo dd{margin:0;color:var(--txt);line-height:1.45}
+  .glo dt.alvo{background:#fff4d6;border-radius:6px;padding:2px 6px;margin-left:-6px}
   .mud li{margin:0 0 8px;line-height:1.4}.mud .d{font-weight:800}.mud .t{color:var(--muted);font-size:12px}
   .aviso{background:#fff4e5;color:var(--amber);border:1px solid var(--amber);border-radius:10px;padding:10px 12px;font-weight:700;margin:0 0 12px}
 </style></head><body>
@@ -122,9 +123,14 @@ async function mostrarMapa(){
   m.telas.forEach(function(t){ var p=pos[t.n]; if(!p) return; var op=t.opera;
     s+='<g class="mapaNo" data-n="'+t.n+'" tabindex="0" role="link" aria-label="'+t.n+' '+esc(t.nome)+(op?'':' (você não opera)')+'">'
       +'<rect x="'+p.x+'" y="'+p.y+'" width="'+(W-20)+'" height="'+(H-10)+'" rx="9" fill="'+(op?'#fff':'#f4f6f8')+'" stroke="'+(op?'#1565c0':'#d8dee6')+'" stroke-width="1.5"/>'
-      +'<text x="'+(p.x+10)+'" y="'+(p.y+22)+'" font-size="13" fill="'+(op?'#1a1d23':'#8b97a5')+'"><tspan font-weight="800" fill="'+(op?'#1565c0':'#8b97a5')+'">'+t.n+'</tspan>  '+esc(t.nome.length>22?t.nome.slice(0,21)+'…':t.nome)+'</text></g>'; });
+      /* a tela não operada em #5a6472 sobre #f4f6f8 (5,5:1); o cinza de antes dava 2,7:1 (③ REVISÃO) */
+      +'<text x="'+(p.x+10)+'" y="'+(p.y+22)+'" font-size="13" fill="'+(op?'#1a1d23':'#5a6472')+'"><tspan font-weight="800" fill="'+(op?'#1565c0':'#5a6472')+'">'+t.n+'</tspan>  <tspan class="mapaNome">'+esc(t.nome)+'</tspan></text></g>'; });
   s+='</svg>';
   el.innerHTML='<div class="card"><h2>O mapa</h2><p class="vazio" style="margin:0 0 8px">Cada caixa é uma tela; a linha diz de onde ela recebe e para onde manda. As suas telas estão em azul; as outras, em cinza, só pelo nome.</p><div class="rola">'+s+'</div></div>';
+  /* o nome que não cabe na caixa é MEDIDO e encurtado (não contado em letras): a
+     caixa tem W-20 de largura, com 10 de cada lado (③ REVISÃO, 22/11/2026) */
+  el.querySelectorAll('.mapaNo text').forEach(function(tx){ var nome=tx.querySelector('.mapaNome'); if(!nome||!tx.getComputedTextLength) return; var cabe=W-20-20, inteiro=nome.textContent, n=inteiro.length;
+    while(tx.getComputedTextLength()>cabe && n>3){ n--; nome.textContent=inteiro.slice(0,n).replace(/\s+$/,'')+'…'; } });
   el.querySelectorAll('.mapaNo').forEach(function(g){ var ir=function(){ location.hash='#tela='+g.getAttribute('data-n'); }; g.onclick=ir; g.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); ir(); } }; });
 }
 
@@ -152,10 +158,13 @@ function textoDaFicha(f){ var s=f.secoes||{}; var partes=[f.titulo,f.nome];
 async function buscar(q){
   var el=document.getElementById('conteudo'), d=dados(); q=norm(q.trim()); if(!q) return;
   if(!D.glo){ var r=await jget('/api/manual/glossario'); D.glo=r.s===200?(r.j.termos||[]):[]; }
-  var fichas=(d?d.fichas:[]).filter(function(f){ return f.opera!==false && textoDaFicha(f).indexOf(q)>=0; });
+  /* em "Todas as telas" a busca alcança o que o servidor entregou — a ficha
+     inteira de quem tem a permissão de ver todas (③ REVISÃO, 22/11/2026) */
+  var todas=D.modo==='todas';
+  var fichas=(d?d.fichas:[]).filter(function(f){ return (todas||f.opera!==false) && textoDaFicha(f).indexOf(q)>=0; });
   var termos=D.glo.filter(function(t){ return norm(t.termo+' '+t.texto).indexOf(q)>=0; });
   var h='<div class="card"><h2>Resultados para “'+esc(q)+'”</h2>';
-  if(!fichas.length&&!termos.length) h+='<p class="vazio">Nada encontrado nas suas telas nem no glossário.</p>';
+  if(!fichas.length&&!termos.length) h+='<p class="vazio">Nada encontrado '+(todas?'em nenhuma tela':'nas suas telas')+' nem no glossário.</p>';
   fichas.forEach(function(f){ var onde=(f.acoes||[]).filter(function(a){ return norm(a.rotulo).indexOf(q)>=0; }).map(function(a){ return 'botão “'+a.rotulo+'”'; });
     h+='<div class="res"><a href="#tela='+f.n+'">'+f.n+' '+esc(f.titulo||f.nome)+'</a>'+(onde.length?'<div class="onde">'+esc(onde.join(' · '))+'</div>':'')+'</div>'; });
   termos.forEach(function(t){ h+='<div class="res"><a href="#glossario">'+esc(t.termo)+'</a> <span class="onde">no glossário</span><div>'+esc(t.texto)+'</div></div>'; });
@@ -168,6 +177,9 @@ async function rota(){
   ['lkMapa','lkGlo','lkMud'].forEach(function(id){ document.getElementById(id).classList.remove('on'); });
   if(m){ desenharLista(+m[1]); await mostrarFicha(+m[1]); }
   else if(h==='glossario'){ desenharLista(0); document.getElementById('lkGlo').classList.add('on'); await mostrarGlossario(); }
+  else if(/^termo=/.test(h)){ /* o [[Termo]] de uma ficha: abre o glossário no próprio termo (③ REVISÃO) */
+    desenharLista(0); document.getElementById('lkGlo').classList.add('on'); await mostrarGlossario();
+    var dt=document.getElementById('termo-'+h.slice(6).replace(/[^a-z0-9-]/g,'')); if(dt){ dt.classList.add('alvo'); dt.scrollIntoView({block:'center'}); } }
   else if(h==='mudou'){ desenharLista(0); document.getElementById('lkMud').classList.add('on'); await mostrarMudancas(); }
   else { desenharLista(0); document.getElementById('lkMapa').classList.add('on'); await mostrarMapa(); }
 }
