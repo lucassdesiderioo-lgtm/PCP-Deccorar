@@ -80,7 +80,7 @@
   "R-COR-07": "37fe295fd852527a",
   "R-EMB-01": "22ad1a743cbde25d",
   "R-EMB-02": "e12038f15c20049f",
-  "R-EMB-03": "0487bf1945cd1e83",
+  "R-EMB-03": "ac98d7177936c841",
   "R-EMB-04": "32ce706aa0f191b3",
   "R-EMB-05": "5a0e9832fea40533",
   "R-EMB-06": "a991245752354381",
@@ -181,12 +181,12 @@
   "R-REC-05": "b041bed3746d12d0",
   "R-REC-06": "62bcaad183e9b532",
   "R-REC-07": "ff71d683a9014480",
-  "R-REV-01": "f10b0e96be06154b",
-  "R-REV-02": "fdb0310753258887",
-  "R-REV-03": "f3a27c4cfb0c0ce3",
+  "R-REV-01": "f196d376f7109725",
+  "R-REV-02": "9f70534cd046bc85",
+  "R-REV-03": "6fa200f05b3f0521",
   "R-REV-04": "ef9f572600bf404c",
-  "R-REV-05": "ec7ad2301a2899e8",
-  "R-REV-06": "85bc15548b9dafc3",
+  "R-REV-05": "9e6bfc96b3fd3dad",
+  "R-REV-06": "ab4cce34443ce9af",
   "R-REV-07": "25c34ca64082377a",
   "R-REV-08": "9b4b79dca19fcdd8",
   "R-REV-09": "2624ef22be05b12e",
@@ -356,7 +356,14 @@
     "21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com \"Parabéns!\" ou \"Você pode melhorar\". Só você vê o seu.",
     "22/11/2026 — O tempo ao lado da sua média está no ar na bancada desde 21/11/2026.",
     "22/11/2026 — Entrou o bloco \"Voltaram da embalagem por defeito\": a persiana que quem embala devolveu aparece aqui com o motivo e quem achou. \"Tem defeito\" escolhe o setor responsável e a peça vira peça com problema; \"Não tem defeito\" fecha a volta e a peça é revisada de novo pelos dois bipes (a peça de devolução volta direto à fila da embalagem). A revisão daquela peça deixa de contar.",
-    "23/11/2026 — A peça que volta da Embalagem por defeito é a que estava reservada para quem embalava; sem reserva, a mais antiga daquele SKU."
+    "23/11/2026 — Consertado o botão \"Peça com problema\": a janela do motivo deixou de devolver o foco ao campo do bipe (o campo piscava e o toque não pegava), o bipe não fecha mais a revisão por baixo dela, e a tela só diz \"Voltou para a produção\" quando o registro foi gravado.",
+    "23/11/2026 — A Revisão virou uma tela só: não se escolhe mais cor ao abrir. A lista mostra Hoje (as vendas de hoje sem peça), Próximos dias (até sexta) e Completar o alvo. Você bipa a peça que tem na mão, e a tela diz para onde ela vai; quem decide é o sistema. O dia de hoje fica em destaque e, quando termina, os próximos dias sobem. No topo aparecem as suas revisadas de hoje, a sua média, \"↩ Devoluções\" e \"Ver a semana\".",
+    "23/11/2026 — Enquanto a peça com problema está sendo registrada, a revisão fica parada: o bipe e o toque nos cartões esperam. Com a revisão aberta, tocar no cartão de outro SKU não faz nada. Com \"Ver a semana\" aberta, o bipe fecha a semana para você ver o que fez. O bipe na observação da peça com problema não vira texto. A venda que já foi revisada e voltou por \"Desfazer\" não aparece como venda nova.",
+    "23/11/2026 — Se a peça com problema não tiver resposta do servidor em 20 segundos, a tela desiste e avisa: confira em Problemas antes de registrar de novo. Tocar no cartão de outro SKU com a revisão aberta mostra o que fazer.",
+    "23/11/2026 — A venda que já está em Hoje não conta de novo nos Próximos dias, mesmo quando o Mercado Livre põe outra data para ela; e a peça revisada que ainda espera a embalagem (inclusive a de devolução) já sai do que falta.",
+    "23/11/2026 — O aviso vermelho de venda nova não aparece quando o estoque livre muda sem venda nova (uma peça embalada para estoque, uma etiqueta impressa).",
+    "23/11/2026 — A peça que volta da Embalagem por defeito é a que estava reservada para quem embalava; sem reserva, a mais antiga daquele SKU.",
+    "23/11/2026 — Quando o PDF de hoje chega antes da planilha do Mercado Livre, a lista não pede mais peças a menos: a venda nova conta também em \"Completar o alvo\". E o código bipado na observação da peça com problema sai do campo mesmo com o leitor mais lento."
    ],
    "situacao": "rascunho"
   },
@@ -373,6 +380,7 @@
     "21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com \"Parabéns!\" ou \"Você pode melhorar\". Só você vê o seu.",
     "22/11/2026 — O tempo ao lado da sua média está no ar na bancada desde 21/11/2026.",
     "22/11/2026 — Entrou o botão \"Peça com defeito\", só para persiana e com a embalagem aberta: escolhe-se o motivo e a peça volta para a Revisão; nada é embalado e nada entra no estoque.",
+    "23/11/2026 — A peça que abate a ordem do dia na embalagem é a que a Revisão marcou como venda de hoje; desde hoje é o sistema que decide isso na Revisão, e não mais a cor escolhida lá.",
     "23/11/2026 — A lista virou quatro blocos, nesta ordem: vermelho (do dia: a peça que destrava uma venda de hoje parada na Etiqueta de Venda), âmbar (pedido de hoje), azul (reposição) e roxo (devolução). No vermelho, primeiro o que tem mais vendas paradas; a barra diz quantas vendas de hoje já têm peça.",
     "23/11/2026 — Bipou uma peça que não é do dia com peça do dia esperando: aparece o aviso, e o próximo bipe decide — o kit segue com esta (fica registrado), o SKU do dia troca. Nunca trava.",
     "23/11/2026 — A peça fica reservada para quem está embalando, do primeiro bipe ao fim: os outros veem \"sendo embalada por\", e a reserva solta em 5 minutos sem bipe. A peça com defeito marcada é a reservada."
@@ -396,7 +404,11 @@
    "linhas": [
     "21/11/2026 — ficha criada em rascunho",
     "22/11/2026 — A lista separa a peça com problema achada na Revisão da achada na Embalagem, com o setor responsável; na achada na Embalagem, a coluna Quem diz quem achou e quem conferiu.",
-    "23/11/2026 — A peça achada na Embalagem é a que estava reservada para quem embalava; sem reserva, a mais antiga daquele SKU."
+    "23/11/2026 — Na Revisão, a peça com problema só aparece aqui quando o registro foi gravado: se a gravação falhar, a tela da Revisão avisa e a revisão continua aberta.",
+    "23/11/2026 — Na Revisão, a mesma peça com problema não é mais registrada duas vezes, nem vai também para a embalagem quando alguém bipa enquanto ela está sendo gravada.",
+    "23/11/2026 — Na Revisão, se o registro da peça com problema não tiver resposta em 20 segundos, a tela avisa: confira nesta lista se ela entrou antes de registrar de novo.",
+    "23/11/2026 — A peça achada na Embalagem é a que estava reservada para quem embalava; sem reserva, a mais antiga daquele SKU.",
+    "23/11/2026 — Na Revisão, o código bipado por engano na observação da peça com problema não vai mais junto para esta lista, nem com o leitor mais lento."
    ],
    "situacao": "rascunho"
   },
@@ -483,7 +495,8 @@
    ],
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
-    "21/11/2026 — ficha criada em rascunho"
+    "21/11/2026 — ficha criada em rascunho",
+    "23/11/2026 — O botão \"Trocar\" do topo virou \"Revisão\" (só para quem revisa). Quem chega pelo \"↩ Devoluções\" da Revisão vê \"← Voltar para a Revisão\"."
    ],
    "situacao": "rascunho"
   },
@@ -554,7 +567,8 @@
    ],
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
-    "21/11/2026 — ficha criada em rascunho"
+    "21/11/2026 — ficha criada em rascunho",
+    "23/11/2026 — A tela da Revisão deixou de ter as telas vermelha e azul: a falta por dia e o alvo calculados aqui aparecem lá como \"Próximos dias\" e \"Completar o alvo\", e a ordem pela data da falta vale lá sempre, com a chave ligada ou não."
    ],
    "situacao": "rascunho"
   },

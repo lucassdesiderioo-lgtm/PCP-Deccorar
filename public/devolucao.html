@@ -52,7 +52,15 @@
   .dvAba{padding:10px 16px;border-radius:9px;font-size:15px;font-weight:600;text-decoration:none;color:var(--muted);border:1px solid var(--line);background:#fff}
   .dvAba.on{background:var(--amber);color:#fff;border-color:var(--amber);font-weight:800}
 </style></head><body>
-<header><div class="mark">D</div><div><h1>Devolucoes</h1><div class="sub">Recebimento e triagem de peças devolvidas</div></div><button onclick="(function(){try{localStorage.removeItem('rev_modo');}catch(e){} location.href='/operador';})()" style="margin-left:auto;background:transparent;border:1px solid #d8dee6;color:#5a6472;border-radius:9px;padding:11px 18px;font-size:14px;cursor:pointer">Trocar</button></header>
+<header><div class="mark">D</div><div><h1>Devolucoes</h1><div class="sub">Recebimento e triagem de peças devolvidas</div></div><button id="voltaRev" data-perm="revisao.executar" onclick="location.href='/operador'" style="margin-left:auto;background:transparent;border:1px solid #d8dee6;color:#5a6472;border-radius:9px;padding:11px 18px;font-size:14px;cursor:pointer">Revisão</button></header>
+<script>
+/* Chegou pelo "↩ Devoluções" da 101 Revisão (REVISAO-TELA-UNICA, 23/11/2026):
+   o botão do topo vira "← Voltar para a Revisão", grande, para a pessoa
+   voltar à tela de onde veio. Sem isso ele continua levando à Revisão. */
+if(/[?&]de=revisao\b/.test(location.search)){ var vb=document.getElementById('voltaRev');
+  vb.textContent='← Voltar para a Revisão';
+  vb.style.cssText='margin-left:auto;background:#fff;border:2px solid #1a1d23;color:#1a1d23;border-radius:12px;padding:13px 20px;font-size:16px;font-weight:800;cursor:pointer;min-height:50px'; }
+</script>
 <nav id="dvAbas" class="dvAbas" style="display:none" aria-label="Devoluções"></nav>
 <div class="wrap">
   <div class="card">

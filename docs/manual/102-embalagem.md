@@ -27,6 +27,7 @@ parametros: kit_codigo = Código do kit de instalação, emb_minimo_seg = Tempo 
 - 21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com "Parabéns!" ou "Você pode melhorar". Só você vê o seu.
 - 22/11/2026 — O tempo ao lado da sua média está no ar na bancada desde 21/11/2026.
 - 22/11/2026 — Entrou o botão "Peça com defeito", só para persiana e com a embalagem aberta: escolhe-se o motivo e a peça volta para a Revisão; nada é embalado e nada entra no estoque.
+- 23/11/2026 — A peça que abate a ordem do dia na embalagem é a que a Revisão marcou como venda de hoje; desde hoje é o sistema que decide isso na Revisão, e não mais a cor escolhida lá.
 - 23/11/2026 — A lista virou quatro blocos, nesta ordem: vermelho (do dia: a peça que destrava uma venda de hoje parada na Etiqueta de Venda), âmbar (pedido de hoje), azul (reposição) e roxo (devolução). No vermelho, primeiro o que tem mais vendas paradas; a barra diz quantas vendas de hoje já têm peça.
 - 23/11/2026 — Bipou uma peça que não é do dia com peça do dia esperando: aparece o aviso, e o próximo bipe decide — o kit segue com esta (fica registrado), o SKU do dia troca. Nunca trava.
 - 23/11/2026 — A peça fica reservada para quem está embalando, do primeiro bipe ao fim: os outros veem "sendo embalada por", e a reserva solta em 5 minutos sem bipe. A peça com defeito marcada é a reservada.

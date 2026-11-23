@@ -115,24 +115,24 @@
 
 ## A revisão
 
-### R-REV-01 · A tela de revisão tem três modos, e a cor é a trava
-- **Regra:** `/operador` abre exigindo a escolha: **vermelho** (pedidos de hoje), **azul** (produção pra estoque), **âmbar** (devoluções). O modo fica salvo por aparelho (`rev_modo`) e o botão "Trocar" força escolher de novo.
-- **Por quê:** a cor impede revisar meia hora no modo errado. Ela espelha os carrinhos físicos separados na produção.
-- **Exceções:** nenhuma.
-- **Teste que trava:** ⚠ **sem teste**.
-- **Status:** no ar.
+### R-REV-01 · A revisão é uma tela só, e quem decide para que a peça serve é o servidor
+- **Regra:** desde 23/11/2026 (spec `REVISAO-TELA-UNICA`) `/operador` abre direto no bipe, sem escolher cor. A lista tem três partes, cada uma com título: **Hoje** (as vendas da Etiqueta de Venda sem peça — o `a_produzir` do `ordem_dia.js`), **Próximos dias** (a falta por dia do `demanda_dominio.porDia`, de amanhã até sexta; na sexta e no sábado, só a segunda) e **Completar o alvo** (o `precisa` menos a falta até o fim da janela). `revisao_lista.js` é o dono da lista e não tem conta de quantidade própria. No bipe que fecha, o servidor grava `modo='hoje'` se a peça cobre uma venda de hoje sem peça, e `'estoque'` nos outros casos — o `modo` que a tela manda é ignorado. Enquanto o dia não termina, Hoje fica em destaque; terminado, faixa verde e os próximos dias no destaque. As devoluções continuam na 251, pelo "↩ Devoluções", que volta pelo "← Voltar para a Revisão".
+- **Por quê:** o dono, 23/11/2026: *"quero questionar se precisamos ter a tela azul e vermelha"*. O carrinho é um só, com o lugar de cada SKU, e a cor espelhava carrinhos separados que não existem. A decisão do modo no servidor tira do revisor uma escolha que ele podia errar.
+- **Exceções:** a peça revisada e ainda não embalada (fila `aguardando` de qualquer modo — estoque, devolução e a de `hoje` de dias anteriores; a de `hoje` revisada hoje já saiu de Hoje) sai primeiro dos próximos dias e depois do alvo. A venda do PDF de hoje é ligada à planilha pela venda ou pelo pack, com os filtros da 401, e sai do dia dela na planilha (a mesma venda não conta duas vezes); o alvo é a mesma conta acumulada até o fim, contra o mesmo livre. A venda de hoje da planilha que ainda não está na 201 não aparece em Hoje: aparece quando o PDF sobe.
+- **Teste que trava:** `teste_revisao_tela_unica.js` (54: a janela, as três partes somando o `precisa` da 401, a mesma venda que não conta duas vezes, o modo decidido no servidor, toda peça na fila descontada, o dia terminado, a lista que falha dizendo) · `teste_revisao_tela_unica_tela.js` (37, num Chromium) · `teste_revisao.js` (seção 2).
+- **Status:** construída em 23/11/2026, falta subir. Até ali: três modos escolhidos pela cor (vermelho, azul, âmbar), o modo gravado era o da cor.
 
-### R-REV-02 · SKU fora da lista no modo vermelho: avisa e deixa passar
-- **Regra:** bipar no vermelho um SKU que não está nos pedidos do dia mostra aviso **no início** da revisão, deixa revisar, e a peça conta como estoque. Nunca bloqueia.
+### R-REV-02 · SKU que não falta em lugar nenhum: avisa e deixa passar
+- **Regra:** bipar um SKU que não está em Hoje, nem nos Próximos dias, nem no alvo mostra no início da revisão *"Não falta em lugar nenhum: vai contar como estoque acima do alvo"*, deixa revisar, e a peça conta como estoque. Nunca bloqueia (o dono, 23/11/2026). Durante a revisão, a tela diz para onde a peça vai (*"Vai para: venda de hoje"*, *"… venda de amanhã"*, *"… completar o alvo"*), e ao fechar diz para onde foi.
 - **Por quê:** operador parado esperando alguém resolver custa mais que um número classificado de outro jeito.
 - **Exceções:** nenhuma.
-- **Teste que trava:** ⚠ **sem teste**.
-- **Status:** no ar.
+- **Teste que trava:** `teste_revisao_tela_unica_tela.js` (o "Vai para") · ⚠ o aviso do SKU que não falta só na tela, sem caso próprio.
+- **Status:** no ar (até 23/11/2026 valia só no modo vermelho, para o SKU fora dos pedidos de hoje).
 
 ### R-REV-03 · A tela azul é ordenada por prioridade, e cada linha diz por quê
 - **Regra:** com `config.ordem_por_falta = 0` (o padrão), quatro degraus, nesta ordem: 1) cliente com prazo até amanhã (a venda **atrasada** conta aqui), 2) sem estoque, 3) cobertura abaixo de metade dos dias de cobertura, 4) abaixo do alvo. **Com a chave ligada (fase 4 da `PLANEJAMENTO-VENDAS-FUTURAS`, 07/11/2026), a ordem é pela data em que a peça vai faltar**: a data mais cedo primeiro; no mesmo dia, venda feita antes de reposição; no mesmo dia e tipo, mais peças faltando primeiro. Venda feita: o primeiro dia de envio que o livre não cobre (a conta da aba por dia). Reposição: `hoje + (livre − comprometido) ÷ ritmo` (pelo livre desde 09/11/2026, R-PLN-06). O degrau 2 "sem estoque" e a cobertura também contam pelo livre. Cada linha traz o `motivo` — *"faltam 3 para ter 10/11 (vendidas)"* ou *"acaba qua 12/11 pelo ritmo (3,5/dia)"*. Sem venda na janela, a cobertura e a data são vazias, nunca zero.
 - **Por quê:** ordenar pelo que falta põe em cima o SKU que mais gira, que quase nunca é o que acaba primeiro. E a fábrica precisa andar 1, 2 ou 3 dias à frente das vendas: terminado o de hoje, a primeira linha é a falta de amanhã.
-- **Exceções:** a chave nasce **desligada** e só o **Admin Geral** (o setor, pelo `ehAdminGeral`) liga ou desliga (403 para os outros, antes de gravar qualquer campo do mesmo pedido). O modo vermelho e o âmbar não mudam.
+- **Exceções:** a chave nasce **desligada** e só o **Admin Geral** (o setor, pelo `ehAdminGeral`) liga ou desliga (403 para os outros, antes de gravar qualquer campo do mesmo pedido). ⚠️ **Desde 23/11/2026 a 101 não lê mais esta ordem** (R-REV-01): a parte Próximos dias da tela única ordena pela data da primeira falta, com ou sem a chave (o dono: *"já usa"*). A chave continua valendo para o `/api/revisao/producao`, que só o tablet com a página antiga ainda chama.
 - **Teste que trava:** `teste_vendas_futuras.js` (a ordem, os três desempates, o motivo, o caso do meio-dia, a chave desligada por padrão e o 403).
 - **Status:** os degraus no ar · a ordem pela falta no ar desde 07/11/2026 (PR #313), **desligada** até o dono ligar.
 
@@ -144,7 +144,7 @@
 - **Status:** no ar.
 
 ### R-REV-05 · A ordem urgente atendida pelo estoque não cobra produção
-- **Regra:** `ordem_dia.js` é o único que responde o que falta das ordens de hoje. A parte urgente cuja venda já saiu, ou que o estoque cobre, aparece em âmbar como "saiu do estoque — nada a produzir". Só `a_produzir` fica vermelho e toca o alarme. O tile, o aviso e a TV leem a mesma conta.
+- **Regra:** `ordem_dia.js` é o único que responde o que falta das ordens de hoje. A parte urgente cuja venda já saiu, ou que o estoque cobre, não cobra produção: só `a_produzir` conta. ~~Na tela vermelha aparecia em âmbar "saiu do estoque — nada a produzir"~~ — desde 23/11/2026 (R-REV-01) a parte Hoje da tela única mostra só o `a_produzir`, e o aviso de status da 101 saiu. A TV e o `/api/revisao/status` continuam lendo a mesma conta.
 - **Por quê:** em 08/09/2026 a tela cobrava 4 peças urgentes com todas as vendas já despachadas.
 - **Exceções:** ordem **manual** nunca é "atendida", porque não tem venda atrás. ⚠ Não mande a embalagem azul abater a ordem.
 - **Teste que trava:** `teste_ordem_dia.js` (17) · `teste_estoque.js` (caso da TV).
@@ -152,10 +152,10 @@
 - **História:** armadilha #20.
 
 ### R-REV-06 · Peça com problema volta para a produção e não entra na fila
-- **Regra:** durante a revisão, "Peça com problema" grava em `rejeicao` o motivo, o tempo até a detecção, o modo e quem rejeitou — o nome em `usuario` e, desde 04/11/2026, o `usuario_id` ao lado, pelo `quem.js`; sem login, 401. A peça não vai para a embalagem. Os motivos são cadastro (`listas`, tipo `rejeicao`). **É só para defeito de verdade**: o bipe errado se resolve no "Cancelar revisão" (R-REV-08).
-- **Por quê:** a peça com defeito não pode virar estoque.
+- **Regra:** durante a revisão, "Peça com problema" grava em `rejeicao` o motivo, o tempo até a detecção, o modo e quem rejeitou — o nome em `usuario` e, desde 04/11/2026, o `usuario_id` ao lado, pelo `quem.js`; sem login, 401. A peça não vai para a embalagem. Os motivos são cadastro (`listas`, tipo `rejeicao`). **É só para defeito de verdade**: o bipe errado se resolve no "Cancelar revisão" (R-REV-08). **Na tela (CONSERTO de 23/11/2026):** com a janela do motivo aberta o foco não volta ao campo do bipe e o bipe não fecha a revisão por baixo dela; a tela só diz "Voltou para a produção" quando o servidor gravou — recusa ou falta de conexão deixam a revisão aberta, dizendo por quê; sem motivo cadastrado, a janela diz onde cadastrar.
+- **Por quê:** a peça com defeito não pode virar estoque. E o dono, 23/11/2026: *"o botão aparece mas não consigo clicar, quando clico nele ele pisca o campo de sku"* — o foco que volta ao bipe roubava o toque da janela.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_revisao.js` (seção 15: quem rejeitou e o 401) · ⚠ que a peça rejeitada não entra na fila continua **sem teste**.
+- **Teste que trava:** `teste_revisao.js` (seção 15: quem rejeitou e o 401) · `teste_revisao_problema_tela.js` (29, num Chromium com toque de iPad; sem navegador diz PULADO) · ⚠ que a peça rejeitada não entra na fila continua **sem teste**.
 - **Status:** no ar; o `usuario_id` em código em 04/11/2026.
 
 ### R-REV-07 · Bipe de fim abaixo de 15 s é recusado, e a revisão continua
@@ -199,8 +199,8 @@
 - **Status:** no ar.
 
 ### R-EMB-03 · Só a embalagem de fila "hoje" abate a ordem do dia
-- **Regra:** a embalagem abate `producao` só quando consome fila de `modo='hoje'` (revisada na tela vermelha).
-- **Por quê:** a tela azul é produção para estoque; abater ali faria o estoque parecer reposto com a peça indo para o cliente.
+- **Regra:** a embalagem abate `producao` só quando consome fila de `modo='hoje'` — desde 23/11/2026 o servidor grava esse modo quando a peça revisada cobre uma venda de hoje sem peça (R-REV-01); até ali era a peça revisada na tela vermelha.
+- **Por quê:** a peça revisada para estoque não atende ordem; abater ali faria o estoque parecer reposto com a peça indo para o cliente.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_montagem.js` · `teste_ordem_dia.js`.
 - **Status:** no ar.
@@ -486,8 +486,7 @@
 
 ## O que ainda não tem teste nesta área
 
-R-EST-04 (reimpressão não baixa), R-REV-01 (os três modos), R-REV-02 (SKU fora
-da lista), R-REV-06 (peça com problema),
+R-EST-04 (reimpressão não baixa), R-REV-02 (o aviso do SKU que não falta), R-REV-06 (que a peça rejeitada não entra na fila),
 R-EMB-05 (conferência no bipe 1) e as partes de tela de R-EST-11 e R-EST-17.
 Ficam aqui para virar trabalho, e não esquecimento.
 

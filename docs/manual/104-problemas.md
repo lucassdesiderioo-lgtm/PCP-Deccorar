@@ -22,4 +22,8 @@ parametros:
 ## Mudanças
 - 21/11/2026 — ficha criada em rascunho
 - 22/11/2026 — A lista separa a peça com problema achada na Revisão da achada na Embalagem, com o setor responsável; na achada na Embalagem, a coluna Quem diz quem achou e quem conferiu.
+- 23/11/2026 — Na Revisão, a peça com problema só aparece aqui quando o registro foi gravado: se a gravação falhar, a tela da Revisão avisa e a revisão continua aberta.
+- 23/11/2026 — Na Revisão, a mesma peça com problema não é mais registrada duas vezes, nem vai também para a embalagem quando alguém bipa enquanto ela está sendo gravada.
+- 23/11/2026 — Na Revisão, se o registro da peça com problema não tiver resposta em 20 segundos, a tela avisa: confira nesta lista se ela entrou antes de registrar de novo.
 - 23/11/2026 — A peça achada na Embalagem é a que estava reservada para quem embalava; sem reserva, a mais antiga daquele SKU.
+- 23/11/2026 — Na Revisão, o código bipado por engano na observação da peça com problema não vai mais junto para esta lista, nem com o leitor mais lento.
