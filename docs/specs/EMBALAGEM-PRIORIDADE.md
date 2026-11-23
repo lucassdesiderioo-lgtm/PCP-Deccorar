@@ -1,6 +1,14 @@
 # EMBALAGEM-PRIORIDADE — o que a 102 embala primeiro, e como a tela se comporta
 
-> **STATUS — 23/11/2026: RASCUNHO, esperando o "pode seguir" do dono.** `REGRA` +
+> **STATUS — 23/11/2026: APROVADA E CONSTRUÍDA (as duas fases), falta subir.** O
+> dono deu o "pode seguir" e disse sim aos três pontos (o consumo `hoje` primeiro,
+> o defeito na reservada, a reposição e a devolução de SKU vermelho no vermelho).
+> Cartões **R-EMB-12** e **R-EMB-13** em `docs/regras/estoque.md`; cinco linhas em
+> `docs/DECISOES.md`. Na construção, a rota da prioridade ficou
+> `GET /api/montagem/prioridade` (e não `/api/embalagem/...`: o `/embalagem` é a
+> Etiqueta de Venda).
+>
+> Rascunho de 23/11/2026: `REGRA` +
 > `NOVIDADE` 🔴 (muda qual linha da fila a embalagem consome, cria a reserva da
 > peça e uma tabela nova). Desenho aprovado pelo dono em 22–23/11/2026: a opção A
 > com as linhas e as barras da C, e o passo a passo F1–F8 (*"ficou perfeito"*),
@@ -158,7 +166,7 @@ A tela só desenha.
 
 ## 8. As fases
 
-1. **Servidor:** `embalagem_prioridade.js` e `GET /api/embalagem/prioridade` (os
+1. **Servidor:** `embalagem_prioridade.js` e `GET /api/montagem/prioridade` (os
    blocos prontos); a reserva (`POST /api/montagem/reservar` no 1º bipe,
    `/renovar` no kit; o cancelar e o defeito soltam); o bipe final consome a linha
    reservada; o evento `fora_prioridade`. O `GET /api/fila` de hoje continua
@@ -185,7 +193,7 @@ na 102 a 1024 e 768 px.
 ## 10. Alçada
 
 - **Telas novas:** nenhuma.
-- **Ações novas:** nenhuma chave. As rotas novas (`GET /api/embalagem/prioridade`,
+- **Ações novas:** nenhuma chave. As rotas novas (`GET /api/montagem/prioridade`,
   `POST /api/montagem/reservar`, `/renovar`) usam `embalagem.executar`, com linha
   própria no `permDaRota`; a leitura também `@admin`, como o `GET /api/fila`.
   As escritas gravam quem pelo `quem.js` (401 sem login).
