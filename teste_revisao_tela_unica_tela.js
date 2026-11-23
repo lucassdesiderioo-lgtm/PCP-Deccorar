@@ -55,6 +55,7 @@ v('BK160140BEGE', J[0], 3); v('BK150160PRETO', J[J.length-1], 2);
 const ordem = (c, q) => { for(let i = 0; i < q; i++) db.prepare("INSERT INTO lote (codigo,estagio,venda) VALUES (?,'pendente',?)").run(c, 'L' + c + Math.random());
   db.prepare("INSERT INTO producao (codigo,qtd,origem,urgente) VALUES (?,?,'ml',1)").run(c, q); };
 ordem('BK140160CINZA', 2); ordem('BK100160BEGE', 1);
+db.prepare("INSERT OR REPLACE INTO config (chave,valor) VALUES ('rev_minimo_seg','0')").run();
 
 const srv = app.listen(0, async () => {
   const base = 'http://localhost:' + srv.address().port;
@@ -97,6 +98,14 @@ const srv = app.listen(0, async () => {
     ok('com um dia por coluna da janela', (await p.$$eval('#semana thead th', l => l.length)) === J.length + 4);
     await p.click('#smFecha'); await p.waitForTimeout(200);
     ok('e fecha', !(await p.isVisible('#semana')));
+
+    console.log('\n── 4-B. desfazer a última não dispara a faixa de venda nova (③ REVISÃO) ──');
+    await p.fill('#scan', 'BK100160BEGE'); await p.keyboard.press('Enter'); await p.waitForTimeout(300);
+    await p.fill('#scan', 'BK100160BEGE'); await p.keyboard.press('Enter'); await p.waitForTimeout(3800);
+    ok('a última de hoje do BEGE foi revisada', /Revisada/.test(await p.textContent('#banner')));
+    await p.click('#desfBt'); await p.waitForTimeout(200); await p.click('#desfSim'); await p.waitForTimeout(3800);
+    ok('a revisão foi desfeita', /Revisão desfeita/.test(await p.textContent('#banner')));
+    ok('e a faixa de venda nova NÃO apareceu', !(await p.isVisible('#faixaNova')));
 
     console.log('\n── 5. terminado o dia ──');
     db.prepare("INSERT INTO revisao (codigo,segundos,modo,usuario_id) VALUES ('BK140160CINZA',60,'hoje',1),('BK140160CINZA',60,'hoje',1),('BK100160BEGE',60,'hoje',1)").run();

@@ -144,7 +144,7 @@
 - **Status:** no ar.
 
 ### R-REV-05 · A ordem urgente atendida pelo estoque não cobra produção
-- **Regra:** `ordem_dia.js` é o único que responde o que falta das ordens de hoje. A parte urgente cuja venda já saiu, ou que o estoque cobre, aparece em âmbar como "saiu do estoque — nada a produzir". Só `a_produzir` fica vermelho e toca o alarme. O tile, o aviso e a TV leem a mesma conta.
+- **Regra:** `ordem_dia.js` é o único que responde o que falta das ordens de hoje. A parte urgente cuja venda já saiu, ou que o estoque cobre, não cobra produção: só `a_produzir` conta. ~~Na tela vermelha aparecia em âmbar "saiu do estoque — nada a produzir"~~ — desde 23/11/2026 (R-REV-01) a parte Hoje da tela única mostra só o `a_produzir`, e o aviso de status da 101 saiu. A TV e o `/api/revisao/status` continuam lendo a mesma conta.
 - **Por quê:** em 08/09/2026 a tela cobrava 4 peças urgentes com todas as vendas já despachadas.
 - **Exceções:** ordem **manual** nunca é "atendida", porque não tem venda atrás. ⚠ Não mande a embalagem azul abater a ordem.
 - **Teste que trava:** `teste_ordem_dia.js` (17) · `teste_estoque.js` (caso da TV).
@@ -199,8 +199,8 @@
 - **Status:** no ar.
 
 ### R-EMB-03 · Só a embalagem de fila "hoje" abate a ordem do dia
-- **Regra:** a embalagem abate `producao` só quando consome fila de `modo='hoje'` (revisada na tela vermelha).
-- **Por quê:** a tela azul é produção para estoque; abater ali faria o estoque parecer reposto com a peça indo para o cliente.
+- **Regra:** a embalagem abate `producao` só quando consome fila de `modo='hoje'` — desde 23/11/2026 o servidor grava esse modo quando a peça revisada cobre uma venda de hoje sem peça (R-REV-01); até ali era a peça revisada na tela vermelha.
+- **Por quê:** a peça revisada para estoque não atende ordem; abater ali faria o estoque parecer reposto com a peça indo para o cliente.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_montagem.js` · `teste_ordem_dia.js`.
 - **Status:** no ar.

@@ -67,7 +67,6 @@ const emTeste = db => {
   try{ const r = db.prepare("SELECT valor FROM config WHERE chave='modo_teste'").get(); return r && r.valor === '1' ? 1 : 0; }
   catch(e){ return 0; }
 };
-const modoDe = b => (b && b.modo) === 'estoque' ? 'estoque' : 'hoje';
 const texto = v => v == null || v === '' ? null : String(v).slice(0, 40);
 
 function evento(db, tipo, q, d){
@@ -188,7 +187,7 @@ module.exports=function(app,db){
     const b=req.body||{};
     const cod=String(b.codigo||'').trim().toUpperCase();
     if(!cod) return res.status(400).json({erro:'codigo'});
-    evento(db,'cancelada',q,{codigo:cod,segundos:Math.round(+b.segundos||0),modo:modoDe(b),inicio:b.inicio,fim:b.fim});
+    evento(db,'cancelada',q,{codigo:cod,segundos:Math.round(+b.segundos||0),modo:LISTA.modoPara(db,cod),inicio:b.inicio,fim:b.fim});
     res.json({ok:true});
   });
 
@@ -260,7 +259,11 @@ module.exports=function(app,db){
      semana só para ler. Leitura: cai no pre('/api/revisao') do permDaRota,
      como o /dia (revisao.executar ou o admin). */
   app.get('/api/revisao/lista',(req,res)=>{
-    const l=LISTA.montar(db);
+    /* A lista que não montou diz que não montou (a tela avisa), e não sai
+       com número faltando (③ REVISÃO). */
+    let l;
+    try{ l=LISTA.montar(db); }
+    catch(e){ console.error('[revisao] lista:', e); return res.status(500).json({erro:'Não deu para montar a lista da revisão. Tente de novo em instantes.'}); }
     /* Quantas a PESSOA revisou hoje e a média dela (o topo da tela). Quem é vem
        do login; sem id, nada. */
     const uid=QUEM.idDe(req);
@@ -268,7 +271,10 @@ module.exports=function(app,db){
       FROM revisao WHERE usuario_id=? AND data=date('now','localtime')`).get(uid);
     res.json(l);
   });
-  app.get('/api/revisao/semana',(req,res)=> res.json(LISTA.semana(db)));
+  app.get('/api/revisao/semana',(req,res)=>{
+    try{ res.json(LISTA.semana(db)); }
+    catch(e){ console.error('[revisao] semana:', e); res.status(500).json({erro:'Não deu para montar a semana. Tente de novo em instantes.'}); }
+  });
   app.get('/api/revisao/defeitos',(req,res)=> res.json({ abertas:DEFEITO.abertas(db), setores:DEFEITO.SETORES }));
   app.post('/api/revisao/defeitos/:id/decidir',(req,res)=>{
     const q=exigir(req,res); if(!q) return;

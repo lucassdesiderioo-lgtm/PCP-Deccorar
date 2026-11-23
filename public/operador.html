@@ -117,7 +117,10 @@
 <div id="semana" hidden></div>
 <script>
 let SKUS=[], PROD={}, emRev=null, tick=null;
-var MODO=null, LISTA=null, VISTO=null, SKUS_EM=0;
+var MODO=null, LISTA=null, VISTO=null, SKUS_EM=0, LISTA_ERRO=false;
+/* A lista que não carrega diz que não carregou (§12, o fetch que falha não
+   some calado): a lista de antes, se houver, continua embaixo. */
+function falhaLista(){ LISTA_ERRO=true; renderTiles(); }
 const $=s=>document.querySelector(s);
 /* TELA ÚNICA (REVISAO-TELA-UNICA, 23/11/2026): não se escolhe cor ao abrir. A
    lista vem pronta do /api/revisao/lista (revisao_lista.js), e quem decide
@@ -125,7 +128,9 @@ const $=s=>document.querySelector(s);
 async function load(){
   /* O cadastro de SKU (a medida e a cor) muda pouco: a cada minuto basta. */
   if(!SKUS.length || Date.now()-SKUS_EM>60000){ try{ SKUS=await (await fetch('/api/skus')).json(); SKUS_EM=Date.now(); }catch(e){} }
-  try{ var r=await fetch('/api/revisao/lista'); if(!r.ok) return; var l=await r.json(); if(!l||!l.totais||!l.hoje_lista) return; LISTA=l; }catch(e){ return; }
+  try{ var r=await fetch('/api/revisao/lista'); var l=r.ok?await r.json():null;
+    if(!l||!l.totais||!l.hoje_lista){ falhaLista(); return; } LISTA=l; LISTA_ERRO=false; }
+  catch(e){ falhaLista(); return; }
   novaVenda(); renderTiles(); loadStats();
 }
 function skuInfo(c){ return SKUS.find(s=>s.codigo===c); }
@@ -178,7 +183,8 @@ function miniTxt(lista, campo){
       +escH(md?md.medida+' '+(md.cor||'').toLowerCase():x.codigo)+'<b>'+x[campo]+'</b></button>'; }).join('')+'</div>';
 }
 function renderTiles(){
-  var L=LISTA; if(!L){ $('#tiles').innerHTML='<div class="muted">Carregando a lista…</div>'; return; }
+  var erro=LISTA_ERRO?'<div class="aviso">Não deu para atualizar a lista agora. A tela tenta de novo sozinha; os números abaixo podem estar velhos.</div>':'';
+  var L=LISTA; if(!L){ $('#tiles').innerHTML=erro||'<div class="muted">Carregando a lista…</div>'; return; }
   var t=L.totais, h='', ate=L.ate?' · até '+escH(L.ate):'';
   var alvo=L.alvo_lista.length?'<div class="depois"><h3>Completar o alvo<b>faltam '+t.alvo+'</b></h3>'+miniTxt(L.alvo_lista,'alvo')+'</div>':'';
   if(!L.hoje_terminado && !L.sem_venda_hoje && L.hoje_lista.length){
@@ -193,7 +199,7 @@ function renderTiles(){
       h+='<div class="foco fp"><div class="fcab"><span class="ft">Próximos dias</span><span class="fs">o dia mais cedo primeiro'+ate+'</span>'
         +'<span class="fn">faltam <b>'+t.proximos+'</b></span></div><div class="gd">'+L.proximos_lista.map(function(x){ return cardTxt(x,'prox'); }).join('')+'</div></div>';
   }
-  h+=alvo;
+  h=erro+h+alvo;
   if(!L.hoje_lista.length && !L.proximos_lista.length && !L.alvo_lista.length)
     h+='<div class="muted">Nada a produzir agora: as vendas estão cobertas e o alvo está cheio. (Confira o Planejamento se acabou de importar a planilha.)</div>';
   $('#tiles').innerHTML=h;
@@ -215,6 +221,10 @@ function destino(cod){
 function novaVenda(){
   var L=LISTA; if(!L) return;
   var agora={}; L.hoje_lista.forEach(function(x){ agora[x.codigo]=x.hoje+(x.hoje_revisadas||0); });
+  /* O SKU que terminou sai da lista de Hoje e volta com um "Desfazer" ou com
+     a peça devolvida pela embalagem: isso não é venda nova (③ REVISÃO). O que
+     já foi visto hoje fica guardado, pelo maior número; vira o dia, zera. */
+  if(VISTO && VISTO.__dia!==L.hoje) VISTO=null;
   if(VISTO){
     var novos=Object.keys(agora).filter(function(c){ return agora[c]>(VISTO[c]||0); });
     if(novos.length){
@@ -226,7 +236,9 @@ function novaVenda(){
       document.getElementById('fxOk').onclick=function(){ f.hidden=true; scan.focus({preventScroll:true}); };
     }
   }
-  VISTO=agora;
+  var guarda=VISTO||{__dia:L.hoje};
+  Object.keys(agora).forEach(function(c){ guarda[c]=Math.max(guarda[c]||0, agora[c]); });
+  VISTO=guarda;
 }
 /* Quantas peças a PESSOA revisou hoje e a média dela (o /api/revisao/lista
    manda "minhas", pelo login). */
@@ -323,7 +335,7 @@ async function finish(){
   }catch(e){ banner('err','Falha de conexão',String(e)); beep(false); }
 }
 async function cancelarRev(){
-  var cur=emRev; if(!cur) return;
+  var cur=emRev; if(!cur || RJ_ENVIANDO) return;
   var seg=Math.round((Date.now()-cur.inicio)/1000);
   clearInterval(tick); tick=null; emRev=null; renderTiles();
   try{
@@ -365,7 +377,7 @@ async function confirmarDesfazer(){
     beep(true); load();
   }catch(e){ banner('err','Sem conexão','Não sei se a revisão foi desfeita — confira a lista da embalagem antes de bipar de novo.'); beep(false); }
 }
-$('#tiles').addEventListener('click',e=>{ const b=e.target.closest('[data-cod]'); if(b) toggle(b.dataset.cod); });
+$('#tiles').addEventListener('click',e=>{ const b=e.target.closest('[data-cod]'); if(b && !janelaAberta()) toggle(b.dataset.cod); });
 const scan=$('#scan');
 /* preventScroll: devolver o foco nao pode arrastar a tela. O #scan mora no
    alto; sem isto, focar de volta rolava a pagina ate ele e jogava pro topo
@@ -375,7 +387,11 @@ const scan=$('#scan');
    problema) o foco NÃO volta ao bipe — ele roubava o toque do campo da
    observação, e o campo do SKU piscava. E campo de digitar que tem o foco
    fica com ele. */
-function janelaAberta(){ return !!document.getElementById('rjBox'); }
+/* Com a janela aberta, OU com a peça com problema indo para o servidor
+   (③ REVISÃO, 23/11/2026): um bipe nessa espera fechava a revisão por baixo,
+   e a mesma peça ia para a fila da embalagem e para a peça com problema. */
+var RJ_ENVIANDO=false;
+function janelaAberta(){ return RJ_ENVIANDO || !!document.getElementById('rjBox'); }
 const keep=()=>{
   if(janelaAberta()) return;
   var a=document.activeElement;
@@ -523,7 +539,7 @@ async function rjCarregar(){
 }
 rjCarregar();
 function rjAbrir(){
-  if(!emRev) return;
+  if(!emRev || RJ_ENVIANDO) return;
   var h='<div style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px" id="rjBox">';
   h+='<div style="background:#f4f6f8;border:1px solid #d8dee6;border-radius:16px;padding:24px;max-width:520px;width:100%">';
   h+='<div style="font-size:19px;font-weight:800;margin-bottom:4px">Peça com problema</div>';
@@ -547,10 +563,13 @@ document.addEventListener('click',function(e){
   var cur=emRev;
   if(!cur) return;
   var seg=Math.round((Date.now()-cur.inicio)/1000);
+  RJ_ENVIANDO=true;
   var bx=document.getElementById('rjBox'); if(bx) bx.remove();
+  var bsE=document.querySelector('#banner .bs'); if(bsE) bsE.insertAdjacentHTML('beforeend','<div id="rjEsperando" style="margin-top:8px;font-weight:700">Registrando a peça com problema…</div>');
   /* A tela só diz "voltou" quando o servidor gravou. Recusa ou falta de
      conexão: a revisão continua aberta e a pessoa tenta de novo. */
-  function naoGravou(msg){ beep(false);
+  function naoGravou(msg){ RJ_ENVIANDO=false; beep(false);
+    var ep=document.getElementById('rjEsperando'); if(ep) ep.remove();
     var bs=document.querySelector('#banner .bs');
     if(bs) bs.innerHTML='<b style="color:#c62828">A peça com problema não foi registrada: '+escH(msg)+'</b>';
     scan.focus({preventScroll:true}); }
@@ -559,6 +578,7 @@ document.addEventListener('click',function(e){
    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok&&!j.erro, j:j}; }); })
    .then(function(x){
      if(!x.ok){ naoGravou(x.j.erro||'o servidor recusou'); return; }
+     RJ_ENVIANDO=false;
      clearInterval(tick); tick=null; emRev=null;
      banner('err','Voltou para a produção', cur.codigo+' · '+motivo);
      renderTiles(); load(); scan.focus({preventScroll:true});

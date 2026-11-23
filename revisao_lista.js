@@ -51,9 +51,11 @@ function janela(hoje){
   return dias;
 }
 
+/* Sem catch: a conta que falhar sobe, e a rota diz que a lista não montou —
+   um zero calado aqui faria a peça na fila deixar de ser descontada (③). */
 function contar(db, sql, args){
   const m = {};
-  try{ db.prepare(sql).all(...(args||[])).forEach(r => { m[String(r.c).toUpperCase()] = r.n; }); }catch(e){}
+  db.prepare(sql).all(...(args||[])).forEach(r => { m[String(r.c).toUpperCase()] = r.n; });
   return m;
 }
 
@@ -82,9 +84,19 @@ function montar(db){
   const calc = {};
   DEMANDA.calcular(db).linhas.forEach(l => { if(l.cadastrado) calc[String(l.codigo).toUpperCase()] = l; });
 
-  /* Revisada e ainda na fila da embalagem, para estoque. */
+  /* AS PEÇAS REVISADAS E AINDA NÃO EMBALADAS (fila 'aguardando'). O livre só
+     sobe na embalagem: sem descontá-las, a bancada revisaria a mesma falta
+     duas vezes (③ REVISÃO, 23/11/2026):
+       - a de modo 'hoje' revisada HOJE já saiu da conta de Hoje (o ordem_dia
+         a conta como revisada); ela entra com a venda de hoje do PDF no que
+         Hoje já cobre (`cobertoHoje`);
+       - TODAS as outras — estoque, devolução e a de 'hoje' de dias
+         anteriores — viram +1 na embalagem e são descontadas da falta. */
+  const filaHojeDeHoje = contar(db, `SELECT UPPER(codigo) c, COUNT(*) n FROM fila
+    WHERE situacao='aguardando' AND modo='hoje' AND data=date('now','localtime') AND COALESCE(teste,0)=0 GROUP BY UPPER(codigo)`);
   const naFila = contar(db, `SELECT UPPER(codigo) c, COUNT(*) n FROM fila
-    WHERE situacao='aguardando' AND COALESCE(modo,'estoque')='estoque' AND COALESCE(teste,0)=0 GROUP BY UPPER(codigo)`);
+    WHERE situacao='aguardando' AND NOT (COALESCE(modo,'')='hoje' AND data=date('now','localtime'))
+      AND COALESCE(teste,0)=0 GROUP BY UPPER(codigo)`);
   /* Revisada hoje para estoque (o andamento dos próximos dias e do alvo). */
   const revEst = contar(db, `SELECT UPPER(codigo) c, COUNT(*) n FROM revisao
     WHERE data=date('now','localtime') AND COALESCE(modo,'estoque')='estoque' AND COALESCE(teste,0)=0 GROUP BY UPPER(codigo)`);
@@ -103,19 +115,26 @@ function montar(db){
     const hojeFalta = o ? Math.max(0, o.a_produzir) : 0;
     const hojeFeitas = o ? (o.revisadas || 0) : 0;
     const f = faltaAte[c] || (() => 0);
-    const base = f(hoje);
-    let resto = naFila[c] || 0;
-    /* Dia a dia: o quanto a falta acumulada cresce em cada dia da janela. */
-    const porDiaSku = []; let ant = base;
+    /* A falta da planilha dia a dia, contando de hoje: o quanto a falta
+       acumulada cresce em cada dia (o primeiro é hoje e a atrasada). */
+    const incHoje = { n: f(hoje) };
+    const porDiaSku = []; let ant = incHoje.n;
     for(const d of dias){ const v = f(d); porDiaSku.push({ dia:d, n:Math.max(0, v - ant) }); ant = v; }
-    /* A peça revisada e ainda não embalada sai primeiro do dia mais cedo. */
-    for(const x of porDiaSku){ const t = Math.min(resto, x.n); x.n -= t; resto -= t; }
+    /* O que Hoje já cobre — a venda de hoje do PDF ainda por revisar e a
+       revisada hoje para ela, esperando a embalagem — sai da falta da
+       planilha a partir do dia mais cedo: a MESMA venda pode estar na
+       planilha com outra data (a "próxima coleta", a NF a emitir), e não
+       pode contar em Hoje e nos Próximos dias (③ REVISÃO, 23/11/2026). */
+    const tirar = (q) => { for(const x of [incHoje].concat(porDiaSku)){ const t = Math.min(q, x.n); x.n -= t; q -= t; } return q; };
+    tirar(hojeFalta + (filaHojeDeHoje[c] || 0));
+    /* A peça revisada e ainda não embalada sai do dia mais cedo. */
+    let resto = tirar(naFila[c] || 0);
     const proxTotal = porDiaSku.reduce((a, x) => a + x.n, 0);
     const l = calc[c];
     const faltaJanela = f(dias.length ? dias[dias.length-1] : hoje);
     let alvo = l ? Math.max(0, l.precisa - faltaJanela) : 0;
     if(s.sob_medida) alvo = 0;   // sob medida não tem alvo (R-REV-04)
-    const t = Math.min(resto, alvo); alvo -= t; resto -= t;
+    alvo -= Math.min(resto, alvo);
     if(!hojeFalta && !proxTotal && !alvo && !hojeFeitas) continue;
     const primeiro = porDiaSku.length ? porDiaSku[0] : null;
     itens.push({

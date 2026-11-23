@@ -47,8 +47,10 @@ async function abrir(browser, opc){
       if(r.request().method() === 'POST'){
         posts.push({ rota:u.pathname, corpo:r.request().postDataJSON() });
         if(u.pathname === '/api/rejeicao' && opc.recusa) return r.fulfill({ status:403, json:{ erro:'Sem permissão para registrar peça com problema' } });
+        if(u.pathname === '/api/rejeicao' && opc.lento) await new Promise(ok => setTimeout(ok, opc.lento));
         return r.fulfill({ json:{ ok:true } });
       }
+      if(u.pathname === '/api/revisao/lista' && opc.listaFalha) return r.fulfill({ status:500, json:{ erro:'Não deu para montar a lista da revisão.' } });
       return r.fulfill({ json: J[u.pathname] !== undefined ? J[u.pathname] : {} });
     }
     const f = path.join(PUB, u.pathname);
@@ -117,6 +119,27 @@ async function abrir(browser, opc){
   t = await abrir(browser, { motivos:[] });
   await t.p.tap('#rjBt'); await t.p.waitForTimeout(200);
   ok('a janela avisa que não há motivo cadastrado', /Nenhum motivo cadastrado/i.test(await t.p.textContent('#rjBox')));
+  await t.ctx.close();
+
+  console.log('\n── 7. esperando o servidor gravar o problema, nada fecha a revisão por baixo (③ REVISÃO) ──');
+  t = await abrir(browser, { lento:1500 });
+  await t.p.tap('#rjBt'); await t.p.waitForTimeout(200);
+  await t.p.tap('.rjOp'); await t.p.waitForTimeout(150);
+  await t.p.evaluate(() => { const s = document.getElementById('scan'); s.focus(); s.value = 'BK140160CINZA'; });
+  await t.p.keyboard.press('Enter'); await t.p.waitForTimeout(150);
+  if(await t.p.isVisible('#rjBt')){ await t.p.tap('#rjBt').catch(()=>{}); await t.p.waitForTimeout(150);
+    if(await t.p.$('.rjOp')) await t.p.tap('.rjOp').catch(()=>{}); }
+  if(await t.p.isVisible('#cancBt').catch(()=>false)) await t.p.tap('#cancBt').catch(()=>{});
+  await t.p.waitForTimeout(1800);
+  ok('o bipe na espera não gravou revisão', !t.posts.some(x => x.rota === '/api/revisao'), t.posts.map(x => x.rota));
+  ok('nem cancelou', !t.posts.some(x => x.rota === '/api/revisao/cancelar'), t.posts.map(x => x.rota));
+  ok('e a peça com problema foi gravada uma vez só', t.posts.filter(x => x.rota === '/api/rejeicao').length === 1, t.posts.map(x => x.rota));
+  ok('no fim, voltou para a produção', /Voltou para a produção/.test(await t.p.textContent('#banner')));
+  await t.ctx.close();
+
+  console.log('\n── 8. a lista que não carrega diz que não carregou (③ REVISÃO) ──');
+  t = await abrir(browser, { listaFalha:true });
+  ok('a tela avisa', /Não deu para atualizar a lista/.test(await t.p.textContent('#tiles')), await t.p.textContent('#tiles'));
   await t.ctx.close();
 
   await browser.close();

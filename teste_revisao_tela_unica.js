@@ -133,5 +133,40 @@ ok('a semana traz os dias da janela', s && s.dias.length === JAN.length, s && s.
 ok('cada linha tem um número por dia', s && s.linhas.every(x => x.dias.length === JAN.length));
 ok('nenhum valor em reais na lista', !/preco|valor|custo/i.test(JSON.stringify(L())));
 
+console.log('\n── 7. a mesma venda não conta em Hoje e em Próximos dias (③ REVISÃO) ──');
+/* E: a venda v está no PDF de hoje (ordem urgente de 1), e a planilha diz
+   amanhã ("Pronto para coleta" indo para a próxima coleta). */
+db.prepare("INSERT OR REPLACE INTO config (chave,valor) VALUES ('rev_minimo_seg','0')").run();
+sku.run('BK130160BEGE', 0, 1, 130, 160);
+vf.run('vE', 'BK130160BEGE', hoje, D0);
+db.prepare("INSERT INTO lote (codigo,estagio,venda) VALUES ('BK130160BEGE','pendente','vE')").run();
+db.prepare("INSERT INTO producao (codigo,qtd,origem,urgente) VALUES ('BK130160BEGE',1,'ml',1)").run();
+let e = item(L(), 'BK130160BEGE');
+eq('E: 1 em Hoje', e.hoje, 1);
+eq('E: e nada nos Próximos dias (a mesma venda)', e.proximos, 0);
+eq('E: Hoje + Próximos + Alvo = o precisa da 401', e.hoje + e.proximos + e.alvo, precisa('BK130160BEGE'));
+rev('BK130160BEGE');
+e = item(L(), 'BK130160BEGE');
+eq('E revisada para hoje: os Próximos dias continuam zerados', e ? e.proximos : 0, 0);
+
+console.log('\n── 8. toda peça na fila que vira +1 é descontada (③ REVISÃO) ──');
+sku.run('BK110160BEGE', 0, 1, 110, 160);
+vf.run('vF', 'BK110160BEGE', hoje, D0);
+eq('F: falta 1 no primeiro dia', item(L(), 'BK110160BEGE').dias[0].n, 1);
+db.prepare("INSERT INTO fila (codigo,modo,situacao) VALUES ('BK110160BEGE','devolucao','aguardando')").run();
+eq('a peça de devolução esperando a embalagem desconta', item(L(), 'BK110160BEGE') ? item(L(), 'BK110160BEGE').dias[0].n : 0, 0);
+sku.run('BK110140PRETO', 0, 1, 110, 140);
+vf.run('vG', 'BK110140PRETO', hoje, D0);
+db.prepare("INSERT INTO fila (codigo,modo,situacao,data) VALUES ('BK110140PRETO','hoje','aguardando',date('now','localtime','-1 day'))").run();
+eq('a peça de hoje de ONTEM esperando a embalagem desconta', item(L(), 'BK110140PRETO') ? item(L(), 'BK110140PRETO').dias[0].n : 0, 0);
+
+console.log('\n── 9. a lista que falha diz que falhou (③ REVISÃO) ──');
+const orig = DEMANDA.porDia;
+DEMANDA.porDia = () => { throw new Error('quebrou de propósito'); };
+const rr = chamar('GET', '/api/revisao/lista');
+DEMANDA.porDia = orig;
+eq('500, e não uma lista sem número', rr.status, 500);
+ok('com o motivo, sem a pilha do erro', rr.body && /^Não deu para montar a lista/.test(rr.body.erro || '') && !/at /.test(rr.body.erro), rr.body);
+
 console.log('\n' + (falhas ? falhas + ' FALHA(S) de ' + n : 'todos os ' + n + ' casos passaram'));
 process.exit(falhas ? 1 : 0);
