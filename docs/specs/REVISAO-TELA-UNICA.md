@@ -1,11 +1,11 @@
 # REVISAO-TELA-UNICA — a 101 Revisão numa tela só, ligada ao planejamento
 
-> **STATUS — 23/11/2026: RASCUNHO, AGUARDANDO O DONO.** Desenhado na conversa de
+> **STATUS — 23/11/2026: COMPLETA, AGUARDANDO O "PODE SEGUIR" DO DONO.** Desenhado na conversa de
 > 23/11/2026 (Claude Code, sessão de perguntas e respostas). Nada construído.
 > Tipo: `REGRA` + `NOVIDADE` · risco 🟡 (comportamento de tela, conta exibida e
 > o modo gravado na revisão, que decide o que abate a ordem do dia). Muda os
 > cartões **R-REV-01**, **R-REV-02** e **R-REV-03** de `docs/regras/estoque.md`.
-> As decisões ainda abertas estão na §9; o design é a fase 2.
+> As decisões do dono estão na §9; o design é a fase 2.
 
 ## 1. O pedido
 
@@ -70,7 +70,7 @@ precisamos ter a tela azul e vermelha."*
 
 ## 5. O cartão de cada SKU
 
-Proposta (a confirmar, §9):
+Decidido (§9):
 
 ```
 1,40 × 1,60  CINZA                 faltam 9
@@ -92,8 +92,7 @@ nada. **É a mesma tela (o mesmo assunto), não uma tela nova.**
 - **SKU que não falta em lugar nenhum** (venda coberta e alvo cheio): **avisa e
   deixa passar** (o dono, 23/11), e a peça conta como estoque acima do alvo.
 - **Venda nova de hoje sem peça** (um PDF da tarde): faixa vermelha no topo e um
-  som, uma vez, sem travar nada. A lista se reordena sozinha. *(Proposta do
-  Claude; o dono disse que é raro.)*
+  som, uma vez, sem travar nada. A lista se reordena sozinha. *(Decidido, §9.)*
 - Os avisos de hoje — SKU não cadastrado, bipe rápido, sem conexão — ficam.
 
 ## 8. O que fica como está, e o que fica de fora
@@ -113,20 +112,31 @@ atualização sozinha da lista (sem redesenhar com a revisão aberta).
 a demanda da revisão passa a vir do que a montagem entregou ao revisor. Esta
 spec não constrói isso; a fase 3 se escreve junto com aquela spec.
 
-## 9. Decisões abertas
+## 9. Decisões do dono (23/11/2026)
 
-1. **O cartão** da §5 está certo, ou falta/sobra alguma coisa?
-2. **Na sexta** (e no sábado), "Próximos dias" mostra a semana seguinte (até a
-   outra sexta), ou só segunda?
-3. **A chave `ordem_por_falta`** (desligada, R-REV-03): a ordem por data em
-   "Próximos dias" vale na revisão já, ou espera a prova da falta da 401 batendo
-   com a bancada?
-4. **A faixa e o som** da venda nova de hoje (§7): sim ou não?
-5. **Dois revisores** no mesmo SKU ao mesmo tempo: a lista de cada tablet se
-   atualiza em poucos segundos; serve, ou precisa mostrar "em revisão no outro
-   tablet"?
+1. **O cartão** da §5: sim, como está.
+2. **Na sexta**, "Próximos dias" mostra só a **segunda** seguinte.
+3. **A ordem pela data da falta** vale na revisão desde a fase 1 (o dono: *"já
+   usa"*), sem esperar a chave `ordem_por_falta`. A chave continua valendo só
+   para o `/api/revisao/producao` de antes; com a tela azul aposentada, ela fica
+   sem uso na revisão — anotar no cartão R-REV-03.
+4. **A faixa vermelha e o som** da venda nova de hoje: sim, uma vez, sem travar.
+5. **Dois revisores** no mesmo SKU: a lista atualizando em poucos segundos basta.
 6. Divergência a anotar: a 206 Horários de coleta trabalha de segunda a sábado;
-   a semana desta tela é até sexta.
+   a semana desta tela é até sexta (a coleta, o dono, é de segunda a sexta).
+
+### A ideia da peça reservada (o dono, 23/11: *"apenas uma ideia"*) — fica para a fase 3
+
+Reservar a necessidade quando a revisão **abre**, para o outro tablet ver o
+número já descontado. **Não entra na fase 1**, por três razões:
+- a revisão aberta **não existe no servidor** hoje: o primeiro bipe só liga o
+  cronômetro no tablet. Reservar pede gravar a revisão em andamento (schema e
+  rota novos) e soltar a reserva do tablet que ficou aberto e foi abandonado;
+- **não há conta dobrada sem ela**: a necessidade é escolhida no bipe que
+  **fecha**, um de cada vez; a segunda peça do mesmo SKU vai para a necessidade
+  seguinte (amanhã, ou o alvo), e nada sobra sem destino;
+- com o **código único por peça** da `PRODUCAO-MAPA-E-MOTOR`, a peça já chega
+  com nome, e a reserva se decide ali (fase 3).
 
 ## 10. Fases
 
