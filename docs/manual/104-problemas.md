@@ -2,7 +2,7 @@
 tela: 104
 titulo: Problemas
 situacao: rascunho
-atualizada_em: 2026-11-22
+atualizada_em: 2026-11-23
 cartoes: R-REV-06, R-EMB-11
 parametros: 
 ---
@@ -22,3 +22,4 @@ parametros:
 ## Mudanças
 - 21/11/2026 — ficha criada em rascunho
 - 22/11/2026 — A lista separa a peça com problema achada na Revisão da achada na Embalagem, com o setor responsável; na achada na Embalagem, a coluna Quem diz quem achou e quem conferiu.
+- 23/11/2026 — Na Revisão, a peça com problema só aparece aqui quando o registro foi gravado: se a gravação falhar, a tela da Revisão avisa e a revisão continua aberta.

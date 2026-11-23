@@ -152,10 +152,10 @@
 - **História:** armadilha #20.
 
 ### R-REV-06 · Peça com problema volta para a produção e não entra na fila
-- **Regra:** durante a revisão, "Peça com problema" grava em `rejeicao` o motivo, o tempo até a detecção, o modo e quem rejeitou — o nome em `usuario` e, desde 04/11/2026, o `usuario_id` ao lado, pelo `quem.js`; sem login, 401. A peça não vai para a embalagem. Os motivos são cadastro (`listas`, tipo `rejeicao`). **É só para defeito de verdade**: o bipe errado se resolve no "Cancelar revisão" (R-REV-08).
-- **Por quê:** a peça com defeito não pode virar estoque.
+- **Regra:** durante a revisão, "Peça com problema" grava em `rejeicao` o motivo, o tempo até a detecção, o modo e quem rejeitou — o nome em `usuario` e, desde 04/11/2026, o `usuario_id` ao lado, pelo `quem.js`; sem login, 401. A peça não vai para a embalagem. Os motivos são cadastro (`listas`, tipo `rejeicao`). **É só para defeito de verdade**: o bipe errado se resolve no "Cancelar revisão" (R-REV-08). **Na tela (CONSERTO de 23/11/2026):** com a janela do motivo aberta o foco não volta ao campo do bipe e o bipe não fecha a revisão por baixo dela; a tela só diz "Voltou para a produção" quando o servidor gravou — recusa ou falta de conexão deixam a revisão aberta, dizendo por quê; sem motivo cadastrado, a janela diz onde cadastrar.
+- **Por quê:** a peça com defeito não pode virar estoque. E o dono, 23/11/2026: *"o botão aparece mas não consigo clicar, quando clico nele ele pisca o campo de sku"* — o foco que volta ao bipe roubava o toque da janela.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_revisao.js` (seção 15: quem rejeitou e o 401) · ⚠ que a peça rejeitada não entra na fila continua **sem teste**.
+- **Teste que trava:** `teste_revisao.js` (seção 15: quem rejeitou e o 401) · `teste_revisao_problema_tela.js` (17, num Chromium com toque de iPad; sem navegador diz PULADO) · ⚠ que a peça rejeitada não entra na fila continua **sem teste**.
 - **Status:** no ar; o `usuario_id` em código em 04/11/2026.
 
 ### R-REV-07 · Bipe de fim abaixo de 15 s é recusado, e a revisão continua

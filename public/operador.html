@@ -301,13 +301,24 @@ const scan=$('#scan');
    alto; sem isto, focar de volta rolava a pagina ate ele e jogava pro topo
    quem tivesse descido pra usar qualquer coisa no fim. O keep existe pro
    BIPE cair no lugar certo, nao pra mexer no que a pessoa esta olhando. */
-const keep=()=>{ if(document.activeElement!==scan) scan.focus({preventScroll:true}); };
+/* CONSERTO de 23/11/2026: com uma janela aberta (o motivo da peça com
+   problema) o foco NÃO volta ao bipe — ele roubava o toque do campo da
+   observação, e o campo do SKU piscava. E campo de digitar que tem o foco
+   fica com ele. */
+function janelaAberta(){ return !!document.getElementById('rjBox'); }
+const keep=()=>{
+  if(janelaAberta()) return;
+  var a=document.activeElement;
+  if(a && a!==scan && (a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT')) return;
+  if(a!==scan) scan.focus({preventScroll:true});
+};
 scan.addEventListener('blur',()=>setTimeout(keep,50));
 document.addEventListener('click',e=>{ if(!e.target.closest('button,a')) keep(); });
 var tmr=null;
 function processa(){
   var v=(scan.value||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
   scan.value='';
+  if(janelaAberta()) return;   // o bipe não fecha a revisão por baixo da janela do motivo
   if(v.length>=8) toggle(v);
 }
 scan.addEventListener('keydown',function(e){
@@ -327,7 +338,7 @@ document.addEventListener('keydown',function(e){
   ult=t;
   if(e.key==='Enter'||e.key==='Tab'){
     var lim=buf.replace(/[^A-Za-z0-9]/g,'').toUpperCase();
-    if(lim.length>=8){ e.preventDefault(); buf=''; toggle(lim); }
+    if(lim.length>=8){ e.preventDefault(); buf=''; if(!janelaAberta()) toggle(lim); }
     else buf='';
     return;
   }
@@ -425,7 +436,9 @@ function rjAbrir(){
   h+='<div style="background:#f4f6f8;border:1px solid #d8dee6;border-radius:16px;padding:24px;max-width:520px;width:100%">';
   h+='<div style="font-size:19px;font-weight:800;margin-bottom:4px">Peça com problema</div>';
   h+='<div style="font-size:14px;color:#5a6472;margin-bottom:18px">'+emRev.codigo+' volta para a produção. Qual o motivo?</div>';
-  for(var i=0;i<RJMOT.length;i++){
+  if(!Array.isArray(RJMOT) || !RJMOT.length)
+    h+='<div style="padding:14px;border-radius:10px;background:#fbf1db;border:1px solid #e7cb8c;color:#8a5a00;font-size:15px">Nenhum motivo cadastrado. Peça para cadastrar os motivos em 902 Cadastros (lista "Peça com problema").</div>';
+  for(var i=0;Array.isArray(RJMOT)&&i<RJMOT.length;i++){
     h+='<button type="button" class="rjOp" data-m="'+RJMOT[i].valor+'" style="display:block;width:100%;text-align:left;margin-bottom:8px;padding:15px;border-radius:10px;border:1px solid #d8dee6;background:transparent;color:#1a1d23;font-size:16px;cursor:pointer">'+RJMOT[i].valor+'</button>';
   }
   h+='<input id="rjObs" placeholder="observação (opcional)" style="width:100%;margin-top:10px;padding:12px;background:#ffffff;border:1px solid #d8dee6;border-radius:9px;color:#1a1d23;font-size:15px">';
@@ -442,14 +455,22 @@ document.addEventListener('click',function(e){
   var cur=emRev;
   if(!cur) return;
   var seg=Math.round((Date.now()-cur.inicio)/1000);
-  clearInterval(tick); tick=null; emRev=null;
   var bx=document.getElementById('rjBox'); if(bx) bx.remove();
+  /* A tela só diz "voltou" quando o servidor gravou. Recusa ou falta de
+     conexão: a revisão continua aberta e a pessoa tenta de novo. */
+  function naoGravou(msg){ beep(false);
+    var bs=document.querySelector('#banner .bs');
+    if(bs) bs.innerHTML='<b style="color:#c62828">A peça com problema não foi registrada: '+escH(msg)+'</b>';
+    scan.focus({preventScroll:true}); }
   fetch('/api/rejeicao',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({codigo:cur.codigo,motivo:motivo,obs:obs,segundos:seg,modo:MODO})})
-   .then(function(){
+   .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok&&!j.erro, j:j}; }); })
+   .then(function(x){
+     if(!x.ok){ naoGravou(x.j.erro||'o servidor recusou'); return; }
+     clearInterval(tick); tick=null; emRev=null;
      banner('err','Voltou para a produção', cur.codigo+' · '+motivo);
-     renderTiles(); load();
-   });
+     renderTiles(); load(); scan.focus({preventScroll:true});
+   }, function(){ naoGravou('sem conexão — toque de novo'); });
 });
 
 var AVANT=0;

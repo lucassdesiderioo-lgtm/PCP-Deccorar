@@ -184,7 +184,7 @@
   "R-REV-03": "f3a27c4cfb0c0ce3",
   "R-REV-04": "ef9f572600bf404c",
   "R-REV-05": "ec7ad2301a2899e8",
-  "R-REV-06": "85bc15548b9dafc3",
+  "R-REV-06": "13573422f4814a25",
   "R-REV-07": "25c34ca64082377a",
   "R-REV-08": "9b4b79dca19fcdd8",
   "R-REV-09": "2624ef22be05b12e",
@@ -353,7 +353,8 @@
     "21/11/2026 — ficha criada em rascunho",
     "21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com \"Parabéns!\" ou \"Você pode melhorar\". Só você vê o seu.",
     "22/11/2026 — O tempo ao lado da sua média está no ar na bancada desde 21/11/2026.",
-    "22/11/2026 — Entrou o bloco \"Voltaram da embalagem por defeito\": a persiana que quem embala devolveu aparece aqui com o motivo e quem achou. \"Tem defeito\" escolhe o setor responsável e a peça vira peça com problema; \"Não tem defeito\" fecha a volta e a peça é revisada de novo pelos dois bipes (a peça de devolução volta direto à fila da embalagem). A revisão daquela peça deixa de contar."
+    "22/11/2026 — Entrou o bloco \"Voltaram da embalagem por defeito\": a persiana que quem embala devolveu aparece aqui com o motivo e quem achou. \"Tem defeito\" escolhe o setor responsável e a peça vira peça com problema; \"Não tem defeito\" fecha a volta e a peça é revisada de novo pelos dois bipes (a peça de devolução volta direto à fila da embalagem). A revisão daquela peça deixa de contar.",
+    "23/11/2026 — Consertado o botão \"Peça com problema\": a janela do motivo deixou de devolver o foco ao campo do bipe (o campo piscava e o toque não pegava), o bipe não fecha mais a revisão por baixo dela, e a tela só diz \"Voltou para a produção\" quando o registro foi gravado."
    ],
    "situacao": "rascunho"
   },
@@ -389,7 +390,8 @@
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
     "21/11/2026 — ficha criada em rascunho",
-    "22/11/2026 — A lista separa a peça com problema achada na Revisão da achada na Embalagem, com o setor responsável; na achada na Embalagem, a coluna Quem diz quem achou e quem conferiu."
+    "22/11/2026 — A lista separa a peça com problema achada na Revisão da achada na Embalagem, com o setor responsável; na achada na Embalagem, a coluna Quem diz quem achou e quem conferiu.",
+    "23/11/2026 — Na Revisão, a peça com problema só aparece aqui quando o registro foi gravado: se a gravação falhar, a tela da Revisão avisa e a revisão continua aberta."
    ],
    "situacao": "rascunho"
   },
