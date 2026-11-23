@@ -66,7 +66,7 @@
   .faixa .ft1{font-size:20px;font-weight:780}.faixa .ft2{font-size:14px;color:#3b4552;margin-top:3px}
   .faixa.nova{border:2px solid var(--red);background:#fbe9e8}.faixa.esp{border-color:#e7cb8c;background:#fdf4e3}.faixa.feito{border-color:#a9d8b4;background:#e7f5eb}.faixa.feito .ft1{color:var(--green)}
   /* O aviso do bipe fora da prioridade (§4): o próximo bipe decide. */
-  .fora{border:2px solid var(--red);background:#fff;border-radius:14px;padding:16px 18px;margin:0 0 14px;text-align:left}
+  .fora{border:2px solid var(--red);background:#fff;border-radius:14px;padding:16px 18px;margin:14px 0;text-align:left}
   .fora .ft{color:var(--red);font-weight:800;font-size:14px;letter-spacing:.5px;text-transform:none;margin:0}
   .fora .fq1{font-size:19px;font-weight:750;margin-top:6px}.fora .fq2{font-size:16px;color:#3b4552;margin-top:6px;line-height:1.5}
   .fora button{min-height:52px;border-radius:12px;font-size:16px;font-weight:800;padding:0 16px;cursor:pointer}
@@ -101,7 +101,7 @@ let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[], avisoFix
 /* A PRIORIDADE (EMBALAGEM-PRIORIDADE, 23/11/2026): os quatro blocos vêm
    prontos do servidor (embalagem_prioridade.js). A tela só desenha. FILA
    continua sendo a lista "SKU → quantas esperam", para a trava da Revisão. */
-let PRIO=null, DIA_ANTES=null, NOVA=null;
+let PRIO=null, VISTOS=null, NOVA=null;
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function doDia(c){ c=String(c||'').toUpperCase(); return !!(PRIO&&PRIO.dia.linhas.some(d=>d.codigo===c)); }
 function linhaDia(c){ c=String(c||'').toUpperCase(); return PRIO?PRIO.dia.linhas.find(d=>d.codigo===c):null; }
@@ -118,9 +118,13 @@ async function carregarFila(){
     FILA=Object.keys(mapa).map(k=>({codigo:k,qtd:mapa[k]}));
     /* A peça do dia que acabou de sair da Revisão (F6): o SKU que não tinha
        peça aqui e agora tem. Fica marcada até o próximo bipe. */
-    const agora={}; p.dia.linhas.forEach(d=>{ agora[d.codigo]=d.aqui; });
-    if(DIA_ANTES){ const c=Object.keys(agora).find(k=>agora[k]>(DIA_ANTES[k]||0)); if(c) NOVA=c; }
-    DIA_ANTES=agora;
+    /* ⚠️ PELA LINHA DA FILA, E NAO PELO NUMERO "aqui" (③ REVISAO): o "aqui"
+       sobe tambem quando a reserva de outra pessoa solta, ou quando um SKU com
+       peca esperando entra no vermelho — e nenhuma peca saiu da Revisao. */
+    const todos=[].concat(p.dia.linhas,p.hoje,p.reposicao,p.devolucao);
+    if(VISTOS){ const d=p.dia.linhas.find(x=>(x.ids||[]).some(id=>!VISTOS.has(id))); if(d) NOVA=d.codigo; }
+    else VISTOS=new Set();
+    todos.forEach(x=>(x.ids||[]).forEach(id=>VISTOS.add(id)));
     desenhar();
     return true;
   }catch(e){ return false; }
@@ -160,11 +164,11 @@ function desenhar(){
       return '<div class="lb"><div><span class="cod">'+esc(x.codigo)+'</span>'+(cls==='b4'?'<span class="selo dev">DEVOLUÇÃO</span>':'')
         +(cur===x.codigo?'<span class="selo">EMBALANDO AGORA</span>':'')
         +'<div style="font-size:12px;color:var(--muted)">'+esc([x.medida,x.cor].filter(Boolean).join(' · '))+'</div></div>'
-        +'<div style="text-align:right">'+motivo(x)+sendoTxt(x)+' · <b>'+x.aqui+'</b> aqui</div></div>';
+        +'<div style="text-align:right">'+[motivo(x),sendoTxt(x).replace(/^ · /,''),'<b>'+x.aqui+'</b> aqui'].filter(Boolean).join(' · ')+'</div></div>';
     }).join('')+'</div>';
   }
   const semDiaAqui=L.length && !L.some(d=>d.aqui>0);
-  h+=bloco('b2','2 · PEDIDO DE HOJE'+(!L.length||semDiaAqui?' — EMBALAR AGORA':''),p.hoje,x=>'ordem pede '+x.ordem_pede+' · falta '+x.falta);
+  h+=bloco('b2','2 · PEDIDO DE HOJE'+(!L.length||semDiaAqui?' — EMBALAR AGORA':''),p.hoje,x=>x.ordem_pede?'ordem pede '+x.ordem_pede+' · falta '+x.falta:'revisada na tela vermelha');
   h+=bloco('b3','3 · REPOSIÇÃO — pela falta do estoque',p.reposicao,x=>x.falta==null?'reposição':(x.falta>0?'abaixo do alvo em '+x.falta:'estoque no alvo'));
   h+=bloco('b4','4 · DEVOLUÇÃO',p.devolucao,()=>'reembalar');
   h+=bloco('b5','Kit e acessório',p.outros,()=>'');
@@ -172,7 +176,7 @@ function desenhar(){
   /* As faixas do topo da lista (F6, F7, F8). */
   const ln=NOVA&&linhaDia(NOVA);
   if(ln && ln.aqui) fx='<div class="faixa nova"><span class="selo" style="margin:0 8px 0 0">NOVA</span><span class="ft1">Chegou da Revisão uma peça do dia</span><div class="ft2"><b style="font-family:ui-monospace,monospace">'+esc(ln.codigo)+'</b> — '+plural(ln.paradas,'venda de hoje esperando','vendas de hoje esperando')+'. Ela está no bloco vermelho.</div></div>';
-  else if(semDiaAqui) fx='<div class="faixa esp"><div class="ft1">Nenhuma peça do dia esperando aqui</div><div class="ft2">As do dia ainda estão na produção. Enquanto isso, embale o bloco 2 — quando uma do dia sair da Revisão, ela aparece em cima.</div></div>';
+  else if(semDiaAqui) fx='<div class="faixa esp"><div class="ft1">Nenhuma peça do dia esperando aqui</div><div class="ft2">'+(L.some(d=>d.sendo.length)?'As do dia estão sendo embaladas ou ainda na produção.':'As do dia ainda estão na produção.')+' Enquanto isso, embale o bloco 2 — quando uma do dia sair da Revisão, ela aparece em cima.</div></div>';
   else if(p.dia.todas) fx='<div class="faixa feito"><div class="ft1">Todas as '+p.dia.m+' vendas de hoje têm peça ✓</div><div class="ft2">A prioridade agora é o bloco 2. Se entrar venda nova de hoje sem peça, o vermelho volta aqui em cima.</div></div>';
   document.getElementById('faixa').innerHTML=fx;
   document.getElementById('filaLista').innerHTML=h;
@@ -260,7 +264,7 @@ async function cancelarEmb(){
   avisoFixo=true;
   /* Kit, acessorio e sob medida nao passam pela fila (R-EMB-02): para eles nao
      se fala da lista "Aguardando embalagem" (③ REVISAO). */
-  const resto=cur.persiana ? ' · nada foi gravado, e a peça continua em "Aguardando embalagem".' : ' · nada foi gravado.';
+  const resto=cur.persiana ? ' · nada foi gravado, e a peça continua esperando embalagem na lista.' : ' · nada foi gravado.';
   banner('','Embalagem cancelada', '<b>'+cur.codigo+'</b>'+resto+' Bipe o SKU para começar de novo.');
   beep(true);
   try{
@@ -353,7 +357,7 @@ function naoNaFila(info){
 let conferindo=false, bipePerdido=null;
 async function conferirRevisao(info){
   conferindo=true; bipePerdido=null;
-  banner('','Conferindo a fila da Revisão…','Aguarde: <b>'+info.codigo+'</b> não está na lista "Aguardando embalagem", e a tela está perguntando de novo.');
+  banner('','Conferindo a fila da Revisão…','Aguarde: <b>'+info.codigo+'</b> não está na lista de peças esperando embalagem, e a tela está perguntando de novo.');
   let leu=false;
   try{ leu=await carregarFila(); }finally{ conferindo=false; }
   if(emb) return;

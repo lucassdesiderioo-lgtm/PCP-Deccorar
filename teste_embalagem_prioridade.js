@@ -133,6 +133,7 @@ eq('…a linha de modo hoje antes da de reposição mais antiga', r.body.fila_id
 p = prio(RUI);
 eq('Rui vê 2 aqui e 1 sendo embalada pela Ana', [p.dia.linhas[0].aqui, p.dia.linhas[0].sendo], [2, ['Ana']]);
 eq('…com o quadradinho listrado', p.dia.linhas[0].quadros, { verde:0, amarelo:2, listrado:1, cinza:1 });
+ok('a peça reservada pela Ana continua nos ids do Rui (soltar a reserva não é peça nova da Revisão)', p.dia.linhas[0].ids.includes(bHoje));
 p = prio(ANA);
 eq('Ana vê a dela como aqui (3), marcada como minha', [p.dia.linhas[0].aqui, p.dia.linhas[0].minha], [3, true]);
 r = chamar('POST', '/api/montagem/reservar', { codigo:'BEGE140' });

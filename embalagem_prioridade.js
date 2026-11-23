@@ -64,7 +64,8 @@ function montar(db, opcoes){
       const o = outros.get(c) || { codigo:c, cor:s.cor || '', aqui:0, desde:f.revisado_em };
       o.aqui++; outros.set(c, o); continue;
     }
-    const g = porSku.get(c) || { codigo:c, aqui:0, sendo:[], minha:false, modos:{hoje:0, estoque:0, devolucao:0}, desde:null };
+    const g = porSku.get(c) || { codigo:c, aqui:0, sendo:[], minha:false, modos:{hoje:0, estoque:0, devolucao:0}, desde:null, ids:[] };
+    g.ids.push(f.id);
     const r = resv.get(f.id);
     if(r && r.usuario_id !== eu){ g.sendo.push(r.usuario_nome || 'outra pessoa'); }
     else {
@@ -99,13 +100,13 @@ function montar(db, opcoes){
   for(const p of pedacos){
     if(!(p.falta > 0)) continue;
     const s = sku(p.codigo); if(s && s.exige_medida === 0) continue;
-    const g = porSku.get(p.codigo) || { aqui:0, sendo:[], minha:false, desde:null };
+    const g = porSku.get(p.codigo) || { aqui:0, sendo:[], minha:false, desde:null, ids:[] };
     const amarelo = Math.min(g.aqui, p.falta), listrado = Math.min(g.sendo.length, p.falta - amarelo);
     dia.push({ codigo:p.codigo, medida:medida(s), cor:s ? s.cor || '' : '',
       paradas:p.falta, pedido:p.pedido_hoje, com_peca:Math.max(0, p.pedido_hoje - p.falta),
       aqui:g.aqui, minha:g.minha, sendo:g.sendo, na_producao:p.falta - amarelo - listrado,
       quadros:{ verde:Math.max(0, p.pedido_hoje - p.falta), amarelo, listrado, cinza:p.falta - amarelo - listrado },
-      desde:g.desde });
+      desde:g.desde, ids:g.ids });
   }
   /* Mais vendas paradas primeiro; empate: quem tem peça aqui; depois a revisada há mais tempo. */
   dia.sort((a, b) => (b.paradas - a.paradas) || ((b.aqui > 0) - (a.aqui > 0))
@@ -125,7 +126,7 @@ function montar(db, opcoes){
       if(noDia.has(g.codigo) || !(g.modos[modo] > 0)) continue;
       const s = sku(g.codigo);
       out.push(Object.assign({ codigo:g.codigo, medida:medida(s), cor:s ? s.cor || '' : '',
-        aqui:g.modos[modo], minha:g.minha, sendo:g.sendo, desde:g.desde }, extra(g.codigo)));
+        aqui:g.modos[modo], minha:g.minha, sendo:g.sendo, desde:g.desde, ids:g.ids }, extra(g.codigo)));
     }
     out.sort((a, b) => ((b.falta || 0) - (a.falta || 0)) || String(a.desde || '9').localeCompare(String(b.desde || '9')));
     return out;
@@ -140,7 +141,7 @@ function montar(db, opcoes){
     if(noDia.has(g.codigo) || g.aqui > 0 || !g.sendo.length) continue;
     const s = sku(g.codigo);
     reposicao.push({ codigo:g.codigo, medida:medida(s), cor:s ? s.cor || '' : '', aqui:0, minha:false, sendo:g.sendo,
-      desde:null, falta:precisa ? (precisa.get(g.codigo) || 0) : null });
+      desde:null, ids:g.ids, falta:precisa ? (precisa.get(g.codigo) || 0) : null });
   }
 
   return {
