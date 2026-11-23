@@ -213,14 +213,14 @@ function mmss(ms){ const t=Math.floor(ms/1000),m=Math.floor(t/60); return String
 function steps(){ return '<div class="steps"><span class="chip done">1 · SKU ✓</span><span class="chip '+(emb&&emb.kitOk?'done':'')+'">2 · Kit '+(emb&&emb.kitOk?'✓':'…')+'</span><span class="chip">3 · SKU final</span></div>'; }
 function banner(kind,title,sub,extra){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(extra||''); mostrarCancelar(); }
 /* O botao acompanha o banner: so com uma embalagem aberta e fora do envio. */
-function mostrarCancelar(){ var l=document.getElementById('cancLin'); if(l) l.style.display=(emb && !emb.enviando)?'':'none';
-  var d=document.getElementById('defBt'); if(d) d.style.display=(emb && !emb.enviando && emb.persiana)?'':'none';
+function mostrarCancelar(){ var l=document.getElementById('cancLin'); if(l) l.style.display=(emb && !emb.enviando && !emb.trocando)?'':'none';
+  var d=document.getElementById('defBt'); if(d) d.style.display=(emb && !emb.enviando && !emb.trocando && emb.persiana)?'':'none';
   if(!(emb && emb.persiana)) fecharDefeito(); }
 /* ── PECA COM DEFEITO: volta para a Revisao (R-EMB-11) ── */
 let MOTIVOS=null;
 function fecharDefeito(){ var p=document.getElementById('defPainel'); if(p){ p.style.display='none'; p.innerHTML=''; } }
 async function abrirDefeito(){
-  if(!emb || emb.enviando || !emb.persiana) return;
+  if(!emb || emb.enviando || emb.trocando || !emb.persiana) return;
   if(!MOTIVOS){ try{ MOTIVOS=(await (await fetch('/api/listas/rejeicao')).json()).map(x=>x.valor||x).filter(Boolean); }catch(e){ MOTIVOS=null; } }
   var p=document.getElementById('defPainel');
   if(!MOTIVOS || !MOTIVOS.length){ p.style.display=''; p.innerHTML='<b>Não deu para carregar os motivos.</b> Confira o Wi-Fi e toque de novo em "Peça com defeito".'; return; }
@@ -242,7 +242,7 @@ async function abrirDefeito(){
   document.getElementById('defOk').addEventListener('click', function(){ if(escolhido) enviarDefeito(escolhido, document.getElementById('defObs').value); });
 }
 async function enviarDefeito(motivo, obs){
-  const cur=emb; if(!cur || cur.enviando) return;
+  const cur=emb; if(!cur || cur.enviando || cur.trocando) return;
   const seg=Math.round((Date.now()-cur.inicio)/1000);
   cur.enviando=true; mostrarCancelar();
   var err=document.getElementById('defErr');
@@ -270,7 +270,7 @@ function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const t=$('#t
    revisao" (R-REV-08): zera num toque, sem motivo. NADA foi gravado; o servidor
    so guarda quem cancelou. A peca continua em "Aguardando embalagem". */
 async function cancelarEmb(){
-  const cur=emb; if(!cur || cur.enviando) return;
+  const cur=emb; if(!cur || cur.enviando || cur.trocando) return;
   const seg=Math.round((Date.now()-cur.inicio)/1000);
   clearInterval(tick); tick=null; emb=null; bipePerdido=null; mostrarFora();
   avisoFixo=true;
@@ -347,12 +347,14 @@ async function trocar(info){
      os bipes nao valem (cur.trocando), para o kit ou o SKU final nao andarem
      no meio de uma troca. */
   if(info){
-    cur.trocando=true; cur.foraErro=''; mostrarFora();
+    cur.trocando=true; cur.foraErro='Trocando para a '+esc(info.codigo)+'… aguarde: o bipe neste meio não vale.'; mostrarFora(); mostrarCancelar(); fecharDefeito();
     let r=null; try{ r=await reservarPeca(info.codigo); }catch(e){ r=null; }
-    cur.trocando=false;
+    cur.trocando=false; mostrarCancelar();
     if(emb!==cur) return;
     let erro=null;
-    if(!r) erro='Sem conexão: a troca não aconteceu. Siga com esta ou bipe a do dia de novo.';
+    /* SEM RESPOSTA, A TROCA PODE TER ACONTECIDO NO SERVIDOR (§12, ③ r3): a tela
+       segue com esta e pede de volta a reserva dela. */
+    if(!r){ erro='Sem conexão: não deu para confirmar a troca. Siga com esta, ou bipe a do dia de novo.'; reservarPeca(cur.codigo).catch(function(){}); }
     else if(r.erro) erro=esc(r.erro);
     else if(r.fila_id==null) erro='Não há nenhuma '+esc(info.codigo)+' esperando embalagem: ela ainda está na produção. Siga com esta ou bipe outra do dia.';
     if(erro){ cur.foraErro=erro; mostrarFora(); beep(false); return; }
@@ -426,7 +428,8 @@ function handle(code){
      a embalagem fica de pe ate o servidor responder. Antes ela era zerada
      antes do envio, e um bipe nesse meio abria uma embalagem nova escondida —
      e a recusa do tempo apagava o desenho dela. */
-  if(emb && (emb.enviando || emb.trocando)){ beep(false); return; }
+  if(emb && emb.enviando){ beep(false); return; }
+  if(emb && emb.trocando){ emb.foraErro='O bipe de <b>'+esc(code)+'</b> chegou durante a troca e <b>não valeu</b>: bipe de novo.'; mostrarFora(); beep(false); return; }
   /* O BIPE DURANTE A CONFERENCIA DA FILA DIZ QUE NAO VALEU (③ REVISAO): com
      rede lenta ele se perdia so com o bipe grave. */
   if(conferindo){ bipePerdido=code; banner('err','Bipe não valeu','A tela ainda está conferindo a fila da Revisão. <b>Bipe de novo</b> em instantes.'); beep(false); return; }

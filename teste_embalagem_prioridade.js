@@ -255,6 +255,17 @@ venda('HOJE100');
 p = prio();
 eq('todas com peça ✓', [p.dia.m, p.dia.n, p.dia.todas], [1, 1, true]);
 
+console.log('\n── 10. a tela 102 (o texto do código) ──');
+{
+  const tela = fs.readFileSync(path.join(__dirname, 'public', 'montagem.html'), 'utf8');
+  ok('o bipe durante a troca não vale e diz isso', /if\(emb && emb\.trocando\)\{ emb\.foraErro=/.test(tela));
+  ok('a troca pergunta ao servidor (fila_id nulo = não está aqui), e não à lista parada', /else if\(r\.fila_id==null\)/.test(tela) && !/function trocar[\s\S]{0,600}naoNaFila/.test(tela));
+  ok('cancelar e defeito ficam barrados durante a troca', /async function cancelarEmb\(\)\{\s*const cur=emb; if\(!cur \|\| cur\.enviando \|\| cur\.trocando\)/.test(tela) && /async function enviarDefeito[^{]*\{\s*const cur=emb; if\(!cur \|\| cur\.enviando \|\| cur\.trocando\)/.test(tela));
+  ok('o selo NOVA só com peça aqui', /NOVA===d\.codigo&&d\.aqui/.test(tela));
+  ok('a faixa NOVA nasce dos ids da fila, e não do número "aqui"', /VISTOS\.has\(id\)/.test(tela));
+  ok('sem a prioridade, a lista cai no /api/fila', /fetch\('\/api\/fila'\)/.test(tela));
+}
+
 /* A permissão das rotas novas (reservar, renovar, prioridade) é conferida pelo
    teste_cobertura.js, que sobe os módulos de verdade: rota sem linha nasce negada. */
 
