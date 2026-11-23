@@ -151,6 +151,11 @@ const srv = app.listen(0, async () => {
     ok('a venda nova dele traz a faixa de novo', await p.isVisible('#faixaNova'));
     if(await p.isVisible('#faixaNova')) await p.click('#fxOk');
 
+    console.log('\n── 6-A2. o livre que cai não é venda nova (③ REVISÃO, rodada 3) ──');
+    db.prepare("UPDATE skus SET estoque=0 WHERE codigo='BK180160BRANCO'").run();
+    await p.waitForTimeout(3500);
+    ok('a falta subiu pelo livre, sem venda nova, e a faixa NÃO aparece', !(await p.isVisible('#faixaNova')));
+
     console.log('\n── 6-B. sem a chave da 251, o "↩ Devoluções" some (③ REVISÃO) ──');
     PERMS = ['revisao.executar'];
     await p.reload(); await p.waitForTimeout(1200);

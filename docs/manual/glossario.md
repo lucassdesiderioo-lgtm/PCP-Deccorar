@@ -44,10 +44,10 @@ A peça que já tem etiqueta de venda impressa e ainda não passou pela Conferê
 O mesmo que reservado: a peça dentro de uma caixa com etiqueta impressa, antes da conferência.
 
 ### Urgente
-Venda que entrou e não tem peça no estoque. O cliente está esperando, e a peça vai para a frente da fila de produção, na tela vermelha da Revisão.
+Venda que entrou e não tem peça no estoque. O cliente está esperando, e a peça aparece em "Hoje", em destaque, na tela da Revisão.
 
 ### Reposição
-Produção para refazer o estoque que a venda consumiu. É o trabalho da tela azul da Revisão.
+Produção para refazer o estoque que a venda consumiu. Na tela da Revisão, é o que aparece em "Próximos dias" e "Completar o alvo".
 
 ### Adiantamento
 Produzir hoje uma ordem que era de amanhã, quando sobra tempo.

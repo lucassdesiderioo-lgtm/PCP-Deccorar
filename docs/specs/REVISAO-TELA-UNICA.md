@@ -6,7 +6,7 @@
 > 🟡. Muda os cartões **R-REV-01**, **R-REV-02** e **R-REV-03** de
 > `docs/regras/estoque.md`; duas linhas em `docs/DECISOES.md`.
 > Testes: `teste_revisao_tela_unica.js` (52), `teste_revisao_tela_unica_tela.js`
-> (36, num Chromium; sem navegador diz PULADO) e `teste_revisao.js` (122, a
+> (37, num Chromium; sem navegador diz PULADO) e `teste_revisao.js` (122, a
 > seção 2 mudou: o modo é do servidor).
 >
 > **O que mudou na construção** (vale o que está aqui):
