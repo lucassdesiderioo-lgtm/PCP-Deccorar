@@ -241,6 +241,11 @@ ok('com peça livre, a reserva passa para a do dia', r.status === 200 && db.prep
 chamar('POST', '/api/montagem/cancelar', { codigo:'UNICA', trocou:1, manter:1, codigo_dia:'BEGE140', segundos:9 });
 eq('o cancelar da troca não solta a reserva nova', (db.prepare('SELECT codigo FROM embalagem_reserva WHERE usuario_id=1').get() || {}).codigo, 'BEGE140');
 void t2;
+db.prepare('DELETE FROM embalagem_reserva').run();
+chamar('POST', '/api/montagem/reservar', { codigo:'UNICA' });
+r = chamar('POST', '/api/montagem/reservar', { codigo:'BRANCO999' });
+eq('reservar SKU sem nenhuma peça esperando: fila_id nulo', [r.status, r.body.fila_id], [200, null]);
+eq('…e a reserva de antes continua (a troca não acontece)', (db.prepare('SELECT codigo FROM embalagem_reserva WHERE usuario_id=1').get() || {}).codigo, 'UNICA');
 
 console.log('\n── 9. o dia feito ──');
 db.prepare("DELETE FROM lote").run();

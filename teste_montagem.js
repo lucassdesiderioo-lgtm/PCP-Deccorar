@@ -350,7 +350,7 @@ cfgSet('emb_minimo_seg','45');
   const fin = tela.slice(tela.indexOf('async function finish()'));
   ok('a embalagem NAO e zerada antes da resposta do servidor',
      fin.indexOf("fetch('/api/montagem'") > 0 && fin.indexOf('emb=null') > fin.indexOf("fetch('/api/montagem'"));
-  ok('o bipe com o envio no ar e ignorado (emb.enviando)', /emb\s*&&\s*emb\.enviando/.test(tela));
+  ok('o bipe com o envio no ar e ignorado (emb.enviando)', /emb\s*&&\s*\(?emb\.enviando/.test(tela));
   ok('nao existe mais o aviso que apagava a embalagem nova', !/A embalagem de '\+cur\.codigo\+' NÃO foi gravada/.test(tela));
   ok('na recusa a tela segue com a mesma embalagem e nao decide sozinha',
      /motivo==='rapido_demais'\)\{\s*cur\.enviando=false;\s*rapidoDemais\(cur/.test(tela) && !/seg\s*<\s*EMB_MIN/.test(tela));

@@ -76,7 +76,6 @@ function reservar(db, codigo, quem, emTeste){
     const f = db.prepare('SELECT modo FROM fila WHERE id=?').get(minha.fila_id) || {};
     return { fila_id:minha.fila_id, modo:f.modo || null, nova:false };
   }
-  if(minha) db.prepare('DELETE FROM embalagem_reserva WHERE id=?').run(minha.id);
   const livre = db.prepare(`SELECT f.id, f.modo FROM fila f WHERE UPPER(f.codigo)=? AND f.situacao='aguardando'
       AND COALESCE(f.teste,0)=? AND f.id NOT IN (SELECT fila_id FROM embalagem_reserva) ORDER BY ${ORDEM} LIMIT 1`).get(cod, emTeste ? 1 : 0);
   if(!livre){
@@ -87,6 +86,9 @@ function reservar(db, codigo, quem, emTeste){
       { motivo:'reservada', por:outra.usuario_nome || null });
     return { fila_id:null, modo:null, nova:false };
   }
+  /* A reserva de antes só sai quando a nova existe (③ REVISÃO): sem peça do
+     SKU novo, a troca não acontece e a embalagem de agora segue reservada. */
+  if(minha) db.prepare('DELETE FROM embalagem_reserva WHERE id=?').run(minha.id);
   db.prepare('INSERT INTO embalagem_reserva (fila_id,codigo,usuario_id,usuario_nome,teste) VALUES (?,?,?,?,?)')
     .run(livre.id, cod, quem.usuario_id, quem.usuario_nome || null, emTeste ? 1 : 0);
   return { fila_id:livre.id, modo:livre.modo, nova:true };

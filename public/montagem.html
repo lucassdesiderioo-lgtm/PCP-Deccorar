@@ -163,7 +163,7 @@ function desenhar(){
       if(d.sendo.length) partes.push(plural(d.sendo.length,'sendo embalada','sendo embaladas')+' por '+esc(d.sendo.join(', ')));
       if(d.na_producao) partes.push(d.na_producao+' na produção');
       h+='<div class="ln'+(d.aqui?'':' vazia')+(cur===d.codigo?' agora':'')+'"><div><div class="cod">'+esc(d.codigo)
-        +(NOVA===d.codigo?'<span class="selo">NOVA</span>':'')+(cur===d.codigo?'<span class="selo">EMBALANDO AGORA</span>':'')+'</div>'
+        +(NOVA===d.codigo&&d.aqui?'<span class="selo">NOVA</span>':'')+(cur===d.codigo?'<span class="selo">EMBALANDO AGORA</span>':'')+'</div>'
         +'<div class="md">'+esc([d.medida,d.cor].filter(Boolean).join(' · '))+'</div></div>'
         +'<div class="nb"><b>'+d.paradas+'</b><span>'+(d.paradas===1?'venda parada':'vendas paradas')+'</span></div>'
         +'<div><div class="qd">'+sq.join('')+'</div><div class="ql">'+partes.join(' · ')+'</div></div></div>';
@@ -333,20 +333,29 @@ function renovar(cur, dia){
     body:JSON.stringify({codigo:cur.codigo,codigo_dia:dia||'',segundos:Math.round((Date.now()-cur.inicio)/1000)})}).catch(function(){});
 }
 /* "Mesmo assim": registra quem escolheu, e o aviso nao volta nesta embalagem. */
-function seguirFora(){ if(!emb || !emb.foraDe) return; renovar(emb, emb.foraDe); emb.foraDe=null; emb.foraVisto=true; mostrarFora(); }
+function seguirFora(){ if(!emb || !emb.foraDe || emb.trocando) return; renovar(emb, emb.foraDe); emb.foraDe=null; emb.foraVisto=true; mostrarFora(); }
 /* Troca para a peca do dia: a embalagem de agora e cancelada (a reserva solta)
    e, se veio o bipe do SKU do dia, a dele comeca do zero. */
 async function trocar(info){
-  const cur=emb; if(!cur || cur.enviando) return;
+  const cur=emb; if(!cur || cur.enviando || cur.trocando) return;
   const dia=cur.foraDe;
   /* ⚠️ A PECA DO DIA E RESERVADA ANTES de cancelar a de agora (③ REVISAO): se
      ela nao estiver aqui, ou estiver com outra pessoa, a embalagem de agora
      continua, e o aviso diz por que. */
+  /* Quem decide se a peca do dia esta aqui e o servidor (③ REVISAO r3): a
+     lista da tela fica parada com a embalagem aberta. Enquanto ele responde,
+     os bipes nao valem (cur.trocando), para o kit ou o SKU final nao andarem
+     no meio de uma troca. */
   if(info){
-    if(naoNaFila(info)){ cur.foraErro='Não há nenhuma '+esc(info.codigo)+' esperando embalagem: ela ainda está na produção. Siga com esta ou bipe outra do dia.'; mostrarFora(); beep(false); return; }
+    cur.trocando=true; cur.foraErro=''; mostrarFora();
     let r=null; try{ r=await reservarPeca(info.codigo); }catch(e){ r=null; }
+    cur.trocando=false;
     if(emb!==cur) return;
-    if(r && r.erro){ cur.foraErro=esc(r.erro); mostrarFora(); beep(false); return; }
+    let erro=null;
+    if(!r) erro='Sem conexão: a troca não aconteceu. Siga com esta ou bipe a do dia de novo.';
+    else if(r.erro) erro=esc(r.erro);
+    else if(r.fila_id==null) erro='Não há nenhuma '+esc(info.codigo)+' esperando embalagem: ela ainda está na produção. Siga com esta ou bipe outra do dia.';
+    if(erro){ cur.foraErro=erro; mostrarFora(); beep(false); return; }
   }
   clearInterval(tick); tick=null; emb=null; bipePerdido=null; mostrarFora();
   try{ await fetch('/api/montagem/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -417,7 +426,7 @@ function handle(code){
      a embalagem fica de pe ate o servidor responder. Antes ela era zerada
      antes do envio, e um bipe nesse meio abria uma embalagem nova escondida —
      e a recusa do tempo apagava o desenho dela. */
-  if(emb && emb.enviando){ beep(false); return; }
+  if(emb && (emb.enviando || emb.trocando)){ beep(false); return; }
   /* O BIPE DURANTE A CONFERENCIA DA FILA DIZ QUE NAO VALEU (③ REVISAO): com
      rede lenta ele se perdia so com o bipe grave. */
   if(conferindo){ bipePerdido=code; banner('err','Bipe não valeu','A tela ainda está conferindo a fila da Revisão. <b>Bipe de novo</b> em instantes.'); beep(false); return; }
