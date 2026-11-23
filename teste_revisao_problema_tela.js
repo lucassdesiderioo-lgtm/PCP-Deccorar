@@ -32,6 +32,8 @@ async function abrir(browser, opc){
   const J = {
     '/api/skus': [{ codigo:'BK140160CINZA', cor:'CINZA', largura_cm:140, altura_cm:160 }],
     '/api/producao': [], '/api/revisao/dia': [], '/api/revisao/hoje': [], '/api/revisao/defeitos': [],
+    '/api/revisao/lista': { hoje:'2026-11-23', dias:[], ate:null, hoje_lista:[], proximos_lista:[], alvo_lista:[],
+      totais:{ hoje:0, hoje_revisadas:0, proximos:0, alvo:0 }, hoje_terminado:false, sem_venda_hoje:true, minhas:{ qtd:0, media_seg:null } },
     '/api/revisao/ultima': { minimo_seg:0, desfazer:null }, '/api/revisao/status': { lancado:false, corte:'10:30' },
     '/api/listas/rejeicao': opc.motivos !== undefined ? opc.motivos : [{ valor:'Tecido manchado' }, { valor:'Medida errada' }],
     '/api/auth/eu': { logado:true, nome:'Ana', destino:{} },

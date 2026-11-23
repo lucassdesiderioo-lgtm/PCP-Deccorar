@@ -9,14 +9,13 @@
 <link rel="apple-touch-icon" href="/icones/operador-180.png">
 <link rel="manifest" href="/app/operador.webmanifest">
 <link rel="stylesheet" href="/ipad.css">
-<title>Revisão — Operador</title>
+<title>Revisão</title>
 <style>
   :root{--bg:#ffffff;--panel:#f4f6f8;--line:#d8dee6;--txt:#1a1d23;--muted:#5a6472;--amber:#b26a00;--green:#2e7d32;--red:#c62828;--blue:#1565c0}
   *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
   header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
   .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
   h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
-  .wrap{max-width:900px;margin:0 auto;padding:18px}
   .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;text-align:center;margin-bottom:16px}
   .banner.rev{background:#e8f0fb;border-color:#a9c9ee}.banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}
   .bt{font-size:26px;font-weight:750}.bs{font-size:15px;color:var(--muted);margin-top:6px}
@@ -26,76 +25,108 @@
         background:var(--panel);border:2px solid var(--line);border-radius:12px;color:var(--txt)}
   #scan:focus{outline:none;border-color:var(--amber)}
   .stats{font-size:13px;color:var(--muted);text-align:center;margin-bottom:14px}.stats b{color:var(--txt)}
-  /* item 5: 2 colunas no tablet 8" (300px min -> ~2 col em 768; 1 col no celular) */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
-  .tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:left;cursor:pointer;color:var(--txt)}
-  .tile.active{border-color:var(--amber);background:#fbf1db}
-  /* item 4: medida como ancora visual — medida grande, SKU abaixo, progresso a direita */
-  .thead{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-  .tmed{font-size:23px;font-weight:800;line-height:1.05}
-  .tcor{font-size:13px;color:var(--muted);font-weight:600;margin-top:1px}
-  .tc{font-family:ui-monospace,monospace;font-weight:600;font-size:14px;color:var(--muted);margin-top:6px;word-break:break-all}
-  .tp{font-size:26px;font-weight:800;color:var(--blue);white-space:nowrap}
   .muted{color:var(--muted);padding:20px}
   .link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
-  header{padding-right:200px}
-  .modoTag{margin-left:auto;display:flex;align-items:center;gap:10px}
-  .modoNome{font-size:13px;font-weight:800;letter-spacing:.5px;padding:7px 13px;border-radius:999px}
-  .btModo{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer}
-  body.m-hoje .modoNome{background:#fbe9e8;color:#c62828;border:1px solid #efb1ad}
-  body.m-hoje header{border-bottom:3px solid var(--red)}
-  body.m-est .modoNome{background:#e8f0fb;color:#1565c0;border:1px solid #a9c9ee}
-  body.m-est header{border-bottom:3px solid var(--blue)}
-  .tf{font-size:12px;color:var(--muted);margin-top:4px}
-  .tile.falta{border-color:#efb1ad}
-  /* Ordem aberta cuja venda já saiu do estoque: nada a produzir, e a tela diz
-     por quê em vez de cobrar. Âmbar, como todo aviso que não é erro. */
-  .tile.coberto{border-color:#e7cb8c;background:#fbf1db}
-  .tile .tf.amb{color:#b26a00}
-  #escolha{position:fixed;inset:0;background:#ffffff;z-index:9998;display:none;
-           flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:22px}
-  #escolha h2{margin:0 0 8px;font-size:22px}
-  .esc{width:100%;max-width:520px;padding:34px 26px;border-radius:20px;border:2px solid;
-       font-size:22px;font-weight:800;cursor:pointer;text-align:center;background:var(--panel);color:var(--txt)}
-  .esc small{display:block;font-size:14px;font-weight:500;color:var(--muted);margin-top:8px}
-  .esc.hoje{border-color:#efb1ad;background:#fbe9e8}
-  .esc.est{border-color:#a9c9ee;background:#e8f0fb}
-  .esc.dev{border-color:#e7cb8c;background:#fbf1db}
-  /* PLANEJAMENTO-VENDAS-FUTURAS fase 4: com a ordem pela data da falta ligada, o
-     tile diz o porque ("faltam 3 para ter 10/11 (vendidas)"). Desligada, nao aparece. */
-  .tmot{color:#1f5fbf;font-weight:700}
+
+  /* ── TELA ÚNICA (REVISAO-TELA-UNICA, 23/11/2026): o tablet deitado. À
+     esquerda a peça na mão, à direita a lista. Sem escolher cor ao abrir: a
+     cor marca cada parte da lista, sempre com o título escrito do lado. ── */
+  header{padding:12px 18px;flex-wrap:wrap}
+  .hdia{font-size:13px;color:var(--muted)}
+  .hesp{flex:1}
+  .cont{display:flex;gap:18px;font-size:13px;color:var(--muted)}
+  .cont b{display:block;font-size:22px;color:var(--txt);font-variant-numeric:tabular-nums}
+  .btTopo{font:700 15px system-ui,sans-serif;padding:12px 16px;border-radius:12px;min-height:48px;cursor:pointer;background:#fff}
+  #btDev{border:2px solid #e7cb8c;background:#fbf1db;color:var(--amber)}
+  #btSemana{border:2px solid var(--txt);color:var(--txt)}
+  .corpo{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);align-items:start}
+  .esq{padding:16px 18px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:12px;min-width:0}
+  .dir{padding:14px 18px 40px;display:flex;flex-direction:column;gap:16px;min-width:0}
+  .esq #scan{max-width:none;margin:0}
+  .esq .banner{margin:0;min-height:300px;display:flex;flex-direction:column;justify-content:center}
+  .esq .banner .bt{font-size:30px;line-height:1.1}
+  .para{display:inline-block;margin-top:10px;padding:8px 14px;border-radius:999px;font-size:15px;font-weight:700}
+  .para.hoje{background:#fbe9e8;color:var(--red);border:1px solid #efb1ad}
+  .para.prox{background:#e8f0fb;color:var(--blue);border:1px solid #a9c9ee}
+  .para.alvo{background:#eef1f4;color:#4b5563;border:1px solid var(--line)}
+  .para.fora{background:#fbf1db;color:var(--amber);border:1px solid #e7cb8c}
+  .foco{border-radius:16px;padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px}
+  .foco.fh{background:#fbe9e8;border:2px solid #efb1ad}
+  .foco.fp{background:#e8f0fb;border:2px solid #a9c9ee}
+  .fcab{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .fcab .ft{font-size:22px;font-weight:850;letter-spacing:.5px;text-transform:uppercase}
+  .fh .ft{color:var(--red)} .fp .ft{color:var(--blue)}
+  .fcab .fs{font-size:14px;color:#3b4552}
+  .fcab .fn{margin-left:auto;font-size:15px;color:#3b4552}.fcab .fn b{font-size:30px;color:var(--txt);font-variant-numeric:tabular-nums}
+  .gd{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .cd{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;text-align:left;padding:14px 16px;border-radius:14px;border:1px solid var(--line);background:#fff;cursor:pointer;font-family:inherit;color:var(--txt);width:100%}
+  .cd.active{outline:3px solid var(--amber);background:#fbf1db}
+  .cd .m{font-size:24px;font-weight:850;line-height:1.05}
+  .cd .c{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .cd .sk{font:600 12px ui-monospace,monospace;color:var(--muted);word-break:break-all}
+  .cd .n{grid-row:1/4;grid-column:2;text-align:right;align-self:center}
+  .cd .n b{display:block;font-size:36px;font-weight:850;line-height:1;font-variant-numeric:tabular-nums}
+  .cd .n small{font-size:12px;color:var(--muted)}
+  .prog{grid-column:1/3;height:16px;margin-top:6px;border-radius:8px;background:#e3e7ec;overflow:hidden}
+  .prog i{display:block;height:100%;background:var(--green)}
+  .cd .d{grid-column:1/3;font-size:13px;color:#3b4552;font-variant-numeric:tabular-nums}
+  .depois{display:flex;flex-direction:column;gap:6px}
+  .depois h3{margin:0;font-size:13px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:baseline}
+  .depois h3 b{margin-left:auto;color:var(--txt);font-size:15px;letter-spacing:0}
+  .mini{display:flex;flex-wrap:wrap;gap:6px}
+  .mini button{font:600 13px system-ui,sans-serif;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:#3b4552;cursor:pointer;min-height:40px}
+  .mini button b{color:var(--txt);margin-left:4px}
+  .mini button.active{outline:3px solid var(--amber)}
+  .fechado{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-radius:14px;background:#e7f5eb;border:2px solid #a9d8b4;color:var(--green);font-weight:800;font-size:17px}
+  .fechado span{font-weight:500;color:#3b4552;font-size:14px}
+  .fechado.neutro{background:var(--panel);border-color:var(--line);color:#3b4552}
+  #faixaNova{position:sticky;top:0;z-index:50;background:var(--red);color:#fff;display:flex;align-items:center;gap:14px;padding:14px 18px;font-size:17px;font-weight:700;flex-wrap:wrap}
+  #faixaNova[hidden]{display:none}
+  #faixaNova button{margin-left:auto;font:700 14px system-ui,sans-serif;padding:10px 16px;border-radius:10px;border:2px solid #fff;background:transparent;color:#fff;cursor:pointer;min-height:44px}
+  #semana{position:fixed;inset:0;z-index:10000;background:rgba(26,29,35,.55);display:flex;align-items:center;justify-content:center;padding:24px}
+  #semana[hidden]{display:none}
+  .sbox{background:#fff;border-radius:18px;width:100%;max-width:980px;max-height:100%;overflow:auto;padding:20px 22px}
+  .sbox .scab{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+  .sbox h3{margin:0;font-size:20px}.sbox .scab p{margin:0;color:var(--muted);font-size:13px}
+  .sbox .scab button{margin-left:auto;font:700 15px system-ui,sans-serif;padding:12px 18px;border-radius:11px;border:2px solid var(--txt);background:#fff;color:var(--txt);min-height:48px;cursor:pointer}
+  .sbox table{width:100%;border-collapse:collapse;font-size:15px;font-variant-numeric:tabular-nums}
+  .sbox th,.sbox td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:center}
+  .sbox th{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+  .sbox td:first-child,.sbox th:first-child{text-align:left}
+  .sbox td.z{color:#b6bdc6}.sbox td.hj{background:#fbe9e8;color:var(--red);font-weight:800}
+  .aviso{background:#fbf1db;border:1px solid #e7cb8c;color:#8a5a00;border-radius:10px;padding:10px 12px;font-size:14px}
+  @media (max-width:900px){ .corpo{grid-template-columns:1fr} .esq{border-right:0;border-bottom:1px solid var(--line)} .gd{grid-template-columns:1fr} }
 </style></head><body>
-<header><div class="mark">R</div><div><h1>Estação de Revisão</h1><div class="sub">Bipe ao começar · bipe ao terminar</div></div>
-<div class="modoTag"><span class="modoNome" id="modoNome">—</span>
-<button class="btModo" id="btModo">Trocar</button></div></header>
-<div id="escolha">
-  <h2>O que você vai revisar agora?</h2>
-  <button class="esc hoje" data-m="hoje">PEDIDOS DE HOJE<small>Peças com venda feita, entrega no mesmo dia</small></button>
-  <button class="esc est" data-m="estoque">PRODUÇÃO PRA ESTOQUE<small>Sem venda ainda — repondo o estoque</small></button>
-  <button class="esc dev" onclick="location.href='/devolucao'">DEVOLUÇÕES<small>Peças que voltaram do Mercado Livre</small></button>
+<header><div class="mark">R</div><div><h1>Revisão</h1><div class="hdia" id="hdia"></div></div>
+<span class="hesp"></span>
+<div class="cont"><div><b id="cQtd">—</b>revisadas hoje</div><div><b id="cMed">—</b>sua média hoje</div></div>
+<button type="button" class="btTopo" id="btDev">↩ Devoluções</button>
+<button type="button" class="btTopo" id="btSemana">Ver a semana</button></header>
+<div id="faixaNova" hidden></div>
+<div class="corpo">
+  <div class="esq">
+    <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters"
+     spellcheck="false" inputmode="text" placeholder="bipe aqui" aria-label="Bipe o código do SKU">
+    <div class="banner" id="banner"></div>
+    <!-- AS PECAS QUE VOLTARAM DA EMBALAGEM POR DEFEITO (EMBALAGEM-DEFEITO-VOLTA, R-EMB-11) -->
+    <div id="volta" style="display:none"></div>
+    <div class="stats" id="stats"></div>
+  </div>
+  <div class="dir" id="tiles"></div>
 </div>
-<div class="wrap">
-  <!-- AS PECAS QUE VOLTARAM DA EMBALAGEM POR DEFEITO (EMBALAGEM-DEFEITO-VOLTA, R-EMB-11) -->
-  <div id="volta" style="display:none;margin-bottom:14px"></div>
-  <div class="banner" id="banner"></div>
-  <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters"
-   spellcheck="false" inputmode="text" placeholder="bipe aqui">
-  <div class="stats" id="stats"></div>
-  <div class="grid" id="tiles"></div>
-</div>
+<div id="semana" hidden></div>
 <script>
 let SKUS=[], PROD={}, emRev=null, tick=null;
-var MODO=null, DIA=[], METAS=[], ADIANTA=[];
+var MODO=null, LISTA=null, VISTO=null, SKUS_EM=0;
 const $=s=>document.querySelector(s);
+/* TELA ÚNICA (REVISAO-TELA-UNICA, 23/11/2026): não se escolhe cor ao abrir. A
+   lista vem pronta do /api/revisao/lista (revisao_lista.js), e quem decide
+   para que a peça serve é o servidor, no bipe que fecha. */
 async function load(){
-  if(!MODO) return;
-  SKUS=await (await fetch('/api/skus')).json();
-  const prod=await (await fetch('/api/producao')).json();
-  PROD={}; for(const r of prod){ (PROD[r.codigo]=PROD[r.codigo]||{pedido:0,feito:0}); PROD[r.codigo].pedido+=r.qtd; PROD[r.codigo].feito+=r.produzido; }
-  if(MODO==='hoje'){ DIA=await (await fetch('/api/revisao/dia')).json(); }
-  else { METAS=await (await fetch('/api/revisao/producao')).json();
-    try{ ADIANTA=await (await fetch('/api/revisao/adiantar')).json(); }catch(e){ ADIANTA=[]; } }
-  renderTiles(); loadStats();
+  /* O cadastro de SKU (a medida e a cor) muda pouco: a cada minuto basta. */
+  if(!SKUS.length || Date.now()-SKUS_EM>60000){ try{ SKUS=await (await fetch('/api/skus')).json(); SKUS_EM=Date.now(); }catch(e){} }
+  try{ var r=await fetch('/api/revisao/lista'); if(!r.ok) return; var l=await r.json(); if(!l||!l.totais||!l.hoje_lista) return; LISTA=l; }catch(e){ return; }
+  novaVenda(); renderTiles(); loadStats();
 }
 function skuInfo(c){ return SKUS.find(s=>s.codigo===c); }
 // item 4: medida como ancora visual (DESIGN.md §3).
@@ -116,55 +147,92 @@ function tileInner(cod, corFallback, num, numColor, detail){
   var sku = md ? '<div class="tc">'+cod+'</div>' : '';
   return '<div class="thead"><div>'+cab+'</div><div class="tp"'+(numColor?' style="color:'+numColor+'"':'')+'>'+num+'</div></div>'+sku+'<div class="tf">'+detail+'</div>';
 }
+/* A LISTA (REVISAO-TELA-UNICA): o dia de hoje em destaque, grande, com o
+   andamento; o resto da semana e o alvo pequenos embaixo. Terminado o dia, ele
+   vira uma faixa verde e os próximos dias sobem para o destaque. Os números
+   vêm prontos do /api/revisao/lista (revisao_lista.js): a tela só desenha. */
+function diasTxt(x){
+  if(!x.dias||!x.dias.length) return '';
+  var ate=LISTA&&LISTA.ate?LISTA.ate.split(' ')[0]:'';
+  var p=[];
+  if(x.dias[0].n) p.push(x.dias[0].rotulo+' '+x.dias[0].n);
+  if(x.dias.length>1 && x.resto_semana) p.push((x.dias[0].n?'até ':'até ')+ate+' '+x.resto_semana);
+  return p.join(' · ');
+}
+function cardTxt(x, modo){
+  var md=medidaDe(x.codigo), f, falta, d;
+  if(modo==='hoje'){ f=x.hoje_revisadas||0; falta=x.hoje;
+    d=f+(f===1?' revisada':' revisadas')+' de '+(f+falta)+' para hoje'+(diasTxt(x)?' · depois: '+diasTxt(x):''); }
+  else { f=x.revisadas_estoque||0; falta=x.proximos; d=f+(f===1?' revisada hoje':' revisadas hoje')+(diasTxt(x)?' · '+diasTxt(x):''); }
+  var pct=(f+falta)?Math.round(f/(f+falta)*100):0;
+  var act=emRev&&emRev.codigo===x.codigo;
+  return '<button type="button" class="cd'+(act?' active':'')+'" data-cod="'+escH(x.codigo)+'">'
+    +'<div class="m">'+escH(md?md.medida:x.codigo)+'</div><div class="c">'+escH(md?md.cor:(x.cor||''))+'</div>'
+    +(md?'<div class="sk">'+escH(x.codigo)+'</div>':'')
+    +'<div class="n"><b>'+falta+'</b><small>'+(modo==='hoje'?'faltam hoje':'faltam')+'</small></div>'
+    +'<div class="prog"><i style="width:'+pct+'%"></i></div><div class="d">'+d+'</div></button>';
+}
+function miniTxt(lista, campo){
+  return '<div class="mini">'+lista.map(function(x){ var md=medidaDe(x.codigo), act=emRev&&emRev.codigo===x.codigo;
+    return '<button type="button" class="'+(act?'active':'')+'" data-cod="'+escH(x.codigo)+'">'
+      +escH(md?md.medida+' '+(md.cor||'').toLowerCase():x.codigo)+'<b>'+x[campo]+'</b></button>'; }).join('')+'</div>';
+}
 function renderTiles(){
-  var html='';
-  if(MODO==='hoje'){
-    /* Os numeros vem prontos do /api/revisao/dia (ordem_dia.js), a MESMA regua
-       do aviso de status. `atendidas` e a ordem que ficou aberta com a venda ja
-       fora do estoque — peca revisada na tela azul, ou que ja estava na
-       prateleira — e nao e trabalho: a tela diz isso em ambar em vez de cobrar
-       producao de um cliente que ja recebeu. */
-    html=DIA.map(function(d){ var act=emRev&&emRev.codigo===d.codigo;
-      var at=d.atendidas||0, ap=d.a_produzir||0;
-      var saiu = at ? (at+(at>1?' saíram':' saiu')+' do estoque' + (d.pendentes>0?' (tem estoque)':' — venda já despachada')) : '';
-      var det, cls='', amb=false;
-      if(ap>0){ det='faltam '+ap+' pra revisar'+(at?' · '+saiu:''); cls=' falta'; }
-      else if(at>0){ det=saiu+' · nada a produzir'; cls=' coberto'; amb=true; }
-      else det='revisão completa';
-      return '<button class="tile '+(act?'active':'')+cls+'" data-cod="'+d.codigo+'">'
-        +tileInner(d.codigo, d.cor, d.revisadas+'/'+d.qtd, '', det).replace('<div class="tf">', amb?'<div class="tf amb">':'<div class="tf">')+'</button>';
-    }).join('')||'<div class="muted">Nenhuma produção lançada para hoje. Lance no Admin.</div>';
+  var L=LISTA; if(!L){ $('#tiles').innerHTML='<div class="muted">Carregando a lista…</div>'; return; }
+  var t=L.totais, h='', ate=L.ate?' · até '+escH(L.ate):'';
+  var alvo=L.alvo_lista.length?'<div class="depois"><h3>Completar o alvo<b>faltam '+t.alvo+'</b></h3>'+miniTxt(L.alvo_lista,'alvo')+'</div>':'';
+  if(!L.hoje_terminado && !L.sem_venda_hoje && L.hoje_lista.length){
+    h+='<div class="foco fh"><div class="fcab"><span class="ft">Hoje</span><span class="fs">vendas de hoje sem peça · '+t.hoje_revisadas+' já revisadas</span>'
+      +'<span class="fn">faltam <b>'+t.hoje+'</b></span></div><div class="gd">'+L.hoje_lista.map(function(x){ return cardTxt(x,'hoje'); }).join('')+'</div></div>';
+    if(L.proximos_lista.length) h+='<div class="depois"><h3>Depois de hoje'+ate+'<b>faltam '+t.proximos+'</b></h3>'+miniTxt(L.proximos_lista,'proximos')+'</div>';
   } else {
-    if(ADIANTA.length){
-      html+='<div style="grid-column:1/-1;background:#fbf1db;border:1px solid #e7cb8c;border-radius:12px;padding:14px;margin-bottom:6px"><b style="color:#b26a00">ADIANTAMENTO - pedidos de amanha</b><div style="font-size:13px;color:#5a6472;margin-top:4px">Se sobrar tempo hoje, ja pode produzir estes.</div></div>';
-      for(var a=0;a<ADIANTA.length;a++){
-        var d2=ADIANTA[a];
-        html+='<button class="tile" data-cod="'+d2.codigo+'" style="border-color:#e7cb8c;background:#fbf1db">'
-          +tileInner(d2.codigo, d2.cor, d2.falta, '#b26a00', 'amanha')+'</button>';
-      }
-    }
-    html+=METAS.map(function(m){ var act=emRev&&emRev.codigo===m.codigo;
-      return '<button class="tile '+(act?'active':'')+(m.precisa>0?' falta':'')+'" data-cod="'+m.codigo+'">'
-        +tileInner(m.codigo, m.cor, m.precisa, '', (m.motivo?'<b class="tmot">'+m.motivo+'</b><br>':'')
-          +'comp '+m.comprometido+' · alvo '+m.alvo+' · est '+(m.estoque==null?'—':m.estoque))+'</button>';
-    }).join('');
-    if(!html) html='<div class="muted">Estoque coberto — nada a produzir agora. (Confira o Planejamento no Admin se acabou de importar a planilha.)</div>';
+    h+=L.hoje_terminado
+      ? '<div class="fechado">✓ Hoje está terminado <span>'+t.hoje_revisadas+(t.hoje_revisadas===1?' peça revisada':' peças revisadas')+' para as vendas de hoje</span></div>'
+      : '<div class="fechado neutro">Nenhuma venda de hoje sem peça <span>quando o PDF de hoje subir, as vendas sem peça aparecem aqui</span></div>';
+    if(L.proximos_lista.length)
+      h+='<div class="foco fp"><div class="fcab"><span class="ft">Próximos dias</span><span class="fs">o dia mais cedo primeiro'+ate+'</span>'
+        +'<span class="fn">faltam <b>'+t.proximos+'</b></span></div><div class="gd">'+L.proximos_lista.map(function(x){ return cardTxt(x,'prox'); }).join('')+'</div></div>';
   }
-  $('#tiles').innerHTML=html;
+  h+=alvo;
+  if(!L.hoje_lista.length && !L.proximos_lista.length && !L.alvo_lista.length)
+    h+='<div class="muted">Nada a produzir agora: as vendas estão cobertas e o alvo está cheio. (Confira o Planejamento se acabou de importar a planilha.)</div>';
+  $('#tiles').innerHTML=h;
 }
-function setModo(m){
-  MODO=m; try{ localStorage.setItem('rev_modo',m); }catch(e){}
-  document.body.classList.toggle('m-hoje',m==='hoje');
-  document.body.classList.toggle('m-est',m==='estoque');
-  $('#modoNome').textContent=(m==='hoje'?'PEDIDOS DE HOJE':'PRA ESTOQUE');
-  $('#escolha').style.display='none';
-  banner('','Pronto','Bipe o código pra iniciar a revisão');
-  load(); setTimeout(function(){ $('#scan').focus(); },100);
+/* Para onde a peça bipada vai: a primeira necessidade do SKU, na mesma ordem
+   que o servidor usa no bipe que fecha (revisao_lista.modoPara). A tela só
+   avisa; quem decide é o servidor. */
+function destino(cod){
+  var L=LISTA; if(!L) return null;
+  var x=L.hoje_lista.concat(L.proximos_lista,L.alvo_lista).filter(function(y){ return y.codigo===cod; })[0];
+  if(!x) return {cls:'fora',txt:'⚠ Não falta em lugar nenhum: vai contar como estoque acima do alvo'};
+  if(x.hoje>0) return {cls:'hoje',txt:'● Vai para: venda de hoje'};
+  if(x.proximos>0){ var d=(x.dias||[]).filter(function(z){ return z.n>0; })[0]; return {cls:'prox',txt:'● Vai para: venda de '+(d?d.rotulo:'até sexta')}; }
+  if(x.alvo>0) return {cls:'alvo',txt:'● Vai para: completar o alvo'};
+  return {cls:'fora',txt:'⚠ Não falta em lugar nenhum: vai contar como estoque acima do alvo'};
 }
-async function loadStats(){
-  const st=await (await fetch('/api/revisao/hoje')).json();
-  const tot=st.reduce((a,b)=>a+b.qtd,0);
-  $('#stats').innerHTML = 'Hoje: <b>'+tot+'</b> revisadas' + (st.length? (' · '+st.map(x=>x.codigo+': '+x.qtd+' (méd '+fmt(x.tmedio)+')').join(' · ')) : '');
+/* A venda nova de hoje sem peça (o PDF da tarde): faixa vermelha e um som, uma
+   vez, sem travar nada. A primeira leitura só guarda o que já havia. */
+function novaVenda(){
+  var L=LISTA; if(!L) return;
+  var agora={}; L.hoje_lista.forEach(function(x){ agora[x.codigo]=x.hoje+(x.hoje_revisadas||0); });
+  if(VISTO){
+    var novos=Object.keys(agora).filter(function(c){ return agora[c]>(VISTO[c]||0); });
+    if(novos.length){
+      var md=medidaDe(novos[0]), nome=md?md.medida+' '+(md.cor||''):novos[0];
+      var f=$('#faixaNova');
+      f.innerHTML='🔔 Venda nova para hoje sem peça: '+escH(nome)+(novos.length>1?' e mais '+(novos.length-1):'')
+        +' <span style="font-weight:500;font-size:14px">· já está em Hoje</span><button type="button" id="fxOk">Entendi</button>';
+      f.hidden=false; beep(false); setTimeout(function(){ beep(false); },300);
+      document.getElementById('fxOk').onclick=function(){ f.hidden=true; scan.focus({preventScroll:true}); };
+    }
+  }
+  VISTO=agora;
+}
+/* Quantas peças a PESSOA revisou hoje e a média dela (o /api/revisao/lista
+   manda "minhas", pelo login). */
+function loadStats(){
+  var m=LISTA&&LISTA.minhas; if(!m) return;
+  $('#cQtd').textContent=m.qtd; $('#cMed').textContent=m.qtd?fmt(m.media_seg):'—';
 }
 function fmt(seg){ seg=+seg||0; const m=Math.floor(seg/60),s=seg%60; return (m?m+'m':'')+s+'s'; }
 function mmss(ms){ const t=Math.floor(ms/1000),m=Math.floor(t/60),s=t%60; return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); }
@@ -175,8 +243,8 @@ function toggle(codigo){
     if(!info){ banner('err','SKU não cadastrado',codigo+' — cadastre no Admin antes'); beep(false); return; }
     /* `a_produzir`, nao `falta`: ordem cuja venda ja saiu do estoque nao pede
        peca — a proxima revisao desse SKU e estoque, e o aviso tem que dizer. */
-    var fora=(MODO==='hoje')&&!DIA.some(function(d){return d.codigo===codigo&&d.a_produzir>0;});
-    emRev={codigo:codigo,cor:info.cor||'',inicio:Date.now(),fora:fora}; renderTiles();
+    var dst=destino(codigo);
+    emRev={codigo:codigo,cor:info.cor||'',inicio:Date.now(),fora:!!(dst&&dst.cls==='fora'),destino:dst}; renderTiles();
     abrirRev(emRev);
     beep(true);
   } else { finish(); }
@@ -204,7 +272,9 @@ async function lerUltima(){
 lerUltima();
 function abrirRev(cur){
   var md=medidaDe(cur.codigo);
-  banner('rev', md? md.medida+'  '+md.cor : cur.codigo, cur.fora?'⚠ NÃO está nos pedidos de hoje — vai contar como estoque':(cur.codigo+' — bipe de novo ao terminar'), true);
+  var dst=cur.destino||destino(cur.codigo);
+  banner('rev', md? md.medida+'  '+md.cor : cur.codigo, escH(cur.codigo)+' — bipe de novo ao terminar'
+    +(dst?'<br><span class="para '+dst.cls+'">'+escH(dst.txt)+'</span>':''), true);
   var bn=$('#banner');
   var lin=document.createElement('div'); lin.id='revAcoes';
   lin.style.cssText='margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap';
@@ -231,7 +301,7 @@ function rapidoDemais(seg, minimo){
 async function finish(){
   const cur=emRev;
   const seg=Math.round((Date.now()-cur.inicio)/1000);
-  const corpo=JSON.stringify({codigo:cur.codigo,segundos:seg,modo:(cur.fora?'estoque':MODO),inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()});
+  const corpo=JSON.stringify({codigo:cur.codigo,segundos:seg,modo:null,inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()});
   if(seg<REV_MIN){
     /* A revisao NAO fecha: so avisa, e o servidor grava o bipe rapido. */
     rapidoDemais(seg, REV_MIN);
@@ -247,7 +317,7 @@ async function finish(){
       emRev=cur; renderTiles(); abrirRev(cur); rapidoDemais(seg, r.minimo); return;
     }
     if(r.erro){ banner('err','Erro',r.erro); beep(false); return; }
-    banner('ok','Revisada ✓ ('+fmt(seg)+')', cur.codigo+' · liberada para a EMBALAGEM', false, (window.tempoBancada?tempoBancada(r.tempo):''));
+    banner('ok','Revisada ✓ ('+fmt(seg)+')', escH(cur.codigo)+' · liberada para a EMBALAGEM'+(r.modo?'<br><span class="para '+(r.modo==='hoje'?'hoje':'prox')+'">● '+(r.modo==='hoje'?'Foi para: venda de hoje':'Foi para: estoque')+'</span>':''), false, (window.tempoBancada?tempoBancada(r.tempo):''));
     beep(true); load();
     await lerUltima(); mostrarDesfazer();
   }catch(e){ banner('err','Falha de conexão',String(e)); beep(false); }
@@ -258,7 +328,7 @@ async function cancelarRev(){
   clearInterval(tick); tick=null; emRev=null; renderTiles();
   try{
     var r=await (await fetch('/api/revisao/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({codigo:cur.codigo,segundos:seg,modo:(cur.fora?'estoque':MODO),inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
+      body:JSON.stringify({codigo:cur.codigo,segundos:seg,modo:null,inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
     if(r.erro){ banner('err','Não deu para registrar o cancelamento',r.erro+' — a revisão não foi gravada.'); beep(false); return; }
     banner('','Revisão cancelada',cur.codigo+' · nada foi para a embalagem. Bipe o código para começar de novo.');
     beep(true); load();
@@ -295,7 +365,7 @@ async function confirmarDesfazer(){
     beep(true); load();
   }catch(e){ banner('err','Sem conexão','Não sei se a revisão foi desfeita — confira a lista da embalagem antes de bipar de novo.'); beep(false); }
 }
-$('#tiles').addEventListener('click',e=>{ const b=e.target.closest('.tile'); if(b) toggle(b.dataset.cod); });
+$('#tiles').addEventListener('click',e=>{ const b=e.target.closest('[data-cod]'); if(b) toggle(b.dataset.cod); });
 const scan=$('#scan');
 /* preventScroll: devolver o foco nao pode arrastar a tela. O #scan mora no
    alto; sem isto, focar de volta rolava a pagina ate ele e jogava pro topo
@@ -346,17 +416,39 @@ document.addEventListener('keydown',function(e){
 });
 scan.focus();
 function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=ok?820:240;g.gain.value=.05;o.start();setTimeout(()=>{o.stop();a.close();},ok?100:220);}catch(e){} }
-document.getElementById('escolha').addEventListener('click',function(e){
-  var b=e.target.closest('.esc'); if(b) setModo(b.dataset.m);
+/* Hoje por extenso no cabeçalho. */
+(function(){ var D=['domingo','segunda','terça','quarta','quinta','sexta','sábado'],
+  M=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  var d=new Date(); $('#hdia').textContent=D[d.getDay()]+', '+d.getDate()+' de '+M[d.getMonth()]; })();
+/* ↩ DEVOLUÇÕES: vai à 251 e volta (a 251 mostra "← Voltar para a Revisão"
+   quando chega com ?de=revisao). Com uma revisão aberta, não sai. */
+document.getElementById('btDev').addEventListener('click',function(){
+  if(emRev){ var bs=document.querySelector('#banner .bs');
+    if(bs && !document.getElementById('devAviso'))
+      bs.insertAdjacentHTML('beforeend','<div class="aviso" id="devAviso" style="margin-top:10px">Termine ou cancele a revisão aberta antes de ir para Devoluções.</div>');
+    beep(false); return; }
+  location.href='/devolucao?de=revisao';
 });
-document.getElementById('btModo').addEventListener('click',function(){
-  if(emRev){ alert('Termine a revisão em andamento antes de trocar de modo.'); return; }
-  document.getElementById('escolha').style.display='flex';
-});
-(function(){ var m=null; try{ m=localStorage.getItem('rev_modo'); }catch(e){}
-  if(m==='hoje'||m==='estoque') setModo(m);
-  else document.getElementById('escolha').style.display='flex';
-})();
+/* VER A SEMANA: só leitura, por cima da tela; a revisão aberta continua. */
+async function abrirSemana(){
+  var box=$('#semana'), s2=null;
+  try{ var r=await fetch('/api/revisao/semana'); if(r.ok) s2=await r.json(); }catch(e){}
+  if(!s2){ box.innerHTML='<div class="sbox"><div class="scab"><h3>A semana</h3><button type="button" id="smFecha">Fechar</button></div><div class="aviso">Não deu para carregar a semana. Tente de novo.</div></div>'; }
+  else {
+    var cab='<tr><th>SKU</th><th>Hoje</th>'+s2.dias.map(function(d){ return '<th>'+escH(d.rotulo)+'</th>'; }).join('')+'<th>Total</th><th>Alvo</th></tr>';
+    var lin=s2.linhas.map(function(x){ var md=medidaDe(x.codigo);
+      return '<tr><td><b>'+escH(md?md.medida:x.codigo)+'</b> '+escH(md?md.cor:'')+'</td><td class="'+(x.hoje?'hj':'z')+'">'+(x.hoje||'—')+'</td>'
+        +x.dias.map(function(n){ return '<td class="'+(n?'':'z')+'">'+(n||'—')+'</td>'; }).join('')
+        +'<td><b>'+x.total+'</b></td><td>'+(x.alvo||'—')+'</td></tr>'; }).join('');
+    box.innerHTML='<div class="sbox" role="dialog" aria-label="A semana"><div class="scab"><div><h3>A semana</h3><p>Peças vendidas que ainda faltam, por dia de coleta · só leitura</p></div><button type="button" id="smFecha">Fechar</button></div>'
+      +(s2.linhas.length?'<div style="overflow-x:auto"><table><thead>'+cab+'</thead><tbody>'+lin+'</tbody></table></div>':'<div class="muted">Nenhuma venda faltando peça nesta semana.</div>')+'</div>';
+  }
+  box.hidden=false;
+  document.getElementById('smFecha').onclick=function(){ box.hidden=true; scan.focus({preventScroll:true}); };
+}
+document.getElementById('btSemana').addEventListener('click',abrirSemana);
+banner('','Pronto','Bipe o código pra iniciar a revisão<br><span style="font-size:14px">ou toque num cartão da lista</span>');
+load();
 /* ── VOLTARAM DA EMBALAGEM POR DEFEITO (R-EMB-11, 21/11/2026) ──
    O revisor confere a peca: com defeito escolhe o setor (vira peca com
    problema); sem defeito a volta fecha e a peca e revisada de novo pelos dois
@@ -424,7 +516,7 @@ document.addEventListener('click',function(e){
   if(t.classList.contains('vSetor')){ voltaDecidir(+t.dataset.id,{decisao:'defeito',setor:t.dataset.s}); return; }
 });
 voltaCarregar(); setInterval(voltaCarregar, 15000);
-/* AUTO_REFRESH_OP */ setInterval(()=>{ if(!emRev&&MODO) load(); }, 3000);
+/* AUTO_REFRESH_OP */ setInterval(()=>{ if(!emRev) load(); }, 3000);
 var RJMOT=[];
 async function rjCarregar(){
   try{ RJMOT=await (await fetch('/api/listas/rejeicao')).json(); }catch(e){}
@@ -463,7 +555,7 @@ document.addEventListener('click',function(e){
     if(bs) bs.innerHTML='<b style="color:#c62828">A peça com problema não foi registrada: '+escH(msg)+'</b>';
     scan.focus({preventScroll:true}); }
   fetch('/api/rejeicao',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({codigo:cur.codigo,motivo:motivo,obs:obs,segundos:seg,modo:MODO})})
+    body:JSON.stringify({codigo:cur.codigo,motivo:motivo,obs:obs,segundos:seg,modo:null})})
    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok&&!j.erro, j:j}; }); })
    .then(function(x){
      if(!x.ok){ naoGravou(x.j.erro||'o servidor recusou'); return; }
@@ -473,54 +565,8 @@ document.addEventListener('click',function(e){
    }, function(){ naoGravou('sem conexão — toque de novo'); });
 });
 
-var AVANT=0;
-async function avisoStatus(){
-  var s=null;
-  try{ s=await (await fetch('/api/revisao/status')).json(); }catch(e){ return; }
-  var el=document.getElementById('avBox');
-  if(!el){
-    el=document.createElement('div');
-    el.id='avBox';
-    el.style.cssText='margin-bottom:14px;padding:15px 18px;border-radius:13px;font-size:15px;line-height:1.5';
-    var w=document.querySelector('.wrap');
-    if(w) w.insertBefore(el,w.firstChild);
-  }
-  var txt='', cor='#f4f6f8', bd='#d8dee6';
-  if(!s.lancado){
-    txt='<b>Nenhuma venda lançada ainda hoje.</b><br><span style="color:#5a6472">O corte de hoje é às '+s.corte+'. Assim que a lista sair, ela aparece aqui.</span>';
-  } else if(s.urgentes===0){
-    txt='<b style="color:#1565c0">Todas as vendas de hoje já estão em estoque.</b><br><span style="color:#5a6472">'+
-        (s.passouCorte?('Lista fechada às '+s.corte+'. '):('Corte às '+s.corte+' — ainda pode entrar venda. '))+
-        'Trabalhe na reposição (tela azul).</span>';
-  } else if(s.urgentesFalta>0){
-    txt='<b style="color:#c62828">'+s.urgentesFalta+' peça(s) URGENTE(S) para hoje</b><br><span style="color:#5a6472">Cliente esperando. Priorize a tela vermelha.'
-       +(s.atendidas>0?' Outras '+s.atendidas+' ordem(ns) já saíram do estoque e não contam aqui.':'')+'</span>';
-    cor='#fbe9e8'; bd='#efb1ad';
-  } else if(s.atendidas>0){
-    /* Ordem aberta, venda fora: nao e pendencia, e a tela tem que dizer isso —
-       "4 pendentes" com 140 etiquetas ja despachadas foi lido como peca perdida
-       em 08/09/2026. */
-    txt='<b style="color:#b26a00">Urgentes do dia concluídos — '+s.atendidas+' saíram do estoque.</b><br><span style="color:#5a6472">'
-       +'Peça(s) revisada(s) na tela azul ou que já estavam na prateleira atenderam a venda; a ordem ficou aberta, mas não há nada a produzir. Pode seguir na reposição.</span>';
-    cor='#fbf1db'; bd='#e7cb8c';
-  } else {
-    txt='<b style="color:#2e7d32">Urgentes do dia concluídos.</b><br><span style="color:#5a6472">Pode seguir na reposição (tela azul).</span>';
-    cor='#e7f5eb'; bd='#a9d8b4';
-  }
-  el.style.background=cor; el.style.border='1px solid '+bd;
-  el.innerHTML=txt;
-  if(s.urgentesFalta>AVANT && AVANT>=0 && MODO==='estoque' && s.urgentesFalta>0){
-    try{ beep(false); setTimeout(function(){beep(false);},300); }catch(e){}
-    var al=document.createElement('div');
-    al.style.cssText='position:fixed;top:0;left:0;right:0;z-index:10002;background:#c62828;color:#fff;padding:16px;text-align:center;font:800 17px system-ui;cursor:pointer';
-    al.innerHTML='CHEGOU PEDIDO URGENTE - '+s.urgentesFalta+' peça(s) para hoje (toque para fechar)';
-    al.onclick=function(){ al.remove(); };
-    document.body.appendChild(al);
-    setTimeout(function(){ if(al.parentNode) al.remove(); },20000);
-  }
-  AVANT=s.urgentesFalta;
-}
-setInterval(avisoStatus,20000);
+/* O aviso de status antigo (os quadros da tela vermelha e azul) saiu com a
+   tela única: a lista diz o que falta, e a venda nova de hoje é a faixa. */
 
 </script><script src="/tempo_bancada.js"></script><script src="/nav.js"></script>
 </body></html>

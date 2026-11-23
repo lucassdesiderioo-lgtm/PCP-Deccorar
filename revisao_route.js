@@ -137,6 +137,7 @@ const MSG = {
 const TEMPO = require('./tempo_operador');
 const DEFEITO = require('./defeito_dominio');
 const QUEM = require('./quem');
+const LISTA = require('./revisao_lista');
 module.exports=function(app,db){
   /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
      registrada neste modulo passa pelo quem.js antes do handler — a de amanha
@@ -151,7 +152,12 @@ module.exports=function(app,db){
     if(!codigo) return res.status(400).json({erro:'codigo'});
     const cod=String(codigo).trim().toUpperCase();
     if(!db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(cod)) return res.status(404).json({erro:'SKU não cadastrado: '+cod});
-    const seg=Math.round(+segundos||0), modo=modoDe(req.body);
+    /* TELA ÚNICA (REVISAO-TELA-UNICA, 23/11/2026): quem decide para que a peça
+       serve é o servidor, no bipe que fecha — 'hoje' se ela cobre uma venda
+       de hoje sem peça (o a_produzir do ordem_dia), 'estoque' nos outros
+       casos. O `modo` que a tela antiga manda é ignorado: o tablet com a
+       página velha em cache segue a mesma regra. */
+    const seg=Math.round(+segundos||0), modo=LISTA.modoPara(db,cod);
     /* A BARREIRA vale aqui tambem, e nao so na tela: o tablet com a tela
        velha nao pode furar a regra. A revisao continua aberta na tela; o
        operador termina e bipa de novo. */
@@ -172,7 +178,7 @@ module.exports=function(app,db){
     const prog=db.prepare(`SELECT COALESCE(SUM(qtd),0) pedido, COALESCE(SUM(produzido),0) feito FROM producao WHERE codigo=? AND data=date('now','localtime')`).get(cod);
     /* TEMPO-NA-BANCADA (R-TEM-01): o tempo desta peça ao lado da mediana de quem a fez. */
     const tempo=TEMPO.seguro(db,'revisao',q.usuario_id,cod,seg,novo);
-    res.json({ok:true,codigo:cod,estoque:est?est.estoque:null,pedido:prog.pedido,feito:prog.feito,tempo});
+    res.json({ok:true,codigo:cod,modo,estoque:est?est.estoque:null,pedido:prog.pedido,feito:prog.feito,tempo});
   });
 
   /* Zera a revisao em andamento. Ela so existe na tela (o cronometro), entao
@@ -250,6 +256,19 @@ module.exports=function(app,db){
      R-EMB-11, 21/11/2026). O revisor confere: com defeito vai ao setor (vira a
      peca com problema); sem defeito, a volta fecha e a peca e revisada de novo. */
   DEFEITO.garantir(db);
+  /* A LISTA DA TELA ÚNICA: Hoje · Próximos dias · Completar o alvo, e a
+     semana só para ler. Leitura: cai no pre('/api/revisao') do permDaRota,
+     como o /dia (revisao.executar ou o admin). */
+  app.get('/api/revisao/lista',(req,res)=>{
+    const l=LISTA.montar(db);
+    /* Quantas a PESSOA revisou hoje e a média dela (o topo da tela). Quem é vem
+       do login; sem id, nada. */
+    const uid=QUEM.idDe(req);
+    l.minhas = uid==null ? { qtd:0, media_seg:null } : db.prepare(`SELECT COUNT(*) qtd, ROUND(AVG(segundos)) media_seg
+      FROM revisao WHERE usuario_id=? AND data=date('now','localtime')`).get(uid);
+    res.json(l);
+  });
+  app.get('/api/revisao/semana',(req,res)=> res.json(LISTA.semana(db)));
   app.get('/api/revisao/defeitos',(req,res)=> res.json({ abertas:DEFEITO.abertas(db), setores:DEFEITO.SETORES }));
   app.post('/api/revisao/defeitos/:id/decidir',(req,res)=>{
     const q=exigir(req,res); if(!q) return;

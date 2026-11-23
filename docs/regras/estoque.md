@@ -115,24 +115,24 @@
 
 ## A revisão
 
-### R-REV-01 · A tela de revisão tem três modos, e a cor é a trava
-- **Regra:** `/operador` abre exigindo a escolha: **vermelho** (pedidos de hoje), **azul** (produção pra estoque), **âmbar** (devoluções). O modo fica salvo por aparelho (`rev_modo`) e o botão "Trocar" força escolher de novo.
-- **Por quê:** a cor impede revisar meia hora no modo errado. Ela espelha os carrinhos físicos separados na produção.
-- **Exceções:** nenhuma.
-- **Teste que trava:** ⚠ **sem teste**.
-- **Status:** no ar.
+### R-REV-01 · A revisão é uma tela só, e quem decide para que a peça serve é o servidor
+- **Regra:** desde 23/11/2026 (spec `REVISAO-TELA-UNICA`) `/operador` abre direto no bipe, sem escolher cor. A lista tem três partes, cada uma com título: **Hoje** (as vendas da Etiqueta de Venda sem peça — o `a_produzir` do `ordem_dia.js`), **Próximos dias** (a falta por dia do `demanda_dominio.porDia`, de amanhã até sexta; na sexta e no sábado, só a segunda) e **Completar o alvo** (o `precisa` menos a falta até o fim da janela). `revisao_lista.js` é o dono da lista e não tem conta de quantidade própria. No bipe que fecha, o servidor grava `modo='hoje'` se a peça cobre uma venda de hoje sem peça, e `'estoque'` nos outros casos — o `modo` que a tela manda é ignorado. Enquanto o dia não termina, Hoje fica em destaque; terminado, faixa verde e os próximos dias no destaque. As devoluções continuam na 251, pelo "↩ Devoluções", que volta pelo "← Voltar para a Revisão".
+- **Por quê:** o dono, 23/11/2026: *"quero questionar se precisamos ter a tela azul e vermelha"*. O carrinho é um só, com o lugar de cada SKU, e a cor espelhava carrinhos separados que não existem. A decisão do modo no servidor tira do revisor uma escolha que ele podia errar.
+- **Exceções:** a peça revisada e ainda não embalada (fila `aguardando`, modo `estoque`) sai primeiro dos próximos dias e depois do alvo. A venda de hoje da planilha que ainda não está na 201 não aparece em Hoje: aparece quando o PDF sobe.
+- **Teste que trava:** `teste_revisao_tela_unica.js` (38: a janela, as três partes somando o `precisa` da 401, o modo decidido no servidor, a peça na fila descontada, o dia terminado) · `teste_revisao_tela_unica_tela.js` (26, num Chromium) · `teste_revisao.js` (seção 2).
+- **Status:** construída em 23/11/2026, falta subir. Até ali: três modos escolhidos pela cor (vermelho, azul, âmbar), o modo gravado era o da cor.
 
-### R-REV-02 · SKU fora da lista no modo vermelho: avisa e deixa passar
-- **Regra:** bipar no vermelho um SKU que não está nos pedidos do dia mostra aviso **no início** da revisão, deixa revisar, e a peça conta como estoque. Nunca bloqueia.
+### R-REV-02 · SKU que não falta em lugar nenhum: avisa e deixa passar
+- **Regra:** bipar um SKU que não está em Hoje, nem nos Próximos dias, nem no alvo mostra no início da revisão *"Não falta em lugar nenhum: vai contar como estoque acima do alvo"*, deixa revisar, e a peça conta como estoque. Nunca bloqueia (o dono, 23/11/2026). Durante a revisão, a tela diz para onde a peça vai (*"Vai para: venda de hoje"*, *"… venda de amanhã"*, *"… completar o alvo"*), e ao fechar diz para onde foi.
 - **Por quê:** operador parado esperando alguém resolver custa mais que um número classificado de outro jeito.
 - **Exceções:** nenhuma.
-- **Teste que trava:** ⚠ **sem teste**.
-- **Status:** no ar.
+- **Teste que trava:** `teste_revisao_tela_unica_tela.js` (o "Vai para") · ⚠ o aviso do SKU que não falta só na tela, sem caso próprio.
+- **Status:** no ar (até 23/11/2026 valia só no modo vermelho, para o SKU fora dos pedidos de hoje).
 
 ### R-REV-03 · A tela azul é ordenada por prioridade, e cada linha diz por quê
 - **Regra:** com `config.ordem_por_falta = 0` (o padrão), quatro degraus, nesta ordem: 1) cliente com prazo até amanhã (a venda **atrasada** conta aqui), 2) sem estoque, 3) cobertura abaixo de metade dos dias de cobertura, 4) abaixo do alvo. **Com a chave ligada (fase 4 da `PLANEJAMENTO-VENDAS-FUTURAS`, 07/11/2026), a ordem é pela data em que a peça vai faltar**: a data mais cedo primeiro; no mesmo dia, venda feita antes de reposição; no mesmo dia e tipo, mais peças faltando primeiro. Venda feita: o primeiro dia de envio que o livre não cobre (a conta da aba por dia). Reposição: `hoje + (livre − comprometido) ÷ ritmo` (pelo livre desde 09/11/2026, R-PLN-06). O degrau 2 "sem estoque" e a cobertura também contam pelo livre. Cada linha traz o `motivo` — *"faltam 3 para ter 10/11 (vendidas)"* ou *"acaba qua 12/11 pelo ritmo (3,5/dia)"*. Sem venda na janela, a cobertura e a data são vazias, nunca zero.
 - **Por quê:** ordenar pelo que falta põe em cima o SKU que mais gira, que quase nunca é o que acaba primeiro. E a fábrica precisa andar 1, 2 ou 3 dias à frente das vendas: terminado o de hoje, a primeira linha é a falta de amanhã.
-- **Exceções:** a chave nasce **desligada** e só o **Admin Geral** (o setor, pelo `ehAdminGeral`) liga ou desliga (403 para os outros, antes de gravar qualquer campo do mesmo pedido). O modo vermelho e o âmbar não mudam.
+- **Exceções:** a chave nasce **desligada** e só o **Admin Geral** (o setor, pelo `ehAdminGeral`) liga ou desliga (403 para os outros, antes de gravar qualquer campo do mesmo pedido). ⚠️ **Desde 23/11/2026 a 101 não lê mais esta ordem** (R-REV-01): a parte Próximos dias da tela única ordena pela data da primeira falta, com ou sem a chave (o dono: *"já usa"*). A chave continua valendo para o `/api/revisao/producao`, que só o tablet com a página antiga ainda chama.
 - **Teste que trava:** `teste_vendas_futuras.js` (a ordem, os três desempates, o motivo, o caso do meio-dia, a chave desligada por padrão e o 403).
 - **Status:** os degraus no ar · a ordem pela falta no ar desde 07/11/2026 (PR #313), **desligada** até o dono ligar.
 
@@ -472,8 +472,7 @@
 
 ## O que ainda não tem teste nesta área
 
-R-EST-04 (reimpressão não baixa), R-REV-01 (os três modos), R-REV-02 (SKU fora
-da lista), R-REV-06 (peça com problema),
+R-EST-04 (reimpressão não baixa), R-REV-02 (o aviso do SKU que não falta), R-REV-06 (que a peça rejeitada não entra na fila),
 R-EMB-05 (conferência no bipe 1) e as partes de tela de R-EST-11 e R-EST-17.
 Ficam aqui para virar trabalho, e não esquecimento.
 

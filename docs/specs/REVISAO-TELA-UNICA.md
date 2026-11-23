@@ -1,11 +1,41 @@
 # REVISAO-TELA-UNICA — a 101 Revisão numa tela só, ligada ao planejamento
 
-> **STATUS — 23/11/2026: COMPLETA, AGUARDANDO O "PODE SEGUIR" DO DONO.** Desenhado na conversa de
-> 23/11/2026 (Claude Code, sessão de perguntas e respostas). Nada construído.
-> Tipo: `REGRA` + `NOVIDADE` · risco 🟡 (comportamento de tela, conta exibida e
-> o modo gravado na revisão, que decide o que abate a ordem do dia). Muda os
-> cartões **R-REV-01**, **R-REV-02** e **R-REV-03** de `docs/regras/estoque.md`.
-> As decisões do dono estão na §9; o design é a fase 2.
+> **STATUS — 23/11/2026: APROVADA PELO DONO** (*"pode seguir"*, 23/11/2026) ·
+> **fases 1 e 2 construídas juntas, falta subir** · fase 3 (a demanda vinda da
+> Montagem) espera a `PRODUCAO-MAPA-E-MOTOR`. Tipo: `REGRA` + `NOVIDADE` · risco
+> 🟡. Muda os cartões **R-REV-01**, **R-REV-02** e **R-REV-03** de
+> `docs/regras/estoque.md`; duas linhas em `docs/DECISOES.md`.
+> Testes: `teste_revisao_tela_unica.js` (38), `teste_revisao_tela_unica_tela.js`
+> (26, num Chromium; sem navegador diz PULADO) e `teste_revisao.js` (122, a
+> seção 2 mudou: o modo é do servidor).
+>
+> **O que mudou na construção** (vale o que está aqui):
+> - o número de cada parte vem de um dono só, `revisao_lista.js`, que junta o
+>   `ordem_dia.js` (Hoje), o `demanda_dominio.porDia` (a falta acumulada por dia;
+>   os próximos dias são o quanto ela cresce depois de hoje) e o `calcular` (o
+>   alvo é o `precisa` menos a falta até o fim da janela — a venda depois da
+>   janela entra no alvo, porque o `precisa` já a conta);
+> - a peça **revisada e ainda não embalada** (fila `aguardando`, modo
+>   `estoque`) sai primeiro dos próximos dias e depois do alvo: sem isso o
+>   número só cairia na embalagem e a bancada revisaria a mesma falta duas vezes;
+> - ⚠️ **a venda de hoje da planilha que ainda não está na 201 não aparece em
+>   Hoje**: Hoje é a 201. Ela aparece quando o PDF sobe;
+> - o cartão de Hoje mostra a falta **de hoje** em número grande e a barra
+>   "revisadas de N para hoje"; o de Próximos dias, a falta até sexta e as
+>   revisadas hoje para estoque;
+> - o modo `hoje` é decidido pelo mesmo `a_produzir` do `ordem_dia`; a conta que
+>   falhar não derruba o bipe (a peça vai como estoque e o log diz);
+> - a leitura nova (`/api/revisao/lista` e `/api/revisao/semana`) cai na linha
+>   das leituras da revisão do `permDaRota` (`revisao.executar` ou o admin),
+>   como o `/dia`: não precisou de linha própria;
+> - o topo mostra as revisadas **da pessoa** hoje e a média dela (`minhas`, pelo
+>   login);
+> - o botão da 251 que dizia "Trocar" virou "Revisão" (leva à 101, como
+>   antes), com `data-perm="revisao.executar"`, e vira "← Voltar para a
+>   Revisão" quando a pessoa chega pelo "↩ Devoluções" (`?de=revisao`);
+> - as rotas antigas da tela (`/api/revisao/dia`, `/producao`, `/adiantar`,
+>   `/status`) continuam no ar: o tablet com a página velha em cache segue
+>   funcionando até recarregar.
 
 ## 1. O pedido
 
@@ -70,7 +100,7 @@ precisamos ter a tela azul e vermelha."*
 
 ## 5. O cartão de cada SKU
 
-Decidido (§9):
+Decidido (§9). Construído assim (§10, o design):
 
 ```
 1,40 × 1,60  CINZA                 faltam 9
@@ -138,13 +168,34 @@ número já descontado. **Não entra na fase 1**, por três razões:
 - com o **código único por peça** da `PRODUCAO-MAPA-E-MOTOR`, a peça já chega
   com nome, e a reserva se decide ali (fase 3).
 
-## 10. Fases
+## 10. O design (fase 2, aprovado em 23/11/2026)
 
-| Fase | O quê | Risco |
+O dono escolheu a opção A (cartões) com as barras da C, e o dia de hoje em
+evidência (o rascunho interativo ficou com ele):
+
+- **o tablet deitado**: à esquerda a peça na mão (o bipe, a peça grande com o
+  cronômetro, "Vai para", Cancelar e Peça com problema, as peças que voltaram
+  da embalagem); à direita a lista;
+- **no topo**: a data, as revisadas **da pessoa** hoje e a média dela,
+  "↩ Devoluções" e "Ver a semana";
+- **enquanto o dia não termina**: Hoje num bloco vermelho grande, cartões em
+  duas colunas com o número grande do que falta hoje e a barra verde do
+  andamento; "Depois de hoje" e "Completar o alvo" em etiquetas pequenas,
+  tocáveis;
+- **terminado o dia** (nenhuma peça faltando para as vendas de hoje): faixa
+  verde *"✓ Hoje está terminado"* e os Próximos dias num bloco azul grande; o
+  alvo continua pequeno. Venda nova de hoje volta o bloco vermelho, com a faixa
+  e o som;
+- **sem venda de hoje no PDF**: faixa cinza *"Nenhuma venda de hoje sem peça"*
+  e os próximos dias no destaque.
+
+## 10-B. Fases
+
+| Fase | O quê | Situação |
 |---|---|---|
-| **1** | A regra: tela única, a lista em três partes, a decisão do modo no servidor, o cartão, "Ver a semana", os avisos. Visual de hoje | 🟡 |
-| **2** | O design novo, tablet deitado, para um ou dois revisores | 🟢/🟡 |
-| **3** | A demanda vindo da Montagem (107) | com a `PRODUCAO-MAPA-E-MOTOR` |
+| **1** | A regra: tela única, a lista em três partes, a decisão do modo no servidor, "Ver a semana", os avisos | construída, falta subir |
+| **2** | O design da §10, e o "↩ Devoluções" com a volta na 251 | construída, falta subir |
+| **3** | A demanda vindo da Montagem (107), e a ideia da peça reservada | com a `PRODUCAO-MAPA-E-MOTOR` |
 
 ## 11. Onde mora
 
@@ -157,7 +208,8 @@ semana" é do mesmo assunto da tela, e por isso não é tela.
 
 - Telas novas: nenhuma.
 - Ações novas: nenhuma — a leitura nova da lista abre com as chaves da 101
-  (`revisao.executar`), com linha própria no `permDaRota`.
+  (`revisao.executar` ou o admin), pela linha das leituras da revisão do
+  `permDaRota`. O botão "Revisão" da 251 ganhou `data-perm="revisao.executar"`.
 - Setores novos: nenhum.
 
 ## 13. Como testar (fase 1)
