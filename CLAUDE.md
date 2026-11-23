@@ -923,6 +923,14 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 > - **o bipe fora da prioridade nunca trava**: o aviso pergunta uma vez, e o
 >   próximo bipe decide (o kit segue e fica `fora_prioridade` em `montagem_evento`;
 >   o SKU do dia troca). A pessoa pode embalar outra coisa para não ficar parada;
+> - ⚠️ **na troca, a peça do dia é reservada ANTES de cancelar a de agora** (pelo
+>   bipe e pelo botão; o `cancelar` vai com `trocou` e `manter`, e não solta a
+>   reserva nova). Se a do dia não está aqui ou está com outra pessoa, **a troca
+>   não acontece** e a embalagem de agora continua, com o motivo no aviso — e o
+>   aviso não oferece de novo a peça recusada. Enquanto o servidor responde, o
+>   bipe não vale e o Cancelar e a Peça com defeito somem; sem resposta, a tela
+>   segue com a de agora e pede de volta a reserva dela. O `/reservar` desiste em
+>   8 s, e a embalagem abre sem reserva;
 > - ⚠️ **o bipe final passou a consumir a linha `hoje` primeiro**, depois
 >   `estoque`, depois `devolucao` (a reservada, quando há). A R-EMB-03 não mudou,
 >   mas a ordem do dia é abatida mais vezes que antes — decisão do dono;
@@ -930,7 +938,8 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 >   (5) minutos sem bipe dela; sem cron, quem pergunta descarta as vencidas;
 > - ⚠️ **a peça reservada por outra pessoa nunca se consome no fim** (③ REVISÃO):
 >   quem não reservou (a página antiga em cache, a reserva vencida) leva 409
->   `reservada` antes de gravar, e não quem reservou. Se a prioridade não carregar,
+>   `reservada` antes de gravar (linha `reservada` em `montagem_evento`, com quem
+>   está com a peça em `detalhe`), e não quem reservou. Se a prioridade não carregar,
 >   a lista cai no `GET /api/fila` (a bancada não para);
 > - **o `GET /api/fila` continua respondendo igual**: é o que o tablet com a página
 >   antiga lê. A tela nova lê `GET /api/montagem/prioridade`.

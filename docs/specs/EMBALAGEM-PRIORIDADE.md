@@ -95,7 +95,9 @@ livre** (não reservada por outra pessoa):
   `montagem_evento` (`fora_prioridade`, com o SKU bipado, o SKU do dia que estava
   esperando, quem e quando).
 - **Bipou um SKU do bloco 1:** a embalagem de antes é cancelada (a reserva solta,
-  §5) e começa a do SKU do dia, com o cronômetro do zero.
+  §5) e começa a do SKU do dia, com o cronômetro do zero. ⚠️ Na construção (③ REVISÃO):
+  a do dia é **reservada antes** de cancelar a de antes; se ela não está aqui ou
+  está com outra pessoa, a troca não acontece e a de antes continua.
 - **Os dois botões continuam na faixa** (*"Vou embalar a do dia"*, *"Embalar esta
   mesmo assim"*), para quem preferir tocar — o toque vale o mesmo que o bipe.
 - **Nunca trava**: o aviso só pergunta uma vez por embalagem. Embalar fora da
@@ -131,7 +133,7 @@ livre** (não reservada por outra pessoa):
   — sem livre, 409 `reservada` para quem não reservou.
 - **"Peça com defeito" passa a marcar a linha reservada** (hoje marca a mais antiga
   do SKU, decisão de 22/11/2026). É a mesma ideia — a peça que está na mão —, só
-  mais precisa. ⚠️ Confirmar no "pode seguir".
+  mais precisa. Confirmado pelo dono no "pode seguir" (23/11/2026).
 - **A tabela é `embalagem_reserva`** (fila_id único, usuario_id, usuario_nome,
   codigo, desde, ultimo_bipe), no modo teste. Não mexe em saldo.
 
@@ -170,7 +172,8 @@ A tela só desenha.
 1. **Servidor:** `embalagem_prioridade.js` e `GET /api/montagem/prioridade` (os
    blocos prontos); a reserva (`POST /api/montagem/reservar` no 1º bipe,
    `/renovar` no kit; o cancelar e o defeito soltam); o bipe final consome a linha
-   reservada; o evento `fora_prioridade`. O `GET /api/fila` de hoje continua
+   reservada; o evento `fora_prioridade`. Na ③ REVISÃO: se a prioridade falhar, a
+  tela cai no `GET /api/fila`. O `GET /api/fila` de hoje continua
    respondendo igual (a página antiga em cache no tablet não quebra).
 2. **Tela 102:** os quatro blocos, as faixas F2–F8, o aviso da §4 com o bipe que
    decide, a recusa da reserva no 1º bipe.
@@ -196,7 +199,7 @@ na 102 a 1024 e 768 px.
 - **Telas novas:** nenhuma.
 - **Ações novas:** nenhuma chave. As rotas novas (`GET /api/montagem/prioridade`,
   `POST /api/montagem/reservar`, `/renovar`) usam `embalagem.executar`, com linha
-  própria no `permDaRota`; a leitura também `@admin`, como o `GET /api/fila`.
+  própria no `permDaRota`; a leitura com a mesma lista do `GET /api/fila` (`embalagem.executar`, `etiqueta.emitir`, `@admin`).
   As escritas gravam quem pelo `quem.js` (401 sem login).
 - **Setores novos:** nenhum.
 - Quem recebe: nada novo a dar.
