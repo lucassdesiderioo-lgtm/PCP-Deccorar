@@ -164,6 +164,7 @@ db.prepare("UPDATE embalagem_reserva SET ultimo_bipe=datetime('now','localtime',
 p = prio(RUI);
 eq('vencida, a peça da Ana volta a ser aqui para o Rui', p.dia.linhas[0].sendo, []);
 r = chamar('POST', '/api/montagem/reservar', { codigo:'BEGE140' });
+ok('Ana bipa de novo depois de vencida: ganha uma peça de volta', r.status === 200 && r.body.fila_id != null, JSON.stringify(r.body));
 db.prepare("UPDATE embalagem_reserva SET ultimo_bipe=datetime('now','localtime','-4 minutes') WHERE usuario_id=1").run();
 r = chamar('POST', '/api/montagem/renovar', { codigo:'BEGE140' });
 eq('o bipe do kit renova', r.body.reservada, true);
@@ -175,7 +176,7 @@ const ev = db.prepare("SELECT * FROM montagem_evento WHERE tipo='fora_prioridade
 eq('fora_prioridade: quem, o SKU embalado e o do dia', [ev && ev.usuario_nome, ev && ev.codigo, ev && ev.detalhe], ['Lia', 'REPO180', 'BEGE140']);
 r = chamar('POST', '/api/montagem/cancelar', { codigo:'REPO180', trocou:1, codigo_dia:'BEGE140', segundos:15 }, { id:3, nome:'Lia' });
 const ev2 = db.prepare("SELECT * FROM montagem_evento WHERE tipo='trocou_prioridade'").get();
-eq('trocar para a do dia: o evento e a reserva solta', [ev2 && ev2.detalhe, !!db.prepare('SELECT 1 FROM embalagem_reserva WHERE usuario_id=3').get()], ['BEGE140', false]);
+eq('trocar pelo botão (sem peça do dia na mão): o evento e a reserva solta', [ev2 && ev2.detalhe, !!db.prepare('SELECT 1 FROM embalagem_reserva WHERE usuario_id=3').get()], ['BEGE140', false]);
 
 console.log('\n── 7. cancelar e defeito soltam; o defeito marca a reservada ──');
 chamar('POST', '/api/montagem/cancelar', { codigo:'BEGE140', segundos:5 });
@@ -202,6 +203,44 @@ r = chamar('POST', '/api/montagem/reservar', { codigo:'REPO180' }, RUI);
 const depoisRui = r.body.fila_id;
 r = chamar('POST', '/api/montagem', { codigo:'REPO180', segundos:60, kit_ok:1, kit_codigo:KIT });
 ok('sem reserva, a Ana não pega a peça reservada pelo Rui', sit(depoisRui) === 'aguardando');
+
+console.log('\n── 8-B. a peça reservada por outra pessoa não se consome no fim (③ revisão) ──');
+db.prepare('DELETE FROM embalagem_reserva').run();
+const u1 = fila('UNICA', 'estoque');
+db.prepare("INSERT INTO skus (codigo,cor,estoque,modelo_id,largura_cm,altura_cm) VALUES ('UNICA','Bege',0,1,110,110)").run();
+r = chamar('POST', '/api/montagem/reservar', { codigo:'UNICA' });
+eq('caso A: Ana reserva a única', r.body.fila_id, u1);
+r = chamar('POST', '/api/montagem', { codigo:'UNICA', segundos:60, kit_ok:1, kit_codigo:KIT }, RUI);
+eq('…Rui, sem reserva (página antiga), leva 409 reservada no fim', [r.status, r.body.motivo], [409, 'reservada']);
+eq('…e a peça da Ana continua esperando', sit(u1), 'aguardando');
+r = chamar('POST', '/api/montagem', { codigo:'UNICA', segundos:60, kit_ok:1, kit_codigo:KIT });
+eq('…Ana fecha: 200, a linha dela', [r.status, sit(u1)], [200, 'embalado']);
+const u2 = fila('UNICA', 'estoque');
+chamar('POST', '/api/montagem/reservar', { codigo:'UNICA' });
+db.prepare("UPDATE embalagem_reserva SET ultimo_bipe=datetime('now','localtime','-6 minutes') WHERE usuario_id=1").run();
+r = chamar('POST', '/api/montagem/reservar', { codigo:'UNICA' }, RUI);
+eq('caso B: a da Ana venceu, Rui reserva a mesma', r.body.fila_id, u2);
+r = chamar('POST', '/api/montagem', { codigo:'UNICA', segundos:60, kit_ok:1, kit_codigo:KIT });
+eq('…Ana (reserva vencida) leva 409 no fim', [r.status, r.body.motivo], [409, 'reservada']);
+r = chamar('POST', '/api/montagem', { codigo:'UNICA', segundos:60, kit_ok:1, kit_codigo:KIT }, RUI);
+eq('…Rui, com a reserva válida, fecha', [r.status, sit(u2)], [200, 'embalado']);
+
+console.log('\n── 8-C. trocar para a peça do dia não perde a embalagem de antes (③ revisão) ──');
+db.prepare('DELETE FROM embalagem_reserva').run();
+const t1 = fila('UNICA', 'estoque'), t2 = fila('BEGE140', 'hoje');
+chamar('POST', '/api/montagem/reservar', { codigo:'UNICA' });
+chamar('POST', '/api/montagem/reservar', { codigo:'BEGE140' }, RUI);
+const livresBege = db.prepare("SELECT id FROM fila WHERE codigo='BEGE140' AND situacao='aguardando' AND id NOT IN (SELECT fila_id FROM embalagem_reserva)").all().map(x=>x.id);
+for(const id of livresBege) db.prepare('INSERT INTO embalagem_reserva (fila_id,codigo,usuario_id,usuario_nome) VALUES (?,?,?,?)').run(id,'BEGE140',9,'Zé');
+r = chamar('POST', '/api/montagem/reservar', { codigo:'BEGE140' });
+eq('Ana tenta a do dia e todas estão com outros: 409', r.status, 409);
+eq('…e a reserva dela de antes continua', (db.prepare('SELECT fila_id FROM embalagem_reserva WHERE usuario_id=1').get() || {}).fila_id, t1);
+db.prepare('DELETE FROM embalagem_reserva WHERE usuario_id IN (2,9)').run();
+r = chamar('POST', '/api/montagem/reservar', { codigo:'BEGE140' });
+ok('com peça livre, a reserva passa para a do dia', r.status === 200 && db.prepare('SELECT codigo FROM embalagem_reserva WHERE usuario_id=1').get().codigo === 'BEGE140');
+chamar('POST', '/api/montagem/cancelar', { codigo:'UNICA', trocou:1, manter:1, codigo_dia:'BEGE140', segundos:9 });
+eq('o cancelar da troca não solta a reserva nova', (db.prepare('SELECT codigo FROM embalagem_reserva WHERE usuario_id=1').get() || {}).codigo, 'BEGE140');
+void t2;
 
 console.log('\n── 9. o dia feito ──');
 db.prepare("DELETE FROM lote").run();

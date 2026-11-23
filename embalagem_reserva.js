@@ -109,8 +109,10 @@ function soltar(db, quem){
 }
 
 /* A linha que o bipe final consome: a reservada pela pessoa (se ainda vale e é
-   do SKU); senão a primeira livre pela ORDEM; senão qualquer uma que espera
-   (a página antiga em cache não reserva — a regra de sempre, R-EMB-02). */
+   do SKU); senão a primeira livre pela ORDEM. ⚠️ NUNCA A RESERVADA POR OUTRA
+   PESSOA (③ REVISÃO): quem não tem reserva (a página antiga em cache, a
+   reserva vencida) leva o 409 no fim — e não quem reservou. `null` com linha
+   esperando quer dizer "todas com outras pessoas" (ver `reservadaPor`). */
 function linhaParaConsumir(db, codigo, quem, emTeste){
   limpar(db);
   const cod = up(codigo), t = emTeste ? 1 : 0;
@@ -123,9 +125,14 @@ function linhaParaConsumir(db, codigo, quem, emTeste){
   }
   return db.prepare(`SELECT f.id, f.modo FROM fila f WHERE UPPER(f.codigo)=? AND f.situacao='aguardando' AND COALESCE(f.teste,0)=?
       AND f.id NOT IN (SELECT fila_id FROM embalagem_reserva) ORDER BY ${ORDEM} LIMIT 1`).get(cod, t)
-    || db.prepare(`SELECT f.id, f.modo FROM fila f WHERE UPPER(f.codigo)=? AND f.situacao='aguardando' AND COALESCE(f.teste,0)=?
-      ORDER BY ${ORDEM} LIMIT 1`).get(cod, t)
     || null;
 }
 
-module.exports = { garantir, limpar, mapa, reservar, renovar, soltar, linhaParaConsumir, minutos, Recusa, ORDEM, RESERVA_MIN_PADRAO };
+/* Quem está com a peça do SKU (o nome da reserva mais antiga), ou null. */
+function reservadaPor(db, codigo, emTeste){
+  const r = db.prepare(`SELECT r.usuario_nome FROM embalagem_reserva r JOIN fila f ON f.id=r.fila_id
+      WHERE UPPER(f.codigo)=? AND f.situacao='aguardando' AND COALESCE(f.teste,0)=? ORDER BY r.desde LIMIT 1`).get(up(codigo), emTeste ? 1 : 0);
+  return r ? (r.usuario_nome || 'outra pessoa') : null;
+}
+
+module.exports = { garantir, limpar, mapa, reservar, renovar, soltar, linhaParaConsumir, reservadaPor, minutos, Recusa, ORDEM, RESERVA_MIN_PADRAO };

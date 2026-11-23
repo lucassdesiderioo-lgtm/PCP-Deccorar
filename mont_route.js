@@ -316,6 +316,17 @@ module.exports=function(app,db){
       return res.status(409).json({erro:'⚠ '+cod+' não passou pela Revisão: não há nenhuma desta persiana esperando embalagem. NADA foi gravado. Leve a persiana para a Revisão e embale depois.',
         motivo:'sem_revisao'});
     }
+    /* A PECA RESERVADA POR OUTRA PESSOA NAO SE CONSOME (EMBALAGEM-PRIORIDADE §5,
+       ③ REVISAO): quem nao tem reserva — a pagina antiga em cache, a reserva
+       vencida — e que leva o 409, e nao quem reservou no 1o bipe. */
+    if(exigeRevisao(cod) && !RESERVA.linhaParaConsumir(db,cod,q,emTeste)){
+      const por=RESERVA.reservadaPor(db,cod,emTeste);
+      try{ db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,usuario_id,usuario_nome,detalhe)
+        VALUES ('reservada',?,?,?,?,?)`).run(cod,Math.round(+segundos||0),q.usuario_id,q.usuario_nome,por); }
+      catch(e){ console.error('[montagem] o registro da recusa reservada falhou (a recusa vale igual):', e.message); }
+      return res.status(409).json({erro:'⚠ A '+cod+' que esperava embalagem está sendo embalada por '+(por||'outra pessoa')+'. NADA foi gravado. Se esta peça na sua mão é outra, leve-a para a Revisão.',
+        motivo:'reservada', por});
+    }
     if(!kit_ok) return res.status(400).json({erro:'⚠ FALTOU O KIT — bipe o kit antes de finalizar '+cod+'.'});
     const kitCad=cfg('kit_codigo');
     const kitLido=(req.body&&req.body.kit_codigo)||'';
@@ -450,7 +461,9 @@ module.exports=function(app,db){
       db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,inicio,fim,usuario_id,usuario_nome,detalhe)
         VALUES (?,?,?,?,?,?,?,?)`).run(tipo,cod,Math.round(+b.segundos||0),txt(b.inicio),txt(b.fim),q.usuario_id,q.usuario_nome,
           b.trocou?String(b.codigo_dia||'').toUpperCase().slice(0,80)||null:null);
-      RESERVA.soltar(db,q);
+      /* Na troca pelo bipe, o /reservar da peca do dia ja trocou a reserva
+         (`manter`): soltar aqui apagaria a nova (③ REVISAO). */
+      if(!(b.trocou && b.manter)) RESERVA.soltar(db,q);
     })();
     res.json({ok:true});
   });
