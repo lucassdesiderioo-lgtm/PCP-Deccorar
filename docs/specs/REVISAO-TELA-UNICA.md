@@ -5,8 +5,8 @@
 > Montagem) espera a `PRODUCAO-MAPA-E-MOTOR`. Tipo: `REGRA` + `NOVIDADE` · risco
 > 🟡. Muda os cartões **R-REV-01**, **R-REV-02** e **R-REV-03** de
 > `docs/regras/estoque.md`; duas linhas em `docs/DECISOES.md`.
-> Testes: `teste_revisao_tela_unica.js` (47), `teste_revisao_tela_unica_tela.js`
-> (34, num Chromium; sem navegador diz PULADO) e `teste_revisao.js` (122, a
+> Testes: `teste_revisao_tela_unica.js` (52), `teste_revisao_tela_unica_tela.js`
+> (36, num Chromium; sem navegador diz PULADO) e `teste_revisao.js` (122, a
 > seção 2 mudou: o modo é do servidor).
 >
 > **O que mudou na construção** (vale o que está aqui):
@@ -15,9 +15,20 @@
 >   os próximos dias são o quanto ela cresce depois de hoje) e o `calcular` (o
 >   alvo é o `precisa` menos a falta até o fim da janela — a venda depois da
 >   janela entra no alvo, porque o `precisa` já a conta);
-> - a peça **revisada e ainda não embalada** (fila `aguardando`, modo
->   `estoque`) sai primeiro dos próximos dias e depois do alvo: sem isso o
->   número só cairia na embalagem e a bancada revisaria a mesma falta duas vezes;
+> - a peça **revisada e ainda não embalada** (fila `aguardando` de qualquer
+>   modo, menos a de `hoje` revisada hoje, que já saiu de Hoje) sai primeiro dos
+>   próximos dias e depois do alvo: sem isso o número só cairia na embalagem e a
+>   bancada revisaria a mesma falta duas vezes (③ REVISÃO);
+> - **a venda do PDF de hoje é ligada à planilha pela venda ou pelo pack** e sai
+>   do dia dela na planilha, e todo o PDF de hoje usa o livre primeiro: a mesma
+>   venda não conta em Hoje e nos Próximos dias, e a venda que a planilha ainda
+>   não traz não apaga a falta de outro cliente (③ REVISÃO, duas rodadas);
+> - **a bancada:** enquanto a peça com problema vai ao servidor nada fecha a
+>   revisão (em 20 s a tela desiste); o cartão de outro SKU não fecha a revisão
+>   aberta; o bipe com a semana aberta fecha a semana; o bipe na observação não
+>   vira texto; a faixa de venda nova não dispara com o "Desfazer"; a lista que
+>   não carrega diz que não carregou; o "↩ Devoluções" só aparece a quem abre a
+>   251 (`devolucao.registrar`) (③ REVISÃO);
 > - ⚠️ **a venda de hoje da planilha que ainda não está na 201 não aparece em
 >   Hoje**: Hoje é a 201. Ela aparece quando o PDF sobe;
 > - o cartão de Hoje mostra a falta **de hoje** em número grande e a barra

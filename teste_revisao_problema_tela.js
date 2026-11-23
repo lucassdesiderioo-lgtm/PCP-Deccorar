@@ -47,6 +47,7 @@ async function abrir(browser, opc){
       if(r.request().method() === 'POST'){
         posts.push({ rota:u.pathname, corpo:r.request().postDataJSON() });
         if(u.pathname === '/api/rejeicao' && opc.recusa) return r.fulfill({ status:403, json:{ erro:'Sem permissão para registrar peça com problema' } });
+        if(u.pathname === '/api/rejeicao' && opc.pendurado) return;   // a rede pendurada: nunca responde
         if(u.pathname === '/api/rejeicao' && opc.lento) await new Promise(ok => setTimeout(ok, opc.lento));
         return r.fulfill({ json:{ ok:true } });
       }
@@ -152,6 +153,16 @@ async function abrir(browser, opc){
   ok('nem cancelou', !t.posts.some(x => x.rota === '/api/revisao/cancelar'), t.posts.map(x => x.rota));
   ok('e a peça com problema foi gravada uma vez só', t.posts.filter(x => x.rota === '/api/rejeicao').length === 1, t.posts.map(x => x.rota));
   ok('no fim, voltou para a produção', /Voltou para a produção/.test(await t.p.textContent('#banner')));
+  await t.ctx.close();
+
+  console.log('\n── 7-B. com a rede pendurada, a bancada não fica travada para sempre (③ REVISÃO, rodada 2) ──');
+  t = await abrir(browser, { pendurado:true });
+  await t.p.tap('#rjBt'); await t.p.waitForTimeout(200);
+  await t.p.tap('.rjOp'); await t.p.waitForTimeout(21500);
+  const banP = await t.p.textContent('#banner');
+  ok('em 20 s a tela desiste e diz que não teve resposta', /sem resposta/i.test(banP), banP);
+  await t.p.tap('#cancBt').catch(()=>{}); await t.p.waitForTimeout(400);
+  ok('e a revisão volta a aceitar o Cancelar', t.posts.some(x => x.rota === '/api/revisao/cancelar'), t.posts.map(x => x.rota));
   await t.ctx.close();
 
   console.log('\n── 8. a lista que não carrega diz que não carregou (③ REVISÃO) ──');

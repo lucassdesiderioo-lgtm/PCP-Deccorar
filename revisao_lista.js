@@ -12,11 +12,17 @@
  *                     vendas até o fim da janela (e a venda depois da janela
  *                     entra aqui: o `precisa` já a conta).
  *
- * A peça revisada e ainda não embalada (fila 'aguardando', modo 'estoque')
- * ainda não subiu o livre: sem descontá-la, o número dos próximos dias só
- * cairia na embalagem e a bancada revisaria a mesma falta duas vezes. Ela sai
- * primeiro dos próximos dias e depois do alvo. A de modo 'hoje' já sai da
- * conta de Hoje pelo ordem_dia.
+ * A peça revisada e ainda não embalada ainda não subiu o livre: sem
+ * descontá-la, o número dos próximos dias só cairia na embalagem e a bancada
+ * revisaria a mesma falta duas vezes. A de modo 'hoje' revisada hoje já sai de
+ * Hoje (o ordem_dia); todas as outras saem primeiro dos próximos dias e depois
+ * do alvo.
+ *
+ * A MESMA VENDA NÃO CONTA DUAS VEZES, E A VENDA QUE A PLANILHA NÃO TRAZ NÃO
+ * APAGA A DE OUTRO CLIENTE (③ REVISÃO, 23/11/2026): a venda do PDF de hoje é
+ * ligada à planilha pela venda ou pelo pack (a régua do demanda_dominio). A
+ * ligada sai do dia dela na planilha; e todo o PDF de hoje entra como o
+ * primeiro a usar o livre — como na urgência.
  *
  * ⚠️ A VENDA DE HOJE DA PLANILHA QUE AINDA NÃO ESTÁ NA 201 NÃO APARECE EM HOJE:
  * Hoje é a 201 (o dono, 23/11/2026). Ela aparece quando o PDF sobe.
@@ -70,14 +76,18 @@ function montar(db){
 
   /* A falta acumulada por dia de envio, por SKU (a régua da 401). */
   const pd = DEMANDA.porDia(db, { semResumo:true });
-  const faltaAte = {};   // c -> função(dia) -> falta acumulada até o dia
+  const faltaAte = {};   // c -> função(dia) -> falta acumulada até o dia (a da 401)
+  const planCel = {};    // c -> { livre, dem: { dia -> vendas } }
   pd.linhas.forEach(l => {
-    const cel = l.celulas;
-    faltaAte[String(l.codigo).toUpperCase()] = function(dia){
+    const cel = l.celulas, c = String(l.codigo).toUpperCase();
+    faltaAte[c] = function(dia){
       let f = 0;
       for(const x of cel){ if(x.dia === 'atrasada' || x.dia <= dia) f = x.falta; }
       return f;
     };
+    const dem = {};
+    for(const x of cel){ const d = x.dia === 'atrasada' ? hoje : x.dia; dem[d] = (dem[d] || 0) + x.vendas; }
+    planCel[c] = { livre: l.livre, dem };
   });
 
   /* O precisa de cada SKU (a mesma conta da 401). */
@@ -86,20 +96,29 @@ function montar(db){
 
   /* AS PEÇAS REVISADAS E AINDA NÃO EMBALADAS (fila 'aguardando'). O livre só
      sobe na embalagem: sem descontá-las, a bancada revisaria a mesma falta
-     duas vezes (③ REVISÃO, 23/11/2026):
-       - a de modo 'hoje' revisada HOJE já saiu da conta de Hoje (o ordem_dia
-         a conta como revisada); ela entra com a venda de hoje do PDF no que
-         Hoje já cobre (`cobertoHoje`);
-       - TODAS as outras — estoque, devolução e a de 'hoje' de dias
-         anteriores — viram +1 na embalagem e são descontadas da falta. */
-  const filaHojeDeHoje = contar(db, `SELECT UPPER(codigo) c, COUNT(*) n FROM fila
-    WHERE situacao='aguardando' AND modo='hoje' AND data=date('now','localtime') AND COALESCE(teste,0)=0 GROUP BY UPPER(codigo)`);
+     duas vezes (③ REVISÃO, 23/11/2026). A de modo 'hoje' revisada HOJE já
+     saiu de Hoje (o ordem_dia a conta como revisada); TODAS as outras —
+     estoque, devolução e a de 'hoje' de dias anteriores — viram +1 na
+     embalagem e são descontadas dos próximos dias e depois do alvo. */
   const naFila = contar(db, `SELECT UPPER(codigo) c, COUNT(*) n FROM fila
     WHERE situacao='aguardando' AND NOT (COALESCE(modo,'')='hoje' AND data=date('now','localtime'))
       AND COALESCE(teste,0)=0 GROUP BY UPPER(codigo)`);
   /* Revisada hoje para estoque (o andamento dos próximos dias e do alvo). */
   const revEst = contar(db, `SELECT UPPER(codigo) c, COUNT(*) n FROM revisao
     WHERE data=date('now','localtime') AND COALESCE(modo,'estoque')='estoque' AND COALESCE(teste,0)=0 GROUP BY UPPER(codigo)`);
+
+  /* O PDF de hoje, por SKU (a régua do urgencia.js: volume pendente, do dia),
+     e quanto dele a planilha também traz, em que data de envio. */
+  const pdfHoje = contar(db, `SELECT UPPER(codigo) c, COUNT(*) n FROM lote
+    WHERE data=date('now','localtime') AND codigo IS NOT NULL AND estagio='pendente' GROUP BY UPPER(codigo)`);
+  const ligada = {};   // c -> { dia -> n }
+  db.prepare(`SELECT UPPER(l.codigo) c,
+      CASE WHEN vf.data_envio < date('now','localtime') THEN date('now','localtime') ELSE vf.data_envio END d,
+      COUNT(*) n
+    FROM lote l JOIN venda_futura vf ON vf.venda_id IN (l.venda, l.packId) AND UPPER(vf.codigo)=UPPER(l.codigo)
+    WHERE l.data=date('now','localtime') AND l.codigo IS NOT NULL AND l.estagio='pendente'
+      AND vf.data_envio IS NOT NULL AND COALESCE(vf.teste,0)=0 AND COALESCE(vf.cancelada,0)=0
+    GROUP BY UPPER(l.codigo), d`).all().forEach(r => { (ligada[r.c] = ligada[r.c] || {})[r.d] = r.n; });
 
   const skus = {};
   db.prepare(`SELECT UPPER(s.codigo) c, s.codigo, s.descricao, s.cor, s.cor_codigo, s.largura_cm, s.altura_cm,
@@ -115,18 +134,28 @@ function montar(db){
     const hojeFalta = o ? Math.max(0, o.a_produzir) : 0;
     const hojeFeitas = o ? (o.revisadas || 0) : 0;
     const f = faltaAte[c] || (() => 0);
-    /* A falta da planilha dia a dia, contando de hoje: o quanto a falta
-       acumulada cresce em cada dia (o primeiro é hoje e a atrasada). */
-    const incHoje = { n: f(hoje) };
-    const porDiaSku = []; let ant = incHoje.n;
-    for(const d of dias){ const v = f(d); porDiaSku.push({ dia:d, n:Math.max(0, v - ant) }); ant = v; }
-    /* O que Hoje já cobre — a venda de hoje do PDF ainda por revisar e a
-       revisada hoje para ela, esperando a embalagem — sai da falta da
-       planilha a partir do dia mais cedo: a MESMA venda pode estar na
-       planilha com outra data (a "próxima coleta", a NF a emitir), e não
-       pode contar em Hoje e nos Próximos dias (③ REVISÃO, 23/11/2026). */
+    /* A falta dos próximos dias, venda a venda: a demanda da planilha sem as
+       vendas que o PDF de hoje já trouxe (essas estão em Hoje), e o PDF de hoje
+       inteiro como o primeiro a usar o livre (③ REVISÃO). */
+    const pc = planCel[c];
+    const porDiaSku = [];
+    const incHoje = { n:0 };
+    if(pc){
+      const dem = Object.assign({}, pc.dem), lig = ligada[c] || {};
+      for(const d of Object.keys(lig)) dem[d] = Math.max(0, (dem[d] || 0) - lig[d]);
+      const livre = pc.livre || 0;
+      let acum = (pdfHoje[c] || 0) + Object.keys(dem).filter(d => d <= hoje).reduce((a, d) => a + dem[d], 0);
+      const fl = () => acum > 0 ? Math.max(0, acum - livre) : 0;
+      let ant = fl();
+      /* Cada dia da janela leva também a venda dos dias que ficaram fora
+         dela antes dele (o sábado e o domingo antes da segunda). */
+      let antD = hoje;
+      for(const d of dias){
+        acum += Object.keys(dem).filter(k => k > antD && k <= d).reduce((a, k) => a + dem[k], 0);
+        const v = fl(); porDiaSku.push({ dia:d, n:Math.max(0, v - ant) }); ant = v; antD = d;
+      }
+    } else for(const d of dias) porDiaSku.push({ dia:d, n:0 });
     const tirar = (q) => { for(const x of [incHoje].concat(porDiaSku)){ const t = Math.min(q, x.n); x.n -= t; q -= t; } return q; };
-    tirar(hojeFalta + (filaHojeDeHoje[c] || 0));
     /* A peça revisada e ainda não embalada sai do dia mais cedo. */
     let resto = tirar(naFila[c] || 0);
     const proxTotal = porDiaSku.reduce((a, x) => a + x.n, 0);
@@ -171,6 +200,9 @@ function montar(db){
     so_proximos: proxL, so_alvo: alvoL,
     totais: { hoje: soma(hojeL, 'hoje'), hoje_revisadas: soma(itens, 'hoje_revisadas'),
               proximos: soma(depois, 'proximos'), alvo: soma(alvoTodos, 'alvo') },
+    /* As revisadas de hoje para a ordem do dia, de todo SKU com ordem (a tela
+       usa para separar a venda nova do "Desfazer"). */
+    revisadas_hoje: Object.keys(hojeMap).reduce((m, c) => { m[hojeMap[c].codigo] = hojeMap[c].revisadas || 0; return m; }, {}),
     hoje_terminado: temOrdem && soma(hojeL, 'hoje') === 0,
     sem_venda_hoje: !temOrdem
   };

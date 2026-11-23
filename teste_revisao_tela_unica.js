@@ -149,6 +149,28 @@ rev('BK130160BEGE');
 e = item(L(), 'BK130160BEGE');
 eq('E revisada para hoje: os Próximos dias continuam zerados', e ? e.proximos : 0, 0);
 
+console.log('\n── 7-B. a venda do PDF que a planilha não traz não apaga a falta de outra (③ REVISÃO, rodada 2) ──');
+/* H: livre 0; a planilha tem 2 vendas de OUTROS clientes no primeiro dia; o
+   PDF de hoje traz 2 vendas novas, que a planilha ainda não tem. */
+sku.run('BK120140BEGE', 0, 1, 120, 140);
+vf.run('vH1', 'BK120140BEGE', hoje, D0); vf.run('vH2', 'BK120140BEGE', hoje, D0);
+db.prepare("INSERT INTO lote (codigo,estagio,venda) VALUES ('BK120140BEGE','pendente','pdfH1'),('BK120140BEGE','pendente','pdfH2')").run();
+db.prepare("INSERT INTO producao (codigo,qtd,origem,urgente) VALUES ('BK120140BEGE',2,'ml',1)").run();
+let h = item(L(), 'BK120140BEGE');
+eq('H: 2 em Hoje (o PDF)', h.hoje, 2);
+eq('H: e as 2 da planilha continuam no primeiro dia', h.dias[0].n, 2);
+/* I: livre 0; a planilha tem W no primeiro dia e V dois dias depois; o PDF de
+   hoje traz V. Hoje cobre V, e W continua faltando no primeiro dia. */
+sku.run('BK130140PRETO', 0, 1, 130, 140);
+const DV = LISTA.janela(hoje).length > 2 ? JAN[2] : db.prepare("SELECT date(?,'+2 day') d").get(D0).d;
+vf.run('vIW', 'BK130140PRETO', hoje, D0); vf.run('vIV', 'BK130140PRETO', hoje, DV);
+db.prepare("INSERT INTO lote (codigo,estagio,venda) VALUES ('BK130140PRETO','pendente','vIV')").run();
+db.prepare("INSERT INTO producao (codigo,qtd,origem,urgente) VALUES ('BK130140PRETO',1,'ml',1)").run();
+const ii = item(L(), 'BK130140PRETO');
+eq('I: 1 em Hoje (V, pelo PDF)', ii.hoje, 1);
+eq('I: W continua no primeiro dia', ii.dias[0].n, 1);
+eq('I: e V não conta de novo no dia dela', ii.dias.reduce((a, x) => a + x.n, 0), 1);
+
 console.log('\n── 8. toda peça na fila que vira +1 é descontada (③ REVISÃO) ──');
 sku.run('BK110160BEGE', 0, 1, 110, 160);
 vf.run('vF', 'BK110160BEGE', hoje, D0);

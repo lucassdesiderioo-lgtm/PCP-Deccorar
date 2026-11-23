@@ -140,6 +140,17 @@ const srv = app.listen(0, async () => {
     ok('e fecha no "Entendi"', !(await p.isVisible('#faixaNova')));
     ok('Hoje volta ao destaque', await p.isVisible('.foco.fh'));
 
+    console.log('\n── 6-A. venda nova de um SKU que já tinha saído de Hoje pelo estoque (③ REVISÃO, rodada 2) ──');
+    /* O 1,80 BRANCO sai de Hoje porque o estoque cobriu (atendidas), e depois
+       o PDF traz 1 venda nova dele: a faixa tem que aparecer. */
+    db.prepare("UPDATE skus SET estoque=1 WHERE codigo='BK180160BRANCO'").run();
+    await p.waitForTimeout(3500);
+    ok('o BRANCO saiu de Hoje (o estoque cobriu)', !(await p.$('.foco.fh .cd[data-cod="BK180160BRANCO"]')));
+    db.prepare("INSERT INTO lote (codigo,estagio,venda) VALUES ('BK180160BRANCO','pendente','novaB')").run();
+    await p.waitForTimeout(3500);
+    ok('a venda nova dele traz a faixa de novo', await p.isVisible('#faixaNova'));
+    if(await p.isVisible('#faixaNova')) await p.click('#fxOk');
+
     console.log('\n── 6-B. sem a chave da 251, o "↩ Devoluções" some (③ REVISÃO) ──');
     PERMS = ['revisao.executar'];
     await p.reload(); await p.waitForTimeout(1200);

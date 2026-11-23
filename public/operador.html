@@ -219,14 +219,20 @@ function destino(cod){
 /* A venda nova de hoje sem peça (o PDF da tarde): faixa vermelha e um som, uma
    vez, sem travar nada. A primeira leitura só guarda o que já havia. */
 function novaVenda(){
+  /* Venda nova é a falta de hoje que SUBIU sem a revisão ter descido: o
+     "Desfazer" e a peça devolvida pela embalagem sobem a falta e descem a
+     revisada na mesma conta, e não são venda nova (③ REVISÃO, 23/11/2026). O
+     SKU que saiu de Hoje conta como falta zero; a revisada vem de todo SKU com
+     ordem (`revisadas_hoje`). Vira o dia, recomeça. */
   var L=LISTA; if(!L) return;
-  var agora={}; L.hoje_lista.forEach(function(x){ agora[x.codigo]=x.hoje+(x.hoje_revisadas||0); });
-  /* O SKU que terminou sai da lista de Hoje e volta com um "Desfazer" ou com
-     a peça devolvida pela embalagem: isso não é venda nova (③ REVISÃO). O que
-     já foi visto hoje fica guardado, pelo maior número; vira o dia, zera. */
-  if(VISTO && VISTO.__dia!==L.hoje) VISTO=null;
+  var falta={}, rev=L.revisadas_hoje||{};
+  L.hoje_lista.forEach(function(x){ falta[x.codigo]=x.hoje; });
+  if(VISTO && VISTO.dia!==L.hoje) VISTO=null;
   if(VISTO){
-    var novos=Object.keys(agora).filter(function(c){ return agora[c]>(VISTO[c]||0); });
+    var cods={}; Object.keys(falta).concat(Object.keys(VISTO.falta)).forEach(function(c){ cods[c]=1; });
+    var novos=Object.keys(cods).filter(function(c){
+      var subiu=(falta[c]||0)-(VISTO.falta[c]||0), desceu=(VISTO.rev[c]||0)-(rev[c]||0);
+      return subiu>Math.max(0,desceu); });
     if(novos.length){
       var md=medidaDe(novos[0]), nome=md?md.medida+' '+(md.cor||''):novos[0];
       var f=$('#faixaNova');
@@ -236,9 +242,7 @@ function novaVenda(){
       document.getElementById('fxOk').onclick=function(){ f.hidden=true; scan.focus({preventScroll:true}); };
     }
   }
-  var guarda=VISTO||{__dia:L.hoje};
-  Object.keys(agora).forEach(function(c){ guarda[c]=Math.max(guarda[c]||0, agora[c]); });
-  VISTO=guarda;
+  VISTO={dia:L.hoje, falta:falta, rev:rev};
 }
 /* Quantas peças a PESSOA revisou hoje e a média dela (o /api/revisao/lista
    manda "minhas", pelo login). */
@@ -382,7 +386,11 @@ async function confirmarDesfazer(){
    ao lado da peça. Fecha-se bipando (ou tocando no cartão do mesmo SKU). */
 $('#tiles').addEventListener('click',e=>{ const b=e.target.closest('[data-cod]');
   if(!b || janelaAberta()) return;
-  if(emRev && b.dataset.cod!==emRev.codigo){ beep(false); return; }
+  if(emRev && b.dataset.cod!==emRev.codigo){ beep(false);
+    var bs=document.querySelector('#banner .bs');
+    if(bs && !document.getElementById('outroAviso'))
+      bs.insertAdjacentHTML('beforeend','<div class="aviso" id="outroAviso" style="margin-top:10px">Termine esta revisão antes: bipe o SKU de novo ou toque em Cancelar.</div>');
+    return; }
   toggle(b.dataset.cod); });
 const scan=$('#scan');
 /* preventScroll: devolver o foco nao pode arrastar a tela. O #scan mora no
@@ -609,16 +617,23 @@ document.addEventListener('click',function(e){
     var bs=document.querySelector('#banner .bs');
     if(bs) bs.innerHTML='<b style="color:#c62828">A peça com problema não foi registrada: '+escH(msg)+'</b>';
     scan.focus({preventScroll:true}); }
-  fetch('/api/rejeicao',{method:'POST',headers:{'Content-Type':'application/json'},
+  /* A rede pendurada não trava a bancada: em 20 s a tela desiste (a regra da
+     Embalagem, R-EMB-09). A resposta pode ter se perdido depois da gravação,
+     e a frase diz isso (③ REVISÃO). */
+  var ctl=(window.AbortController?new AbortController():null);
+  var prazo=setTimeout(function(){ if(ctl) ctl.abort(); },20000);
+  fetch('/api/rejeicao',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl?ctl.signal:undefined,
     body:JSON.stringify({codigo:cur.codigo,motivo:motivo,obs:obs,segundos:seg,modo:null})})
    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok&&!j.erro, j:j}; }); })
    .then(function(x){
+     clearTimeout(prazo);
      if(!x.ok){ naoGravou(x.j.erro||'o servidor recusou'); return; }
      RJ_ENVIANDO=false;
      clearInterval(tick); tick=null; emRev=null;
      banner('err','Voltou para a produção', cur.codigo+' · '+motivo);
      renderTiles(); load(); scan.focus({preventScroll:true});
-   }, function(){ naoGravou('sem conexão — toque de novo'); });
+   }, function(e){ clearTimeout(prazo);
+     naoGravou(e&&e.name==='AbortError'?'sem resposta do servidor em 20 s. Ela pode ter sido gravada: confira em Problemas (104) antes de registrar de novo':'sem conexão — toque de novo'); });
 });
 
 /* O aviso de status antigo (os quadros da tela vermelha e azul) saiu com a
