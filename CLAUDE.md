@@ -155,6 +155,7 @@ R6. `escrivao-papel` antes do commit final.
 | resolveu dívida | risque na §14, com data |
 | trabalhou numa spec | STATUS da spec + índice em `docs/specs/README.md` |
 | terminou a spec inteira | spec vai para `docs/arquivo/` |
+| mexeu em tela, botão, número mostrado ou regra que a tela aplica | a ficha da tela em `docs/manual/`, com a linha datada em "Mudanças", e `node manual_retrato.js` regravado (§26) |
 
 10. Commit com mensagem clara. Em branch: **abra o PR**.
 11. Entregue o **FECHAMENTO** e **✋ espere o "pode subir"** antes de merge ou deploy:
@@ -3694,7 +3695,7 @@ logado"*. Linhas em `docs/DECISOES.md`.
 > recusado na bancada, um desfazer de verdade e a primeira sessão nova gravada
 > em `sessao`. Prova que não foi feita se escreve como não feita.
 
-**Rode `node teste_quem.js` (317) ao criar QUALQUER rota de escrita, mexer no
+**Rode `node teste_quem.js` (318) ao criar QUALQUER rota de escrita, mexer no
 `quem.js` ou num `require` de módulo de rotas.** Ele sobe os módulos na ordem do
 `server.js` e chama cada escrita sem login; rota nova que não passa pelo `quem.js`
 reprova no mesmo minuto em que é escrita.
@@ -3916,7 +3917,8 @@ Esperado: telas `302`, API `401`, `/login` `200`.
 fase 2), e a 106 `/material-extra` (FICHAS-NO-CADASTRO-UNICO) — e, desde
 05/11/2026, a tela 206 `/coleta-horarios` (HORARIOS-DE-COLETA) — e, desde
 08/11/2026, a 905 `/minha-producao` (RELATORIOS-UNIFICADOS) — e, desde
-11/11/2026, a 906 `/parametros` (ARRUMAR-O-LUGAR fase 3).
+11/11/2026, a 906 `/parametros` (ARRUMAR-O-LUGAR fase 3) — e, desde 21/11/2026,
+a 907 `/manual` (MANUAL-DO-SISTEMA fase 1; e `/api/manual/minhas` tem que dar 401).
 
 Proteção contra força bruta: 5 PINs errados bloqueiam a pessoa por 1 minuto —
 **inclusive com o PIN certo**, senão a trava só atrasaria quem chuta —, e a trava é
@@ -4394,7 +4396,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). ~~**Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa~~ — **fechado em 08/11/2026**: a 905 Minha produção e a aba Por pessoa da 904 (§21) · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (27 casos), `teste_carga.js` (67), `teste_divergencia.js` (70) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (86), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (158), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (87), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (317), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (84), `teste_impressos.js` (42), `teste_quantidade.js` (42), `teste_casos_reais.js` (85), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (67), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (67), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (109), `teste_501_so_compra.js` (93), `teste_custo_historico.js` (15), `teste_parametros.js` (113), `teste_gravar_nf_da_nota.js` (28), `teste_pendencias_caminho.js` (78), `teste_fichas_material.js` (64), `teste_pendencias_menu.js` (49), `teste_pendencias_sobmedida.js` (67), `teste_roteiro.js` (25), `teste_diagnosticar_diferenca_telas.js` (27), `teste_tempo_operador.js` (28), `teste_defeito_volta.js` (65), `teste_embalagem_prioridade.js` (75); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (27 casos), `teste_carga.js` (67), `teste_divergencia.js` (70) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (86), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (378), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (158), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (87), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (318), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (84), `teste_impressos.js` (42), `teste_quantidade.js` (42), `teste_casos_reais.js` (85), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (67), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (67), `teste_menu.js` (43), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (109), `teste_501_so_compra.js` (93), `teste_custo_historico.js` (15), `teste_parametros.js` (113), `teste_gravar_nf_da_nota.js` (28), `teste_pendencias_caminho.js` (78), `teste_fichas_material.js` (64), `teste_pendencias_menu.js` (49), `teste_pendencias_sobmedida.js` (67), `teste_roteiro.js` (25), `teste_diagnosticar_diferenca_telas.js` (27), `teste_tempo_operador.js` (28), `teste_defeito_volta.js` (65), `teste_embalagem_prioridade.js` (75); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4406,7 +4408,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 20 | ~~**Editar um setor APAGA, sem avisar, as permissões que ele tem acima do próprio nível.**~~ **RESOLVIDO em 26/10/2026** (fase 3 da `ACESSOS-UNIFICADOS`, R-ACE-03) — o nível do setor virou **etiqueta**: a tela mostra a caixinha acima do nível como ela está (marcada, com o aviso "acima do nível do setor") e manda a lista inteira (`todas`); a tela antiga, sem a marca, não apaga nada. A permissão **sensível nova** pede confirmação (409 `sensiveis`) antes de entrar. As três **intransferíveis** continuam fora de qualquer setor que não seja o Admin Geral, agora por trava própria, e não mais pelo nível · `teste_setor_salvar.js` (26). **Desde 04/11/2026 o nível volta a travar** (fase 4 da `ACESSO-POR-TELA-E-NIVEL`), mas recusando a chave **nova** na hora, dizendo por quê — a que já estava fica, nunca se apaga (§10) | — |
 | 21 | ~~**A tarja "sem estoque" da Etiqueta de Venda só acusa o livre ≤ 0**, e não a fila inteira do SKU~~ **RESOLVIDO em 06/11/2026** (CONSERTO) — a linha e a peça da caixa contam a fila inteira de hoje do SKU (`tarja_estoque.js`, dono único), o sob medida não ganha tarja e o JOIN da linha é em maiúscula. A trava da impressão não mudou. **Fica aberto:** o painel "Pra despachar depois" continua com a regra antiga · `teste_tarja_estoque.js` (23) | — |
 | 22 | **O `pdfjs-dist` está na versão 3.11, e o `npm audit` acusa.** A falha (PDF malicioso rodando JavaScript) está fechada pela opção `isEvalSupported:false` em todo `getDocument` (07/11/2026, §12), mas a versão continua acusada, e com ela a instalação opcional do `canvas` (`@mapbox/node-pre-gyp`, `tar`), que o PCP nunca chama e que só roda no `npm install`. O conserto do audit é a **versão 6**: só carrega por `import` (ESM) e mexe no texto que o `parse.js` lê — tem que passar pelo caderno de casos reais inteiro (R-INV-01) antes de subir. O Express (`proxy-addr`, `body-parser`, `qs`) foi consertado no mesmo dia, e o `tecido/` dá 0 vulnerabilidades. ✅ No ar desde 07/11/2026 (PR #307) | Baixo enquanto a opção estiver em todo `getDocument` |
-| 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **três formas**: dado que ninguém preencheu, **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2; o `POST /api/componentes` ficou **oito meses**, e no lugar dele se fazia `INSERT` à mão — §7-B, armadilha #33) e **chave de permissão que nenhuma rota lê** (a `minimo.definir` da linha abaixo). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
+| 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **três formas**: dado que ninguém preencheu, **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2; o `POST /api/componentes` ficou **oito meses**, e no lugar dele se fazia `INSERT` à mão — §7-B, armadilha #33) e **chave de permissão que nenhuma rota lê** (a `minimo.definir` da linha abaixo). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa. **Desde 21/11/2026 o manual (§26) cobre a ponta de quem opera:** tela, ação ou regra sem a ficha reprova o `teste_manual.js` — a regra que ninguém explica à bancada passa a acusar; a flag não preenchida continua sem quem acuse | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
 
 ---
 
@@ -5161,7 +5163,7 @@ de material do PCP (marca e modelo): `node teste_componentes.js`. Todos os
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 906 casos
+cd tecido && npm test          # 907 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
@@ -5368,7 +5370,7 @@ estiveram no ar até 02/10/2026:
   e não no `NOMES`.
 
 **Rode `cd tecido && npm test` ao criar tela** — o `telas_listas.test.js`
-(5 casos) recusa tela declarada sem porta na inicial ou sem `modulo` e `bloco`,
+(6 casos) recusa tela declarada sem porta na inicial ou sem `modulo` e `bloco`,
 porta que aponta para tela que não existe, e o rodapé de volta no `nav.js`. Os dois defeitos foram
 reintroduzidos, e cada um reprova o seu caso.
 
@@ -5692,7 +5694,7 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 | 600 | **fechada** — as 16 telas do sob medida ficam com o número; nenhuma nasce aqui | — |
 | 700 | Frota | reservado |
 | 800 | Mercado Livre (integração) | reservado |
-| 900 | Administração | existe (hoje "Sistema") |
+| 900 | Administração | existe (hoje "Sistema"); desde 21/11/2026 também a 907 Manual (§26) |
 | 1000 | Comercial | existe em parte (609–611) · consumidor final reservado |
 | 1100 | Cadastros | existe (402–404, 902, 606/608 e, desde 11/11/2026, 1101–1103) |
 | 1200 | Almoxarifado | existe (502–504, 603–605 e, desde 11/11/2026, 1201) |
@@ -6017,3 +6019,134 @@ teste_corte_separacao.js`.
 ⚠️ **Construído, falta subir** (12/11/2026). As fases 2 a 6 (o corte com o maço de
 etiquetas, a montagem, os kits, a rejeição com dono, o cartão de ponto) não
 começaram.
+
+---
+
+## 26. O manual do sistema — a ficha de cada tela, dentro da tela (21/11/2026)
+
+Spec `docs/specs/MANUAL-DO-SISTEMA.md`, fase 1 (a fundação) construída em
+21/11/2026, falta subir; duas linhas em `docs/DECISOES.md` (D7 e D8). O dono:
+*"estar a regra de cada tela … dentro de cada tela eu também consigo ler como
+funciona … tudo que for novo, esse manual vai se atualizando"*.
+
+| Dono único | O quê |
+|---|---|
+| `manual.js` | ler, validar e montar a ficha; o retrato; **o único que lê `docs/manual/`** |
+| `manual_route.js` | as seis leituras (`/api/manual/*`), sem escrita |
+| `manual_retrato.js` | regrava `docs/manual/retrato.json` e **recusa** sem a linha de "Mudanças" |
+| `public/manual_ajuda.js` | o botão "?" e o desenho da ficha, um só para as duas operações |
+| `public/manual.html` | a 907 Manual (Administração · Comum, nível Operação, `manual.ler`) |
+| `docs/manual/NNN-nome.md` | uma ficha por tela, as 53; `glossario.md` |
+
+O que parece bug e não é:
+
+- **As 53 fichas estão em RASCUNHO, e a 907 não foi apresentada ao time.** A
+  fase 1 é a fundação: o teste já cobra tela nova, e o dono confere a tela. O
+  texto é das fases 2 a 4. A lista `RASCUNHOS_INICIAIS` do `teste_manual.js`
+  **só encolhe** (R-ORG-14): ficha escrita sai dela, e tela nova nasce `pronta`.
+- **Cada pessoa vê só as telas que opera (D7)**, pela conta do portão
+  (`abre_tela.js`, a mesma do ☰ Menu). A tela que ela não opera volta **só** nome,
+  módulo e nível — nenhuma seção. **"Ver todas" é a chave `manual.ver_todas`**
+  (D8), nível Supervisor: dada por exceção a quem é Operação, não vale (teto).
+- **As duas chaves nascem só para o Admin Geral** (R-ALC-06), sem backfill. No
+  deploy da fase 1 **ninguém da bancada vê o "?"**, e é assim que deve ser até a
+  fase 2, quando o dono marca `manual.ler` nos setores.
+- **O que o sistema sabe, o manual lê na hora e nunca copia:** as telas e o
+  `liga` (os dois mapas), as ações pelo `permissoes.js` e pelo `TELA_DA_CHAVE`,
+  o valor de hoje de cada parâmetro (`config`, a cada pedido). As fichas são
+  lidas **no boot** (§12): editou, reinicia.
+- ⚠️ **O RETRATO É O QUE FAZ A RÉGUA SER TESTE, E NÃO PAPEL.** `retrato.json`
+  guarda a impressão digital do corpo de cada ficha, **a lista das linhas** de
+  "Mudanças", a situação e as ações da tela, e a impressão de cada cartão de
+  `docs/regras/` citado. Texto, cartão ou ação que mudou sem linha nova em
+  "Mudanças" é **recusado** pelo `manual_retrato.js`, e o `teste_manual.js`
+  exige que o retrato bata com os arquivos. **Não se regrava para o teste
+  passar** — a linha é o que a 907 mostra em "O que mudou". Mudar só o
+  cabeçalho, ou só acrescentar uma linha em "Mudanças", não pede linha.
+  ⚠️ **"LINHA NOVA" É A LISTA DE ANTES INTEIRA MAIS PELO MENOS UMA** (③ REVISÃO,
+  22/11/2026): a primeira versão comparava só a linha de data mais recente, e
+  por isso editar o texto dela passava por linha nova, e a linha legítima
+  datada pelo dia da regra (19/11, o passivo que dá a baixa) numa ficha nascida
+  em 21/11 era recusada — foi o que aconteceu ao mesclar o `main`. Hoje a
+  linha de qualquer data conta, duas do mesmo dia contam, e editar a última não
+  conta. **Sem `retrato.json` é recusa** (o primeiro retrato aconteceu em
+  21/11/2026; `--primeiro-retrato` grava um do zero de propósito), e a ficha
+  com história que não está no retrato também: a entrada foi apagada. **E a
+  linha que estava no retrato e sumiu (apagada ou com o texto trocado) é
+  recusa, com o corpo igual ou não** (2ª rodada): a linha é registro — em duas
+  rodadas o corpo mudaria sem linha que o explicasse; para corrigir uma linha,
+  acrescenta-se outra.
+- **A ficha não tem R$, nome de arquivo, rota, SQL, código de cartão nem nome
+  de tabela** no corpo (os cartões vão no cabeçalho; o detector pega
+  `venda_futura`), e a Regra B do §20 vale nela: o `teste_linguagem.js` passou
+  a varrer `docs/manual/`. ⚠️ **As STRINGS do `liga` do mapa (`'skus'`,
+  `'lote'`) NÃO chegam à ficha** (③ REVISÃO): são nome de tabela, escritas para
+  quem edita o mapa (R-ORG-07); o "Onde entra no fluxo" leva só as telas
+  numeradas. O "Também usa" da primeira versão escrevia `skus` para o operador.
+- **O parâmetro tem NOME na ficha** (`parametros: rev_minimo_seg = Tempo mínimo
+  da revisão (segundos)`, ③ REVISÃO): a chave do `config` é o que o código lê,
+  o nome é o que a tela escreve — a primeira versão escrevia "rev minimo seg",
+  chave de banco em tela (§19). Parâmetro sem nome reprova o `validar`. ⚠️ **E
+  O SEGREDO DA `config` NUNCA É PARÂMETRO**: `backup_token` (o que protege o
+  `/baixar-backup`), senha e chave cifrada são recusados pelo `validar`, e o
+  `montar` e a rota não os deixam viajar mesmo assim (`parametroPermitido`) —
+  o `parametroExiste` só sabe que a palavra aparece no código.
+- **O "?" só pergunta a ficha a quem tem `manual.ler`** (ou ao Admin Geral), pela
+  resposta do `/api/telas/minhas` que **os dois `nav.js` guardam em
+  `window.TELAS_MINHAS`** (③ REVISÃO): sem a chave, nenhum pedido — a primeira
+  versão disparava um 403 no console de toda tela de toda pessoa até o dono
+  marcar a chave. Sem a chave a rota continua 403 e o botão não nasce. ⚠️ **É
+  UM GLOBAL NOMEADO, E NÃO O `MENU` DO `nav.js`**: o `MENU` do sob medida vive
+  dentro de um IIFE, e a versão que lia `window.MENU` fazia o "?" nunca nascer
+  no `/sobmedida` — nem para o Admin Geral (o testador de tela achou; a regra
+  inerte da dívida 18). O `teste_manual_tela.js` não sobe o sob medida: a prova
+  de lá é o A13 do `teste_manual.js` (os dois `nav.js` gravam o global) e a
+  conferência na tela.
+- **As ações do sob medida entram UMA vez na ficha**: o `permissoes.js` da raiz
+  já traz `sobmedida.<chave>` com a tela, e o laço do `TELA_DA_CHAVE` do
+  `acoesDaTela` as repetia — a 602 saía com 12 ações, 6 em dobro (testador de
+  tela). O retrato guarda a lista das ações, e foi regravado.
+- **O "?" não toma o foco, e o ✕ do painel também não** (③ REVISÃO): na 101,
+  102, 201 e 202 a tela puxa o bipe de volta ("o bipe não pode ficar sem
+  dono"), mas a 251 Receber peça e a 303 Inventário não puxam — com o foco no
+  ✕, o bipe seguinte caía no botão e o Enter do leitor fechava o painel com o
+  código perdido, calado. O painel é leitura, abre na mesma página (nunca em
+  aba nova, §12) e fecha devolvendo o foco a quem o tinha.
+- **O "Onde entra no fluxo" é gerado do `liga`**; a ficha pode trazer uma frase
+  a mais, nunca substituí-lo. O `[[Termo]]` abre o glossário da 907 **no
+  próprio termo** (`#termo=…`), e o apelido `/sobmedida/inicio` acha a 601. O
+  apelido do termo é **uma régua só** (`MANUAL_FICHA.apelidoTermo`, que a 907
+  usa no id do `<dt>`) e sai do texto **cru**, antes do escape — rodando sobre o
+  texto escapado, "Etiqueta & NF" virava `etiqueta-amp-nf` no link e
+  `etiqueta-nf` no glossário (2ª rodada).
+- **Na 907, o mapa MEDE o nome da tela contra a caixa** (nunca conta letras,
+  §12), a tela não operada é escrita em `#5a6472` (5,5:1 — o cinza de antes
+  dava 2,7:1), e a busca em "Todas as telas" alcança o que a chave dá. **No
+  painel do "?", os chips, o "Abrir o manual" e o ✕ têm 44 px** (o alvo de
+  toque do `DESIGN.md` §4; saíam com 31). ⚠️ O botão "?" segue a altura dos
+  outros botões da barra de sessão (36 px): mudar é da barra, não do manual.
+
+**Rode `node teste_manual.js` (115) ao mexer em qualquer ficha, cartão, no
+`manual.js`, no `manual_route.js`, no `manual_retrato.js`, no `permissoes.js`
+ou nos dois mapas de telas** — oito defeitos foram reintroduzidos um a um, e
+cada um reprova: a 907 sem ficha (3 casos), cartão inexistente citado (1), texto
+mudado sem a linha de "Mudanças" (2), a ficha inteira a quem não opera (2), o
+"todas" sem exigir a chave (3), o `permDaRota` sem as linhas (1, mais 1 no
+`teste_cobertura.js`), cartão mudado sem regravar o retrato (2) e um segundo
+leitor de `docs/manual/` (1); e, na ③ REVISÃO de 22/11/2026, o segredo
+viajando no `montar` (1), a assinatura só pela última linha (3), o
+apelido sem resolver (1), o "Também usa" de volta (1), a linha de "Mudanças"
+apagada ou trocada passando (2), o apelido do termo em duas réguas (1), as
+ações do sob medida em dobro (2) e o "?" lendo o `MENU` (1). **`node teste_manual_tela.js` (55, num Chromium; sem
+navegador diz PULADO) ao mexer na 907, no `manual_ajuda.js` ou nas barras** —
+o foco no ✕ (2), a chave do config como rótulo (1), o cinza claro no
+mapa (1), a busca filtrando em "Todas" (1), o pedido da ficha sem a chave
+(1) e o nome cortado sem medir (1) reprovam; **e `node manual_retrato.js`
+depois de escrever a linha de "Mudanças".** Também `teste_mapa`, `teste_lugar`,
+`teste_cobertura`, `teste_acesso`, `teste_menu`, `teste_linguagem` e `cd tecido
+&& npm test` ganharam a 907.
+
+⚠️ **Construído, falta subir.** Ainda não provado com dado real: a 907 aberta
+pelo dono no servidor com as 53 em rascunho e o mapa; `/manual` dando 302 sem
+login no servidor; o "?" aparecendo para o Admin Geral e para ninguém mais.
+Prova que não foi feita se escreve como não feita.

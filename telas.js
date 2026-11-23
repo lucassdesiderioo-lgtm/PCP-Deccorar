@@ -169,6 +169,14 @@ const TELAS = [
      na 206, que é o assunto deles. */
   { n:906, nome:'Parâmetros',            rota:'/parametros',    nivel:'supervisor', onde:'computador', perms:['sobmedida.parametro.ler','sobmedida.parametro.editar','@admin'],
     modulo:'administracao', bloco:'comum', liga:[202, 602, 609, 610, 611] },
+  /* A 907 MANUAL (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026): a ficha de cada
+     tela, em língua de fábrica, lida pelo "?" de toda tela e por esta. Cada
+     pessoa vê só as telas que opera (D7); "ver todas" é a chave
+     `manual.ver_todas` (D8). Nível Operação: é da bancada. Nasce só para o
+     Admin Geral (R-ALC-06): o dono marca `manual.ler` nos setores na fase 2. A
+     ficha mora em docs/manual/, e o `teste_manual.js` reprova tela sem ficha. */
+  { n:907, nome:'Manual',                rota:'/manual',        nivel:'operacao',   onde:'computador', perms:['manual.ler'],
+    modulo:'administracao', bloco:'comum', liga:['todas as telas, pelo "?" de cada uma', 'docs/manual (as fichas)', 'config (o valor de hoje dos parâmetros)'] },
   // 903 Modo teste SAIU em 11/11/2026 (aposentado, decisao do dono): o numero
   // fica vago para sempre (R-TEL-02).
   { n:904, nome:'Relatórios',            rota:'/relatorios',    nivel:'supervisor', onde:'computador', perms:['relatorios.ver'],        area:'relatorios', aba:'rel',

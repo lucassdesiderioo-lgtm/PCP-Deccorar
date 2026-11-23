@@ -174,6 +174,10 @@ app.get('/coleta-horarios',(req,res)=> res.sendFile(path.join(__dirname,'public'
 require('./material_extra_route')(app, db);
 app.get('/material-extra',(req,res)=> res.sendFile(path.join(__dirname,'public','material-extra.html')));
 app.get('/parametros',(req,res)=> res.sendFile(path.join(__dirname,'public','parametros.html')));   // 906 Parâmetros (ARRUMAR-O-LUGAR fase 3)
+/* A 907 Manual (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026): a ficha de cada
+   tela, lida pelo "?" e pela tela. Só leitura; as fichas são lidas no boot. */
+require('./manual_route')(app, db);
+app.get('/manual',(req,res)=> res.sendFile(path.join(__dirname,'public','manual.html')));
 // A central de pendencias (fase 1): so le, e pergunta a funcao de cada tela
 // dona — por isso depois de todas elas.
 require('./pendencias_route')(app, db);
