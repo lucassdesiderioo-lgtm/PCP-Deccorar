@@ -126,8 +126,9 @@ livre** (não reservada por outra pessoa):
   pessoa tem **uma** reserva por vez: bipar outro SKU troca a reserva.
 - **O bipe final consome a linha reservada**, e não "a mais antiga": a peça que
   sai é a que foi presa no 1º bipe. Se a reserva venceu e outra pessoa pegou a
-  peça, o bipe final cai na regra de sempre (outra linha `aguardando` do SKU, ou
-  409 `sem_revisao`, R-EMB-02).
+  peça, o bipe final cai na regra de sempre (outra linha `aguardando` **livre** do
+  SKU, ou 409). Na construção (③ REVISÃO): **nunca a reservada por outra pessoa**
+  — sem livre, 409 `reservada` para quem não reservou.
 - **"Peça com defeito" passa a marcar a linha reservada** (hoje marca a mais antiga
   do SKU, decisão de 22/11/2026). É a mesma ideia — a peça que está na mão —, só
   mais precisa. ⚠️ Confirmar no "pode seguir".
