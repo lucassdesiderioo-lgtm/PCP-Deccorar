@@ -321,11 +321,13 @@ function mostrarFora(){
   p.innerHTML='<div class="ft">TEM PEÇA DO DIA ESPERANDO</div>'
     +'<div class="fq1">Você bipou a <span style="font-family:ui-monospace,monospace">'+esc(emb.codigo)+'</span>, que não é do dia.</div>'
     +'<div class="fq2">A <b>'+esc(d.codigo)+'</b> tem '+plural(d.aqui,'peça aqui','peças aqui')+' e <b>'+plural(d.paradas,'venda de hoje parada','vendas de hoje paradas')+'</b> na Etiqueta de Venda.<br>'
-    +'Para trocar, <b>bipe a '+esc(d.codigo)+'</b>. Para seguir com esta, <b>bipe o kit</b>.</div>'
+    +(emb.foraRecusada===d.codigo?'Siga com esta: <b>bipe o kit</b>.':'Para trocar, <b>bipe a '+esc(d.codigo)+'</b>. Para seguir com esta, <b>bipe o kit</b>.')+'</div>'
     +(emb.foraErro?'<div style="color:var(--red);font-weight:700;margin-top:8px">'+emb.foraErro+'</div>':'')
-    +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"><button type="button" class="bd1" id="foraTroca">Vou embalar a '+esc(d.codigo)+'</button>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+(emb.foraRecusada===d.codigo?'':'<button type="button" class="bd1" id="foraTroca">Vou embalar a '+esc(d.codigo)+'</button>')
     +'<button type="button" class="bd2" id="foraSegue">Embalar esta mesmo assim</button></div>';
-  document.getElementById('foraTroca').addEventListener('click', function(){ trocar(null); keep(); });
+  var bt=document.getElementById('foraTroca');
+  /* o botao reserva a do dia antes de cancelar esta, como o bipe (③ r3) */
+  if(bt) bt.addEventListener('click', function(){ var i=SKUS.find(function(x){ return String(x.codigo).toUpperCase()===String(d.codigo).toUpperCase(); }); trocar(i||null, true); keep(); });
   document.getElementById('foraSegue').addEventListener('click', function(){ seguirFora(); keep(); });
 }
 function renovar(cur, dia){
@@ -336,9 +338,9 @@ function renovar(cur, dia){
 function seguirFora(){ if(!emb || !emb.foraDe || emb.trocando) return; renovar(emb, emb.foraDe); emb.foraDe=null; emb.foraVisto=true; mostrarFora(); }
 /* Troca para a peca do dia: a embalagem de agora e cancelada (a reserva solta)
    e, se veio o bipe do SKU do dia, a dele comeca do zero. */
-async function trocar(info){
+async function trocar(info, peloBotao){
   const cur=emb; if(!cur || cur.enviando || cur.trocando) return;
-  const dia=cur.foraDe;
+  let dia=cur.foraDe;
   /* ⚠️ A PECA DO DIA E RESERVADA ANTES de cancelar a de agora (③ REVISAO): se
      ela nao estiver aqui, ou estiver com outra pessoa, a embalagem de agora
      continua, e o aviso diz por que. */
@@ -355,15 +357,16 @@ async function trocar(info){
     /* SEM RESPOSTA, A TROCA PODE TER ACONTECIDO NO SERVIDOR (§12, ③ r3): a tela
        segue com esta e pede de volta a reserva dela. */
     if(!r){ erro='Sem conexão: não deu para confirmar a troca. Siga com esta, ou bipe a do dia de novo.'; reservarPeca(cur.codigo).catch(function(){}); }
-    else if(r.erro) erro=esc(r.erro);
+    else if(r.erro){ erro=esc(r.erro); if(r.motivo==='reservada' && info.codigo.toUpperCase()===String(cur.foraDe||'').toUpperCase()) cur.foraRecusada=cur.foraDe; }
     else if(r.fila_id==null) erro='Não há nenhuma '+esc(info.codigo)+' esperando embalagem: ela ainda está na produção. Siga com esta ou bipe outra do dia.';
     if(erro){ cur.foraErro=erro; mostrarFora(); beep(false); return; }
   }
   clearInterval(tick); tick=null; emb=null; bipePerdido=null; mostrarFora();
   try{ await fetch('/api/montagem/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({codigo:cur.codigo,trocou:1,manter:info?1:0,codigo_dia:dia||'',segundos:Math.round((Date.now()-cur.inicio)/1000)})}); }catch(e){}
-  if(info){ abrir(info); return; }
-  avisoFixo=true; banner('go','Pegue a peça do dia','A embalagem de <b>'+esc(cur.codigo)+'</b> foi cancelada e a peça continua esperando. Bipe a <b>'+esc(dia)+'</b> para começar.');
+    body:JSON.stringify({codigo:cur.codigo,trocou:1,manter:info?1:0,codigo_dia:(info?info.codigo:dia)||'',segundos:Math.round((Date.now()-cur.inicio)/1000)})}); }catch(e){}
+  if(info && !peloBotao){ abrir(info); return; }
+  if(info) dia=info.codigo;
+  avisoFixo=true; banner('go','Pegue a peça do dia','A embalagem de <b>'+esc(cur.codigo)+'</b> foi cancelada e a peça continua esperando. Bipe a <b>'+esc(dia)+'</b> para começar'+(info?' — ela já está reservada para você.':'.'));
   beep(true); carregarFila();
 }
 function abrir(info){
