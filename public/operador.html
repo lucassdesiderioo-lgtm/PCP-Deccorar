@@ -576,6 +576,12 @@ function rjAbrir(){
    mais rápido que uma pessoa e termina com Enter: as teclas que chegaram em
    rajada (menos de 50 ms entre uma e outra) antes do Enter saem do campo, e a
    janela diz que o bipe não vale com ela aberta. */
+function skuNoFim(txt){
+  var t=String(txt||'').toUpperCase().replace(/\s+$/,''), achou='';
+  (SKUS||[]).forEach(function(x){ var c=String(x.codigo||'').toUpperCase();
+    if(c.length>=6 && c.length>achou.length && t.slice(-c.length)===c) achou=c; });
+  return achou ? String(txt).replace(/\s+$/,'').slice(-achou.length) : '';
+}
 function vigiarBipeNaObs(el){
   if(!el) return;
   var rajada=0, ultima=0, antes='';
@@ -583,6 +589,11 @@ function vigiarBipeNaObs(el){
     var t=Date.now();
     if(e.key==='Enter'||e.key==='Tab'){
       e.preventDefault();
+      /* E o leitor LENTO (③ REVISÃO, rodada 4): o que termina o campo é um SKU
+         cadastrado, colado ou não ao texto? Sai também — a regra não depende
+         da velocidade do leitor. */
+      var sku=skuNoFim(el.value);
+      if(rajada<8 && sku){ antes=el.value.slice(0, el.value.length-sku.length).replace(/\s+$/,''); rajada=8; }
       if(rajada>=8){ el.value=antes;
         var av=document.getElementById('rjAvisoBipe');
         if(!av){ av=document.createElement('div'); av.id='rjAvisoBipe';

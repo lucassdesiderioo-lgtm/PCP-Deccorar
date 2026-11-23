@@ -139,6 +139,15 @@ async function abrir(browser, opc){
   ok('e a janela diz que o bipe não vale', /bipe não vale/i.test(await t.p.textContent('#rjBox')));
   await t.ctx.close();
 
+  console.log('\n── 6-D. o leitor lento também não escreve na observação (③ REVISÃO, rodada 4) ──');
+  t = await abrir(browser);
+  await t.p.tap('#rjBt'); await t.p.waitForTimeout(200);
+  await t.p.tap('#rjObs'); await t.p.keyboard.type('fio solto ', { delay:120 });
+  await t.p.keyboard.type('BK140160CINZA', { delay:90 }); await t.p.keyboard.press('Enter'); await t.p.waitForTimeout(300);
+  ok('o SKU cadastrado bipado devagar sai da observação', (await t.p.inputValue('#rjObs')).trim() === 'fio solto', await t.p.inputValue('#rjObs'));
+  ok('e a janela diz que o bipe não vale', /bipe não vale/i.test(await t.p.textContent('#rjBox')));
+  await t.ctx.close();
+
   console.log('\n── 7. esperando o servidor gravar o problema, nada fecha a revisão por baixo (③ REVISÃO) ──');
   t = await abrir(browser, { lento:1500 });
   await t.p.tap('#rjBt'); await t.p.waitForTimeout(200);

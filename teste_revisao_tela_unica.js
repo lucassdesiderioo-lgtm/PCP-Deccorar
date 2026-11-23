@@ -171,6 +171,31 @@ eq('I: 1 em Hoje (V, pelo PDF)', ii.hoje, 1);
 eq('I: W continua no primeiro dia', ii.dias[0].n, 1);
 eq('I: e V não conta de novo no dia dela', ii.dias.reduce((a, x) => a + x.n, 0), 1);
 
+console.log('\n── 7-C. a venda do PDF que a planilha não traz conta também no alvo (③ REVISÃO, rodada 4) ──');
+/* K: 5 livres; a planilha tem 1 venda no primeiro dia; o PDF de hoje traz 5
+   vendas que a planilha ainda não tem. O livre cobre as 5 do PDF (nada em
+   Hoje), e o que falta é a venda da planilha mais o alvo. */
+sku.run('BK150140CINZA', 5, 1, 150, 140);
+vf.run('vK1', 'BK150140CINZA', hoje, D0);
+for(let i = 0; i < 5; i++) db.prepare("INSERT INTO lote (codigo,estagio,venda) VALUES ('BK150140CINZA','pendente',?)").run('pdfK' + i);
+const calcK = DEMANDA.calcular(db).linhas.find(l => l.codigo === 'BK150140CINZA');
+const kk = item(L(), 'BK150140CINZA') || { hoje:0, proximos:0, alvo:0 };
+eq('K: Hoje + Próximos + Alvo = a venda da planilha + as do PDF + o alvo − o livre',
+   kk.hoje + kk.proximos + kk.alvo, Math.max(0, 1 + 5 + calcK.alvo - 5));
+
+console.log('\n── 7-D. a ligação PDF × planilha usa os filtros da 401 (③ REVISÃO, rodada 4) ──');
+/* N: livre 0. A planilha guarda a venda de um pacote pelo PACK, e uma caixa
+   desse pack já tem etiqueta: a 401 tira a linha do pack. A outra caixa do
+   pack está pendente no PDF de hoje. A venda de outro cliente (vN2) no mesmo
+   dia não pode sumir. */
+sku.run('BK170140BEGE', 0, 1, 170, 140);
+vf.run('PACKN', 'BK170140BEGE', hoje, D0);
+vf.run('vN2', 'BK170140BEGE', hoje, D0);
+db.prepare("INSERT INTO lote (codigo,estagio,packId,venda,embalado_em) VALUES ('BK170140BEGE','embalado','PACKN','vNa',datetime('now','localtime'))").run();
+db.prepare("INSERT INTO lote (codigo,estagio,packId,venda) VALUES ('BK170140BEGE','pendente','PACKN','vNb')").run();
+const nn = item(L(), 'BK170140BEGE') || { dias:[{ n:0 }] };
+eq('N: a venda do outro cliente continua no primeiro dia', nn.dias[0].n, 1);
+
 console.log('\n── 8. toda peça na fila que vira +1 é descontada (③ REVISÃO) ──');
 sku.run('BK110160BEGE', 0, 1, 110, 160);
 vf.run('vF', 'BK110160BEGE', hoje, D0);

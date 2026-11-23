@@ -431,5 +431,5 @@ function aProduzir(db){
   return calcular(db).linhas.filter(l => l.cadastrado && l.precisa > 0);
 }
 
-module.exports = { calcular, aProduzir, cfgNum, porDia, comEtiqueta, janelas, vendasPorSku, vendasTotal, rotuloDia, JANELAS,
+module.exports = { sql, calcular, aProduzir, cfgNum, porDia, comEtiqueta, janelas, vendasPorSku, vendasTotal, rotuloDia, JANELAS,
   vendasPorDiaPeriodo, vendasPorMes, vendasPorSkuPeriodo, primeiraVenda };

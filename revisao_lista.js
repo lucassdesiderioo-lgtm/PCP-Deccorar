@@ -76,15 +76,9 @@ function montar(db){
 
   /* A falta acumulada por dia de envio, por SKU (a régua da 401). */
   const pd = DEMANDA.porDia(db, { semResumo:true });
-  const faltaAte = {};   // c -> função(dia) -> falta acumulada até o dia (a da 401)
   const planCel = {};    // c -> { livre, dem: { dia -> vendas } }
   pd.linhas.forEach(l => {
     const cel = l.celulas, c = String(l.codigo).toUpperCase();
-    faltaAte[c] = function(dia){
-      let f = 0;
-      for(const x of cel){ if(x.dia === 'atrasada' || x.dia <= dia) f = x.falta; }
-      return f;
-    };
     const dem = {};
     for(const x of cel){ const d = x.dia === 'atrasada' ? hoje : x.dia; dem[d] = (dem[d] || 0) + x.vendas; }
     planCel[c] = { livre: l.livre, dem };
@@ -111,13 +105,19 @@ function montar(db){
      e quanto dele a planilha também traz, em que data de envio. */
   const pdfHoje = contar(db, `SELECT UPPER(codigo) c, COUNT(*) n FROM lote
     WHERE data=date('now','localtime') AND codigo IS NOT NULL AND estagio='pendente' GROUP BY UPPER(codigo)`);
+  /* A ligação só olha a linha da planilha que a 401 conta: os MESMOS filtros
+     do porDia (a futura, e sem a venda que já tem etiqueta). Uma linha que a
+     401 deixou de fora apagaria, no dia dela, a venda de OUTRO cliente (③
+     REVISÃO, rodada 4). */
   const ligada = {};   // c -> { dia -> n }
+  const Q = DEMANDA.sql(db);
   db.prepare(`SELECT UPPER(l.codigo) c,
       CASE WHEN vf.data_envio < date('now','localtime') THEN date('now','localtime') ELSE vf.data_envio END d,
       COUNT(*) n
-    FROM lote l JOIN venda_futura vf ON vf.venda_id IN (l.venda, l.packId) AND UPPER(vf.codigo)=UPPER(l.codigo)
+    FROM lote l JOIN (SELECT venda_id, codigo, data_envio FROM venda_futura
+                      WHERE ${Q.FUTURA}${Q.ETQ ? ' AND NOT '+Q.ETQ : ''}) vf
+      ON vf.venda_id IN (l.venda, l.packId) AND UPPER(vf.codigo)=UPPER(l.codigo)
     WHERE l.data=date('now','localtime') AND l.codigo IS NOT NULL AND l.estagio='pendente'
-      AND vf.data_envio IS NOT NULL AND COALESCE(vf.teste,0)=0 AND COALESCE(vf.cancelada,0)=0
     GROUP BY UPPER(l.codigo), d`).all().forEach(r => { (ligada[r.c] = ligada[r.c] || {})[r.d] = r.n; });
 
   const skus = {};
@@ -125,7 +125,7 @@ function montar(db){
       COALESCE(m.sob_medida,0) sob_medida
     FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id`).all().forEach(s => { skus[s.c] = s; });
 
-  const cods = new Set(Object.keys(hojeMap).concat(Object.keys(faltaAte), Object.keys(calc)));
+  const cods = new Set(Object.keys(hojeMap).concat(Object.keys(planCel), Object.keys(calc)));
   const itens = [];
   for(const c of cods){
     const s = skus[c];
@@ -133,17 +133,23 @@ function montar(db){
     const o = hojeMap[c];
     const hojeFalta = o ? Math.max(0, o.a_produzir) : 0;
     const hojeFeitas = o ? (o.revisadas || 0) : 0;
-    const f = faltaAte[c] || (() => 0);
     /* A falta dos próximos dias, venda a venda: a demanda da planilha sem as
        vendas que o PDF de hoje já trouxe (essas estão em Hoje), e o PDF de hoje
        inteiro como o primeiro a usar o livre (③ REVISÃO). */
     const pc = planCel[c];
+    const l = calc[c];
     const porDiaSku = [];
     const incHoje = { n:0 };
-    if(pc){
-      const dem = Object.assign({}, pc.dem), lig = ligada[c] || {};
+    /* O ALVO É A MESMA CONTA, ATÉ O FIM (③ REVISÃO, rodada 4): depois da
+       janela, a venda que vem depois dela e o alvo do SKU entram na mesma
+       soma acumulada, contra o mesmo livre. A venda do PDF que a planilha
+       ainda não traz usa o livre aqui e também no alvo — antes ela usava o
+       livre nos próximos dias e sumia do alvo, e a lista pedia peça a menos. */
+    let alvo = 0;
+    {
+      const dem = Object.assign({}, pc ? pc.dem : {}), lig = ligada[c] || {};
       for(const d of Object.keys(lig)) dem[d] = Math.max(0, (dem[d] || 0) - lig[d]);
-      const livre = pc.livre || 0;
+      const livre = pc ? (pc.livre || 0) : (l && l.livre != null ? l.livre : 0);
       let acum = (pdfHoje[c] || 0) + Object.keys(dem).filter(d => d <= hoje).reduce((a, d) => a + dem[d], 0);
       const fl = () => acum > 0 ? Math.max(0, acum - livre) : 0;
       let ant = fl();
@@ -154,15 +160,14 @@ function montar(db){
         acum += Object.keys(dem).filter(k => k > antD && k <= d).reduce((a, k) => a + dem[k], 0);
         const v = fl(); porDiaSku.push({ dia:d, n:Math.max(0, v - ant) }); ant = v; antD = d;
       }
-    } else for(const d of dias) porDiaSku.push({ dia:d, n:0 });
+      acum += Object.keys(dem).filter(k => k > antD).reduce((a, k) => a + dem[k], 0);
+      acum += (s.sob_medida || !l) ? 0 : (l.alvo || 0);   // sob medida não tem alvo (R-REV-04)
+      alvo = Math.max(0, fl() - ant);
+    }
     const tirar = (q) => { for(const x of [incHoje].concat(porDiaSku)){ const t = Math.min(q, x.n); x.n -= t; q -= t; } return q; };
     /* A peça revisada e ainda não embalada sai do dia mais cedo. */
     let resto = tirar(naFila[c] || 0);
     const proxTotal = porDiaSku.reduce((a, x) => a + x.n, 0);
-    const l = calc[c];
-    const faltaJanela = f(dias.length ? dias[dias.length-1] : hoje);
-    let alvo = l ? Math.max(0, l.precisa - faltaJanela) : 0;
-    if(s.sob_medida) alvo = 0;   // sob medida não tem alvo (R-REV-04)
     alvo -= Math.min(resto, alvo);
     if(!hojeFalta && !proxTotal && !alvo && !hojeFeitas) continue;
     const primeiro = porDiaSku.length ? porDiaSku[0] : null;
