@@ -8,6 +8,8 @@ const ESTOQUE  = require('./estoque_dominio');
 const QUEM     = require('./quem');
 const TEMPO    = require('./tempo_operador');
 const DEFEITO  = require('./defeito_dominio');
+const RESERVA  = require('./embalagem_reserva');
+const PRIO     = require('./embalagem_prioridade');
 /* O tempo minimo da embalagem, em segundos (EMBALAGEM-TEMPO-MINIMO, 21/11/2026).
    E so o padrao do boot: quem manda e config.emb_minimo_seg. */
 const EMB_MINIMO_PADRAO = 45;
@@ -69,7 +71,12 @@ module.exports=function(app,db){
     tipo TEXT NOT NULL, codigo TEXT, segundos INTEGER, inicio TEXT, fim TEXT,
     usuario_id INTEGER, usuario_nome TEXT,
     data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')),
-    teste INTEGER DEFAULT 0)`);
+    teste INTEGER DEFAULT 0, detalhe TEXT)`);
+  /* `detalhe` (EMBALAGEM-PRIORIDADE, 23/11/2026): o SKU do dia que esperava
+     quando a pessoa embalou fora da prioridade. No fim, como o SQLite poe (§17). */
+  try{ db.exec('ALTER TABLE montagem_evento ADD COLUMN detalhe TEXT'); }catch(e){}
+  /* A PECA RESERVADA PARA QUEM ESTA EMBALANDO (EMBALAGEM-PRIORIDADE §5). */
+  RESERVA.garantir(db);
   function embMinimoSeg(){
     const n = parseInt(cfg('emb_minimo_seg'), 10);
     return Number.isFinite(n) && n >= 0 ? n : EMB_MINIMO_PADRAO;
@@ -309,6 +316,17 @@ module.exports=function(app,db){
       return res.status(409).json({erro:'⚠ '+cod+' não passou pela Revisão: não há nenhuma desta persiana esperando embalagem. NADA foi gravado. Leve a persiana para a Revisão e embale depois.',
         motivo:'sem_revisao'});
     }
+    /* A PECA RESERVADA POR OUTRA PESSOA NAO SE CONSOME (EMBALAGEM-PRIORIDADE §5,
+       ③ REVISAO): quem nao tem reserva — a pagina antiga em cache, a reserva
+       vencida — e que leva o 409, e nao quem reservou no 1o bipe. */
+    if(exigeRevisao(cod) && !RESERVA.linhaParaConsumir(db,cod,q,emTeste)){
+      const por=RESERVA.reservadaPor(db,cod,emTeste);
+      try{ db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,usuario_id,usuario_nome,detalhe)
+        VALUES ('reservada',?,?,?,?,?)`).run(cod,Math.round(+segundos||0),q.usuario_id,q.usuario_nome,por); }
+      catch(e){ console.error('[montagem] o registro da recusa reservada falhou (a recusa vale igual):', e.message); }
+      return res.status(409).json({erro:'⚠ A '+cod+' que esperava embalagem está sendo embalada por '+(por||'outra pessoa')+'. NADA foi gravado. Se esta peça na sua mão é outra, leve-a para a Revisão.',
+        motivo:'reservada', por});
+    }
     if(!kit_ok) return res.status(400).json({erro:'⚠ FALTOU O KIT — bipe o kit antes de finalizar '+cod+'.'});
     const kitCad=cfg('kit_codigo');
     const kitLido=(req.body&&req.body.kit_codigo)||'';
@@ -345,7 +363,11 @@ module.exports=function(app,db){
         /* ⚠️ A MESMA REGUA DA TRAVA (UPPER), ③ REVISAO: com comparacao exata aqui,
            uma linha em minuscula passava na trava e nunca era consumida —
            e autorizava +1 para sempre. */
-        const f=db.prepare("SELECT id,modo FROM fila WHERE UPPER(codigo)=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod,emTeste);
+        /* A LINHA QUE SAI (EMBALAGEM-PRIORIDADE §5, 23/11/2026): a reservada no
+           1o bipe; sem reserva, a de modo `hoje` primeiro, depois `estoque`,
+           depois `devolucao` (embalagem_reserva.js, dono unico). Ate aqui era a
+           mais antiga de qualquer modo. */
+        const f=RESERVA.linhaParaConsumir(db,cod,q,emTeste);
         if(f){ db.prepare("UPDATE fila SET situacao='embalado', embalado_em=datetime('now','localtime') WHERE id=?").run(f.id); naFila=true; modo=f.modo; }
         /* O modo da fila fica na linha da embalagem (FICHAS-NO-CADASTRO-UNICO):
            o "consumido por operacao" nao conta a devolucao reembalada. */
@@ -410,6 +432,7 @@ module.exports=function(app,db){
           const r=db.prepare("SELECT id FROM producao WHERE codigo=? AND data=date('now','localtime') AND produzido<qtd ORDER BY id LIMIT 1").get(cod);
           if(r){ db.prepare('UPDATE producao SET produzido=produzido+1 WHERE id=?').run(r.id); abatido=true; }
         }
+        RESERVA.soltar(db,q);
       })();
     }catch(e){
       console.error('[montagem] POST /api/montagem falhou em '+cod+':', e);
@@ -432,8 +455,16 @@ module.exports=function(app,db){
     const cod=String(b.codigo||'').trim().toUpperCase().slice(0,80);
     if(!cod) return res.status(400).json({erro:'codigo'});
     const txt=v=>v==null||v===''?null:String(v).slice(0,40);
-    db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,inicio,fim,usuario_id,usuario_nome)
-      VALUES ('cancelada',?,?,?,?,?,?)`).run(cod,Math.round(+b.segundos||0),txt(b.inicio),txt(b.fim),q.usuario_id,q.usuario_nome);
+    /* `trocou`: cancelada para embalar a peca do dia (EMBALAGEM-PRIORIDADE §4). */
+    const tipo=b.trocou?'trocou_prioridade':'cancelada';
+    db.transaction(()=>{
+      db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,inicio,fim,usuario_id,usuario_nome,detalhe)
+        VALUES (?,?,?,?,?,?,?,?)`).run(tipo,cod,Math.round(+b.segundos||0),txt(b.inicio),txt(b.fim),q.usuario_id,q.usuario_nome,
+          b.trocou?String(b.codigo_dia||'').toUpperCase().slice(0,80)||null:null);
+      /* Na troca pelo bipe, o /reservar da peca do dia ja trocou a reserva
+         (`manter`): soltar aqui apagaria a nova (③ REVISAO). */
+      if(!(b.trocou && b.manter)) RESERVA.soltar(db,q);
+    })();
     res.json({ok:true});
   });
   /* A PECA COM DEFEITO VOLTA PARA A REVISAO (EMBALAGEM-DEFEITO-VOLTA, R-EMB-11,
@@ -444,13 +475,63 @@ module.exports=function(app,db){
     const q=QUEM.exigir(req,res); if(!q) return;
     const emTeste = cfg('modo_teste')==='1' ? 1 : 0;
     try{
-      const r=db.transaction(()=>DEFEITO.marcar(db,req.body||{},q,emTeste))();
+      /* A peca marcada e a RESERVADA (EMBALAGEM-PRIORIDADE §5, decisao do dono
+         de 23/11/2026): a que esta na mao. Sem reserva, a mais antiga do SKU. */
+      const r=db.transaction(()=>{
+        const cod=String((req.body||{}).codigo||'').trim().toUpperCase();
+        RESERVA.limpar(db);
+        const minha=db.prepare('SELECT fila_id FROM embalagem_reserva WHERE usuario_id=? AND codigo=?').get(q.usuario_id,cod);
+        const out=DEFEITO.marcar(db,req.body||{},q,emTeste,minha?minha.fila_id:null);
+        RESERVA.soltar(db,q);
+        return out;
+      })();
       res.json(Object.assign({ok:true},r));
     }catch(e){
       if(e instanceof DEFEITO.Recusa) return res.status(e.status).json(Object.assign({erro:e.message},e.extra));
       console.error('[montagem] POST /api/montagem/defeito falhou:', e);
       res.status(500).json({erro:'Não deu para devolver a peça à Revisão: '+e.message+' — NADA foi gravado.'});
     }
+  });
+  /* A PRIORIDADE DA EMBALAGEM (EMBALAGEM-PRIORIDADE, 23/11/2026): os quatro
+     blocos prontos, pelo dono unico (embalagem_prioridade.js). Quem pergunta
+     ve a propria reserva como "aqui" e a dos outros como "sendo embalada". */
+  app.get('/api/montagem/prioridade',(req,res)=>{
+    const emTeste = cfg('modo_teste')==='1' ? 1 : 0;
+    try{ res.json(PRIO.montar(db,{emTeste, usuario_id:QUEM.idDe(req)})); }
+    catch(e){ console.error('[montagem] GET /api/montagem/prioridade falhou:', e); res.status(500).json({erro:'Não deu para montar a prioridade: '+e.message}); }
+  });
+  /* O 1o BIPE DO SKU RESERVA UMA PECA para a pessoa (§5). A recusa (todas com
+     outras pessoas) vem aqui, e nada abre. Kit, acessorio e sob medida nao
+     reservam: nao passam pela fila. */
+  app.post('/api/montagem/reservar',(req,res)=>{
+    const q=QUEM.exigir(req,res); if(!q) return;
+    const emTeste = cfg('modo_teste')==='1' ? 1 : 0;
+    const cod=String((req.body||{}).codigo||'').trim().toUpperCase();
+    if(!cod) return res.status(400).json({erro:'codigo'});
+    if(!exigeRevisao(cod)) return res.json({ok:true, fila_id:null, sem_reserva:true});
+    try{
+      const r=db.transaction(()=>RESERVA.reservar(db,cod,q,emTeste))();
+      res.json(Object.assign({ok:true, minutos:RESERVA.minutos(db)},r));
+    }catch(e){
+      if(e instanceof RESERVA.Recusa) return res.status(e.status).json(Object.assign({erro:e.message},e.extra));
+      console.error('[montagem] POST /api/montagem/reservar falhou:', e);
+      res.status(500).json({erro:'Não deu para reservar a peça: '+e.message});
+    }
+  });
+  /* O BIPE DO KIT RENOVA A RESERVA, e diz se a pessoa embalou fora da
+     prioridade (§4): `codigo_dia` e o SKU do dia que estava esperando. */
+  app.post('/api/montagem/renovar',(req,res)=>{
+    const q=QUEM.exigir(req,res); if(!q) return;
+    const b=req.body||{};
+    const cod=String(b.codigo||'').trim().toUpperCase().slice(0,80);
+    if(!cod) return res.status(400).json({erro:'codigo'});
+    const dia=String(b.codigo_dia||'').trim().toUpperCase().slice(0,80);
+    const ok=db.transaction(()=>{
+      if(dia) db.prepare(`INSERT INTO montagem_evento (tipo,codigo,segundos,usuario_id,usuario_nome,detalhe)
+        VALUES ('fora_prioridade',?,?,?,?,?)`).run(cod,Math.round(+b.segundos||0),q.usuario_id,q.usuario_nome,dia);
+      return RESERVA.renovar(db,cod,q);
+    })();
+    res.json({ok:true, reservada:ok});
   });
   app.get('/api/fila',(req,res)=>{
     /* A MESMA REGUA DA TRAVA DO POST (③ REVISAO): so a fila do momento (modo
