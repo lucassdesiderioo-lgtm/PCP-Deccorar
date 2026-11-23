@@ -30,3 +30,4 @@ parametros: rev_minimo_seg = Tempo mínimo da revisão (segundos)
 - 23/11/2026 — Se a peça com problema não tiver resposta do servidor em 20 segundos, a tela desiste e avisa: confira em Problemas antes de registrar de novo. Tocar no cartão de outro SKU com a revisão aberta mostra o que fazer.
 - 23/11/2026 — A venda que já está em Hoje não conta de novo nos Próximos dias, mesmo quando o Mercado Livre põe outra data para ela; e a peça revisada que ainda espera a embalagem (inclusive a de devolução) já sai do que falta.
 - 23/11/2026 — O aviso vermelho de venda nova não aparece quando o estoque livre muda sem venda nova (uma peça embalada para estoque, uma etiqueta impressa).
+- 23/11/2026 — A peça que volta da Embalagem por defeito é a que estava reservada para quem embalava; sem reserva, a mais antiga daquele SKU.

@@ -88,7 +88,9 @@
   "R-EMB-08": "a41323c92d2bf4ce",
   "R-EMB-09": "54022b475e77c8f7",
   "R-EMB-10": "754dc6056b8f74df",
-  "R-EMB-11": "e28dc370c68d3cf5",
+  "R-EMB-11": "3ea97ab5f438fd8c",
+  "R-EMB-12": "08385a517cdb886c",
+  "R-EMB-13": "52331eae18215254",
   "R-EST-01": "6cb7de19b6e17f38",
   "R-EST-02": "50fcc9282e44164a",
   "R-EST-03": "044d524d09846887",
@@ -359,7 +361,8 @@
     "23/11/2026 — Enquanto a peça com problema está sendo registrada, a revisão fica parada: o bipe e o toque nos cartões esperam. Com a revisão aberta, tocar no cartão de outro SKU não faz nada. Com \"Ver a semana\" aberta, o bipe fecha a semana para você ver o que fez. O bipe na observação da peça com problema não vira texto. A venda que já foi revisada e voltou por \"Desfazer\" não aparece como venda nova.",
     "23/11/2026 — Se a peça com problema não tiver resposta do servidor em 20 segundos, a tela desiste e avisa: confira em Problemas antes de registrar de novo. Tocar no cartão de outro SKU com a revisão aberta mostra o que fazer.",
     "23/11/2026 — A venda que já está em Hoje não conta de novo nos Próximos dias, mesmo quando o Mercado Livre põe outra data para ela; e a peça revisada que ainda espera a embalagem (inclusive a de devolução) já sai do que falta.",
-    "23/11/2026 — O aviso vermelho de venda nova não aparece quando o estoque livre muda sem venda nova (uma peça embalada para estoque, uma etiqueta impressa)."
+    "23/11/2026 — O aviso vermelho de venda nova não aparece quando o estoque livre muda sem venda nova (uma peça embalada para estoque, uma etiqueta impressa).",
+    "23/11/2026 — A peça que volta da Embalagem por defeito é a que estava reservada para quem embalava; sem reserva, a mais antiga daquele SKU."
    ],
    "situacao": "rascunho"
   },
@@ -376,7 +379,10 @@
     "21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com \"Parabéns!\" ou \"Você pode melhorar\". Só você vê o seu.",
     "22/11/2026 — O tempo ao lado da sua média está no ar na bancada desde 21/11/2026.",
     "22/11/2026 — Entrou o botão \"Peça com defeito\", só para persiana e com a embalagem aberta: escolhe-se o motivo e a peça volta para a Revisão; nada é embalado e nada entra no estoque.",
-    "23/11/2026 — A peça que abate a ordem do dia na embalagem é a que a Revisão marcou como venda de hoje; desde hoje é o sistema que decide isso na Revisão, e não mais a cor escolhida lá."
+    "23/11/2026 — A peça que abate a ordem do dia na embalagem é a que a Revisão marcou como venda de hoje; desde hoje é o sistema que decide isso na Revisão, e não mais a cor escolhida lá.",
+    "23/11/2026 — A lista virou quatro blocos, nesta ordem: vermelho (do dia: a peça que destrava uma venda de hoje parada na Etiqueta de Venda), âmbar (pedido de hoje), azul (reposição) e roxo (devolução). No vermelho, primeiro o que tem mais vendas paradas; a barra diz quantas vendas de hoje já têm peça.",
+    "23/11/2026 — Bipou uma peça que não é do dia com peça do dia esperando: aparece o aviso, e o próximo bipe decide — o kit segue com esta (fica registrado), o SKU do dia troca. Nunca trava.",
+    "23/11/2026 — A peça fica reservada para quem está embalando, do primeiro bipe ao fim: os outros veem \"sendo embalada por\", e a reserva solta em 5 minutos sem bipe. A peça com defeito marcada é a reservada."
    ],
    "situacao": "rascunho"
   },
@@ -399,7 +405,8 @@
     "22/11/2026 — A lista separa a peça com problema achada na Revisão da achada na Embalagem, com o setor responsável; na achada na Embalagem, a coluna Quem diz quem achou e quem conferiu.",
     "23/11/2026 — Na Revisão, a peça com problema só aparece aqui quando o registro foi gravado: se a gravação falhar, a tela da Revisão avisa e a revisão continua aberta.",
     "23/11/2026 — Na Revisão, a mesma peça com problema não é mais registrada duas vezes, nem vai também para a embalagem quando alguém bipa enquanto ela está sendo gravada.",
-    "23/11/2026 — Na Revisão, se o registro da peça com problema não tiver resposta em 20 segundos, a tela avisa: confira nesta lista se ela entrou antes de registrar de novo."
+    "23/11/2026 — Na Revisão, se o registro da peça com problema não tiver resposta em 20 segundos, a tela avisa: confira nesta lista se ela entrou antes de registrar de novo.",
+    "23/11/2026 — A peça achada na Embalagem é a que estava reservada para quem embalava; sem reserva, a mais antiga daquele SKU."
    ],
    "situacao": "rascunho"
   },

@@ -26,6 +26,7 @@ module.exports=function(app, db){
     {nome:'montagem_evento', pk:'id', rotulo:'embalagem (bipes recusados)'},
     /* A peca devolvida da Embalagem por defeito (EMBALAGEM-DEFEITO-VOLTA, 21/11/2026). */
     {nome:'embalagem_defeito', pk:'id', rotulo:'embalagem (voltas por defeito)'},
+    {nome:'embalagem_reserva', pk:'id', rotulo:'embalagem (peças reservadas)'},
     {nome:'lote',         pk:'id',   rotulo:'expedicao'},
     // As pecas dentro da caixa (§5-B). Andam junto com o `lote`: apagar o
     // volume de teste e deixar os itens dele de pe criaria linha orfa, e o

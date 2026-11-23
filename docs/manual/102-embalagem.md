@@ -3,7 +3,7 @@ tela: 102
 titulo: Embalagem
 situacao: rascunho
 atualizada_em: 2026-11-23
-cartoes: R-EMB-01, R-EMB-02, R-EMB-03, R-EMB-04, R-EMB-05, R-EMB-06, R-EMB-07, R-EMB-08, R-EMB-09, R-EMB-10, R-EST-02, R-EST-05, R-KIT-03, R-TEM-01, R-EMB-11
+cartoes: R-EMB-01, R-EMB-02, R-EMB-03, R-EMB-04, R-EMB-05, R-EMB-06, R-EMB-07, R-EMB-08, R-EMB-09, R-EMB-10, R-EST-02, R-EST-05, R-KIT-03, R-TEM-01, R-EMB-11, R-EMB-12, R-EMB-13
 parametros: kit_codigo = Código do kit de instalação, emb_minimo_seg = Tempo mínimo da embalagem (segundos)
 ---
 
@@ -28,3 +28,6 @@ parametros: kit_codigo = Código do kit de instalação, emb_minimo_seg = Tempo 
 - 22/11/2026 — O tempo ao lado da sua média está no ar na bancada desde 21/11/2026.
 - 22/11/2026 — Entrou o botão "Peça com defeito", só para persiana e com a embalagem aberta: escolhe-se o motivo e a peça volta para a Revisão; nada é embalado e nada entra no estoque.
 - 23/11/2026 — A peça que abate a ordem do dia na embalagem é a que a Revisão marcou como venda de hoje; desde hoje é o sistema que decide isso na Revisão, e não mais a cor escolhida lá.
+- 23/11/2026 — A lista virou quatro blocos, nesta ordem: vermelho (do dia: a peça que destrava uma venda de hoje parada na Etiqueta de Venda), âmbar (pedido de hoje), azul (reposição) e roxo (devolução). No vermelho, primeiro o que tem mais vendas paradas; a barra diz quantas vendas de hoje já têm peça.
+- 23/11/2026 — Bipou uma peça que não é do dia com peça do dia esperando: aparece o aviso, e o próximo bipe decide — o kit segue com esta (fica registrado), o SKU do dia troca. Nunca trava.
+- 23/11/2026 — A peça fica reservada para quem está embalando, do primeiro bipe ao fim: os outros veem "sendo embalada por", e a reserva solta em 5 minutos sem bipe. A peça com defeito marcada é a reservada.

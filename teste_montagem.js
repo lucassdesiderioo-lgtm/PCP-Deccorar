@@ -350,7 +350,7 @@ cfgSet('emb_minimo_seg','45');
   const fin = tela.slice(tela.indexOf('async function finish()'));
   ok('a embalagem NAO e zerada antes da resposta do servidor',
      fin.indexOf("fetch('/api/montagem'") > 0 && fin.indexOf('emb=null') > fin.indexOf("fetch('/api/montagem'"));
-  ok('o bipe com o envio no ar e ignorado (emb.enviando)', /emb\s*&&\s*emb\.enviando/.test(tela));
+  ok('o bipe com o envio no ar e ignorado (emb.enviando)', /emb\s*&&\s*\(?emb\.enviando/.test(tela));
   ok('nao existe mais o aviso que apagava a embalagem nova', !/A embalagem de '\+cur\.codigo\+' NÃO foi gravada/.test(tela));
   ok('na recusa a tela segue com a mesma embalagem e nao decide sozinha',
      /motivo==='rapido_demais'\)\{\s*cur\.enviando=false;\s*rapidoDemais\(cur/.test(tela) && !/seg\s*<\s*EMB_MIN/.test(tela));
@@ -464,7 +464,7 @@ console.log('\n── 10. a persiana so embala se veio da revisao (EMBALAGEM-SO-
   ok('o bipe durante a conferencia diz que nao valeu (e o aviso final repete)',
      /if\(conferindo\)\{ bipePerdido=code; banner\('err','Bipe não valeu'/.test(tela) && /function perdido\(\)/.test(tela));
   ok('o bipe perdido de uma conferencia nao sobra para a embalagem seguinte (③ r3)',
-     /if\(!naoNaFila\(info\)\)\{ const nota=perdido\(\); abrir\(info\); if\(nota\) \$\('#banner'\)\.insertAdjacentHTML/.test(tela) && /cur\.enviando\) return;\s*bipePerdido=null;/.test(tela));
+     /if\(!naoNaFila\(info\)\)\{ const nota=perdido\(\); iniciar\(info, nota\); return; \}/.test(tela) && /const nota=\(notaAntes\|\|''\)\+perdido\(\); abrir\(info\); if\(nota\) \$\('#banner'\)\.insertAdjacentHTML/.test(tela) && /cur\.enviando\) return;\s*bipePerdido=null;/.test(tela));
   ok('a regra da tela e a mesma do servidor: so persiana (exige_medida)', /exige_medida===0\) return false/.test(tela));
 }
 
@@ -500,7 +500,7 @@ console.log('\n── 11. cancelar a embalagem em andamento (21/11/2026) ──'
   const fc2 = tela.slice(tela.indexOf('function cancelarEmb('), tela.indexOf('function cancelarEmb(') + 1500);
   ok('cancelar zera a embalagem e chama a rota', /emb=null/.test(fc2) && /\/api\/montagem\/cancelar/.test(fc2));
   ok('o aviso do cancelamento fica ate o proximo bipe', /avisoFixo=true/.test(fc2));
-  ok('com o envio no ar nao se cancela', /enviando\) return/.test(fc2));
+  ok('com o envio no ar nao se cancela', /enviando( \|\| cur\.trocando)?\) return/.test(fc2));
   ok('kit e sob medida nao ouvem "continua em Aguardando embalagem" (③)', /persiana:info\.exige_medida!==0/.test(tela) && /cur\.persiana \?/.test(fc2));
   ok('a recusa do registro nao mostra a chave crua (③)', !/r\.erro\+'\)/.test(fc2));
 }
