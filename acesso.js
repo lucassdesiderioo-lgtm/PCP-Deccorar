@@ -942,6 +942,10 @@ module.exports = function(app, db){
     /* A peca com defeito volta da Embalagem para a Revisao (EMBALAGEM-DEFEITO-VOLTA):
        marca quem embala; decide quem registra a peca com problema na Revisao. */
     if(eq('/api/montagem/defeito')) return 'embalagem.executar';
+    /* A prioridade e a reserva da embalagem (EMBALAGEM-PRIORIDADE, 23/11/2026):
+       reservar e renovar sao a bancada; ler os blocos, como o GET /api/fila. */
+    if(eq('/api/montagem/reservar') || eq('/api/montagem/renovar')) return 'embalagem.executar';
+    if(eq('/api/montagem/prioridade')) return ['embalagem.executar','etiqueta.emitir','@admin'];
     if(M !== 'GET' && pre('/api/revisao/defeitos')) return 'revisao.rejeitar';
     if(eq('/api/revisao/defeitos')) return 'revisao.executar';
     if(M !== 'GET' && eq('/api/embalar')) return 'etiqueta.emitir';

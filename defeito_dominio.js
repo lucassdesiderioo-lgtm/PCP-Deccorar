@@ -73,7 +73,7 @@ function motivoValido(db, motivo){
 const txt = (v, n) => v == null || String(v).trim() === '' ? null : String(v).trim().slice(0, n);
 
 /* d: { codigo, motivo, obs, segundos }  quem: { usuario_id, usuario_nome }  emTeste: 0|1 */
-function marcar(db, d, quem, emTeste){
+function marcar(db, d, quem, emTeste, filaId){
   const cod = String(d.codigo || '').trim().toUpperCase().slice(0, 80);
   if(!cod) throw new Recusa(400, 'Falta o SKU da peça.');
   const motivo = txt(d.motivo, 120);
@@ -81,7 +81,10 @@ function marcar(db, d, quem, emTeste){
   if(!motivoValido(db, motivo)) throw new Recusa(400, 'Esse motivo não está na lista. Escolha um da lista.', { motivo:'motivo_invalido' });
   if(!db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(cod)) throw new Recusa(404, 'SKU não cadastrado: ' + cod);
   if(!ehPersiana(db, cod)) throw new Recusa(400, cod + ' não é persiana: kit, acessório e sob medida não voltam para a Revisão.', { motivo:'nao_persiana' });
-  const f = db.prepare("SELECT * FROM fila WHERE UPPER(codigo)=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod, emTeste ? 1 : 0);
+  /* A peca reservada para quem embala (EMBALAGEM-PRIORIDADE §5, 23/11/2026);
+     sem reserva, a mais antiga do SKU (decisao do dono de 22/11/2026). */
+  const f = (filaId != null && db.prepare("SELECT * FROM fila WHERE id=? AND UPPER(codigo)=? AND situacao='aguardando' AND COALESCE(teste,0)=?").get(filaId, cod, emTeste ? 1 : 0))
+    || db.prepare("SELECT * FROM fila WHERE UPPER(codigo)=? AND situacao='aguardando' AND COALESCE(teste,0)=? ORDER BY id LIMIT 1").get(cod, emTeste ? 1 : 0);
   if(!f) throw new Recusa(409, 'Não há nenhuma ' + cod + ' esperando embalagem: ela não pode voltar para a Revisão por aqui.', { motivo:'sem_revisao' });
   db.prepare("UPDATE fila SET situacao='defeito' WHERE id=?").run(f.id);
   /* A revisão daquela peça deixa de contar (a linha da fila sabe de qual nasceu). */
