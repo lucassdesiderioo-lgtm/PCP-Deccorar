@@ -121,6 +121,23 @@ async function abrir(browser, opc){
   ok('a janela avisa que não há motivo cadastrado', /Nenhum motivo cadastrado/i.test(await t.p.textContent('#rjBox')));
   await t.ctx.close();
 
+  console.log('\n── 6-B. cancelar a janela devolve o foco ao bipe (③ REVISÃO) ──');
+  t = await abrir(browser);
+  await t.p.tap('#rjBt'); await t.p.waitForTimeout(200);
+  await t.p.tap('#rjCancel'); await t.p.waitForTimeout(300);
+  ok('o foco volta ao campo do bipe', await t.p.evaluate(() => document.activeElement.id) === 'scan',
+     await t.p.evaluate(() => document.activeElement.tagName));
+  await t.ctx.close();
+
+  console.log('\n── 6-C. o bipe com o foco na observação não vira texto (③ REVISÃO) ──');
+  t = await abrir(browser);
+  await t.p.tap('#rjBt'); await t.p.waitForTimeout(200);
+  await t.p.tap('#rjObs'); await t.p.keyboard.type('fio solto', { delay:120 });
+  await t.p.keyboard.type('BK100160BEGE', { delay:5 }); await t.p.keyboard.press('Enter'); await t.p.waitForTimeout(300);
+  ok('a observação fica só com o que a pessoa digitou', (await t.p.inputValue('#rjObs')) === 'fio solto', await t.p.inputValue('#rjObs'));
+  ok('e a janela diz que o bipe não vale', /bipe não vale/i.test(await t.p.textContent('#rjBox')));
+  await t.ctx.close();
+
   console.log('\n── 7. esperando o servidor gravar o problema, nada fecha a revisão por baixo (③ REVISÃO) ──');
   t = await abrir(browser, { lento:1500 });
   await t.p.tap('#rjBt'); await t.p.waitForTimeout(200);

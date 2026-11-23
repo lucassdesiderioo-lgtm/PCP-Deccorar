@@ -5,8 +5,8 @@
 > Montagem) espera a `PRODUCAO-MAPA-E-MOTOR`. Tipo: `REGRA` + `NOVIDADE` · risco
 > 🟡. Muda os cartões **R-REV-01**, **R-REV-02** e **R-REV-03** de
 > `docs/regras/estoque.md`; duas linhas em `docs/DECISOES.md`.
-> Testes: `teste_revisao_tela_unica.js` (38), `teste_revisao_tela_unica_tela.js`
-> (26, num Chromium; sem navegador diz PULADO) e `teste_revisao.js` (122, a
+> Testes: `teste_revisao_tela_unica.js` (47), `teste_revisao_tela_unica_tela.js`
+> (34, num Chromium; sem navegador diz PULADO) e `teste_revisao.js` (122, a
 > seção 2 mudou: o modo é do servidor).
 >
 > **O que mudou na construção** (vale o que está aqui):

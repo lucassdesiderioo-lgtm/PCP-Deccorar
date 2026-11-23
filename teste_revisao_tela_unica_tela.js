@@ -35,7 +35,8 @@ function ok(desc, cond, det){ n++; if(cond) console.log('  ok  ' + n + ' — ' +
 const app = express(); app.use(express.json());
 app.locals.acesso = { auditar(){}, podePermissao(){ return true; }, ehAdminGeral(){ return false; } };
 app.use((q, r, nx) => { q.usuario = { id:1, nome:'Ana' }; nx(); });
-app.get('/api/telas/minhas', (q, r) => r.json({ telas:[], perms:['revisao.executar','revisao.rejeitar'] }));
+let PERMS = ['revisao.executar','revisao.rejeitar','devolucao.registrar'];
+app.get('/api/telas/minhas', (q, r) => r.json({ telas:[], perms:PERMS }));
 app.get('/api/auth/eu', (q, r) => r.json({ logado:true, nome:'Ana', destino:{} }));
 app.get('/api/teste/ativo', (q, r) => r.json({ ativo:false }));
 require('./exp_route')(app, db); require('./plan_route')(app, db); require('./revisao_route')(app, db); require('./cad_route')(app, db);
@@ -107,6 +108,22 @@ const srv = app.listen(0, async () => {
     ok('a revisão foi desfeita', /Revisão desfeita/.test(await p.textContent('#banner')));
     ok('e a faixa de venda nova NÃO apareceu', !(await p.isVisible('#faixaNova')));
 
+    console.log('\n── 4-C. a bancada (③ REVISÃO) ──');
+    await p.fill('#scan', 'BK140160CINZA'); await p.keyboard.press('Enter'); await p.waitForTimeout(300);
+    const antes = db.prepare('SELECT COUNT(*) n FROM revisao').get().n;
+    await p.click('.cd[data-cod="BK100160BEGE"], .mini [data-cod="BK100160BEGE"]').catch(()=>{});
+    await p.waitForTimeout(400);
+    ok('tocar no cartão de OUTRO SKU não fecha a revisão aberta', db.prepare('SELECT COUNT(*) n FROM revisao').get().n === antes && /Vai para/.test(await p.textContent('#banner')));
+    await p.click('#btSemana'); await p.waitForTimeout(400);
+    await p.evaluate(() => { const s = document.getElementById('scan'); s.focus(); s.value = 'BK140160CINZA'; });
+    await p.keyboard.press('Enter'); await p.waitForTimeout(500);
+    ok('o bipe com a semana aberta fecha a semana (a pessoa vê o que gravou)', !(await p.isVisible('#semana')));
+    ok('e a revisão fechou à vista', /Revisada/.test(await p.textContent('#banner')));
+    await p.waitForTimeout(3500);
+    ok('o cabeçalho de Hoje concorda no singular', !/1 já revisadas/.test(await p.textContent('#tiles')), await p.textContent('#tiles .fcab'));
+    db.prepare("DELETE FROM revisao WHERE id=(SELECT MAX(id) FROM revisao)").run();
+    db.prepare("DELETE FROM fila WHERE id=(SELECT MAX(id) FROM fila)").run();
+
     console.log('\n── 5. terminado o dia ──');
     db.prepare("INSERT INTO revisao (codigo,segundos,modo,usuario_id) VALUES ('BK140160CINZA',60,'hoje',1),('BK140160CINZA',60,'hoje',1),('BK100160BEGE',60,'hoje',1)").run();
     await p.waitForTimeout(3500);
@@ -122,6 +139,13 @@ const srv = app.listen(0, async () => {
     await p.click('#fxOk'); await p.waitForTimeout(200);
     ok('e fecha no "Entendi"', !(await p.isVisible('#faixaNova')));
     ok('Hoje volta ao destaque', await p.isVisible('.foco.fh'));
+
+    console.log('\n── 6-B. sem a chave da 251, o "↩ Devoluções" some (③ REVISÃO) ──');
+    PERMS = ['revisao.executar'];
+    await p.reload(); await p.waitForTimeout(1200);
+    ok('quem só revisa não vê o botão', !(await p.isVisible('#btDev')));
+    PERMS = ['revisao.executar','revisao.rejeitar','devolucao.registrar'];
+    await p.reload(); await p.waitForTimeout(1200);
 
     console.log('\n── 7. larguras e erros ──');
     let w = await largura(); ok('1180 px: nada rola de lado', w[0] <= w[1], w);

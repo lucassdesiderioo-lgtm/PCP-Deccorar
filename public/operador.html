@@ -100,7 +100,7 @@
 <header><div class="mark">R</div><div><h1>Revisão</h1><div class="hdia" id="hdia"></div></div>
 <span class="hesp"></span>
 <div class="cont"><div><b id="cQtd">—</b>revisadas hoje</div><div><b id="cMed">—</b>sua média hoje</div></div>
-<button type="button" class="btTopo" id="btDev">↩ Devoluções</button>
+<button type="button" class="btTopo" id="btDev" data-perm="devolucao.registrar">↩ Devoluções</button>
 <button type="button" class="btTopo" id="btSemana">Ver a semana</button></header>
 <div id="faixaNova" hidden></div>
 <div class="corpo">
@@ -188,7 +188,7 @@ function renderTiles(){
   var t=L.totais, h='', ate=L.ate?' · até '+escH(L.ate):'';
   var alvo=L.alvo_lista.length?'<div class="depois"><h3>Completar o alvo<b>faltam '+t.alvo+'</b></h3>'+miniTxt(L.alvo_lista,'alvo')+'</div>':'';
   if(!L.hoje_terminado && !L.sem_venda_hoje && L.hoje_lista.length){
-    h+='<div class="foco fh"><div class="fcab"><span class="ft">Hoje</span><span class="fs">vendas de hoje sem peça · '+t.hoje_revisadas+' já revisadas</span>'
+    h+='<div class="foco fh"><div class="fcab"><span class="ft">Hoje</span><span class="fs">vendas de hoje sem peça · '+t.hoje_revisadas+(t.hoje_revisadas===1?' já revisada':' já revisadas')+'</span>'
       +'<span class="fn">faltam <b>'+t.hoje+'</b></span></div><div class="gd">'+L.hoje_lista.map(function(x){ return cardTxt(x,'hoje'); }).join('')+'</div></div>';
     if(L.proximos_lista.length) h+='<div class="depois"><h3>Depois de hoje'+ate+'<b>faltam '+t.proximos+'</b></h3>'+miniTxt(L.proximos_lista,'proximos')+'</div>';
   } else {
@@ -377,7 +377,13 @@ async function confirmarDesfazer(){
     beep(true); load();
   }catch(e){ banner('err','Sem conexão','Não sei se a revisão foi desfeita — confira a lista da embalagem antes de bipar de novo.'); beep(false); }
 }
-$('#tiles').addEventListener('click',e=>{ const b=e.target.closest('[data-cod]'); if(b && !janelaAberta()) toggle(b.dataset.cod); });
+/* Com uma revisão aberta, o toque no cartão de OUTRO SKU não faz nada (③
+   REVISÃO): o toggle fecharia a revisão aberta como revisada, e o cartão fica
+   ao lado da peça. Fecha-se bipando (ou tocando no cartão do mesmo SKU). */
+$('#tiles').addEventListener('click',e=>{ const b=e.target.closest('[data-cod]');
+  if(!b || janelaAberta()) return;
+  if(emRev && b.dataset.cod!==emRev.codigo){ beep(false); return; }
+  toggle(b.dataset.cod); });
 const scan=$('#scan');
 /* preventScroll: devolver o foco nao pode arrastar a tela. O #scan mora no
    alto; sem isto, focar de volta rolava a pagina ate ele e jogava pro topo
@@ -405,6 +411,7 @@ function processa(){
   var v=(scan.value||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
   scan.value='';
   if(janelaAberta()) return;   // o bipe não fecha a revisão por baixo da janela do motivo
+  fecharSemana();              // e com a semana aberta, ela fecha: a pessoa vê o que o bipe fez (③ REVISÃO)
   if(v.length>=8) toggle(v);
 }
 scan.addEventListener('keydown',function(e){
@@ -424,7 +431,7 @@ document.addEventListener('keydown',function(e){
   ult=t;
   if(e.key==='Enter'||e.key==='Tab'){
     var lim=buf.replace(/[^A-Za-z0-9]/g,'').toUpperCase();
-    if(lim.length>=8){ e.preventDefault(); buf=''; if(!janelaAberta()) toggle(lim); }
+    if(lim.length>=8){ e.preventDefault(); buf=''; if(!janelaAberta()){ fecharSemana(); toggle(lim); } }
     else buf='';
     return;
   }
@@ -462,6 +469,7 @@ async function abrirSemana(){
   box.hidden=false;
   document.getElementById('smFecha').onclick=function(){ box.hidden=true; scan.focus({preventScroll:true}); };
 }
+function fecharSemana(){ var b=document.getElementById('semana'); if(b && !b.hidden) b.hidden=true; }
 document.getElementById('btSemana').addEventListener('click',abrirSemana);
 banner('','Pronto','Bipe o código pra iniciar a revisão<br><span style="font-size:14px">ou toque num cartão da lista</span>');
 load();
@@ -553,9 +561,37 @@ function rjAbrir(){
   h+='<button type="button" id="rjCancel" style="width:100%;margin-top:14px;padding:13px;border-radius:9px;border:1px solid #d8dee6;background:transparent;color:#5a6472;font-size:15px;cursor:pointer">Cancelar</button>';
   h+='</div></div>';
   var d=document.createElement('div'); d.innerHTML=h; document.body.appendChild(d.firstChild);
+  vigiarBipeNaObs(document.getElementById('rjObs'));
+}
+/* O LEITOR NÃO ESCREVE NA OBSERVAÇÃO (③ REVISÃO, 23/11/2026): com o foco no
+   campo, o bipe virava texto e era gravado com o motivo. O leitor digita muito
+   mais rápido que uma pessoa e termina com Enter: as teclas que chegaram em
+   rajada (menos de 50 ms entre uma e outra) antes do Enter saem do campo, e a
+   janela diz que o bipe não vale com ela aberta. */
+function vigiarBipeNaObs(el){
+  if(!el) return;
+  var rajada=0, ultima=0, antes='';
+  el.addEventListener('keydown',function(e){
+    var t=Date.now();
+    if(e.key==='Enter'||e.key==='Tab'){
+      e.preventDefault();
+      if(rajada>=8){ el.value=antes;
+        var av=document.getElementById('rjAvisoBipe');
+        if(!av){ av=document.createElement('div'); av.id='rjAvisoBipe';
+          av.style.cssText='margin-top:8px;color:#c62828;font-weight:700;font-size:14px';
+          el.parentNode.insertBefore(av, el.nextSibling); }
+        av.textContent='O bipe não vale com esta janela aberta: escolha o motivo ou toque em Cancelar.';
+        beep(false); }
+      rajada=0; return;
+    }
+    if(e.key && e.key.length===1){
+      if(t-ultima<50) rajada++; else { rajada=1; antes=el.value; }
+      ultima=t;
+    }
+  });
 }
 document.addEventListener('click',function(e){
-  if(e.target.closest('#rjCancel')){ var b=document.getElementById('rjBox'); if(b) b.remove(); return; }
+  if(e.target.closest('#rjCancel')){ var b=document.getElementById('rjBox'); if(b) b.remove(); scan.focus({preventScroll:true}); return; }
   var o=e.target.closest('.rjOp');
   if(!o) return;
   var motivo=o.getAttribute('data-m');
