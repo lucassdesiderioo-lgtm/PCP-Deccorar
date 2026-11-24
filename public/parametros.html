@@ -28,6 +28,9 @@
   .msg.err{color:var(--verm);font-weight:700}
   .msg.ok{color:var(--ok)}
   .msg.aviso{color:var(--amb);font-weight:700}
+  .vale{font-size:12px;color:var(--sub);margin:4px 0 8px}
+  .vale a{color:var(--amb);font-weight:700;text-decoration:none}
+  .vale b{color:var(--txt)}
   .nota{color:var(--sub);font-size:12px}
   .linha{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
   .chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--borda);border-radius:8px;padding:4px 8px;font-size:13px;margin:0 6px 6px 0}
@@ -53,11 +56,26 @@ function erroDe(x){ return (x.j && (x.j.erro || x.j.mensagem)) || ('não deu par
 function card(id){ var d=document.getElementById(id); if(d){ d.innerHTML=''; return d; }
   d=document.createElement('div'); d.className='card'; d.id=id; document.getElementById('corpo').appendChild(d); return d; }
 
+/* ── Onde cada ajuste vale (AJUSTE de 24/11/2026, decisão do dono) ─────────
+   Todo ajuste da 906 diz o número e o nome da tela onde ele age, lidos do mapa
+   pelo servidor (`parametros_onde.js`, rota /api/parametros/onde). A tela que a
+   pessoa abre vira link; a que ela não abre aparece só escrita. Sem tela
+   conhecida, nada — não se inventa. */
+var ONDE={}, ABRE=new Set();
+function valeNa(chave){
+  var ts=ONDE[chave]; if(!ts||!ts.length) return '';
+  return '<div class="vale">vale na '+ts.map(function(t){
+    var nome=esc(t.n+' '+t.nome);
+    return ABRE.has(t.rota) ? '<a href="'+esc(t.rota)+'">'+nome+' →</a>' : '<b>'+nome+'</b>';
+  }).join(' · ')+'</div>';
+}
+
 /* ── Segundo bipe na Conferência (medida padrão; muda quem é nível Admin) ─── */
 async function partBipe(){
   var c=card('pBipe'), pode=EU.admin;
   var x=await jget('/api/config/conferencia'), lig=!!(x.j && x.j.ligada);
   c.innerHTML='<h2>Segundo bipe na Conferência</h2><p class="ajuda">Com isso ligado, a Conferência pede <b>dois bipes</b>: a etiqueta de venda e, em seguida, o código de barras do produto <b>na mesma caixa</b>. Se a etiqueta estiver colada na caixa errada, os dois não batem e o volume <b>não carrega</b>. O operador não vê qual SKU esperar — a conferência é cega. Custa um bipe a mais por volume.</p>'
+    +valeNa('conf_carregamento')
     +'<label class="liga"><input type="checkbox" id="bipeLig" '+(lig?'checked':'')+(pode?'':' disabled')+'> <span>Exigir o bipe do SKU na Conferência</span></label>'
     +'<div class="msg" id="bipeMsg"></div>'+(pode?'':'<p class="nota">Ligar e desligar é de quem é nível Admin.</p>');
   if(!pode) return;
@@ -76,13 +94,13 @@ async function partTempos(){
   var c=card('pTempo'), x=await jget('/api/config/tempos-minimos');
   if(x.s!==200 || !x.j){ c.innerHTML='<h2>Tempo mínimo na bancada</h2><div class="msg err">Não deu para ler os tempos mínimos ('+x.s+').</div>'; return; }
   if(typeof x.j.reserva_seg==='number') RESERVA_SEG=x.j.reserva_seg;
-  var linha=function(k,rot,ajuda){ return '<tr><td><b>'+rot+'</b> <span class="nota">(segundos)</span><br><span class="nota">'+ajuda+'</span></td>'
+  var linha=function(k,chave,rot,ajuda){ return '<tr><td><b>'+rot+'</b> <span class="nota">(segundos)</span><br><span class="nota">'+ajuda+'</span>'+valeNa(chave)+'</td>'
     +'<td><input class="num" inputmode="numeric" data-tempo="'+k+'" value="'+esc(x.j[k])+'"> <button class="g" type="button" data-tsalvar="'+k+'">Salvar</button>'
     +'<div class="msg" data-tmsg="'+k+'"></div></td></tr>'; };
   c.innerHTML='<h2>Tempo mínimo na bancada</h2><p class="ajuda">O bipe que fecha a peça antes deste tempo é <b>recusado</b>, e a peça continua aberta: é o que segura o bipe duplo acidental. Vale no próximo bipe, sem reiniciar nada. Ao <b>baixar</b> o da Revisão, recarregue os tablets da Revisão: a tela aberta guarda o número de antes.</p>'
     +'<div class="rola"><table>'
-    +linha('embalagem','Embalagem','Do 1º bipe do SKU ao bipe que fecha a embalagem.')
-    +linha('revisao','Revisão','Do bipe que inicia ao bipe que encerra a revisão.')
+    +linha('embalagem','emb_minimo_seg','Embalagem','Do 1º bipe do SKU ao bipe que fecha a embalagem.')
+    +linha('revisao','rev_minimo_seg','Revisão','Do bipe que inicia ao bipe que encerra a revisão.')
     +'</table></div>';
   c.querySelectorAll('input[data-tempo]').forEach(function(i){ i.oninput=function(){ avisoTempo(c,i.dataset.tempo); }; avisoTempo(c,i.dataset.tempo); });
   c.querySelectorAll('button[data-tsalvar]').forEach(function(b){ b.onclick=async function(){
@@ -111,7 +129,7 @@ function avisoTempo(c,k){
 
 /* ── Os parâmetros do sob medida: o corte e o prazo (rota de lá) ─────────── */
 function linhaParam(p, pode, extenso){
-  return '<tr><td><b>'+esc(p.rotulo||p.chave)+'</b>'+(p.unidade?' <span class="nota">('+esc(p.unidade)+')</span>':'')+'<br><span class="nota">'+esc(p.ajuda||'')+'</span></td>'
+  return '<tr><td><b>'+esc(p.rotulo||p.chave)+'</b>'+(p.unidade?' <span class="nota">('+esc(p.unidade)+')</span>':'')+'<br><span class="nota">'+esc(p.ajuda||'')+'</span>'+valeNa(p.chave)+'</td>'
     +'<td>'+(p.tipo==='numero'
       ? '<input class="num" inputmode="decimal" data-tipo="numero" data-chave="'+esc(p.chave)+'" value="'+esc(String(p.valor).replace('.',','))+'"'
       : '<input data-tipo="texto" data-chave="'+esc(p.chave)+'" value="'+esc(p.valor)+'"')+(pode?'':' disabled')+'>'
@@ -223,7 +241,10 @@ async function recarregarPrazo(){
 async function iniciar(){
   var x=await jget('/api/telas/minhas');
   if(x.s===401){ location.href='/login?r=/parametros'; return; }
-  if(x.j){ EU.perms=x.j.perms||[]; EU.ag=!!x.j.admin_geral; EU.admin=!!x.j.nivel_admin; }
+  if(x.j){ EU.perms=x.j.perms||[]; EU.ag=!!x.j.admin_geral; EU.admin=!!x.j.nivel_admin;
+    ABRE=new Set((x.j.telas||[]).map(function(t){ return t.rota; })); }
+  /* Onde cada ajuste vale: sem a resposta, os cards abrem do mesmo jeito, só sem a linha. */
+  try{ var on=await jget('/api/parametros/onde'); if(on.s===200 && on.j) ONDE=on.j; }catch(e){}
   document.getElementById('corpo').innerHTML='';
   var algum=false;
   /* Os horários de corte e despacho moram na 206 desde 11/11/2026 (AJUSTE): é o
