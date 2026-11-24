@@ -937,7 +937,9 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 > embalagem. ⚠️ **O alerta da embalagem demorada**
 > (acima de 600 s, avisando quem supervisiona a pessoa) **não existe**: o dono
 > pediu, e é NOVIDADE que espera spec — o sistema não tem "quem supervisiona esta
-> pessoa". `node teste_tempos_minimos.js` (35). Construído, falta subir.
+> pessoa". `node teste_tempos_minimos.js` (35). ✅ **No ar desde 24/11/2026** (PR #371):
+> o dono fez o deploy e disse *"deu certo o deploy"*. ⚠️ **Ainda não provado com
+> dado real:** a primeira troca do mínimo pela 906 valendo no bipe da bancada.
 >
 > ⚠️ **A PERSIANA SÓ EMBALA SE VEIO DA REVISÃO (21/11/2026)** — spec
 > `EMBALAGEM-SO-DA-REVISAO`, cartão R-EMB-02 (mudou), linha em
@@ -5799,7 +5801,8 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 > pessoa abre vira link; a que ela não abre fica só escrita; sem tela conhecida,
 > nada. **Parâmetro novo na 906 entra no `ONDE` do `parametros_onde.js`** — o
 > `teste_parametros_onde.js` (61) reprova o do sob medida (lido do banco novo de
-> lá) e os da medida padrão sem a tela. Construído, falta subir.
+> lá) e os da medida padrão sem a tela. ✅ **No ar desde 24/11/2026** (PR #372): o dono
+> fez o deploy e disse *"deu certo o deploy"*.
 >
 > **Rode `node teste_parametros.js` (113) ao mexer na 906, no horário padrão da
 > 206, no `POST /api/config/horarios`, no card do segundo bipe, na aba Parâmetros
