@@ -10,7 +10,8 @@
 > embalada sai **primeiro de Hoje** (*"tem 29 na embalagem, já tem 9 … deveria
 > aparecer 20"*), e só o que sobra sai dos próximos dias e do alvo; o cartão
 > diz quantas estão na embalagem, e a peça revisada com o Hoje coberto vai como
-> reposição. Vale sobre o item da construção abaixo. `teste_revisao_tela_unica.js` (66).
+> reposição. Vale sobre o item da construção abaixo. **No ar desde 24/11/2026**
+> (PR #368): o dono viu o "(K na embalagem)" no cartão. `teste_revisao_tela_unica.js` (66).
 > Testes: `teste_revisao_tela_unica.js` (66), `teste_revisao_tela_unica_tela.js`
 > (37, num Chromium; sem navegador diz PULADO) e `teste_revisao.js` (122, a
 > seção 2 mudou: o modo é do servidor).

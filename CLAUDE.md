@@ -348,7 +348,8 @@ bug e não é:
   aparecer 20"*), de qualquer modo, e só o que sobra sai dos próximos dias e do
   alvo. O cartão diz *"N de M para hoje já revisadas (K na embalagem)"* e as conta na
   barra; a peça revisada com o Hoje do SKU coberto vai como reposição (o
-  `modoPara` usa a mesma fila). Construído, falta subir.
+  `modoPara` usa a mesma fila). ✅ **No ar desde 24/11/2026** (PR #368): o
+  dono conferiu na bancada o cartão com o "(K na embalagem)".
 - **O dia de hoje fica em destaque**; terminado (nada faltando para as vendas de
   hoje), faixa verde e os Próximos dias sobem. Venda nova de hoje traz faixa
   vermelha e um som, uma vez, sem travar. O SKU que não falta em lugar nenhum
