@@ -102,13 +102,16 @@ function montar(db, opcoes){
      destravar venda de hoje — o menor entre as peças aqui e as vendas paradas.
      O SKU do dia SEM peça aqui sai do vermelho (não há o que embalar), e a peça
      que passa das vendas paradas desce para a Reposição. */
-  const dia = [], doDiaSet = new Set(), excesso = new Map();
+  const dia = [], doDiaSet = new Set(), excesso = new Map(), soReservadas = [];
   for(const p of pedacos){
     if(!(p.falta > 0)) continue;
     const s = sku(p.codigo); if(s && s.exige_medida === 0) continue;
     doDiaSet.add(p.codigo);
     const g = porSku.get(p.codigo) || { aqui:0, sendo:[], minha:false, desde:null, ids:[] };
-    if(!(g.aqui > 0)) continue;
+    /* ⚠️ Todas as peças com outra pessoa (③ REVISÃO): não há o que embalar,
+       mas o SKU tem peça na fila — a tela precisa saber, senão o bipe diz "não
+       passou pela Revisão" e a peça é revisada de novo. */
+    if(!(g.aqui > 0)){ if(g.sendo.length) soReservadas.push({ codigo:p.codigo, sendo:g.sendo }); continue; }
     const para = Math.min(g.aqui, p.falta), listrado = Math.min(g.sendo.length, p.falta - para);
     if(g.aqui > para) excesso.set(p.codigo, g.aqui - para);
     dia.push({ codigo:p.codigo, medida:medida(s), cor:s ? s.cor || '' : '',
@@ -168,6 +171,7 @@ function montar(db, opcoes){
       faltam_embalar:dia.reduce((s, d) => s + d.para_embalar, 0) },
     hoje, reposicao, devolucao,
     outros:[...outros.values()],
+    so_reservadas:soReservadas,
     reserva_min:RESERVA.minutos(db)
   };
 }

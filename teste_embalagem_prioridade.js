@@ -255,6 +255,20 @@ r = chamar('POST', '/api/montagem/reservar', { codigo:'BRANCO999' });
 eq('reservar SKU sem nenhuma peça esperando: fila_id nulo', [r.status, r.body.fila_id], [200, null]);
 eq('…e a reserva de antes continua (a troca não acontece)', (db.prepare('SELECT codigo FROM embalagem_reserva WHERE usuario_id=1').get() || {}).codigo, 'UNICA');
 
+console.log('\n── 8-D. o SKU do dia com todas as peças com outra pessoa (③ revisão) ──');
+db.prepare('DELETE FROM embalagem_reserva').run();
+db.prepare("INSERT INTO skus (codigo,cor,estoque,modelo_id,largura_cm,altura_cm) VALUES ('UMA120','Bege',0,1,120,120)").run();
+venda('UMA120'); venda('UMA120');
+fila('UMA120', 'estoque');
+chamar('POST', '/api/montagem/reservar', { codigo:'UMA120' });          // Ana fica com a única
+p = prio(RUI);
+const todos = p.dia.linhas.concat(p.hoje, p.reposicao, p.devolucao);
+ok('para o Rui, UMA120 não está em bloco nenhum (nada para ele embalar)', !todos.some(x => x.codigo === 'UMA120'));
+eq('mas vem na lista das que estão só com outra pessoa, para o bipe dele dizer quem está com ela', (p.so_reservadas || []).filter(x => x.codigo === 'UMA120').map(x => x.sendo), [['Ana']]);
+r = chamar('POST', '/api/montagem/reservar', { codigo:'UMA120' }, RUI);
+eq('e o bipe do Rui é 409 reservada (não "não passou pela Revisão")', [r.status, r.body.motivo], [409, 'reservada']);
+db.prepare('DELETE FROM embalagem_reserva').run();
+
 console.log('\n── 9. o dia feito ──');
 db.prepare("DELETE FROM lote").run();
 p = prio();
@@ -274,6 +288,8 @@ console.log('\n── 10. a tela 102 (o texto do código) ──');
   ok('depois da recusa, o aviso não manda trocar pela mesma peça', /emb\.foraRecusada===d\.codigo\?'':/.test(tela));
   ok('o cartão do dia mostra "para embalar", e não estoque nem produção (24/11/2026)', /<span>para embalar<\/span>/.test(tela) && !/com peça'/.test(tela) && !/na produção'/.test(tela));
   ok('a barra do topo diz quantas peças do dia faltam embalar', /faltam embalar <b>'\+fe\+'<\/b>/.test(tela));
+  ok('a peça só com outra pessoa entra na trava da Revisão da tela (FILA), e não vira "não passou pela Revisão"', /p\.so_reservadas/.test(tela));
+  ok('o aviso do bipe fora da prioridade conta só o que é para embalar do dia', /d\.para_embalar/.test(tela.slice(tela.indexOf('function mostrarFora'), tela.indexOf('function renovar'))));
   ok('o selo NOVA só com peça aqui', /NOVA===d\.codigo&&d\.aqui/.test(tela));
   ok('a faixa NOVA nasce dos ids da fila, e não do número "aqui"', /VISTOS\.has\(id\)/.test(tela));
   ok('sem a prioridade, a lista cai no /api/fila', /fetch\('\/api\/fila'\)/.test(tela));

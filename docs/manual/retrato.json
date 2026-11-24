@@ -89,8 +89,8 @@
   "R-EMB-09": "54022b475e77c8f7",
   "R-EMB-10": "754dc6056b8f74df",
   "R-EMB-11": "3ea97ab5f438fd8c",
-  "R-EMB-12": "baf712629325dfa2",
-  "R-EMB-13": "f525cd07d09e2a00",
+  "R-EMB-12": "56df91f5ddfd40a5",
+  "R-EMB-13": "5bb3a1add2e7c523",
   "R-EST-01": "6cb7de19b6e17f38",
   "R-EST-02": "50fcc9282e44164a",
   "R-EST-03": "044d524d09846887",
@@ -386,7 +386,8 @@
     "23/11/2026 — Bipou uma peça que não é do dia com peça do dia esperando: aparece o aviso, e o próximo bipe decide — o kit segue com esta (fica registrado), o SKU do dia troca. Nunca trava.",
     "23/11/2026 — A peça fica reservada para quem está embalando, do primeiro bipe ao fim: os outros veem \"sendo embalada por\", e a reserva solta em 5 minutos sem bipe. A peça com defeito marcada é a reservada.",
     "24/11/2026 — A lista em quatro blocos, o aviso do bipe fora da prioridade e a peça reservada para quem embala estão no ar na bancada.",
-    "24/11/2026 — O cartão do bloco vermelho mostra só o que embalar: o número grande é \"para embalar\", sem o que já está no estoque nem o que ainda está na produção. O produto do dia sem peça para embalar sai do vermelho, e a peça a mais vai para a Reposição. O topo diz quantas peças do dia faltam embalar."
+    "24/11/2026 — O cartão do bloco vermelho mostra só o que embalar: o número grande é \"para embalar\", sem o que já está no estoque nem o que ainda está na produção. O produto do dia sem peça para embalar sai do vermelho, e a peça a mais vai para a Reposição. O topo diz quantas peças do dia faltam embalar.",
+    "24/11/2026 — Quando todas as peças de um produto do dia estão com outra pessoa, ele não aparece na lista, e o bipe dele diz quem está com a peça."
    ],
    "situacao": "rascunho"
   },

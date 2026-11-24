@@ -126,7 +126,7 @@ async function carregarFila(){
     }
     PRIO=p;
     const mapa={};
-    [].concat(p.dia.linhas,p.hoje,p.reposicao,p.devolucao,p.outros).forEach(function(x){ mapa[x.codigo]=(mapa[x.codigo]||0)+(x.aqui||0)+((x.sendo&&x.sendo.length)||0); });
+    [].concat(p.dia.linhas,p.hoje,p.reposicao,p.devolucao,p.outros,p.so_reservadas||[]).forEach(function(x){ mapa[x.codigo]=(mapa[x.codigo]||0)+(x.aqui||0)+((x.sendo&&x.sendo.length)||0); });
     FILA=Object.keys(mapa).map(k=>({codigo:k,qtd:mapa[k]}));
     /* A peça do dia que acabou de sair da Revisão (F6): o SKU que não tinha
        peça aqui e agora tem. Fica marcada até o próximo bipe. */
@@ -313,11 +313,11 @@ async function iniciar(info, notaAntes){
 function mostrarFora(){
   const p=document.getElementById('foraPainel');
   if(!emb || !emb.foraDe || emb.kitOk || emb.enviando){ p.style.display='none'; p.innerHTML=''; return; }
-  const d=linhaDia(emb.foraDe)||{codigo:emb.foraDe,paradas:0,aqui:0};
+  const d=linhaDia(emb.foraDe)||{codigo:emb.foraDe,paradas:0,aqui:0,para_embalar:0};
   p.style.display='';
   p.innerHTML='<div class="ft">TEM PEÇA DO DIA ESPERANDO</div>'
     +'<div class="fq1">Você bipou a <span style="font-family:ui-monospace,monospace">'+esc(emb.codigo)+'</span>, que não é do dia.</div>'
-    +'<div class="fq2">A <b>'+esc(d.codigo)+'</b> tem '+plural(d.aqui,'peça aqui','peças aqui')+' e <b>'+plural(d.paradas,'venda de hoje parada','vendas de hoje paradas')+'</b> na Etiqueta de Venda.<br>'
+    +'<div class="fq2">A <b>'+esc(d.codigo)+'</b> tem '+plural(d.para_embalar||d.aqui,'peça do dia para embalar','peças do dia para embalar')+' e <b>'+plural(d.paradas,'venda de hoje parada','vendas de hoje paradas')+'</b> na Etiqueta de Venda.<br>'
     +(emb.foraRecusada===d.codigo?'Siga com esta: <b>bipe o kit</b>.':'Para trocar, <b>bipe a '+esc(d.codigo)+'</b>. Para seguir com esta, <b>bipe o kit</b>.')+'</div>'
     +(emb.foraErro?'<div style="color:var(--red);font-weight:700;margin-top:8px">'+emb.foraErro+'</div>':'')
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+(emb.foraRecusada===d.codigo?'':'<button type="button" class="bd1" id="foraTroca">Vou embalar a '+esc(d.codigo)+'</button>')
