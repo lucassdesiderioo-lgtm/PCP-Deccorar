@@ -275,14 +275,14 @@
 - **Por quê:** o dono, 22/11/2026: *"a partir do momento que uma peça é revisada e precisa ser entregue no dia, ela tem que entrar como prioridade número 1"*, sem deixar a pessoa parada.
 - **Exceções:** "do dia" é a régua da Etiqueta de Venda (`fila_dia.js`): venda futura nunca é vermelha. Nunca trava: o aviso pergunta uma vez por embalagem, e é só do bloco 1. A lista não se reordena com uma embalagem aberta. Kit, acessório e sob medida ficam fora dos blocos. O `GET /api/fila` continua igual (tablet com a página antiga).
 - **Teste que trava:** `teste_embalagem_prioridade.js` (75).
-- **Status:** construído em 23/11/2026, falta subir.
+- **Status:** no ar desde 24/11/2026 (PR #365); ainda não provado com dado real.
 
 ### R-EMB-13 · A peça fica reservada para quem está embalando
 - **Regra:** o 1º bipe do SKU reserva uma linha `aguardando` para a pessoa (`POST /api/montagem/reservar`, tabela `embalagem_reserva`), na ordem **`hoje` → `estoque` → `devolucao`**, a mais antiga no mesmo modo. É a linha que o bipe final consome e a que a "Peça com defeito" marca. Os outros a veem como *"sendo embalada por …"* e não a contam como aqui; sem peça livre do SKU, a recusa (409 `reservada`) vem no 1º bipe. A reserva é da **pessoa** (o login): uma por vez, a mesma em outro tablet, e bipar outro SKU troca. Solta ao embalar, cancelar, marcar defeito ou depois de `config.emb_reserva_min` (5) minutos sem bipe dela (o kit renova, `POST /api/montagem/renovar`). Sem cron: quem pergunta descarta as vencidas. `embalagem_reserva.js` é o dono.
 - **Por quê:** o dono, 23/11/2026: *"se uma pessoa estiver no meio de um processo de embalagem … ela deveria ficar reservada para a pessoa que está embalando"*.
 - **Exceções:** sem reserva (página antiga em cache, reserva vencida, sem rede), o bipe final pega a primeira livre na mesma ordem — **nunca a reservada por outra pessoa**: sem livre, 409 `reservada` antes de gravar (linha `reservada` em `montagem_evento`, com quem está com a peça), e quem leva o 409 é quem não reservou (③ REVISÃO, 23/11/2026). O `/reservar` desiste em 8 s na tela, e a embalagem abre sem reserva; a reserva antiga só sai quando a nova existe. Na troca pelo bipe, a peça do dia é reservada antes de cancelar a de agora (`cancelar` com `trocou` e `manter`); se ela não estiver aqui ou estiver com outra pessoa, a embalagem de agora continua. Kit, acessório e sob medida não reservam. A R-EMB-03 não mudou: só a fila `hoje` abate a ordem do dia — mudou qual linha sai, e por isso ela é abatida mais vezes (decisão do dono, 23/11/2026). Não mexe em saldo.
 - **Teste que trava:** `teste_embalagem_prioridade.js` (75).
-- **Status:** construído em 23/11/2026, falta subir.
+- **Status:** no ar desde 24/11/2026 (PR #365); ainda não provado com dado real.
 ---
 
 ## O kit e a etiqueta dele

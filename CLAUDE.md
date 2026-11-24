@@ -1022,7 +1022,12 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 >   a lista cai no `GET /api/fila` (a bancada não para);
 > - **o `GET /api/fila` continua respondendo igual**: é o que o tablet com a página
 >   antiga lê. A tela nova lê `GET /api/montagem/prioridade`.
-> **Depois do deploy, recarregue os tablets da Embalagem.** Construído, falta subir.
+> **Depois do deploy, recarregue os tablets da Embalagem.** ✅ **No ar desde
+> 24/11/2026** (PR #365): o dono fez o deploy e disse que a tela da Embalagem deu
+> certo. A spec foi para `docs/arquivo/`. ⚠️ **Ainda não provado com dado real:**
+> o bloco vermelho num dia de vendas de hoje sem peça, o aviso respondido pelo
+> bipe e duas pessoas no mesmo SKU com a reserva. Prova que não foi feita se
+> escreve como não feita.
 
 > ⚠️ **A FILA DA EMBALAGEM FOI ACERTADA PELA MESA DO FIM DO DIA 04/11/2026**
 > (linha em `docs/DECISOES.md`). `node ajustar_fila_embalagem.js` simula, e
