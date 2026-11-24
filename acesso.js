@@ -915,6 +915,8 @@ module.exports = function(app, db){
     if(eq('/devolucoes')) return ['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro','devolucao.baixar'];
     // As telas que a pessoa abre (fase 5): cada um ve as proprias, so nome e endereco.
     if(eq('/api/telas/minhas')) return '@logado';
+    /* Onde cada ajuste da 906 vale: de quem abre a 906 (AJUSTE de 24/11/2026). */
+    if(eq('/api/parametros/onde')) return ['sobmedida.parametro.ler', 'sobmedida.parametro.editar', '@admin'];
     /* O MANUAL (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026): seis leituras. "Ver
        todas as telas" é chave própria (D8); o resto é de quem lê o manual. A tela
        /manual sai do mapa, como as outras. ANTES do pre('/api/manual'): a linha
