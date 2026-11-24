@@ -937,7 +937,7 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 > embalagem. ⚠️ **O alerta da embalagem demorada**
 > (acima de 600 s, avisando quem supervisiona a pessoa) **não existe**: o dono
 > pediu, e é NOVIDADE que espera spec — o sistema não tem "quem supervisiona esta
-> pessoa". `node teste_tempos_minimos.js` (30). Construído, falta subir.
+> pessoa". `node teste_tempos_minimos.js` (31). Construído, falta subir.
 >
 > ⚠️ **A PERSIANA SÓ EMBALA SE VEIO DA REVISÃO (21/11/2026)** — spec
 > `EMBALAGEM-SO-DA-REVISAO`, cartão R-EMB-02 (mudou), linha em
