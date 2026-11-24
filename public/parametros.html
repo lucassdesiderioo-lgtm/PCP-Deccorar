@@ -84,7 +84,7 @@ async function partTempos(){
     +linha('embalagem','Embalagem','Do 1º bipe do SKU ao bipe que fecha a embalagem.')
     +linha('revisao','Revisão','Do bipe que inicia ao bipe que encerra a revisão.')
     +'</table></div>';
-  c.querySelectorAll('input[data-tempo]').forEach(function(i){ i.oninput=function(){ avisoTempo(c,i.dataset.tempo); }; });
+  c.querySelectorAll('input[data-tempo]').forEach(function(i){ i.oninput=function(){ avisoTempo(c,i.dataset.tempo); }; avisoTempo(c,i.dataset.tempo); });
   c.querySelectorAll('button[data-tsalvar]').forEach(function(b){ b.onclick=async function(){
     var k=b.dataset.tsalvar, i=c.querySelector('input[data-tempo="'+k+'"]'), m=c.querySelector('[data-tmsg="'+k+'"]'), t=String(i.value).trim();
     i.classList.remove('erro');

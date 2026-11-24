@@ -121,6 +121,7 @@ ok('o card aparece só para o nível Admin', /if\(EU\.admin\)\{[^}]*partTempos\(
 ok('a tela recusa menos de 1 e avisa acima de 600', /600/.test(PAR) && /mínimo é 1/.test(PAR));
 ok('a tela recusa o número que não se guarda (isSafeInteger)', /isSafeInteger/.test(PAR));
 ok('a tela avisa quando a embalagem passa do tempo da reserva', /reserva_seg/.test(PAR) && /reserva/.test(PAR));
+ok('o aviso aparece já ao abrir, com o número gravado (③ REVISÃO, testador de tela)', /forEach\(function\(i\)\{ i\.oninput=[^\n]*avisoTempo\(c,i\.dataset\.tempo\); \}; avisoTempo\(c,i\.dataset\.tempo\); \}\)/.test(PAR));
 ok('a tela diz que, ao baixar o da Revisão, os tablets se recarregam', /recarregue os tablets da Revisão/.test(PAR));
 
 db.close(); fs.rmSync(tmp, { recursive:true, force:true });
