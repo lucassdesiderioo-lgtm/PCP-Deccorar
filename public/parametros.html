@@ -206,7 +206,7 @@ async function partPrazo(lista){
   var h='<h2>Sob medida — prazo e feriados</h2><p class="ajuda">Os números que dizem quando um pedido enviado fica pronto, e os feriados que empurram o prazo. Feriado errado empurra o prazo de todos os pedidos.</p>';
   if(pr && pr.prazo) h+='<p><b>Enviando agora: pronto na '+esc(pr.prazo.entrega_extenso)+'</b></p><p class="nota">'+esc(pr.prazo.explicacao||'')+'</p>';
   h+= nums.length ? '<div class="rola"><table>'+nums.map(function(p){ return linhaParam(p,pode,ext[p.chave]); }).join('')+'</table></div>' : '';
-  h+='<h2 style="margin-top:14px;font-size:15px">Feriados</h2><div id="ferLista"><div class="vazio">carregando…</div></div>';
+  h+='<h2 style="margin-top:14px;font-size:15px">Feriados</h2>'+valeNa('feriados')+'<div id="ferLista"><div class="vazio">carregando…</div></div>';
   if(pode) h+='<div class="linha"><input type="date" id="ferData"> <input id="ferNome" placeholder="Feriado (ex.: Natal)"> <button class="p" id="ferAdd" type="button">Cadastrar feriado</button></div><div class="msg" id="ferMsg"></div>';
   c.innerHTML=h;
   if(pode) ligarSalvar(c, redesenharSm);

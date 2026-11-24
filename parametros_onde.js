@@ -22,12 +22,11 @@ const ONDE = {
   alturaMinimaSobra:    [602],
   pesoSobra:            [602],
   margem:               [602],
-  corteTempoMaxHoras:   [602, 607],
   // a lista de medidas da sobra
-  sobraLarguraMin:      [603],
-  sobraLarguraMax:      [603],
-  sobraAlturaMin:       [603],
-  sobraAlturaMax:       [603],
+  sobraLarguraMin:      [602, 603],
+  sobraLarguraMax:      [602, 603],
+  sobraAlturaMin:       [602, 603],
+  sobraAlturaMax:       [602, 603],
   // a etiqueta da sobra e a do rolo
   etqFonteCodigo:       [605],
   etqBarraAltura:       [605],
@@ -43,15 +42,18 @@ const ONDE = {
   estMinDias:           [607],
   estMinSeguranca:      [607],
   paradoDias:           [607],
+  // o tempo do corte só sai no painel (o corte não lê o número)
+  corteTempoMaxHoras:   [607],
   // o pedido e o prazo
   pedidoNumeroInicial:  [611],
   prazoCorteDiaSemana:  [611, 610],
   prazoCorteHora:       [611, 610],
   prazoEntregaDiaSemana:[611, 610],
   prazoSemanas:         [611, 610],
-  // a bancada e o crédito
-  bipeAbertoMaxHoras:   [613, 615],
-  creditoRevisaoMeses:  [616]
+  feriados:             [611, 610],   // o card de feriados: empurram o prazo
+  // o bipe longo só sai dos indicadores (a bancada não lê o número), e o crédito
+  bipeAbertoMaxHoras:   [615],
+  creditoRevisaoMeses:  [616, 610]
 };
 
 /* A tela pelo número, nos dois mapas: { n, nome, rota }, ou null. */
