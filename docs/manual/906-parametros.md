@@ -4,7 +4,7 @@ titulo: Parâmetros
 situacao: rascunho
 atualizada_em: 2026-11-24
 cartoes: 
-parametros: conf_carregamento = Segundo bipe na Conferência (1 = ligado); emb_minimo_seg = Tempo mínimo da embalagem (segundos); rev_minimo_seg = Tempo mínimo da revisão (segundos)
+parametros: conf_carregamento = Segundo bipe na Conferência (1 = ligado), emb_minimo_seg = Tempo mínimo da embalagem (segundos), rev_minimo_seg = Tempo mínimo da revisão (segundos)
 ---
 
 ## Para que serve

@@ -122,6 +122,14 @@ ok('a tela recusa menos de 1 e avisa acima de 600', /600/.test(PAR) && /mínimo 
 ok('a tela recusa o número que não se guarda (isSafeInteger)', /isSafeInteger/.test(PAR));
 ok('a tela avisa quando a embalagem passa do tempo da reserva', /reserva_seg/.test(PAR) && /reserva/.test(PAR));
 ok('o aviso aparece já ao abrir, com o número gravado (③ REVISÃO, testador de tela)', /forEach\(function\(i\)\{ i\.oninput=[^\n]*avisoTempo\(c,i\.dataset\.tempo\); \}; avisoTempo\(c,i\.dataset\.tempo\); \}\)/.test(PAR));
+/* A conta do aviso, rodada (③ REVISÃO, rodada 2): tirada do HTML e chamada. */
+const fnAviso = (PAR.match(/function textoAviso\(k,v\)\{[\s\S]*?\n\}/) || [''])[0];
+const aviso = new Function('RESERVA_SEG','TEMPO_AVISO', fnAviso + '; return textoAviso;')(300, 600);
+ok('o aviso da reserva vale a partir de 300 s (no exato também), e não antes', /reserva/.test(aviso('embalagem',300)) && aviso('embalagem',299) === '', JSON.stringify([aviso('embalagem',300), aviso('embalagem',299)]));
+ok('a revisão só avisa acima de 600 s', aviso('revisao',600) === '' && /600/.test(aviso('revisao',601)));
+const aviso2 = new Function('RESERVA_SEG','TEMPO_AVISO', fnAviso + '; return textoAviso;')(600, 600);
+ok('o aviso segue o tempo da reserva que o servidor manda (10 min: 400 s não avisa)', aviso2('embalagem',400) === '');
+ok('a tela lê o reserva_seg da resposta', /RESERVA_SEG=x\.j\.reserva_seg/.test(PAR));
 ok('a tela diz que, ao baixar o da Revisão, os tablets se recarregam', /recarregue os tablets da Revisão/.test(PAR));
 
 db.close(); fs.rmSync(tmp, { recursive:true, force:true });

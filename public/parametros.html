@@ -98,7 +98,7 @@ async function partTempos(){
 /* O aviso nunca trava. Na embalagem, acima do tempo da reserva (R-EMB-13): a
    peça reservada solta no meio da embalagem, e outra pessoa pode pegá-la. */
 function textoAviso(k,v){
-  if(k==='embalagem' && v>RESERVA_SEG) return 'Acima de '+Math.round(RESERVA_SEG/60)+' min, a reserva da peça solta no meio da embalagem (ela solta depois de '+Math.round(RESERVA_SEG/60)+' min sem bipe), e outra pessoa pode pegar a mesma peça.'+(v>TEMPO_AVISO?' E a bancada vai esperar '+Math.round(v/60)+' min em cada peça.':'');
+  if(k==='embalagem' && v>=RESERVA_SEG) return 'A partir de '+Math.round(RESERVA_SEG/60)+' min, a reserva da peça solta no meio da embalagem (ela solta depois de '+Math.round(RESERVA_SEG/60)+' min sem bipe), e outra pessoa pode pegar a mesma peça.'+(v>TEMPO_AVISO?' E a bancada vai esperar '+Math.round(v/60)+' min em cada peça.':'');
   if(v>TEMPO_AVISO) return 'Acima de '+TEMPO_AVISO+' s ('+Math.round(v/60)+' min): a bancada vai esperar tudo isso em cada peça.';
   return '';
 }
