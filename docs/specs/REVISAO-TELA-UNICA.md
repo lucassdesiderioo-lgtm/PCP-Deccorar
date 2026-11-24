@@ -4,8 +4,14 @@
 > **fases 1 e 2 construídas juntas, falta subir** · fase 3 (a demanda vinda da
 > Montagem) espera a `PRODUCAO-MAPA-E-MOTOR`. Tipo: `REGRA` + `NOVIDADE` · risco
 > 🟡. Muda os cartões **R-REV-01**, **R-REV-02** e **R-REV-03** de
-> `docs/regras/estoque.md`; duas linhas em `docs/DECISOES.md`.
-> Testes: `teste_revisao_tela_unica.js` (54), `teste_revisao_tela_unica_tela.js`
+> `docs/regras/estoque.md`; três linhas em `docs/DECISOES.md`.
+>
+> **24/11/2026, decisão do dono (a terceira linha):** a peça revisada e ainda não
+> embalada sai **primeiro de Hoje** (*"tem 29 na embalagem, já tem 9 … deveria
+> aparecer 20"*), e só o que sobra sai dos próximos dias e do alvo; o cartão
+> diz quantas estão na embalagem, e a peça revisada com o Hoje coberto vai como
+> reposição. Vale sobre o item da construção abaixo. `teste_revisao_tela_unica.js` (66).
+> Testes: `teste_revisao_tela_unica.js` (66), `teste_revisao_tela_unica_tela.js`
 > (37, num Chromium; sem navegador diz PULADO) e `teste_revisao.js` (122, a
 > seção 2 mudou: o modo é do servidor).
 >
@@ -16,7 +22,7 @@
 >   alvo é o `precisa` menos a falta até o fim da janela — a venda depois da
 >   janela entra no alvo, porque o `precisa` já a conta);
 > - a peça **revisada e ainda não embalada** (fila `aguardando` de qualquer
->   modo, menos a de `hoje` revisada hoje, que já saiu de Hoje) sai primeiro dos
+>   modo, menos a de `hoje` revisada hoje, que já saiu de Hoje) ~~sai primeiro dos~~ (desde 24/11/2026: primeiro de Hoje)
 >   próximos dias e depois do alvo: sem isso o número só cairia na embalagem e a
 >   bancada revisaria a mesma falta duas vezes (③ REVISÃO);
 > - **a venda do PDF de hoje é ligada à planilha pela venda ou pelo pack** e sai

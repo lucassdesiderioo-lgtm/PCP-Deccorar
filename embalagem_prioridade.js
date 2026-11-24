@@ -96,22 +96,34 @@ function montar(db, opcoes){
   }
 
   // Bloco 1.
-  const dia = [];
+  /* ⚠️ O CARTÃO MOSTRA SÓ O TRABALHO DA EMBALAGEM (decisão do dono, 24/11/2026:
+     "a pessoa tem que focar no que precisa ser feito"). Nada de "com peça"
+     (estoque) nem de "na produção": o número é o que embalar agora para
+     destravar venda de hoje — o menor entre as peças aqui e as vendas paradas.
+     O SKU do dia SEM peça aqui sai do vermelho (não há o que embalar), e a peça
+     que passa das vendas paradas desce para a Reposição. */
+  const dia = [], doDiaSet = new Set(), excesso = new Map(), soReservadas = [];
   for(const p of pedacos){
     if(!(p.falta > 0)) continue;
     const s = sku(p.codigo); if(s && s.exige_medida === 0) continue;
+    doDiaSet.add(p.codigo);
     const g = porSku.get(p.codigo) || { aqui:0, sendo:[], minha:false, desde:null, ids:[] };
-    const amarelo = Math.min(g.aqui, p.falta), listrado = Math.min(g.sendo.length, p.falta - amarelo);
+    /* ⚠️ Todas as peças com outra pessoa (③ REVISÃO): não há o que embalar,
+       mas o SKU tem peça na fila — a tela precisa saber, senão o bipe diz "não
+       passou pela Revisão" e a peça é revisada de novo. */
+    if(!(g.aqui > 0)){ if(g.sendo.length) soReservadas.push({ codigo:p.codigo, sendo:g.sendo, ids:g.ids }); continue; }
+    const para = Math.min(g.aqui, p.falta), listrado = Math.min(g.sendo.length, p.falta - para);
+    if(g.aqui > para) excesso.set(p.codigo, g.aqui - para);
     dia.push({ codigo:p.codigo, medida:medida(s), cor:s ? s.cor || '' : '',
-      paradas:p.falta, pedido:p.pedido_hoje, com_peca:Math.max(0, p.pedido_hoje - p.falta),
-      aqui:g.aqui, minha:g.minha, sendo:g.sendo, na_producao:p.falta - amarelo - listrado,
-      quadros:{ verde:Math.max(0, p.pedido_hoje - p.falta), amarelo, listrado, cinza:p.falta - amarelo - listrado },
-      desde:g.desde, ids:g.ids });
+      paradas:p.falta, para_embalar:para, aqui:g.aqui, minha:g.minha, sendo:g.sendo,
+      quadros:{ amarelo:para, listrado }, desde:g.desde, ids:g.ids });
   }
-  /* Mais vendas paradas primeiro; empate: quem tem peça aqui; depois a revisada há mais tempo. */
-  dia.sort((a, b) => (b.paradas - a.paradas) || ((b.aqui > 0) - (a.aqui > 0))
+  /* Mais vendas paradas primeiro; depois a revisada há mais tempo. */
+  dia.sort((a, b) => (b.paradas - a.paradas)
     || String(a.desde || '9').localeCompare(String(b.desde || '9')) || a.codigo.localeCompare(b.codigo));
-  const noDia = new Set(dia.map(d => d.codigo));
+  /* Todo SKU do dia fica fora dos outros blocos — o que sobra dele entra na
+     Reposição pelo `excesso`, logo abaixo. */
+  const noDia = doDiaSet;
 
   // A ordem do dia (bloco 2) e o abaixo do alvo (bloco 3).
   const ordem = new Map();
@@ -136,6 +148,14 @@ function montar(db, opcoes){
   const reposicao = blocoDe('estoque', c => ({ falta:precisa ? (precisa.get(c) || 0) : null }));
   const devolucao = blocoDe('devolucao', () => ({}));
 
+  /* A peça do dia que passa das vendas paradas (17 aqui para 9 vendas) é reposição. */
+  for(const [c, n] of excesso){
+    const g = porSku.get(c), s = sku(c);
+    reposicao.push({ codigo:c, medida:medida(s), cor:s ? s.cor || '' : '', aqui:n, minha:false, sendo:[],
+      desde:g.desde, ids:g.ids, falta:precisa ? (precisa.get(c) || 0) : null });
+  }
+  reposicao.sort((a, b) => ((b.falta || 0) - (a.falta || 0)) || String(a.desde || '9').localeCompare(String(b.desde || '9')));
+
   // Os SKUs que só têm peça com outra pessoa (fora do vermelho) aparecem junto.
   for(const g of porSku.values()){
     if(noDia.has(g.codigo) || g.aqui > 0 || !g.sendo.length) continue;
@@ -146,9 +166,12 @@ function montar(db, opcoes){
 
   return {
     dia:{ linhas:dia, m, n:m - faltaTotal, todas:m > 0 && faltaTotal === 0,
-      aqui:dia.reduce((s, d) => s + d.aqui, 0) },
+      aqui:dia.reduce((s, d) => s + d.aqui, 0),
+      /* a barra do topo: quantas peças do dia faltam embalar (decisão 1b, 24/11/2026) */
+      faltam_embalar:dia.reduce((s, d) => s + d.para_embalar, 0) },
     hoje, reposicao, devolucao,
     outros:[...outros.values()],
+    so_reservadas:soReservadas,
     reserva_min:RESERVA.minutos(db)
   };
 }

@@ -93,10 +93,10 @@ function montar(db){
      duas vezes (③ REVISÃO, 23/11/2026). A de modo 'hoje' revisada HOJE já
      saiu de Hoje (o ordem_dia a conta como revisada); TODAS as outras —
      estoque, devolução e a de 'hoje' de dias anteriores — viram +1 na
-     embalagem e são descontadas dos próximos dias e depois do alvo. */
-  const naFila = contar(db, `SELECT UPPER(codigo) c, COUNT(*) n FROM fila
-    WHERE situacao='aguardando' AND NOT (COALESCE(modo,'')='hoje' AND data=date('now','localtime'))
-      AND COALESCE(teste,0)=0 GROUP BY UPPER(codigo)`);
+     embalagem e são descontadas PRIMEIRO DE HOJE (decisão do dono, 24/11/2026:
+     "tem 29 na embalagem, já tem 9 … deveria aparecer 20 para a pessoa revisar"),
+     e o que sobrar, dos próximos dias e depois do alvo. */
+  const naFila = naFilaMap(db);
   /* Revisada hoje para estoque (o andamento dos próximos dias e do alvo). */
   const revEst = contar(db, `SELECT UPPER(codigo) c, COUNT(*) n FROM revisao
     WHERE data=date('now','localtime') AND COALESCE(modo,'estoque')='estoque' AND COALESCE(teste,0)=0 GROUP BY UPPER(codigo)`);
@@ -131,7 +131,10 @@ function montar(db){
     const s = skus[c];
     if(!s) continue;
     const o = hojeMap[c];
-    const hojeFalta = o ? Math.max(0, o.a_produzir) : 0;
+    /* A peça já revisada e esperando a embalagem sai primeiro de Hoje. */
+    const hojeBruto = o ? Math.max(0, o.a_produzir) : 0;
+    const naEmb = Math.min(hojeBruto, naFila[c] || 0);
+    const hojeFalta = hojeBruto - naEmb;
     const hojeFeitas = o ? (o.revisadas || 0) : 0;
     /* A falta dos próximos dias, venda a venda: a demanda da planilha sem as
        vendas que o PDF de hoje já trouxe (essas estão em Hoje), e o PDF de hoje
@@ -166,15 +169,18 @@ function montar(db){
     }
     const tirar = (q) => { for(const x of [incHoje].concat(porDiaSku)){ const t = Math.min(q, x.n); x.n -= t; q -= t; } return q; };
     /* A peça revisada e ainda não embalada sai do dia mais cedo. */
-    let resto = tirar(naFila[c] || 0);
+    let resto = tirar((naFila[c] || 0) - naEmb);
     const proxTotal = porDiaSku.reduce((a, x) => a + x.n, 0);
     alvo -= Math.min(resto, alvo);
-    if(!hojeFalta && !proxTotal && !alvo && !hojeFeitas) continue;
+    /* O SKU com o Hoje todo coberto pela embalagem fica na conta (③ REVISÃO):
+       sem nada a revisar, ele não entra em lista nenhuma, mas a peça dele
+       conta em "já revisadas" e na faixa de venda nova. */
+    if(!hojeFalta && !proxTotal && !alvo && !hojeFeitas && !naEmb) continue;
     const primeiro = porDiaSku.length ? porDiaSku[0] : null;
     itens.push({
       codigo: s.codigo, descricao: s.descricao || '', cor: s.cor_codigo || s.cor || '',
       largura_cm: s.largura_cm, altura_cm: s.altura_cm,
-      hoje: hojeFalta, hoje_revisadas: hojeFeitas,
+      hoje: hojeFalta, hoje_revisadas: hojeFeitas, hoje_na_embalagem: naEmb,
       dias: porDiaSku.map(x => ({ dia:x.dia, rotulo: x.dia === amanha ? 'amanhã' : rotulo(x.dia), n:x.n })),
       primeiro_dia: primeiro ? primeiro.n : 0,
       resto_semana: porDiaSku.slice(1).reduce((a, x) => a + x.n, 0),
@@ -203,14 +209,28 @@ function montar(db){
     ate: dias.length ? rotulo(dias[dias.length-1]) : null,
     hoje_lista: hojeL, proximos_lista: depois, alvo_lista: alvoTodos,
     so_proximos: proxL, so_alvo: alvoL,
-    totais: { hoje: soma(hojeL, 'hoje'), hoje_revisadas: soma(itens, 'hoje_revisadas'),
+    totais: { hoje: soma(hojeL, 'hoje'), hoje_revisadas: soma(itens, 'hoje_revisadas'), hoje_na_embalagem: soma(itens, 'hoje_na_embalagem'),
               proximos: soma(depois, 'proximos'), alvo: soma(alvoTodos, 'alvo') },
     /* As revisadas de hoje para a ordem do dia, de todo SKU com ordem (a tela
        usa para separar a venda nova do "Desfazer"). */
-    revisadas_hoje: Object.keys(hojeMap).reduce((m, c) => { m[hojeMap[c].codigo] = hojeMap[c].revisadas || 0; return m; }, {}),
+    /* A peça na embalagem conta junto: a que sai da fila por defeito sobe o
+       Hoje e desce aqui, e não é venda nova (24/11/2026). */
+    revisadas_hoje: Object.keys(hojeMap).reduce((m, c) => {
+      const it = itens.find(x => String(x.codigo).toUpperCase() === c);
+      m[hojeMap[c].codigo] = (hojeMap[c].revisadas || 0) + (it ? it.hoje_na_embalagem || 0 : 0); return m; }, {}),
     hoje_terminado: temOrdem && soma(hojeL, 'hoje') === 0,
     sem_venda_hoje: !temOrdem
   };
+}
+
+/* As peças revisadas esperando a embalagem que ainda não saíram de Hoje pelo
+   ordem_dia: toda a fila 'aguardando', menos a de modo 'hoje' revisada hoje
+   (essa o ordem_dia já conta como revisada). Uma régua só para a lista e para
+   o modo (③ REVISÃO). */
+function naFilaMap(db){
+  return contar(db, `SELECT UPPER(codigo) c, COUNT(*) n FROM fila
+    WHERE situacao='aguardando' AND NOT (COALESCE(modo,'')='hoje' AND data=date('now','localtime'))
+      AND COALESCE(teste,0)=0 GROUP BY UPPER(codigo)`);
 }
 
 /* O modo que a revisão grava, decidido no servidor no bipe que fecha
@@ -223,7 +243,9 @@ function modoPara(db, codigo){
      teste) não derruba o bipe: a peça vai como estoque, e o log diz. */
   try{
     const o = ORDEM_DIA.linhas(db).find(x => String(x.codigo).toUpperCase() === c);
-    return o && o.a_produzir > 0 ? 'hoje' : 'estoque';
+    /* A mesma conta do Hoje da lista: o dia já coberto pelas peças esperando a
+       embalagem não pede mais peça do dia (decisão do dono, 24/11/2026). */
+    return o && (o.a_produzir - (naFilaMap(db)[c] || 0)) > 0 ? 'hoje' : 'estoque';
   }catch(e){ console.error('[revisao] não consegui decidir o modo de '+c+':', e.message); return 'estoque'; }
 }
 

@@ -2,7 +2,7 @@
 tela: 101
 titulo: Revisão
 situacao: rascunho
-atualizada_em: 2026-11-23
+atualizada_em: 2026-11-24
 cartoes: R-EST-01, R-REV-01, R-REV-02, R-REV-03, R-REV-04, R-REV-05, R-REV-06, R-REV-07, R-REV-08, R-REV-09, R-TEM-01, R-EMB-11
 parametros: rev_minimo_seg = Tempo mínimo da revisão (segundos)
 ---
@@ -32,3 +32,5 @@ parametros: rev_minimo_seg = Tempo mínimo da revisão (segundos)
 - 23/11/2026 — O aviso vermelho de venda nova não aparece quando o estoque livre muda sem venda nova (uma peça embalada para estoque, uma etiqueta impressa).
 - 23/11/2026 — A peça que volta da Embalagem por defeito é a que estava reservada para quem embalava; sem reserva, a mais antiga daquele SKU.
 - 23/11/2026 — Quando o PDF de hoje chega antes da planilha do Mercado Livre, a lista não pede mais peças a menos: a venda nova conta também em "Completar o alvo". E o código bipado na observação da peça com problema sai do campo mesmo com o leitor mais lento.
+- 24/11/2026 — O "Hoje" já desconta as peças revisadas que estão esperando na embalagem: com 29 vendas paradas e 9 peças na embalagem, pede 20. O cartão diz quantas já estão na embalagem.
+- 24/11/2026 — O cartão escreve "N de M para hoje já revisadas (K na embalagem)", contando junto o produto do dia que já está todo na embalagem.
