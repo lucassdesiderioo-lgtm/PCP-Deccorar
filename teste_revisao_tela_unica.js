@@ -228,6 +228,21 @@ hH = item(L(), "BK150180BEGE");
 eq("com 4 esperando a embalagem, Hoje de H zera", hH ? hH.hoje : 0, 0);
 ok('e H sai da parte Hoje', !L().hoje_lista.some(x => x.codigo === 'BK150180BEGE'));
 eq('a revisão seguinte de H vai como reposição (o dia já está coberto)', (rev('BK150180BEGE'), modoUltima()), 'estoque');
+/* ③ REVISÃO (testador de tela): o SKU com o Hoje todo coberto pela embalagem
+   não pode sumir da conta de "já revisadas". */
+l = L();
+ok('as 4 de H na embalagem contam no total de já na embalagem', l.totais.hoje_na_embalagem >= 4, l.totais);
+ok('e nas revisadas de hoje de H (a faixa de venda nova não dispara)', (l.revisadas_hoje['BK150180BEGE'] || 0) >= 4, l.revisadas_hoje);
+sku.run('BK100160BEGE', 0, 1, 100, 160);
+vf.run('vJ0', 'BK100160BEGE', hoje, hoje);
+db.prepare("INSERT INTO lote (codigo,estagio,venda,data) VALUES ('BK100160BEGE','pendente','vJ0',date('now','localtime'))").run();
+db.prepare("INSERT INTO producao (codigo,qtd,origem,urgente) VALUES ('BK100160BEGE',1,'ml',1)").run();
+for(let i = 0; i < 3; i++) db.prepare("INSERT INTO fila (codigo,modo,situacao) VALUES ('BK100160BEGE','estoque','aguardando')").run();
+l = L();
+const jJ = l.hoje_lista.concat(l.proximos_lista, l.alvo_lista).find(x => x.codigo === 'BK100160BEGE');
+ok('J (1 venda, 3 na embalagem): não está em Hoje', !l.hoje_lista.some(x => x.codigo === 'BK100160BEGE'));
+eq('mas a peça dele na embalagem conta como já revisada para hoje', l.revisadas_hoje['BK100160BEGE'], 1);
+void jJ;
 
 
 const orig = DEMANDA.porDia;

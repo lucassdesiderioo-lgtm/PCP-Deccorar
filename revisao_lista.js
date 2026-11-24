@@ -172,7 +172,10 @@ function montar(db){
     let resto = tirar((naFila[c] || 0) - naEmb);
     const proxTotal = porDiaSku.reduce((a, x) => a + x.n, 0);
     alvo -= Math.min(resto, alvo);
-    if(!hojeFalta && !proxTotal && !alvo && !hojeFeitas) continue;
+    /* O SKU com o Hoje todo coberto pela embalagem fica na conta (③ REVISÃO):
+       sem nada a revisar, ele não entra em lista nenhuma, mas a peça dele
+       conta em "já revisadas" e na faixa de venda nova. */
+    if(!hojeFalta && !proxTotal && !alvo && !hojeFeitas && !naEmb) continue;
     const primeiro = porDiaSku.length ? porDiaSku[0] : null;
     itens.push({
       codigo: s.codigo, descricao: s.descricao || '', cor: s.cor_codigo || s.cor || '',

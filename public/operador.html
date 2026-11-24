@@ -169,7 +169,7 @@ function cardTxt(x, modo){
   /* A peça já revisada e esperando a embalagem conta como feita para hoje
      (decisão do dono, 24/11/2026): o número grande é só o que falta revisar. */
   if(modo==='hoje'){ var emb=x.hoje_na_embalagem||0; f=(x.hoje_revisadas||0)+emb; falta=x.hoje;
-    d=f+(f===1?' revisada':' revisadas')+' de '+(f+falta)+' para hoje'+(emb?' · '+emb+(emb===1?' já está':' já estão')+' na embalagem':'')+(diasTxt(x)?' · depois: '+diasTxt(x):''); }
+    d=f+' de '+(f+falta)+' para hoje já '+(f===1?'revisada':'revisadas')+(emb?' ('+emb+' na embalagem)':'')+(diasTxt(x)?' · depois: '+diasTxt(x):''); }
   else { f=x.revisadas_estoque||0; falta=x.proximos; d=f+(f===1?' revisada hoje':' revisadas hoje')+(diasTxt(x)?' · '+diasTxt(x):''); }
   var pct=(f+falta)?Math.round(f/(f+falta)*100):0;
   var act=emRev&&emRev.codigo===x.codigo;
