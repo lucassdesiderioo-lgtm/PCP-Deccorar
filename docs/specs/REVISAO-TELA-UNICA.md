@@ -1,7 +1,7 @@
 # REVISAO-TELA-UNICA — a 101 Revisão numa tela só, ligada ao planejamento
 
 > **STATUS — 23/11/2026: APROVADA PELO DONO** (*"pode seguir"*, 23/11/2026) ·
-> **fases 1 e 2 construídas juntas, falta subir** · fase 3 (a demanda vinda da
+> **fases 1 e 2 no ar desde 24/11/2026** (PR #366, *"deu tudo certo no deploy"*) · fase 3 (a demanda vinda da
 > Montagem) espera a `PRODUCAO-MAPA-E-MOTOR`. Tipo: `REGRA` + `NOVIDADE` · risco
 > 🟡. Muda os cartões **R-REV-01**, **R-REV-02** e **R-REV-03** de
 > `docs/regras/estoque.md`; três linhas em `docs/DECISOES.md`.
@@ -212,8 +212,8 @@ evidência (o rascunho interativo ficou com ele):
 
 | Fase | O quê | Situação |
 |---|---|---|
-| **1** | A regra: tela única, a lista em três partes, a decisão do modo no servidor, "Ver a semana", os avisos | construída, falta subir |
-| **2** | O design da §10, e o "↩ Devoluções" com a volta na 251 | construída, falta subir |
+| **1** | A regra: tela única, a lista em três partes, a decisão do modo no servidor, "Ver a semana", os avisos | no ar (24/11/2026, PR #366) |
+| **2** | O design da §10, e o "↩ Devoluções" com a volta na 251 | no ar (24/11/2026, PR #366) |
 | **3** | A demanda vindo da Montagem (107), e a ideia da peça reservada | com a `PRODUCAO-MAPA-E-MOTOR` |
 
 ## 11. Onde mora
