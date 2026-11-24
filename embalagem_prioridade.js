@@ -111,7 +111,7 @@ function montar(db, opcoes){
     /* ⚠️ Todas as peças com outra pessoa (③ REVISÃO): não há o que embalar,
        mas o SKU tem peça na fila — a tela precisa saber, senão o bipe diz "não
        passou pela Revisão" e a peça é revisada de novo. */
-    if(!(g.aqui > 0)){ if(g.sendo.length) soReservadas.push({ codigo:p.codigo, sendo:g.sendo }); continue; }
+    if(!(g.aqui > 0)){ if(g.sendo.length) soReservadas.push({ codigo:p.codigo, sendo:g.sendo, ids:g.ids }); continue; }
     const para = Math.min(g.aqui, p.falta), listrado = Math.min(g.sendo.length, p.falta - para);
     if(g.aqui > para) excesso.set(p.codigo, g.aqui - para);
     dia.push({ codigo:p.codigo, medida:medida(s), cor:s ? s.cor || '' : '',

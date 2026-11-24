@@ -133,7 +133,7 @@ async function carregarFila(){
     /* ⚠️ PELA LINHA DA FILA, E NAO PELO NUMERO "aqui" (③ REVISAO): o "aqui"
        sobe tambem quando a reserva de outra pessoa solta, ou quando um SKU com
        peca esperando entra no vermelho — e nenhuma peca saiu da Revisao. */
-    const todos=[].concat(p.dia.linhas,p.hoje,p.reposicao,p.devolucao);
+    const todos=[].concat(p.dia.linhas,p.hoje,p.reposicao,p.devolucao,p.so_reservadas||[]);
     if(VISTOS){ const d=p.dia.linhas.find(x=>(x.ids||[]).some(id=>!VISTOS.has(id))); if(d) NOVA=d.codigo; }
     else VISTOS=new Set();
     todos.forEach(x=>(x.ids||[]).forEach(id=>VISTOS.add(id)));
