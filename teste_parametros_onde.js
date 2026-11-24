@@ -42,7 +42,7 @@ ok('   o segundo bipe vale na 202', JSON.stringify(O.ONDE.conf_carregamento) ===
 
 /* os parâmetros do sob medida: os do banco novo, pelas migrações de lá */
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pcp-onde-'));
-process.env.BANCO_TECIDO = path.join(tmp, 'tecido.db');
+process.env.BANCO_TECIDO = path.join(tmp, 'sm_teste.db');
 let chavesSm = [];
 try{
   const d = require('./tecido/nucleo/db');
