@@ -92,13 +92,17 @@ module.exports=function(app,db){
   const TEMPOS = [ ['embalagem','emb_minimo_seg','o tempo mínimo da embalagem', () => embMinimoSeg()],
                    ['revisao','rev_minimo_seg','o tempo mínimo da revisão', () => REV_MIN.minimoSeg(db)] ];
   const temposAgora = () => { const o = {}; for(const [k,,,ler] of TEMPOS) o[k] = ler(); return o; };
-  app.get('/api/config/tempos-minimos',(req,res)=> res.json(temposAgora()));
+  /* `reserva_seg`: a peça reservada solta depois disso sem bipe (R-EMB-13); a
+     906 avisa quando o mínimo da embalagem passa dele (③ REVISÃO). */
+  app.get('/api/config/tempos-minimos',(req,res)=> res.json(Object.assign(temposAgora(), {reserva_seg:RESERVA.minutos(db)*60})));
   app.post('/api/config/tempos-minimos',(req,res)=>{
     const b = req.body || {}, novo = {};
     for(const [k,,rotulo] of TEMPOS){
       if(!(k in b)) continue;
-      const v = b[k], txt = String(v == null ? '' : v).trim();
-      if(!/^\d+$/.test(txt) || +txt < 1)
+      /* ③ REVISÃO: só número ou texto, e só o inteiro que se guarda — o enorme
+         virava "1e+21", e o parseInt da trava lia 1 (a trava quase desligada). */
+      const v = b[k], txt = (typeof v === 'number' || typeof v === 'string') ? String(v).trim() : '';
+      if(!/^\d+$/.test(txt) || !Number.isSafeInteger(+txt) || +txt < 1)
         return res.status(400).json({erro:'Não gravei nada: ' + rotulo + ' tem de ser um número inteiro de segundos, no mínimo 1.', campo:k});
       novo[k] = +txt;
     }

@@ -77,13 +77,19 @@ chamar('POST', R, { embalagem:40 });
 
 console.log('\n── 3. recusar o impossível, sem gravar nada ──');
 for(const [rot, corpo] of [['zero', {embalagem:0, revisao:30}], ['negativo', {embalagem:-5}], ['fração', {embalagem:12.5}],
-    ['texto', {embalagem:'abc'}], ['vazio', {embalagem:''}], ['texto com número', {revisao:'30s'}], ['nulo', {revisao:null}]]){
+    ['texto', {embalagem:'abc'}], ['vazio', {embalagem:''}], ['texto com número', {revisao:'30s'}], ['nulo', {revisao:null}],
+    /* ③ REVISÃO: o número que não se guarda virava "1e+21" e o parseInt da trava lia 1 */
+    ['número gigante', {embalagem:'1000000000000000000000'}], ['número gigante (revisão)', {revisao:1e21}],
+    ['lista', {embalagem:[60]}]]){
   r = chamar('POST', R, corpo);
   ok('recusa ' + rot + ' (400, diz o campo) e nada grava', r.status === 400 && r.body && /embalagem|revis/i.test(r.body.erro || '')
     && cfg('emb_minimo_seg') === '40' && cfg('rev_minimo_seg') === '18', JSON.stringify([r.status, r.body, cfg('emb_minimo_seg'), cfg('rev_minimo_seg')]));
 }
 r = chamar('POST', R, {});
 ok('sem nenhum dos dois campos é 400', r.status === 400, JSON.stringify(r));
+
+r = chamar('GET', R);
+ok('a leitura diz em quantos segundos a reserva da peça solta (5 min = 300)', r.body && r.body.reserva_seg === 300, JSON.stringify(r.body));
 
 console.log('\n── 4. sem login nada grava ──');
 r = chamar('POST', R, { embalagem:50 }, null);
@@ -113,6 +119,9 @@ const PAR = ler('public/parametros.html');
 ok('a 906 tem o card "Tempo mínimo na bancada", pela rota', /Tempo mínimo na bancada/.test(PAR) && /\/api\/config\/tempos-minimos/.test(PAR));
 ok('o card aparece só para o nível Admin', /if\(EU\.admin\)\{[^}]*partTempos\(\)/.test(PAR));
 ok('a tela recusa menos de 1 e avisa acima de 600', /600/.test(PAR) && /mínimo é 1/.test(PAR));
+ok('a tela recusa o número que não se guarda (isSafeInteger)', /isSafeInteger/.test(PAR));
+ok('a tela avisa quando a embalagem passa do tempo da reserva', /reserva_seg/.test(PAR) && /reserva/.test(PAR));
+ok('a tela diz que, ao baixar o da Revisão, os tablets se recarregam', /recarregue os tablets da Revisão/.test(PAR));
 
 db.close(); fs.rmSync(tmp, { recursive:true, force:true });
 console.log('\n' + (falhas ? falhas + ' FALHA(S) em ' + n : 'TODOS OS ' + n + ' PASSARAM'));
