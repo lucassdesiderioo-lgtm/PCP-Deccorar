@@ -1,6 +1,11 @@
 # EMBALAGEM-PRIORIDADE — o que a 102 embala primeiro, e como a tela se comporta
 
-> **STATUS — 23/11/2026: APROVADA E CONSTRUÍDA (as duas fases), falta subir.** O
+> **STATUS — 24/11/2026: CONCLUÍDA E NO AR (PR #365).** O dono fez o deploy e
+> disse que a tela da Embalagem deu certo. Ainda não provado com dado real: o
+> bloco vermelho num dia de vendas sem peça, o aviso respondido pelo bipe e duas
+> pessoas no mesmo SKU com a reserva.
+>
+> 23/11/2026: APROVADA E CONSTRUÍDA (as duas fases). O
 > dono deu o "pode seguir" e disse sim aos três pontos (o consumo `hoje` primeiro,
 > o defeito na reservada, a reposição e a devolução de SKU vermelho no vermelho).
 > Cartões **R-EMB-12** e **R-EMB-13** em `docs/regras/estoque.md`; cinco linhas em
