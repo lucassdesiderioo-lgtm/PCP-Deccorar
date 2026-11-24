@@ -367,9 +367,12 @@ mexer no `revisao_lista.js`, no modo do `POST /api/revisao`, no `operador.html`
 ou no botão de volta da 251** — e `node teste_revisao.js`, `node
 teste_ordem_dia.js` e `node teste_vendas_futuras.js`.
 
-⚠️ **Construído, falta subir.** Ainda não provado com dado real: a lista batendo
-com a 401 SKU a SKU num dia de fábrica, e a primeira venda nova de hoje trazendo
-a faixa vermelha na bancada.
+✅ **No ar desde 24/11/2026** (PR #366): o dono fez o backup, o deploy e o teste
+de segurança e disse *"deu tudo certo no deploy"*. ⚠️ **Ainda não provado com
+dado real:** a lista batendo com a 401 SKU a SKU num dia de fábrica, a primeira
+venda nova de hoje trazendo a faixa vermelha na bancada, o "Peça com problema"
+num iPad de verdade e o leitor lento sem escrever na observação. Prova que não
+foi feita se escreve como não feita.
 
 ### ⚠️ ARMADILHA #11 — a planilha do ML é ESPELHO, e um recorte apaga a média
 
