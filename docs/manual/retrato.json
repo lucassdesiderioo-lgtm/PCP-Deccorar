@@ -86,7 +86,7 @@
   "R-EMB-06": "a991245752354381",
   "R-EMB-07": "25b34fdd830acc26",
   "R-EMB-08": "a41323c92d2bf4ce",
-  "R-EMB-09": "54022b475e77c8f7",
+  "R-EMB-09": "fc5292da3309196a",
   "R-EMB-10": "754dc6056b8f74df",
   "R-EMB-11": "3ea97ab5f438fd8c",
   "R-EMB-12": "440684358b2635e1",
@@ -187,7 +187,7 @@
   "R-REV-04": "ef9f572600bf404c",
   "R-REV-05": "9e6bfc96b3fd3dad",
   "R-REV-06": "ab4cce34443ce9af",
-  "R-REV-07": "25c34ca64082377a",
+  "R-REV-07": "51a772bf5424e145",
   "R-REV-08": "9b4b79dca19fcdd8",
   "R-REV-09": "2624ef22be05b12e",
   "R-SAI-01": "09d5e82f39b8f1d2",
@@ -365,7 +365,8 @@
     "23/11/2026 — A peça que volta da Embalagem por defeito é a que estava reservada para quem embalava; sem reserva, a mais antiga daquele SKU.",
     "23/11/2026 — Quando o PDF de hoje chega antes da planilha do Mercado Livre, a lista não pede mais peças a menos: a venda nova conta também em \"Completar o alvo\". E o código bipado na observação da peça com problema sai do campo mesmo com o leitor mais lento.",
     "24/11/2026 — O \"Hoje\" já desconta as peças revisadas que estão esperando na embalagem: com 29 vendas paradas e 9 peças na embalagem, pede 20. O cartão diz quantas já estão na embalagem.",
-    "24/11/2026 — O cartão escreve \"N de M para hoje já revisadas (K na embalagem)\", contando junto o produto do dia que já está todo na embalagem."
+    "24/11/2026 — O cartão escreve \"N de M para hoje já revisadas (K na embalagem)\", contando junto o produto do dia que já está todo na embalagem.",
+    "24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo."
    ],
    "situacao": "rascunho"
   },
@@ -389,7 +390,8 @@
     "24/11/2026 — A lista em quatro blocos, o aviso do bipe fora da prioridade e a peça reservada para quem embala estão no ar na bancada.",
     "24/11/2026 — O cartão do bloco vermelho mostra só o que embalar: o número grande é \"para embalar\", sem o que já está no estoque nem o que ainda está na produção. O produto do dia sem peça para embalar sai do vermelho, e a peça a mais vai para a Reposição. O topo diz quantas peças do dia faltam embalar.",
     "24/11/2026 — Quando todas as peças de um produto do dia estão com outra pessoa, ele não aparece na lista, e o bipe dele diz quem está com a peça.",
-    "24/11/2026 — Quando a peça que estava com outra pessoa volta a ficar livre, a tela não a anuncia mais como peça nova da Revisão."
+    "24/11/2026 — Quando a peça que estava com outra pessoa volta a ficar livre, a tela não a anuncia mais como peça nova da Revisão.",
+    "24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo."
    ],
    "situacao": "rascunho"
   },
@@ -898,7 +900,8 @@
    ],
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
-    "21/11/2026 — ficha criada em rascunho"
+    "21/11/2026 — ficha criada em rascunho",
+    "24/11/2026 — Entrou o card \"Tempo mínimo na bancada\": quem é nível Admin muda aqui o tempo mínimo da Embalagem e o da Revisão, em segundos (no mínimo 1). Vale no próximo bipe. Acima de 10 minutos a tela avisa antes de salvar."
    ],
    "situacao": "rascunho"
   },

@@ -34,3 +34,4 @@ parametros: rev_minimo_seg = Tempo mínimo da revisão (segundos)
 - 23/11/2026 — Quando o PDF de hoje chega antes da planilha do Mercado Livre, a lista não pede mais peças a menos: a venda nova conta também em "Completar o alvo". E o código bipado na observação da peça com problema sai do campo mesmo com o leitor mais lento.
 - 24/11/2026 — O "Hoje" já desconta as peças revisadas que estão esperando na embalagem: com 29 vendas paradas e 9 peças na embalagem, pede 20. O cartão diz quantas já estão na embalagem.
 - 24/11/2026 — O cartão escreve "N de M para hoje já revisadas (K na embalagem)", contando junto o produto do dia que já está todo na embalagem.
+- 24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo.

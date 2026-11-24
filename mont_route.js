@@ -81,6 +81,39 @@ module.exports=function(app,db){
     const n = parseInt(cfg('emb_minimo_seg'), 10);
     return Number.isFinite(n) && n >= 0 ? n : EMB_MINIMO_PADRAO;
   }
+  /* OS DOIS TEMPOS MINIMOS DA BANCADA NA 906 (AJUSTE de 24/11/2026, decisao
+     do dono): o da embalagem (acima) e o da revisao (`config.rev_minimo_seg`,
+     dono `revisao_route.js`, que continua lendo a cada bipe). So o nivel Admin
+     muda (`@admin` no permDaRota, como o segundo bipe). Inteiro, no minimo 1 —
+     zero desligaria a trava; sem teto (a tela avisa acima de 600). Campo
+     ausente fica como estava; numero impossivel e 400 dizendo qual, e nada
+     grava. A troca vai para a auditoria com o antes e o depois. */
+  const REV_MIN = require('./revisao_route');
+  const TEMPOS = [ ['embalagem','emb_minimo_seg','o tempo mínimo da embalagem', () => embMinimoSeg()],
+                   ['revisao','rev_minimo_seg','o tempo mínimo da revisão', () => REV_MIN.minimoSeg(db)] ];
+  const temposAgora = () => { const o = {}; for(const [k,,,ler] of TEMPOS) o[k] = ler(); return o; };
+  app.get('/api/config/tempos-minimos',(req,res)=> res.json(temposAgora()));
+  app.post('/api/config/tempos-minimos',(req,res)=>{
+    const b = req.body || {}, novo = {};
+    for(const [k,,rotulo] of TEMPOS){
+      if(!(k in b)) continue;
+      const v = b[k], txt = String(v == null ? '' : v).trim();
+      if(!/^\d+$/.test(txt) || +txt < 1)
+        return res.status(400).json({erro:'Não gravei nada: ' + rotulo + ' tem de ser um número inteiro de segundos, no mínimo 1.', campo:k});
+      novo[k] = +txt;
+    }
+    if(!Object.keys(novo).length) return res.status(400).json({erro:'Mande o tempo mínimo da embalagem, o da revisão, ou os dois.'});
+    const antes = temposAgora(), mudou = [];
+    db.transaction(()=>{
+      for(const [k,chave,rotulo] of TEMPOS){
+        if(!(k in novo)) continue;
+        db.prepare(`INSERT INTO config (chave,valor) VALUES (?,?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor`).run(chave, String(novo[k]));
+        if(antes[k] !== novo[k]) mudou.push(rotulo + ': ' + antes[k] + ' s → ' + novo[k] + ' s');
+      }
+    })();
+    if(mudou.length) auditar(req, 'tempo_minimo', mudou.length + ' tempo(s)', mudou.join(' · '));
+    res.json(Object.assign({ok:true}, temposAgora()));
+  });
   app.get('/api/config/kit',(req,res)=>{ const r=db.prepare("SELECT valor FROM config WHERE chave='kit_codigo'").get(); res.json({kit:r?r.valor:null}); });
   // Guarda o valor COMO VEIO (so trim) — o link do Drive e case-sensitive e
   // vira QR pro cliente. A conferencia na embalagem (kitBate/kitNorm) compara
