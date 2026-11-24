@@ -1257,6 +1257,9 @@ module.exports = function(app, db){
     // Ligar/desligar a conferencia dupla muda o que a expedicao e obrigada a
     // fazer — e decisao de quem responde pela operacao, nao de quem carrega.
     if(M !== 'GET' && eq('/api/config/conferencia')) return '@admin';
+    /* Os dois tempos minimos da bancada (906, AJUSTE de 24/11/2026): ler e
+       mudar sao do nivel Admin, como o segundo bipe. */
+    if(eq('/api/config/tempos-minimos')) return '@admin';
     /* ⚠️ ANTES do `pre('/api/kit')`, senao a impressao cai em `kit.editar` e a
        chave nova nao manda em nada — a ponta que some em silencio (§5,
        armadilha #23). Imprimir e tirar copia do que ja foi decidido; editar e

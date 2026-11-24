@@ -289,3 +289,5 @@ module.exports=function(app,db){
   FROM revisao WHERE data=date('now','localtime') GROUP BY codigo ORDER BY qtd DESC`).all()));
 };
 module.exports.garantirSchema=garantirSchema;
+module.exports.minimoSeg=minimoSeg;
+module.exports.MINIMO_PADRAO=MINIMO_PADRAO;

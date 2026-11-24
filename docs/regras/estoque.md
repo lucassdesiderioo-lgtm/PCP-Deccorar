@@ -159,10 +159,10 @@
 - **Status:** no ar; o `usuario_id` em código em 04/11/2026.
 
 ### R-REV-07 · Bipe de fim abaixo de 15 s é recusado, e a revisão continua
-- **Regra:** o bipe que fecharia uma revisão com menos de `config.rev_minimo_seg` segundos (padrão **15**, editável sem deploy) é **recusado, não perguntado**. A tela apita, diz "rápido demais — a revisão continua" e o cronômetro segue; o operador termina e bipa de novo. O `POST /api/revisao` recusa também (409, `motivo:'rapido_demais'`), sem `revisao` e sem `fila`, e grava o evento `rapido_demais` em `revisao_evento`, com quem bipou.
+- **Regra:** o bipe que fecharia uma revisão com menos de `config.rev_minimo_seg` segundos (padrão **15**, editável sem deploy — desde 24/11/2026 na **906 Parâmetros**, card "Tempo mínimo na bancada", por quem é nível Admin; inteiro, no mínimo 1) é **recusado, não perguntado**. A tela apita, diz "rápido demais — a revisão continua" e o cronômetro segue; o operador termina e bipa de novo. O `POST /api/revisao` recusa também (409, `motivo:'rapido_demais'`), sem `revisao` e sem `fila`, e grava o evento `rapido_demais` em `revisao_evento`, com quem bipou.
 - **Por quê:** o bipe duplo acidental gravava uma revisão de 1 s e mandava para a embalagem uma peça que ninguém revisou. Nos 30 dias até 04/11/2026 a revisão de verdade começa por volta de 20 s; abaixo de 15 s eram 23 revisões, quase só bipe acidental.
 - **Exceções:** ⚠ **o limite NÃO é 1 minuto**: quase metade das revisões reais fica abaixo de 60 s, e trava que dispara no caso normal vira desvio (#6).
-- **Teste que trava:** `teste_revisao.js` (seção 7).
+- **Teste que trava:** `teste_revisao.js` (seção 7) e `teste_tempos_minimos.js` (a 906).
 - **Status:** em código em 04/11/2026 (spec `QUEM-FEZ-E-REVISAO`, fase 1).
 
 ### R-REV-08 · "Cancelar revisão" zera a revisão em andamento
@@ -241,10 +241,10 @@
 - **Status:** em código em 26/10/2026. Desde 04/11/2026 a revisão (fase 1) e a embalagem (fase 2) leem quem fez pelo `quem.js` (dono único, spec `QUEM-FEZ-E-REVISAO`) e recusam sem login (401), antes de olhar SKU e kit; a linha do livro do +1 (`movimento_estoque`) grava o mesmo quem. A Etiqueta de Venda entrou na fase 3 (05/11/2026, cartão R-QUEM-01). ~~Nenhuma tela mostra ainda~~ — desde 08/11/2026 a 905 Minha produção e a aba Por pessoa da 904 mostram (`produtividade_dominio.js`, CLAUDE.md §21).
 
 ### R-EMB-09 · Bipe que fecha a embalagem abaixo de 45 s é recusado, e a embalagem continua
-- **Regra:** o 3º bipe (o SKU de novo) com menos de `config.emb_minimo_seg` segundos (padrão **45**, editável sem deploy) desde o 1º bipe — o kit no meio conta — é **recusado pelo servidor**: `POST /api/montagem` responde 409 (`motivo:'rapido_demais'`, com `minimo` e `segundos`) e nada grava (nem `montagem`, nem o +1 no livro, nem a fila, nem a ordem do dia, nem a baixa de material). A recusa vira uma linha `rapido_demais` em `montagem_evento`, com quem bipou. A tela reabre a embalagem com o kit já conferido e o cronômetro do mesmo início; a pessoa termina e bipa de novo. A ordem das recusas: login → SKU → kit → tempo.
+- **Regra:** o 3º bipe (o SKU de novo) com menos de `config.emb_minimo_seg` segundos (padrão **45**, editável sem deploy — desde 24/11/2026 na **906 Parâmetros**, card "Tempo mínimo na bancada", por quem é nível Admin; inteiro, no mínimo 1, sem teto: acima de 600 s a tela só avisa) desde o 1º bipe — o kit no meio conta — é **recusado pelo servidor**: `POST /api/montagem` responde 409 (`motivo:'rapido_demais'`, com `minimo` e `segundos`) e nada grava (nem `montagem`, nem o +1 no livro, nem a fila, nem a ordem do dia, nem a baixa de material). A recusa vira uma linha `rapido_demais` em `montagem_evento`, com quem bipou. A tela reabre a embalagem com o kit já conferido e o cronômetro do mesmo início; a pessoa termina e bipa de novo. A ordem das recusas: login → SKU → kit → tempo.
 - **Por quê:** o espelho da R-REV-07, decidido pelo dono em 21/11/2026: o bipe duplo ou apressado fechava a embalagem sem a peça ter sido embalada de verdade.
 - **Exceções:** ⚠ **a frase do 409 serve às duas páginas** ("a embalagem NÃO foi gravada e o tempo recomeça: bipe o SKU agora e espere 45 s antes de bipar o kit e o SKU"): o tablet com a página antiga em cache já descartou a embalagem quando a lê. Na tela nova a embalagem fica de pé enquanto o servidor responde, o bipe nesse meio é ignorado, e o envio desiste em 20 s. ⚠ **a tela não recusa sozinha, ao contrário da Revisão**: quem decide é só o servidor. Uma tela com o número dela, no dia em que o `config` baixasse o mínimo, diria "continua" de uma embalagem já gravada, e o segundo bipe somaria +2. Vale para todo SKU, inclusive kit e acessório. A bancada do sob medida não entra.
-- **Teste que trava:** `teste_montagem.js` (seção 9).
+- **Teste que trava:** `teste_montagem.js` (seção 9) e `teste_tempos_minimos.js` (a 906).
 - **Status:** no ar desde 21/11/2026 (PR #359, spec `EMBALAGEM-TEMPO-MINIMO`).
 
 ### R-EMB-10 · "Cancelar embalagem" zera a embalagem em andamento
