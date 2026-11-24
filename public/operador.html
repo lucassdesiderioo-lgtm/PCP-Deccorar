@@ -166,8 +166,10 @@ function diasTxt(x){
 }
 function cardTxt(x, modo){
   var md=medidaDe(x.codigo), f, falta, d;
-  if(modo==='hoje'){ f=x.hoje_revisadas||0; falta=x.hoje;
-    d=f+(f===1?' revisada':' revisadas')+' de '+(f+falta)+' para hoje'+(diasTxt(x)?' · depois: '+diasTxt(x):''); }
+  /* A peça já revisada e esperando a embalagem conta como feita para hoje
+     (decisão do dono, 24/11/2026): o número grande é só o que falta revisar. */
+  if(modo==='hoje'){ var emb=x.hoje_na_embalagem||0; f=(x.hoje_revisadas||0)+emb; falta=x.hoje;
+    d=f+(f===1?' revisada':' revisadas')+' de '+(f+falta)+' para hoje'+(emb?' · '+emb+(emb===1?' já está':' já estão')+' na embalagem':'')+(diasTxt(x)?' · depois: '+diasTxt(x):''); }
   else { f=x.revisadas_estoque||0; falta=x.proximos; d=f+(f===1?' revisada hoje':' revisadas hoje')+(diasTxt(x)?' · '+diasTxt(x):''); }
   var pct=(f+falta)?Math.round(f/(f+falta)*100):0;
   var act=emRev&&emRev.codigo===x.codigo;
@@ -188,12 +190,12 @@ function renderTiles(){
   var t=L.totais, h='', ate=L.ate?' · até '+escH(L.ate):'';
   var alvo=L.alvo_lista.length?'<div class="depois"><h3>Completar o alvo<b>faltam '+t.alvo+'</b></h3>'+miniTxt(L.alvo_lista,'alvo')+'</div>':'';
   if(!L.hoje_terminado && !L.sem_venda_hoje && L.hoje_lista.length){
-    h+='<div class="foco fh"><div class="fcab"><span class="ft">Hoje</span><span class="fs">vendas de hoje sem peça · '+t.hoje_revisadas+(t.hoje_revisadas===1?' já revisada':' já revisadas')+'</span>'
+    h+='<div class="foco fh"><div class="fcab"><span class="ft">Hoje</span><span class="fs">vendas de hoje sem peça · '+(t.hoje_revisadas+(t.hoje_na_embalagem||0))+((t.hoje_revisadas+(t.hoje_na_embalagem||0))===1?' já revisada':' já revisadas')+'</span>'
       +'<span class="fn">faltam <b>'+t.hoje+'</b></span></div><div class="gd">'+L.hoje_lista.map(function(x){ return cardTxt(x,'hoje'); }).join('')+'</div></div>';
     if(L.proximos_lista.length) h+='<div class="depois"><h3>Depois de hoje'+ate+'<b>faltam '+t.proximos+'</b></h3>'+miniTxt(L.proximos_lista,'proximos')+'</div>';
   } else {
     h+=L.hoje_terminado
-      ? '<div class="fechado">✓ Hoje está terminado <span>'+t.hoje_revisadas+(t.hoje_revisadas===1?' peça revisada':' peças revisadas')+' para as vendas de hoje</span></div>'
+      ? '<div class="fechado">✓ Hoje está terminado <span>'+(t.hoje_revisadas+(t.hoje_na_embalagem||0))+((t.hoje_revisadas+(t.hoje_na_embalagem||0))===1?' peça revisada':' peças revisadas')+' para as vendas de hoje</span></div>'
       : '<div class="fechado neutro">Nenhuma venda de hoje sem peça <span>quando o PDF de hoje subir, as vendas sem peça aparecem aqui</span></div>';
     if(L.proximos_lista.length)
       h+='<div class="foco fp"><div class="fcab"><span class="ft">Próximos dias</span><span class="fs">o dia mais cedo primeiro'+ate+'</span>'

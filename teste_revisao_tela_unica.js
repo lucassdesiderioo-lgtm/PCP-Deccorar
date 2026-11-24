@@ -207,7 +207,29 @@ vf.run('vG', 'BK110140PRETO', hoje, D0);
 db.prepare("INSERT INTO fila (codigo,modo,situacao,data) VALUES ('BK110140PRETO','hoje','aguardando',date('now','localtime','-1 day'))").run();
 eq('a peça de hoje de ONTEM esperando a embalagem desconta', item(L(), 'BK110140PRETO') ? item(L(), 'BK110140PRETO').dias[0].n : 0, 0);
 
-console.log('\n── 9. a lista que falha diz que falhou (③ REVISÃO) ──');
+console.log('\n── 10. a peça já revisada e esperando a embalagem sai primeiro de Hoje (decisão do dono, 24/11/2026) ──');
+/* O dono: "180x150 bege tem 29 na embalagem, já tem 9 na tela de revisão deveria
+   aparecer 20 para a pessoa revisar e não 29". H tem 5 vendas de hoje sem peça e
+   2 peças revisadas (como estoque) esperando a embalagem: Hoje pede 3. */
+sku.run('BK150180BEGE', 0, 1, 150, 180);
+for(let i = 0; i < 5; i++){ vf.run('vDH'+i, 'BK150180BEGE', hoje, hoje);
+  db.prepare("INSERT INTO lote (codigo,estagio,venda,data) VALUES ('BK150180BEGE','pendente',?,date('now','localtime'))").run('vDH'+i); }
+db.prepare("INSERT INTO producao (codigo,qtd,origem,urgente) VALUES ('BK150180BEGE',5,'ml',1)").run();
+db.prepare("INSERT INTO fila (codigo,modo,situacao,data) VALUES ('BK150180BEGE','estoque','aguardando',date('now','localtime','-1 day'))").run();
+db.prepare("INSERT INTO fila (codigo,modo,situacao) VALUES ('BK150180BEGE','estoque','aguardando')").run();
+let hH = item(L(), "BK150180BEGE");
+eq("Hoje de H: 5 vendas − 2 na embalagem = 3", hH && hH.hoje, 3);
+eq("e diz quantas já estão na embalagem", hH && hH.hoje_na_embalagem, 2);
+ok('H continua na parte Hoje', L().hoje_lista.some(x => x.codigo === 'BK150180BEGE'));
+eq('a revisão de H ainda é do dia', (rev('BK150180BEGE'), modoUltima()), 'hoje');
+eq('Hoje de H desce para 2', item(L(), 'BK150180BEGE').hoje, 2);
+db.prepare("INSERT INTO fila (codigo,modo,situacao) VALUES ('BK150180BEGE','estoque','aguardando'),('BK150180BEGE','estoque','aguardando')").run();
+hH = item(L(), "BK150180BEGE");
+eq("com 4 esperando a embalagem, Hoje de H zera", hH ? hH.hoje : 0, 0);
+ok('e H sai da parte Hoje', !L().hoje_lista.some(x => x.codigo === 'BK150180BEGE'));
+eq('a revisão seguinte de H vai como reposição (o dia já está coberto)', (rev('BK150180BEGE'), modoUltima()), 'estoque');
+
+
 const orig = DEMANDA.porDia;
 DEMANDA.porDia = () => { throw new Error('quebrou de propósito'); };
 const rr = chamar('GET', '/api/revisao/lista');

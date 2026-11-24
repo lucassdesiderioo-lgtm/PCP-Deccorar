@@ -148,24 +148,20 @@ function desenhar(){
   let h='', fx='';
   const L=p.dia.linhas;
   if(L.length){
-    const pct=p.dia.m?Math.round(100*p.dia.n/p.dia.m):0;
-    h+='<div class="bloco b1"><div class="bh">1 · DO DIA — EMBALAR PRIMEIRO<span class="bd"><b>'+p.dia.n+' de '+p.dia.m+'</b> vendas de hoje com peça</span></div>'
-      +'<div class="barra"><i style="width:'+pct+'%"></i></div>';
+    /* SÓ O TRABALHO DA EMBALAGEM (decisão do dono, 24/11/2026): o número
+       grande é quanto embalar agora; nada de estoque nem de produção. */
+    const fe=p.dia.faltam_embalar||0;
+    h+='<div class="bloco b1"><div class="bh">1 · DO DIA — EMBALAR PRIMEIRO<span class="bd">faltam embalar <b>'+fe+'</b> '+(fe===1?'peça':'peças')+' do dia</span></div>';
     L.forEach(function(d){
       const q=d.quadros, sq=[];
-      for(let i=0;i<q.verde;i++) sq.push('<span class="v"></span>');
       for(let i=0;i<q.amarelo;i++) sq.push('<span class="a"></span>');
       for(let i=0;i<q.listrado;i++) sq.push('<span class="l"></span>');
-      for(let i=0;i<q.cinza;i++) sq.push('<span></span>');
-      const partes=[];
-      if(d.com_peca) partes.push(d.com_peca+' com peça');
-      if(d.aqui) partes.push(d.aqui+' aqui para embalar');
+      const partes=[plural(d.paradas,'venda de hoje esperando esta peça','vendas de hoje esperando esta peça')];
       if(d.sendo.length) partes.push(plural(d.sendo.length,'sendo embalada','sendo embaladas')+' por '+esc(d.sendo.join(', ')));
-      if(d.na_producao) partes.push(d.na_producao+' na produção');
-      h+='<div class="ln'+(d.aqui?'':' vazia')+(cur===d.codigo?' agora':'')+'"><div><div class="cod">'+esc(d.codigo)
+      h+='<div class="ln'+(cur===d.codigo?' agora':'')+'"><div><div class="cod">'+esc(d.codigo)
         +(NOVA===d.codigo&&d.aqui?'<span class="selo">NOVA</span>':'')+(cur===d.codigo?'<span class="selo">EMBALANDO AGORA</span>':'')+'</div>'
         +'<div class="md">'+esc([d.medida,d.cor].filter(Boolean).join(' · '))+'</div></div>'
-        +'<div class="nb"><b>'+d.paradas+'</b><span>'+(d.paradas===1?'venda parada':'vendas paradas')+'</span></div>'
+        +'<div class="nb"><b>'+d.para_embalar+'</b><span>para embalar</span></div>'
         +'<div><div class="qd">'+sq.join('')+'</div><div class="ql">'+partes.join(' · ')+'</div></div></div>';
     });
     h+='</div>';
@@ -179,7 +175,8 @@ function desenhar(){
         +'<div style="text-align:right">'+[motivo(x),sendoTxt(x).replace(/^ · /,''),'<b>'+x.aqui+'</b> aqui'].filter(Boolean).join(' · ')+'</div></div>';
     }).join('')+'</div>';
   }
-  const semDiaAqui=L.length && !L.some(d=>d.aqui>0);
+  /* Há venda do dia sem peça, mas nenhuma peça do dia aqui para embalar. */
+  const semDiaAqui=!L.length && p.dia.m>0 && !p.dia.todas;
   h+=bloco('b2','2 · PEDIDO DE HOJE'+(!L.length||semDiaAqui?' — EMBALAR AGORA':''),p.hoje,x=>x.ordem_pede?'ordem pede '+x.ordem_pede+' · falta '+x.falta:'revisada na tela vermelha');
   h+=bloco('b3','3 · REPOSIÇÃO — pela falta do estoque',p.reposicao,x=>x.falta==null?'reposição':(x.falta>0?'abaixo do alvo em '+x.falta:'estoque no alvo'));
   h+=bloco('b4','4 · DEVOLUÇÃO',p.devolucao,()=>'reembalar');
@@ -188,7 +185,7 @@ function desenhar(){
   /* As faixas do topo da lista (F6, F7, F8). */
   const ln=NOVA&&linhaDia(NOVA);
   if(ln && ln.aqui) fx='<div class="faixa nova"><span class="selo" style="margin:0 8px 0 0">NOVA</span><span class="ft1">Chegou da Revisão uma peça do dia</span><div class="ft2"><b style="font-family:ui-monospace,monospace">'+esc(ln.codigo)+'</b> — '+plural(ln.paradas,'venda de hoje esperando','vendas de hoje esperando')+'. Ela está no bloco vermelho.</div></div>';
-  else if(semDiaAqui) fx='<div class="faixa esp"><div class="ft1">Nenhuma peça do dia esperando aqui</div><div class="ft2">'+(L.some(d=>d.sendo.length)?'As do dia estão sendo embaladas ou ainda na produção.':'As do dia ainda estão na produção.')+' Enquanto isso, embale o bloco 2 — quando uma do dia sair da Revisão, ela aparece em cima.</div></div>';
+  else if(semDiaAqui) fx='<div class="faixa esp"><div class="ft1">Nenhuma peça do dia para embalar agora</div><div class="ft2">Embale o bloco 2. Quando uma peça do dia sair da Revisão, ela aparece em cima.</div></div>';
   else if(p.dia.todas) fx='<div class="faixa feito"><div class="ft1">Todas as '+p.dia.m+' vendas de hoje têm peça ✓</div><div class="ft2">A prioridade agora é o bloco 2. Se entrar venda nova de hoje sem peça, o vermelho volta aqui em cima.</div></div>';
   document.getElementById('faixa').innerHTML=fx;
   document.getElementById('filaLista').innerHTML=h;
