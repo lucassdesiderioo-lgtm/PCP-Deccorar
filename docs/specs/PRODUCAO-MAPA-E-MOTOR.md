@@ -336,7 +336,8 @@ em série) · Tecido · Tubo e base** —, cada um com a lista do planejamento:
   reposição de perda, teste, outro (com texto). A peça fica marcada "fora do
   planejamento" nos relatórios e na pré-fabricação.
 - **Cancelar etiqueta**: Supervisor, com motivo; ela deixa de descontar. A etiqueta
-  impressa e parada há mais de N dias (`config`, sugestão 15) aparece na 204.
+  impressa e parada há mais de N dias aparece na 204; o N (15) se muda na 906
+  Parâmetros.
 
 ### 14.5 O corte (108) e a montagem (107) — 1 peça ou mais
 
@@ -344,35 +345,40 @@ O mesmo jeito nas duas, no tablet:
 
 ```
  ① QUANTAS?   [ 1 PEÇA ]   [ MAIS DE UMA ] → [2] [3] … [10]  (botões grandes)
- ② bipa as etiquetas
-      CORTE:     a etiqueta de cada peça que vai cortar (TC ou TB, do mesmo item)
-      MONTAGEM:  por peça, três bipes — persiana em série → tecido → tubo
-                 conferido na hora contra a ficha: "este tecido é 117 × 125;
-                 o BK140140BEGE pede 137 × 145" → recusa
- ③ faz o trabalho
- ④ FIM: bipa de novo uma etiqueta do lote
+ CORTE:     bipa a etiqueta de cada peça que vai cortar (TC ou TB, do mesmo item)
+            → corta → FIM: bipa de novo a etiqueta de cada peça
+ MONTAGEM:  QUATRO bipes por peça (o dono, 25/11/2026):
+            ① SKU em série  ② tecido  ③ tubo   → monta →   ④ SKU em série de novo = FIM
+            os bipes ② e ③ são conferidos na hora contra a ficha: "este tecido é
+            117 × 125; o BK140140BEGE pede 137 × 145" → recusa
+            COM MAIS DE UMA: a mesma lógica — ①②③ de cada peça no início, e cada
+            peça fecha com o ④ dela; o lote termina quando todas fecharam
  [ Cancelar ] antes do fim: nada grava, as etiquetas ficam livres
 ```
 
 - **Lote só de peças iguais** (um item de tecido, uma medida de tubo, um SKU na
   montagem). Etiqueta já usada é recusada dizendo quando e por quem.
-- Grava quem (o login, `quem.js`), início, fim e o tempo; o tempo por peça é o do
-  lote ÷ as peças.
+- Grava quem (o login, `quem.js`), início, fim e o tempo de cada peça (do ① ao ④
+  dela); no corte, o do lote ÷ as peças.
+- **É a montagem que liga** a persiana em série ao tecido, ao tubo, a quem cortou cada
+  um e a quem montou, e passa a peça à frente.
 - A persiana montada vai **sozinha** para a fila da revisão (o carrinho).
-- ⚠️ **A troca de etiqueta entre duas persianas montadas é possível** (o dono aceita:
-  *"não vejo outro jeito"*). Quem a pega é a revisão (14.6).
+- ⚠️ **A troca de etiqueta entre duas persianas montadas é possível, e nada a pega**
+  (o dono aceita: *"não vejo outro jeito"*; e a revisão não bipa o tecido, 14.6).
 
 ### 14.6 A revisão (101)
 
-- **Início:** bipa a **etiqueta da persiana** (por fora).
-- **Fim:** bipa a **etiqueta do tecido** — a persiana está aberta no teste. Se não é
-  a que a montagem ligou àquela persiana: *"esta etiqueta não é desta peça"*. Os
-  bipes são os dois de sempre; o tempo mínimo (R-REV-07) continua.
+- **Início e fim pelo SKU em série** (o dono, 25/11/2026): os dois bipes de sempre,
+  agora com a etiqueta da persiana. O tempo mínimo (R-REV-07) continua. Pelo número,
+  a revisão sabe o tecido, o tubo, quem cortou e quem montou.
+- ⚠️ A revisão **não** bipa a etiqueta do tecido (era a proposta do rascunho): a
+  troca de etiqueta entre duas persianas montadas não é pega.
 - A peça enrolada segue com a etiqueta da persiana por fora.
 
 ### 14.7 A embalagem (102)
 
-- O 1º e o 3º bipe passam a ser a **etiqueta da persiana** (o kit continua como está,
+- **Bipa a etiqueta de SKU como já faz, agora com o código em série**: o 1º e o 3º
+  bipe são a etiqueta da persiana (o kit continua como está,
   e os kits com etiqueta seguem a fase 4, desligada). A embalagem sabe **qual peça**
   é: consome a linha da fila dela (acaba o "pega a mais antiga" da peça com defeito,
   R-EMB-11 e R-EMB-13).
@@ -407,8 +413,9 @@ Fase própria, depois da 4.
 
 | # | Pergunta |
 |---|---|
-| B | O N dias da etiqueta parada (sugestão 15) |
-| C | A peça devolvida que volta à embalagem (`reembalar`) ganha etiqueta de persiana nova ou segue como peça antiga? (sugestão: segue como antiga até a fase 14.10) |
+| B | ✅ **15 dias, mudável na 906 Parâmetros** (o dono, 25/11/2026), com o "vale na 109" (`parametros_onde.js`) |
+| C | ✅ **A peça devolvida que volta à embalagem segue como peça antiga** até a fase 7 (14.10) |
+| D | Montagem com mais de uma: cada peça fecha com o próprio ④ (o tempo é por peça) — confirmar |
 
 ---
 
