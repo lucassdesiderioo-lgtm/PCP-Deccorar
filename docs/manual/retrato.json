@@ -366,7 +366,8 @@
     "23/11/2026 — Quando o PDF de hoje chega antes da planilha do Mercado Livre, a lista não pede mais peças a menos: a venda nova conta também em \"Completar o alvo\". E o código bipado na observação da peça com problema sai do campo mesmo com o leitor mais lento.",
     "24/11/2026 — O \"Hoje\" já desconta as peças revisadas que estão esperando na embalagem: com 29 vendas paradas e 9 peças na embalagem, pede 20. O cartão diz quantas já estão na embalagem.",
     "24/11/2026 — O cartão escreve \"N de M para hoje já revisadas (K na embalagem)\", contando junto o produto do dia que já está todo na embalagem.",
-    "24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo."
+    "24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo.",
+    "25/11/2026 — a persiana que vem da montagem se revisa pela etiqueta de SKU em série, e a tela mostra quem cortou e quem montou"
    ],
    "situacao": "rascunho"
   },
@@ -391,7 +392,8 @@
     "24/11/2026 — O cartão do bloco vermelho mostra só o que embalar: o número grande é \"para embalar\", sem o que já está no estoque nem o que ainda está na produção. O produto do dia sem peça para embalar sai do vermelho, e a peça a mais vai para a Reposição. O topo diz quantas peças do dia faltam embalar.",
     "24/11/2026 — Quando todas as peças de um produto do dia estão com outra pessoa, ele não aparece na lista, e o bipe dele diz quem está com a peça.",
     "24/11/2026 — Quando a peça que estava com outra pessoa volta a ficar livre, a tela não a anuncia mais como peça nova da Revisão.",
-    "24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo."
+    "24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo.",
+    "25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU"
    ],
    "situacao": "rascunho"
   },
@@ -440,6 +442,36 @@
    ],
    "situacao": "rascunho"
   },
+  "107": {
+   "acoes": [
+    "producao.montar"
+   ],
+   "corpo": "cbdbe6f9bf8c02d6",
+   "linhas": [
+    "25/11/2026 — tela nova: a montagem da persiana com a etiqueta de SKU em série, o tecido e o tubo"
+   ],
+   "situacao": "pronta"
+  },
+  "108": {
+   "acoes": [
+    "producao.cortar_tecido"
+   ],
+   "corpo": "b16ab01e27098d5c",
+   "linhas": [
+    "25/11/2026 — tela nova: o corte de tecido pela lista do planejamento, com o maço de etiquetas em branco"
+   ],
+   "situacao": "pronta"
+  },
+  "110": {
+   "acoes": [
+    "producao.cortar_tubo"
+   ],
+   "corpo": "13cba994c2d43903",
+   "linhas": [
+    "25/11/2026 — tela nova: o corte de tubo e base pela lista do planejamento, com o maço de etiquetas em branco"
+   ],
+   "situacao": "pronta"
+  },
   "201": {
    "acoes": [
     "etiqueta.emitir"
@@ -447,7 +479,8 @@
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
     "21/11/2026 — ficha criada em rascunho",
-    "19/11/2026 — A etiqueta continua só reservando a peça. A caixa que saiu da fábrica sem passar pela Conferência passa a ter o estoque baixado quando o acerto das caixas não conferidas é feito, uma vez só."
+    "19/11/2026 — A etiqueta continua só reservando a peça. A caixa que saiu da fábrica sem passar pela Conferência passa a ter o estoque baixado quando o acerto das caixas não conferidas é feito, uma vez só.",
+    "25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU"
    ],
    "situacao": "rascunho"
   },
@@ -460,7 +493,8 @@
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
     "21/11/2026 — ficha criada em rascunho",
-    "19/11/2026 — A caixa que saiu sem ninguém conferir e é fechada depois pelo acerto das caixas não conferidas tem o estoque baixado nesse acerto, uma vez só, como se tivesse sido conferida aqui."
+    "19/11/2026 — A caixa que saiu sem ninguém conferir e é fechada depois pelo acerto das caixas não conferidas tem o estoque baixado nesse acerto, uma vez só, como se tivesse sido conferida aqui.",
+    "25/11/2026 — aceita a etiqueta de SKU em série no bipe de cada persiana"
    ],
    "situacao": "rascunho"
   },
@@ -564,19 +598,23 @@
    ],
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
-    "21/11/2026 — ficha criada em rascunho"
+    "21/11/2026 — ficha criada em rascunho",
+    "25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU"
    ],
    "situacao": "rascunho"
   },
   "401": {
    "acoes": [
     "necessidade.ver",
-    "planilha.importar"
+    "planilha.importar",
+    "producao.corrigir",
+    "producao.etiqueta"
    ],
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
     "21/11/2026 — ficha criada em rascunho",
-    "23/11/2026 — A tela da Revisão deixou de ter as telas vermelha e azul: a falta por dia e o alvo calculados aqui aparecem lá como \"Próximos dias\" e \"Completar o alvo\", e a ordem pela data da falta vale lá sempre, com a chave ligada ou não."
+    "23/11/2026 — A tela da Revisão deixou de ter as telas vermelha e azul: a falta por dia e o alvo calculados aqui aparecem lá como \"Próximos dias\" e \"Completar o alvo\", e a ordem pela data da falta vale lá sempre, com a chave ligada ou não.",
+    "25/11/2026 — nova aba Etiquetas da produção: as etiquetas de SKU em série e os maços de tecido e de tubo; o Supervisor abre a tela só nesta aba"
    ],
    "situacao": "rascunho"
   },

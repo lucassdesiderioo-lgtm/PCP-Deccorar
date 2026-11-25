@@ -17,6 +17,7 @@ const ONDE = {
   emb_minimo_seg:       [102],
   rev_minimo_seg:       [101],
   conf_carregamento:    [202],
+  etiqueta_parada_dias: [401],   // a etiqueta da producao parada (PRODUCAO-MAPA-E-MOTOR v7)
   // sob medida: o plano de corte
   larguraMinimaSobra:   [602],
   alturaMinimaSobra:    [602],

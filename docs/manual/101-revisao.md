@@ -2,7 +2,7 @@
 tela: 101
 titulo: Revisão
 situacao: rascunho
-atualizada_em: 2026-11-24
+atualizada_em: 2026-11-25
 cartoes: R-EST-01, R-REV-01, R-REV-02, R-REV-03, R-REV-04, R-REV-05, R-REV-06, R-REV-07, R-REV-08, R-REV-09, R-TEM-01, R-EMB-11
 parametros: rev_minimo_seg = Tempo mínimo da revisão (segundos)
 ---
@@ -35,3 +35,4 @@ parametros: rev_minimo_seg = Tempo mínimo da revisão (segundos)
 - 24/11/2026 — O "Hoje" já desconta as peças revisadas que estão esperando na embalagem: com 29 vendas paradas e 9 peças na embalagem, pede 20. O cartão diz quantas já estão na embalagem.
 - 24/11/2026 — O cartão escreve "N de M para hoje já revisadas (K na embalagem)", contando junto o produto do dia que já está todo na embalagem.
 - 24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo.
+- 25/11/2026 — a persiana que vem da montagem se revisa pela etiqueta de SKU em série, e a tela mostra quem cortou e quem montou

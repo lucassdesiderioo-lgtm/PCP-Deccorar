@@ -236,13 +236,13 @@ async function chamar(m, rota, corpo, u, params){
   eq('fora do planejamento "Outro" sem texto é recusado', x.status, 400);
   x = await chamar('POST', '/api/producao/etiquetas/fora', { sku:'BK150150BEGE', quantidade:1, motivo:'Teste' }, MARIA);
   ok('fora do planejamento com motivo da lista imprime', x.status === 200 && x.body.tipo === 'pdf', JSON.stringify(x.body).slice(0, 200));
-  x = await chamar('POST', '/api/producao/corte/:tipo/iniciar', { item:'BK999', quantidade:1, etiqueta:'TC000021' }, ANA, { tipo:'tecido' });
+  x = await chamar('POST', '/api/producao/corte/tecido/iniciar', { item:'BK999', quantidade:1, etiqueta:'TC000021' }, ANA, { tipo:'tecido' });
   eq('o corte recusa item fora da lista (409)', x.status, 409);
-  x = await chamar('POST', '/api/producao/corte/:tipo/iniciar', { item:'BK150150BEGE', quantidade:1, etiqueta:'TC000021', entrada_inicial:true }, ANA, { tipo:'tecido' });
+  x = await chamar('POST', '/api/producao/corte/tecido/iniciar', { item:'BK150150BEGE', quantidade:1, etiqueta:'TC000021', entrada_inicial:true }, ANA, { tipo:'tecido' });
   eq('a entrada inicial sem "corrigir" é recusada (403)', x.status, 403);
-  x = await chamar('POST', '/api/producao/corte/:tipo/iniciar', { item:'BK150150BEGE', quantidade:1, etiqueta:'TC000021' }, ANA, { tipo:'tecido' });
+  x = await chamar('POST', '/api/producao/corte/tecido/iniciar', { item:'BK150150BEGE', quantidade:1, etiqueta:'TC000021' }, ANA, { tipo:'tecido' });
   ok('iniciar pela rota', x.status === 200 && x.body.aberto, JSON.stringify(x.body));
-  x = await chamar('POST', '/api/producao/corte/:tipo/bipar', { codigo:'TC000021' }, ANA, { tipo:'tecido' });
+  x = await chamar('POST', '/api/producao/corte/tecido/bipar', { codigo:'TC000021' }, ANA, { tipo:'tecido' });
   ok('fechar pela rota devolve o tempo (ou null, sem histórico)', x.status === 200 && x.body.fechado && 'tempo' in x.body);
   x = await chamar('GET', '/api/producao/traduzir/:codigo', {}, ANA, { codigo:psB[0] });
   ok('o tradutor da rota devolve o SKU e o rótulo', x.body.etiqueta && x.body.sku === 'BK150150BEGE' && /Nº/.test(x.body.rotulo));
@@ -250,6 +250,19 @@ async function chamar(m, rota, corpo, u, params){
   ok('quem fez a persiana, pela rota', x.body.tecido.nome === 'Ana' && x.body.montagem.nome === 'João');
   x = await chamar('GET', '/api/producao/etiquetas/contar', {}, MARIA);
   ok('a bolinha só leva o número', typeof x.body.hoje === 'number' && Object.keys(x.body).length === 1);
+
+  console.log('\n── 10. a alçada (R-ALC) ──');
+  const REG = require('./permissoes');
+  const nv = { 'producao.cortar_tecido':['operacao',108], 'producao.cortar_tubo':['operacao',110], 'producao.montar':['operacao',107],
+    'producao.etiqueta':['supervisor',401], 'producao.corrigir':['supervisor',401] };
+  ok('as cinco chaves existem, com nível e tela', Object.keys(nv).every(k => { const p = REG.find(x => x.chave === k); return p && p.nivel === nv[k][0] && p.tela === nv[k][1]; }));
+  ok('"corrigir" é sensível', REG.find(x => x.chave === 'producao.corrigir').sensivel === true);
+  const src = require('fs').readFileSync(require('path').join(__dirname, 'acesso.js'), 'utf8');
+  const fora = src.split('\n').filter(l => /producao\.(cortar_tecido|cortar_tubo|montar|etiqueta|corrigir)/.test(l) && !/return /.test(l));
+  ok('nenhum setor nativo recebe as chaves novas pelo seed (só o Admin Geral, R-ALC-06)', fora.length === 0, fora.join(' | '));
+  const T = require('./telas').TELAS;
+  ok('107, 108 e 110 no mapa: Produção · Medida padrão · Operação', [107,108,110].every(nu => { const t = T.find(x => x.n === nu); return t && t.modulo === 'producao' && t.bloco === 'medida_padrao' && t.nivel === 'operacao'; }));
+  ok('a 401 abre para o Supervisor com a chave das etiquetas', (t => t.nivel === 'supervisor' && t.perms.includes('producao.etiqueta'))(T.find(x => x.n === 401)));
 
   console.log('\n' + (falhas ? falhas + ' de ' + n + ' casos FALHARAM' : 'todos os ' + n + ' casos passaram'));
   process.exit(falhas ? 1 : 0);

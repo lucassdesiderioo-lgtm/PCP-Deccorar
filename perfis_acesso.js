@@ -138,7 +138,11 @@ const NASCERAM_DEPOIS = ['coleta.horario',   // HORARIOS-DE-COLETA, 05/11/2026
   /* O MODO TESTE FOI APOSENTADO (11/11/2026): a chave saiu do registro e a 903
      do mapa. Sai da comparacao pelo nome (como a 203); que ninguem mais liga o
      modo e travado no teste_tarja_modo_teste.js e no teste_regras_estoque.js. */
-  'teste.operar'];
+  'teste.operar',
+  /* A PRODUCAO DA MEDIDA PADRAO (PRODUCAO-MAPA-E-MOTOR v7, 25/11/2026): as
+     cinco chaves nascem so para o Admin Geral (R-ALC-06). Saem da comparacao
+     pelo nome; que nenhum setor as recebe e travado no teste_producao_motor.js. */
+  'producao.cortar_tecido','producao.cortar_tubo','producao.montar','producao.etiqueta','producao.corrigir'];
 function comparar(antes, agora){
   if(!antes) return 'sem retrato de antes';
   /* A 203 Subir PDF SAIU em 05/11/2026 (decisão do dono, D2): o endereço

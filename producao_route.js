@@ -104,21 +104,34 @@ module.exports = function(app, db){
     catch(e){ erro(res, e, 'gerar o PDF'); }
   });
 
+  /* Os dias que uma etiqueta impressa fica parada antes de ficar ambar na
+     lista das nao usadas (o dono: 15, mudavel na 906 Parametros). Inteiro, de
+     1 a 365; numero impossivel e recusado, nunca clampado (#25). */
+  app.get('/api/config/etiqueta-parada', (req, res) => res.json({ dias:ETQ.diasParada(db), padrao:ETQ.DIAS_PARADA_PADRAO }));
+  app.post('/api/config/etiqueta-parada', (req, res) => {
+    const v = (req.body || {}).dias, t = String(v == null ? '' : v).trim();
+    if(!/^\d+$/.test(t) || +t < 1 || +t > 365) return res.status(400).json({ erro:'Os dias têm que ser um número inteiro de 1 a 365.' });
+    const antes = ETQ.diasParada(db);
+    db.prepare("INSERT INTO config (chave,valor) VALUES ('etiqueta_parada_dias',?) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor").run(String(+t));
+    try{ app.locals.acesso.auditar(req, 'producao', 'etiqueta_parada_dias', 'de ' + antes + ' para ' + (+t) + ' dias'); }catch(e){}
+    res.json({ ok:true, dias:+t });
+  });
+
   // ── 108 Corte de tecido e 110 Serralheria ───────────────────────────────
-  const tipoOk = t => (t === 'tecido' || t === 'tubo') ? t : null;
   const listaDe = t => t === 'tecido' ? LISTA.listaTecido(db) : LISTA.listaTubo(db);
-  app.get('/api/producao/corte/:tipo', (req, res) => {
-    const t = tipoOk(req.params.tipo);
-    if(!t) return res.status(404).json({ erro:'Corte desconhecido.' });
+  /* Uma rota por bancada, com o caminho escrito: a permissao e de cada uma
+     (producao.cortar_tecido, producao.cortar_tubo), e a varredura da
+     cobertura confere o caminho de verdade. */
+  for(const t of ['tecido', 'tubo']){
+  app.get('/api/producao/corte/' + t, (req, res) => {
     try{
-      res.json({ lista:listaDe(t), aberto:CORTE.aberto(db, req.usuario, t), dia:CORTE.doDia(db, req.usuario, t),
+      res.json({ lista:listaDe(t), aberto:CORTE.aberto(db, QUEM.pessoa(req), t), dia:CORTE.doDia(db, QUEM.pessoa(req), t),
         motivos:CORTE.MOTIVOS_PERDA[t], proxima:ETQ.proxima(db, CORTE.TIPOS[t]).rotulo,
         pode_entrada:pode(req, 'producao.corrigir') });
     }catch(e){ erro(res, e, 'montar a lista do corte'); }
   });
-  app.post('/api/producao/corte/:tipo/iniciar', (req, res) => {
-    const t = tipoOk(req.params.tipo), b = req.body || {};
-    if(!t) return res.status(404).json({ erro:'Corte desconhecido.' });
+  app.post('/api/producao/corte/' + t + '/iniciar', (req, res) => {
+    const b = req.body || {};
     try{
       /* A entrada inicial (§14.10) e so do Supervisor (producao.corrigir). */
       if(b.entrada_inicial && !pode(req, 'producao.corrigir')) throw new ETQ.Recusa('A entrada inicial é de quem tem a permissão de corrigir a produção (Supervisor).', 403);
@@ -134,25 +147,26 @@ module.exports = function(app, db){
         etiqueta:b.etiqueta, entrada_inicial:!!b.entrada_inicial }, QUEM.pessoa(req)) });
     }catch(e){ erro(res, e, 'iniciar o corte'); }
   });
-  app.post('/api/producao/corte/:tipo/bipar', (req, res) => {
+  app.post('/api/producao/corte/' + t + '/bipar', (req, res) => {
     try{
       const r = CORTE.bipar(db, (req.body || {}).codigo, QUEM.pessoa(req));
       if(r.fechado) r.tempo = tempo(req, r.fechado.tipo === 'tecido' ? 'corte_tecido' : 'corte_tubo', r.fechado);
       res.json(Object.assign({ ok:true }, r));
     }catch(e){ erro(res, e, 'bipar'); }
   });
-  app.post('/api/producao/corte/:tipo/perdida', (req, res) => {
+  app.post('/api/producao/corte/' + t + '/perdida', (req, res) => {
     try{ res.json(Object.assign({ ok:true }, CORTE.perdida(db, (req.body || {}).motivo, QUEM.pessoa(req)))); }
     catch(e){ erro(res, e, 'marcar a peça perdida'); }
   });
-  app.post('/api/producao/corte/:tipo/cancelar', (req, res) => {
+  app.post('/api/producao/corte/' + t + '/cancelar', (req, res) => {
     try{ CORTE.cancelar(db, QUEM.pessoa(req)); res.json({ ok:true }); }
     catch(e){ erro(res, e, 'cancelar o corte'); }
   });
+  }
 
   // ── 107 Montagem ────────────────────────────────────────────────────────
   app.get('/api/producao/montagem', (req, res) => {
-    try{ res.json({ lista:LISTA.listaMontagem(db), aberto:MONT.aberto(db, req.usuario), dia:MONT.doDia(db, req.usuario) }); }
+    try{ res.json({ lista:LISTA.listaMontagem(db), aberto:MONT.aberto(db, QUEM.pessoa(req)), dia:MONT.doDia(db, QUEM.pessoa(req)) }); }
     catch(e){ erro(res, e, 'montar a lista da montagem'); }
   });
   app.post('/api/producao/montagem/iniciar', (req, res) => {
