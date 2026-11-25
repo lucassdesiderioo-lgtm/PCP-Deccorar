@@ -213,7 +213,11 @@ module.exports = function(app, db){
     if(!r) return res.status(404).json({ erro:'Não é etiqueta de persiana.' });
     const nome = x => x ? { nome:x.nome || null, em:x.em || null, etiqueta:x.codigo ? ETQ.rotulo({ tipo:x.codigo.slice(0,2), numero:x.numero }) : null } : null;
     res.json({ sku:r.etiqueta.sku, numero:r.etiqueta.numero, rotulo:ETQ.rotulo(r.etiqueta), montada:!!r.persiana,
-      situacao:r.persiana ? r.persiana.situacao : null,
+      situacao:r.persiana ? r.persiana.situacao : null, ...(() => {
+        /* a regra de "pode revisar?" é do montagem_persiana.paraRevisar (a troca,
+           a peça com problema): a tela não decide por conta própria. */
+        try{ MONT.paraRevisar(db, req.params.codigo); return { revisavel:true }; }
+        catch(e){ if(e instanceof MONT.Recusa) return { revisavel:false, motivo:e.message }; throw e; } })(),
       tecido:nome(r.tecido), tubo:nome(r.tubo), montagem:r.persiana ? { nome:r.montagem.nome, em:r.montagem.em } : null });
   });
 

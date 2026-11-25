@@ -155,5 +155,27 @@ ok('a peça com problema sai do carrinho', MONT.comProblema(db, ps[2]) && (MONT.
 r = chamar('POST', '/api/revisao', { codigo:ps[2], segundos:40 }, RUI);
 eq('...e volta a ser revisável depois de consertada', r.status, 200);
 
+console.log('\n── 5. a tela 101 pergunta ao servidor se a persiana revisa ──');
+const rotP = {};
+require('./producao_route')({ locals:{ acesso:{ podePermissao:() => true } }, use(){}, get(p, h){ rotP['GET ' + p] = h; }, post(){}, delete(){}, put(){}, patch(){} }, db);
+function ler(codigo){ const out = {}; rotP['GET /api/producao/persiana/:codigo']({ params:{ codigo }, query:{}, body:{}, usuario:RUI }, { status(c){ out.status = c; return this; }, json(b){ out.body = b; return this; } }); return out.body; }
+MONT.comProblema(db, ps[2]) || db.prepare("UPDATE persiana SET situacao='problema' WHERE codigo=?").run(ps[2]);
+ok('a persiana com problema, consertada, é revisável na tela', ler(ps[2]).revisavel === true, JSON.stringify(ler(ps[2])));
+r = chamar('POST', '/api/revisao', { codigo:ps[2], segundos:40 }, RUI);
+const rv2 = db.prepare('SELECT revisao_id FROM persiana WHERE codigo=?').get(ps[2]).revisao_id;
+ok('a já revisada, sem marcada do SKU, não é revisável, com o motivo', ler(ps[1]).revisavel === false && /já foi revisada/.test(ler(ps[1]).motivo));
+MONT.revisaoApagada(db, rv2, true);
+ok('...e com uma marcada do SKU, a troca é revisável na tela', ler(ps[1]).revisavel === true);
+/* a volta da embalagem decidida "tem defeito" tira a marcada do carrinho */
+const DEF = require('./defeito_dominio'); DEF.garantir(db);
+db.exec("CREATE TABLE IF NOT EXISTS rejeicao (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, motivo TEXT, obs TEXT, segundos INTEGER, modo TEXT, usuario TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, usuario_id INTEGER, origem TEXT, setor TEXT)");
+db.prepare("INSERT INTO embalagem_defeito (codigo, motivo) VALUES ('BK150150BEGE','Tecido manchado')").run();
+const idv = db.prepare('SELECT MAX(id) m FROM embalagem_defeito').get().m;
+const car1 = MONT.noCarrinho(db).BK150150BEGE || 0;
+try{ DEF.decidir(db, idv, { decisao:'defeito', setor:DEF.SETORES[0].chave }, { usuario_id:3, usuario_nome:'Rui' }); }catch(e){ console.log('   (decidir: ' + e.message + ')'); }
+eq('com defeito, a persiana marcada sai do carrinho', (MONT.noCarrinho(db).BK150150BEGE || 0), car1 - 1);
+eq('...fica "com problema", sem a marca', db.prepare('SELECT situacao||voltou_defeito s FROM persiana WHERE codigo=?').get(ps[2]).s, 'problema0');
+ok('...e sem marcada, a já revisada volta a ser recusada', ler(ps[1]).revisavel === false);
+
 console.log('\n' + (falhas ? falhas + ' de ' + n + ' casos FALHARAM' : 'todos os ' + n + ' casos passaram'));
 process.exit(falhas ? 1 : 0);

@@ -267,7 +267,7 @@ async function abrirSerie(codigo){
   catch(e){ banner('err','Sem conexão','Não deu para ler a etiqueta. Bipe de novo.'); beep(false); return; }
   if(r.erro){ banner('err','Etiqueta não reconhecida',escH(r.erro)); beep(false); return; }
   if(!r.montada){ banner('err',escH(r.rotulo),'Esta persiana ainda não passou pela montagem (107): monte antes de revisar.'); beep(false); return; }
-  if(r.situacao!=='montada'){ banner('err',escH(r.rotulo),r.situacao==='montando'?'Esta persiana ainda está sendo montada.':'Esta persiana já foi revisada.'); beep(false); return; }
+  if(r.revisavel===false || (r.revisavel===undefined && r.situacao!=='montada')){ banner('err',escH(r.rotulo),escH(r.motivo||(r.situacao==='montando'?'Esta persiana ainda está sendo montada.':'Esta persiana já foi revisada.'))); beep(false); return; }
   if(!skuInfo(r.sku)){ banner('err','SKU não cadastrado',escH(r.sku)); beep(false); return; }
   var dst=destino(r.sku);
   emRev={codigo:r.sku,serie:codigo,rotulo:r.rotulo,quem:r,cor:(skuInfo(r.sku)||{}).cor||'',inicio:Date.now(),fora:!!(dst&&dst.cls==='fora'),destino:dst};

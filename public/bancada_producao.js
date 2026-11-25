@@ -78,7 +78,7 @@
     var max = MONT && SEL ? Math.min(SEL.tecido, SEL.tubo) : 999;
     return '<div class="visor">' + (DIG || '—') + '</div>' +
       (DIG && MONT && +DIG > max ? '<div class="bs" style="color:var(--red);font-weight:700">Só há tecido e tubo cortados para ' + max + '.</div>' : '') +
-      (DIG && !MONT && SEL && +DIG > resta(SEL) ? '<div class="bs" style="color:var(--amber);font-weight:700">' + (+DIG - resta(SEL)) + ' a mais do que falta: ficam na prateleira.</div>' : '') +
+      (DIG && !MONT && !ENTRADA && SEL && +DIG > resta(SEL) ? '<div class="bs" style="color:var(--amber);font-weight:700">' + (+DIG - resta(SEL)) + ' a mais do que falta: ficam na prateleira.</div>' : '') +
       '<div class="teclado">' + [1,2,3,4,5,6,7,8,9].map(function(k){ return '<button type="button" data-dig="' + k + '">' + k + '</button>'; }).join('') +
       '<button type="button" data-dig="apaga" aria-label="apagar">⌫</button><button type="button" data-dig="0">0</button><button type="button" class="okb" data-dig="ok">OK</button></div>';
   }
@@ -98,7 +98,7 @@
     if(!SEL) return h + '<div class="banner"><div class="bt">Escolha na lista o que vai ' + (MONT ? 'montar' : 'cortar') + '</div><div class="bs">Comece pelo vermelho: o que falta para hoje.</div></div>' +
       (!MONT && DADOS && DADOS.pode_entrada ? '<label class="entrada"><input type="checkbox" id="entrada"' + (ENTRADA ? ' checked' : '') + '> Entrada inicial (o que já estava cortado no dia da virada)</label>' : '');
     if(!SEL.qtd) return h + '<div class="banner">' + cab(SEL) + (ENTRADA ? '<div class="bs" style="color:var(--amber);font-weight:700">Entrada inicial: não conta tempo nem produtividade.</div>' : '') +
-      '<div class="bs">Quantas vai ' + (MONT ? 'montar' : (ENTRADA ? 'lançar' : 'cortar')) + '? (faltam ' + resta(SEL) + (MONT ? ' · na prateleira dá para ' + Math.min(SEL.tecido, SEL.tubo) : '') + ')</div>' + teclado() + '</div>' +
+      '<div class="bs">Quantas vai ' + (MONT ? 'montar' : (ENTRADA ? 'lançar' : 'cortar')) + '?' + (ENTRADA ? '' : ' (faltam ' + resta(SEL)) + (MONT ? ' · na prateleira dá para ' + Math.min(SEL.tecido, SEL.tubo) : '') + (ENTRADA ? '' : ')') + '</div>' + teclado() + '</div>' +
       '<button type="button" class="btn" data-acao="voltar">Cancelar</button>';
     /* quantidade escolhida: espera o primeiro bipe (o corte) ou inicia (a montagem) */
     return h + '<div class="banner rev">' + cab(SEL) + '<div class="bt">INÍCIO</div><div class="bs">Bipe a primeira etiqueta do maço · ' + SEL.qtd + ' peça' + (SEL.qtd > 1 ? 's' : '') + (DADOS ? ' · próxima no maço: ' + esc(DADOS.proxima) : '') + '</div></div>' +
@@ -183,7 +183,7 @@
   function achar(chave){ if(!DADOS) return null; var l = (ENTRADA && DADOS.itens_entrada) ? DADOS.itens_entrada : DADOS.lista.itens; return l.find(function(x){ return x.chave === chave; }); }
   async function bipe(v){
     if(ENVIANDO) return;
-    MSG = null;
+    MSG = null; CONF_CANC = false;   // a confirmação do cancelar vale para o que estava bipado
     var ab = DADOS && DADOS.aberto, r;
     if(ab) r = await post('bipar', { codigo:v });
     else if(!MONT && SEL && SEL.qtd) r = await post('iniciar', { item:SEL.chave, quantidade:SEL.qtd, etiqueta:v, entrada_inicial:ENTRADA });
@@ -230,9 +230,9 @@
     if(acao === 'perda'){ PERDA = true; desenhar(); var m = $('#motivo'); if(m) m.focus(); return; }
     if(acao === 'perdaNao'){ PERDA = false; desenhar(); return; }
     if(acao === 'perdaOk'){ var mo = $('#motivo') ? $('#motivo').value : ''; PERDA = false; resposta(await post('perdida', { motivo:mo })); return; }
-    if(acao === 'cancelar' && !MONT && DADOS && DADOS.aberto && DADOS.aberto.pecas.length > 1 && !CONF_CANC){
+    if(acao === 'cancelar' && !MONT && DADOS && DADOS.aberto && DADOS.aberto.pecas.length >= 1 && !CONF_CANC){
       /* ③ REVISAO: cancelar solta as etiquetas bipadas — so se as pecas NAO foram cortadas. */
-      CONF_CANC = true; MSG = { t:'As ' + DADOS.aberto.pecas.length + ' etiquetas bipadas voltam para o maço, e as peças saem do sistema. Só cancele se elas NÃO foram cortadas. Toque em Cancelar corte de novo para confirmar.' }; beep(false); desenhar(); return; }
+      CONF_CANC = true; MSG = { t:(DADOS.aberto.pecas.length > 1 ? 'As ' + DADOS.aberto.pecas.length + ' etiquetas bipadas voltam' : 'A etiqueta bipada volta') + ' para o maço, e as peças saem do sistema. Só cancele se elas NÃO foram cortadas. Toque em Cancelar corte de novo para confirmar.' }; beep(false); desenhar(); return; }
     if(acao === 'cancelar'){ CONF_CANC = false; var rc = await post('cancelar', {}); if(rc.erro){ MSG = { t:rc.erro }; beep(false); } SEL = null; FIM = null; await carregar(); return; }
   });
 

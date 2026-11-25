@@ -134,6 +134,15 @@ function decidir(db, id, b, quem){
     rejeicao_id = REJ.registrar(db, { codigo:d.codigo, motivo:d.motivo, obs:[d.obs, txt(b.obs, 500)].filter(Boolean).join(' — ') || null,
       segundos:d.segundos, modo:d.modo, origem:'embalagem', setor:s.nome }, quem);
   }
+  /* A persiana em serie marcada por esta volta (PRODUCAO-MAPA-E-MOTOR v7, ③):
+     com defeito ela vai para o setor e sai do carrinho, como a peça com problema
+     da 101 (montagem_persiana.comProblema). Sem defeito ela fica marcada, para
+     a troca na revisão de novo. */
+  if(decisao === 'defeito'){
+    try{ db.prepare(`UPDATE persiana SET situacao='problema', voltou_defeito=0 WHERE id=(SELECT id FROM persiana
+      WHERE sku=? AND situacao='montada' AND voltou_defeito=1 ORDER BY id LIMIT 1)`).run(d.codigo); }
+    catch(e){ if(!/no such table/.test(e.message)) throw e; }
+  }
   /* A peça de devolução nunca teve revisão: sem defeito, volta direto a esperar
      embalagem, com o modo dela (senão, revisada de novo, perderia a devolução). */
   let volta_fila = false;
