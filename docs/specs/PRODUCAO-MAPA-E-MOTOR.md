@@ -1,5 +1,5 @@
 > **STATUS · 12/11/2026 — APROVADA pelo dono (v6)** · **fase 1 construída, falta subir** (o roteiro na ficha: `etapas.js`, `ficha_formula.etapa`, a 404; `teste_roteiro.js`, 25; ③ REVISÃO: modelo sem ficha e sob medida ficam sem roteiro, decisão de construção; **REGRA do dono em 12/11/2026: toda linha da ficha tem etapa de preparo — sem "sai direto na embalagem" —, e o kit passa só por montagem e embalagem**, linha em `docs/DECISOES.md`) · próxima: fase 2
-> **v7 · 25/11/2026 — decisões do dono no protótipo, escritas no §14** (as três etiquetas, a aba "Etiquetas da produção" da 401, a 108 Corte de tecido, a 110 Serralheria e a 107 Montagem no formato da 101, a revisão e a embalagem pelo SKU em série, o rastreio na 904). **Falta o dono confirmar a regra F (§14.9)** e aprovar o texto. **Onde o §14 e o resto desta spec divergirem, vale o §14.**
+> **v7 · 25/11/2026 — decisões do dono no protótipo, escritas no §14** (as três etiquetas, a aba "Etiquetas da produção" da 401, a 108 Corte de tecido, a 110 Serralheria e a 107 Montagem no formato da 101, a revisão e a embalagem pelo SKU em série, o rastreio na 904). **Falta o dono responder a H (§14.9)** e aprovar o texto. **Onde o §14 e o resto desta spec divergirem, vale o §14.**
 > Reescrita sobre o processo que o dono descreveu em 11/11/2026 e as respostas de
 > 12/11/2026 (§10). A versão de 17/08/2026 está em
 > `docs/arquivo/PRODUCAO-MAPA-E-MOTOR-v1.md` (histórico, não é regra). Absorve a
@@ -334,7 +334,7 @@ Só a **impressão em bloco**:
   necessidade daquele SKU** (a conta dos próximos dias e do alvo também desconta o
   impresso); se não servir, o Supervisor a cancela.
 
-**Quando abre cada parte** (proposta de 25/11/2026, **a confirmar pelo dono**, §14.11 F):
+**Quando abre cada parte** (✅ o dono, 25/11/2026):
 
 | Parte | Abre quando | Quanto se pode imprimir |
 |---|---|---|
@@ -415,6 +415,22 @@ antes"*). O teclado não deixa passar do que há cortado. **Quatro bipes por pe�
 - ⚠️ **A troca de etiqueta de SKU entre duas persianas montadas é possível, e nada a
   pega** (o dono aceita: *"não vejo outro jeito"*).
 
+**111 Kits** (o dono, 25/11/2026: *"essas duas coisas poderiam ser na mesma tela"*).
+No mesmo formato, com **dois botões grandes no topo: KIT DE INSTALAÇÃO · COMANDO /
+CORRENTE**. A lista de cada um: Hoje · Depois de hoje · Alvo, já sem o que está
+pronto na prateleira.
+
+- **Kit de instalação:** um só, um por persiana.
+- **Comando / corrente:** um cartão **por medida da corrente**, a mesma da aba Corte
+  e separação da 401 (a linha da ficha, hoje `2 × altura − 20`), com a altura e os
+  SKUs que ela serve.
+- **Sem bipe:** toca no cartão → teclado (ex.: 20) → **▶ INICIAR** → **■ TERMINEI** →
+  a tela pergunta **quantos ficaram prontos** (já vem com o número do início; se
+  algum se perdeu, corrige, e o que falta volta para a lista). O tempo por kit é o
+  do lote ÷ os prontos.
+- ⚠️ **Isto muda o que a spec dizia dos kits** (a etiqueta sequencial KC e KI e a
+  embalagem bipando os dois, §4 e fase 4): pergunta H.
+
 ### 14.5 A revisão (101) e a embalagem (102)
 
 - **Revisão:** início e fim pelo **SKU em série** (os dois bipes de sempre; o tempo
@@ -457,8 +473,9 @@ cliente. Numa devolução, bipa-se o saco e vê-se a história inteira daquela p
 | C | ✅ A peça devolvida segue como antiga até a fase 7 |
 | D | ✅ Cada peça da montagem fecha com o próprio ④ |
 | E | ✅ "Voltou para você" na tela de quem fez; conserta e bipa o SKU |
-| F | **A regra do §14.3 "Quando abre cada parte"**: os próximos dias depois do dia todo impresso; o alvo depois do **dia seguinte** todo impresso; próximos dias e alvo **limitados ao tecido e tubo cortados livres**; o dia **sem limite** |
-| G | Os kits de comando e de instalação (fase 4): em que tela o kit é montado, agora que a 108 é só o corte de tecido |
+| F | ✅ A regra do §14.3 "Quando abre cada parte" (o dono, 25/11/2026) |
+| G | ✅ A **111 Kits**, as duas coisas na mesma tela (§14.4) |
+| H | Os kits **ainda levam etiqueta sequencial** (KC/KI) e a embalagem os bipa (a fase 4, desligada), ou ficam **sem etiqueta**, e a embalagem continua bipando o código fixo do kit como hoje? |
 
 ---
 
@@ -469,7 +486,7 @@ cliente. Numa devolução, bipa-se o saco e vê-se a história inteira daquela p
 | **1** | **O roteiro na ficha**: a etapa de cada linha da 404 e as etapas de cada modelo | 🟡 |
 | **2** | **A aba "Etiquetas da produção" da 401** (os maços TC e TB, as não usadas, o histórico) + **108 Corte de tecido** e **110 Serralheria** no formato da 101 (§14.4) + a pré-fabricação e o "já cortado" na 1101 e na 501 | 🔴 (schema, etiqueta) |
 | **3** | **A etiqueta da persiana em série** na aba da 401, com a dinâmica do dia e a bolinha do ☰ Menu (§14.2, §14.3) + **107 Montagem** (§14.4) + **a revisão pela etiqueta da persiana** (§14.5) | 🔴 |
-| **4** | **A embalagem bipa a etiqueta da persiana** (§14.5) + os **kits** com etiqueta (a embalagem bipa as duas, nasce desligado; a tela é a pergunta G) + a conferência da pré-fabricação (§6) | 🔴 (mexe no bipe da embalagem) |
+| **4** | **A embalagem bipa a etiqueta da persiana** (§14.5) + a **111 Kits** (§14.4; a etiqueta dos kits é a pergunta H) + a conferência da pré-fabricação (§6) | 🔴 (mexe no bipe da embalagem) |
 | **5** | **Rejeição com etapa e pessoa** (101, 104) | 🟡 |
 | **6** | **O cartão de ponto** (a pausa), os indicadores (tempo por unidade por etapa na 904 e na 905) e a **aba "Rastreio da produção" da 904** (§14.6) | 🟡 |
 | **7** | **A Etiqueta de Venda bipa a etiqueta da persiana** (§14.8): a peça ligada ao cliente, e a "parada no estoque" | 🔴 |
@@ -483,6 +500,7 @@ cliente. Numa devolução, bipa-se o saco e vê-se a história inteira daquela p
 | Montagem | 107 | Produção | Medida padrão | 108, 110 (a prateleira), 101 Revisão, 404, 401 |
 | Corte de tecido | 108 | Produção | Medida padrão | 401 (a lista e as etiquetas TC), 404 (a medida de corte), 107 |
 | Serralheria | 110 | Produção | Medida padrão | 401 (a lista e as etiquetas TB), 404 (o tubo e a medida de corte), 107 |
+| Kits | 111 | Produção | Medida padrão | 401 (Corte e separação: a medida da corrente), 404, 102 |
 | — aba "Etiquetas da produção" | 401 | Planejamento | Medida padrão | 101 (a conta), 107, 108, 110, 402 (o motor da etiqueta). A 401 passa a abrir para o Supervisor, só nesta aba |
 | — aba "Rastreio da produção" | 904 | Relatórios | Medida padrão | 107, 108, 110, 101, 102 |
 
@@ -500,8 +518,8 @@ cadastro da pessoa (901).
 | Montar persianas | `producao.montar` | Operação | 107 | não |
 | Cortar tecido | `producao.cortar_tecido` | Operação | 108 | não |
 | Cortar tubo e base | `producao.cortar_tubo` | Operação | 110 | não |
-| Montar kit de comando | `producao.kit_comando` | Operação | 108 | não |
-| Montar kit de instalação | `producao.kit_instalacao` | Operação | 108 | não |
+| Montar kit de comando | `producao.kit_comando` | Operação | 111 | não |
+| Montar kit de instalação | `producao.kit_instalacao` | Operação | 111 | não |
 | Imprimir as etiquetas da produção (persiana, tecido, tubo), pelo planejamento e fora dele com motivo; reimprimir | `producao.etiqueta` | **Supervisor** | 401 (aba; abre a 401 só nela) | não |
 | Conferir a pré-fabricação, marcar perdida, corrigir lote, **cancelar etiqueta** | `producao.corrigir` | Supervisor | 107 / 108 / 110 / 401 | **sim** |
 | Consultar o rastreio da produção | `producao.rastrear` | Supervisor | 904 (aba) | não |
