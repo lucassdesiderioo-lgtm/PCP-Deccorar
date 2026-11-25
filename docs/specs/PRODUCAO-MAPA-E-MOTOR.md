@@ -335,9 +335,13 @@ em série) · Tecido · Tubo e base** —, cada um com a lista do planejamento:
   quantidade, com **motivo de uma lista curta** — peça com defeito para refazer,
   reposição de perda, teste, outro (com texto). A peça fica marcada "fora do
   planejamento" nos relatórios e na pré-fabricação.
-- **Cancelar etiqueta**: Supervisor, com motivo; ela deixa de descontar. A etiqueta
-  impressa e parada há mais de N dias aparece na 204; o N (15) se muda na 906
-  Parâmetros.
+- **A lista das etiquetas impressas e ainda não usadas**, na própria 109 (o dono,
+  25/11/2026: *"não é uma coisa que precisa estar nas pendências"*): por tipo
+  (persiana, tecido, tubo), com o SKU e o número, quem imprimiu e há quantos dias.
+  A parada há mais de N dias aparece em âmbar e em cima; o N (15) se muda na 906
+  Parâmetros. **Não vai para a 204.**
+- **Cancelar etiqueta**, nessa lista: marca uma ou várias, escolhe o motivo, um
+  toque. Supervisor. Cancelada deixa de descontar, e o número não volta.
 
 ### 14.5 O corte (108) e a montagem (107) — 1 peça ou mais
 
@@ -358,8 +362,19 @@ O mesmo jeito nas duas, no tablet:
 
 - **Lote só de peças iguais** (um item de tecido, uma medida de tubo, um SKU na
   montagem). Etiqueta já usada é recusada dizendo quando e por quem.
-- Grava quem (o login, `quem.js`), início, fim e o tempo de cada peça (do ① ao ④
-  dela); no corte, o do lote ÷ as peças.
+- Grava quem (o login, `quem.js`) e a hora de cada bipe. O tempo:
+
+  | | Como sai o tempo por peça |
+  |---|---|
+  | **1 peça** | do ① ao ④ dela |
+  | **em lote** | do primeiro ① ao último ④, ÷ as peças (a pessoa trabalha nas N ao mesmo tempo; o ④ de cada uma diz quando ela ficou pronta, não quanto ela levou) |
+
+  As duas formas aparecem **separadas** nos relatórios ("uma por vez" · "em lote"):
+  misturadas, o lote puxaria a média para baixo. O corte segue igual (lote ÷ peças).
+- **A tela do operador (107 e 108) mostra o tempo e a quantidade do dia, como a 101**
+  (R-TEM-01, `tempo_operador.js`): ao fechar, "Agora" e "Sua média" (a mediana da
+  pessoa naquele SKU, 30 dias) com "Parabéns!" ou "Você pode melhorar", e as peças
+  feitas hoje. As atividades entram no `ATIVIDADES` do `tempo_operador.js`.
 - **É a montagem que liga** a persiana em série ao tecido, ao tubo, a quem cortou cada
   um e a quem montou, e passa a peça à frente.
 - A persiana montada vai **sozinha** para a fila da revisão (o carrinho).
@@ -369,8 +384,11 @@ O mesmo jeito nas duas, no tablet:
 ### 14.6 A revisão (101)
 
 - **Início e fim pelo SKU em série** (o dono, 25/11/2026): os dois bipes de sempre,
-  agora com a etiqueta da persiana. O tempo mínimo (R-REV-07) continua. Pelo número,
-  a revisão sabe o tecido, o tubo, quem cortou e quem montou.
+  agora com a etiqueta da persiana. O tempo mínimo (R-REV-07) continua.
+- **No primeiro bipe a tela mostra os NOMES** de quem cortou o tecido, quem cortou o
+  tubo e quem montou (o dono: *"se acontecer alguma coisa de errado a pessoa tem que
+  devolver para a pessoa que fez o trabalho anterior"*). A "Peça com problema" escolhe
+  a etapa culpada e a peça volta para aquela pessoa (§7, fase 5).
 - ⚠️ A revisão **não** bipa a etiqueta do tecido (era a proposta do rascunho): a
   troca de etiqueta entre duas persianas montadas não é pega.
 - A peça enrolada segue com a etiqueta da persiana por fora.
@@ -413,9 +431,10 @@ Fase própria, depois da 4.
 
 | # | Pergunta |
 |---|---|
-| B | ✅ **15 dias, mudável na 906 Parâmetros** (o dono, 25/11/2026), com o "vale na 109" (`parametros_onde.js`) |
+| B | ✅ **15 dias, mudável na 906 Parâmetros**, e **não vai para a 204**: a lista mora na 109, com o cancelar (o dono, 25/11/2026) |
 | C | ✅ **A peça devolvida que volta à embalagem segue como peça antiga** até a fase 7 (14.10) |
-| D | Montagem com mais de uma: cada peça fecha com o próprio ④ (o tempo é por peça) — confirmar |
+| D | ✅ Cada peça fecha com o próprio ④; o tempo por peça no lote é o do lote ÷ as peças, e "uma por vez" e "em lote" aparecem separados (14.5) |
+| E | A peça com problema que "volta para quem fez": aparece numa lista "voltou para você" na tela daquela pessoa (107 ou 108)? |
 
 ---
 
