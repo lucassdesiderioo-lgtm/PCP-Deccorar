@@ -1,7 +1,7 @@
 # CONFERENCIA-CARRINHOS — a 202 Conferência com carrinhos, as barras do dia e a trava do dia seguinte
 
-> **STATUS — 24/11/2026: RASCUNHO, AGUARDANDO A APROVAÇÃO DO DONO.** Nada
-> construído. Tipo: `REGRA` + `NOVIDADE` · risco 🔴 (estoque, etiqueta,
+> **STATUS — 25/11/2026: APROVADA PELO DONO** (*"p1 sim, p2 sim, p3 sim,
+> aprovado"*) · **planejada, nada construído** · próxima: fase 1. Tipo: `REGRA` + `NOVIDADE` · risco 🔴 (estoque, etiqueta,
 > permissão). Desenhada em conversa com o dono em 24/11/2026, com o protótipo
 > clicável aprovado (*"ficou bom"*):
 > https://claude.ai/artifact/47UkW1LpH96RSss5JQj6AQ
@@ -178,7 +178,7 @@ estoque** → **reimprime** a etiqueta → bipa na conferência. Resultado: saí
 acima** do real. Se a caixa perdida **aparecer**, a persiana volta à prateleira
 e o saldo volta a bater sozinho; por isso a perda não se lança na hora.
 
-**Proposta (a confirmar, D6):** como a reimpressão não pede motivo, **o sistema
+**Decidido (D6, 25/11/2026):** como a reimpressão não pede motivo, **o sistema
 reconhece o caso sozinho**: reimprimir uma caixa que está travando a 201
 (R-TRV-01) abre uma pendência na 204 — *"Caixa da NF 9901 reimpressa no dia
 seguinte: pode haver uma persiana BK160140BEGE perdida"*. Quem resolve é
@@ -208,7 +208,7 @@ O dono liga o segundo bipe na 906 quando quiser (não depende de fase).
 | D3 | Cada pessoa com o seu login; o aparelho é compartilhado; **sem PIN no meio do processo** |
 | D4 | O sistema **só registra** quem conferiu e quem entregou; não impede que seja a mesma pessoa |
 | D5 | O motorista leva **o carrinho inteiro** |
-| D6 | **Proposta, a confirmar:** a reimpressão de caixa que trava a 201 abre a pendência da §7 |
+| D6 | A reimpressão de caixa que trava a 201 abre a pendência da §7 (confirmado em 25/11/2026) |
 | D7 | A agência pode usar carrinho ou não; na tela ela é o "Carro da agência" |
 | D8 | Na agência continua escolhendo **quem levou** |
 | D9 | **Não existe "foi sem conferir"**: a caixa a mais é bipada no caminhão |
@@ -221,12 +221,8 @@ O dono liga o segundo bipe na 906 quando quiser (não depende de fase).
 | D16 | A reimpressão continua **sem motivo** |
 | D17 | A pendência da caixa perdida é resolvida por **Supervisor** |
 
-**Perguntas que ficam para a aprovação:**
-- **P1 (D6):** a pendência automática da caixa reimpressa, da §7, pode ser assim?
-- **P2:** a **venda futura adiantada** impressa ontem e não bipada também trava
-  a 201? (Proposta: sim — se foi impressa, é caixa na fábrica esperando.)
-- **P3:** o **sob medida** (SKU `SOBMEDIDA`) entra na trava igual? (Proposta:
-  sim; ele não baixa estoque, mas a caixa existe.)
+| D18 | A **venda futura adiantada** impressa em dia anterior e não bipada também trava a 201 (25/11/2026) |
+| D19 | O **sob medida** entra na trava igual às outras caixas (25/11/2026) |
 
 ## 10. Onde mora (R-ORG-13)
 
