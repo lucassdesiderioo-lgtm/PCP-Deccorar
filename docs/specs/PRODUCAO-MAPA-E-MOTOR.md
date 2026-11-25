@@ -1,4 +1,5 @@
 > **STATUS · 12/11/2026 — APROVADA pelo dono (v6)** · **fase 1 construída, falta subir** (o roteiro na ficha: `etapas.js`, `ficha_formula.etapa`, a 404; `teste_roteiro.js`, 25; ③ REVISÃO: modelo sem ficha e sob medida ficam sem roteiro, decisão de construção; **REGRA do dono em 12/11/2026: toda linha da ficha tem etapa de preparo — sem "sai direto na embalagem" —, e o kit passa só por montagem e embalagem**, linha em `docs/DECISOES.md`) · próxima: fase 2
+> **RASCUNHO v7 · 25/11/2026 — espera o dono aprovar o texto** (§14): a etiqueta da persiana em série por SKU, as etiquetas de tecido e de tubo impressas pelo planejamento (no lugar do maço em branco), a tela 109 Etiquetas da produção, a montagem e o corte com 1 ou N peças, a revisão e a embalagem pela etiqueta da persiana, e os tempos parados de cada persiana. **Onde o §14 e o resto desta spec divergirem, vale o §14.**
 > Reescrita sobre o processo que o dono descreveu em 11/11/2026 e as respostas de
 > 12/11/2026 (§10). A versão de 17/08/2026 está em
 > `docs/arquivo/PRODUCAO-MAPA-E-MOTOR-v1.md` (histórico, não é regra). Absorve a
@@ -250,16 +251,178 @@ e desconta do lote aberto.
 
 ---
 
+## 14. v7 — a etiqueta da persiana e as etiquetas pelo planejamento (25/11/2026, RASCUNHO)
+
+> Decisões do dono na conversa de 25/11/2026. **Substitui** o maço em branco do §2
+> (e o bipe da etiqueta de cima do maço, §9-A), a "imprimir maço" da 108 (§5) e o
+> bipe do SKU na revisão e na embalagem para a peça que vem da montagem nova.
+> O resto da spec continua: a baixa na embalagem, a pré-fabricação (§3), a
+> conferência (§6), a rejeição com dono (§7), o ponto (§8).
+
+### 14.1 Por que a persiana precisa de etiqueta por fora
+
+O dono: *"essas etiquetas com código de barra para tecido e para o tubo ficam
+enroladas dentro da persiana … depois que a pessoa termina a revisão ela não tem
+mais acesso, e nem a embalagem."* Hoje, depois da embalagem, todo saco do mesmo SKU
+tem a mesma etiqueta: o sistema sabe quem embalou **o SKU** naquela hora, não
+**aquela peça**. A etiqueta da persiana em série vai **por fora**, e é por ela que a
+história escondida dentro da persiana (o tecido, o tubo, quem cortou, quem montou)
+chega à revisão, à embalagem e à prateleira.
+
+### 14.2 A etiqueta da persiana — o SKU em série
+
+- **O mesmo motor e o mesmo formato da etiqueta do cadastro de SKU**
+  (`sku_etq_pdf.js`, 100 × 35, Zebra ZD220), com o **"Nº 41" em destaque**.
+- **A sequência é POR SKU** (decisão do dono: *"vai ser mais intuitivo"*): o
+  BK160140BEGE tem os seus nº 1, 2, 3…; o BK140140CINZA tem os dele. O número
+  nunca volta e nunca se reaproveita, nem o da etiqueta cancelada.
+- **O código de barras é o número da etiqueta na fábrica** (a ordem em que saiu da
+  Zebra, de qualquer SKU), e **não é escrito** na etiqueta: ninguém o lê. Ele existe
+  porque o código do SKU é livre (§7 do CLAUDE.md) e o leitor tira espaço e hífen —
+  `SKU-41` chegaria como outro SKU. O sistema guarda que aquele código é o
+  "BK160140BEGE nº 41".
+- **Um tradutor só** (dono único) converte o código da etiqueta em SKU + número; as
+  telas que hoje leem o SKU passam por ele quando forem ligadas, e o saco antigo,
+  com a etiqueta comum, continua aceito.
+- **A 402 Cadastro de SKU fica com a etiqueta comum** (sem número) durante a
+  transição; a etiqueta em série não se imprime ali.
+
+### 14.3 As etiquetas de tecido e de tubo saem pelo planejamento
+
+No lugar do maço em branco (§2), elas são **impressas já com o item**: a etiqueta é a
+própria ordem de corte.
+
+```
+TC 000041 · BLACKOUT BEGE · corte 157 × 145 · para BK160140BEGE
+TB 000017 · TUBO 38 · corte 157 · (a base vai junto, sem etiqueta)
+```
+
+A medida de corte é a da ficha (`corte_largura`/`corte_altura`, a régua da aba Corte
+e separação, #18 e #12). O tecido agrupa por cor + medida, o tubo só pela medida
+(§3, sem mudança).
+
+### 14.4 A 109 Etiquetas da produção — onde tudo se imprime
+
+Tela nova, do **Supervisor**, no computador da Zebra. Três blocos — **Persiana (SKU
+em série) · Tecido · Tubo e base** —, cada um com a lista do planejamento:
+
+1. **A necessidade do DIA** (a parte Hoje da 101).
+2. **Os próximos dias** (de amanhã até sexta, a parte Próximos dias da 101).
+3. **O alvo** (Completar o alvo).
+
+- **Os próximos dias e o alvo só abrem quando toda a necessidade do dia já tem
+  etiqueta impressa** (o dono: *"a montagem já pode seguir com o próximo passo, que
+  é as de amanhã"*). O Supervisor imprime o dia e os próximos de uma vez, para a
+  bancada não ficar pedindo serviço.
+- **Venda nova de hoje no meio não trava nada**: a tela do operador (107, 108) diz
+  *"tem peça na frente com prioridade"*.
+- **A conta não é nova (#12):** parte da lista da 101 (`revisao_lista.js`, que já
+  desconta a mesa da embalagem) e desconta o que já está a caminho, sem contar duas
+  vezes:
+
+  | BK160140BEGE, hoje | Peças |
+  |---|---|
+  | Falta para as vendas de hoje | 12 |
+  | − na mesa da embalagem (revisadas, esperando embalar) | 3 |
+  | − no carrinho da revisão (montadas, esperando revisar) | 2 |
+  | − etiquetas de persiana impressas e ainda não montadas | 4 |
+  | **= pode imprimir para hoje** | **3** → nº 45, 46 e 47 |
+
+  O tecido e o tubo descontam, além disso, o que já está cortado e o que já tem
+  etiqueta e ainda não foi cortado. Até a 107 existir, o carrinho da revisão conta
+  zero, e a tela diz.
+- **Imprimir fora do planejamento**, nos três blocos: o SKU (ou a medida do tubo) e a
+  quantidade, com **motivo de uma lista curta** — peça com defeito para refazer,
+  reposição de perda, teste, outro (com texto). A peça fica marcada "fora do
+  planejamento" nos relatórios e na pré-fabricação.
+- **Cancelar etiqueta**: Supervisor, com motivo; ela deixa de descontar. A etiqueta
+  impressa e parada há mais de N dias (`config`, sugestão 15) aparece na 204.
+
+### 14.5 O corte (108) e a montagem (107) — 1 peça ou mais
+
+O mesmo jeito nas duas, no tablet:
+
+```
+ ① QUANTAS?   [ 1 PEÇA ]   [ MAIS DE UMA ] → [2] [3] … [10]  (botões grandes)
+ ② bipa as etiquetas
+      CORTE:     a etiqueta de cada peça que vai cortar (TC ou TB, do mesmo item)
+      MONTAGEM:  por peça, três bipes — persiana em série → tecido → tubo
+                 conferido na hora contra a ficha: "este tecido é 117 × 125;
+                 o BK140140BEGE pede 137 × 145" → recusa
+ ③ faz o trabalho
+ ④ FIM: bipa de novo uma etiqueta do lote
+ [ Cancelar ] antes do fim: nada grava, as etiquetas ficam livres
+```
+
+- **Lote só de peças iguais** (um item de tecido, uma medida de tubo, um SKU na
+  montagem). Etiqueta já usada é recusada dizendo quando e por quem.
+- Grava quem (o login, `quem.js`), início, fim e o tempo; o tempo por peça é o do
+  lote ÷ as peças.
+- A persiana montada vai **sozinha** para a fila da revisão (o carrinho).
+- ⚠️ **A troca de etiqueta entre duas persianas montadas é possível** (o dono aceita:
+  *"não vejo outro jeito"*). Quem a pega é a revisão (14.6).
+
+### 14.6 A revisão (101)
+
+- **Início:** bipa a **etiqueta da persiana** (por fora).
+- **Fim:** bipa a **etiqueta do tecido** — a persiana está aberta no teste. Se não é
+  a que a montagem ligou àquela persiana: *"esta etiqueta não é desta peça"*. Os
+  bipes são os dois de sempre; o tempo mínimo (R-REV-07) continua.
+- A peça enrolada segue com a etiqueta da persiana por fora.
+
+### 14.7 A embalagem (102)
+
+- O 1º e o 3º bipe passam a ser a **etiqueta da persiana** (o kit continua como está,
+  e os kits com etiqueta seguem a fase 4, desligada). A embalagem sabe **qual peça**
+  é: consome a linha da fila dela (acaba o "pega a mais antiga" da peça com defeito,
+  R-EMB-11 e R-EMB-13).
+
+### 14.8 Os tempos parados de cada persiana
+
+```
+ impressa ─▶ cortada ─▶ montada ─▶ revisada ─▶ embalada ─▶ saiu do estoque
+       espera    parada     parada no    parada na     parada no
+       o corte   cortada    carrinho     mesa da       estoque
+                            da revisão   embalagem
+```
+
+- Cada trecho é um número por persiana; a média e o pior caso por SKU e por semana
+  vão para a 904. Peça antiga, sem série, não entra.
+- ⚠️ **"Parada no estoque" só existe quando a Etiqueta de Venda bipar a etiqueta da
+  persiana** (14.10). Até lá esse trecho fica sem número, e a tela diz.
+
+### 14.9 A transição — a peça de antes
+
+A peça sem etiqueta em série (o estoque de hoje, a devolução, o saco com a etiqueta
+comum) **continua revisada e embalada pelo SKU, como hoje**, até acabar. Nada da
+bancada para no primeiro dia.
+
+### 14.10 Para depois (o dono: "essa é a ideia")
+
+A **Etiqueta de Venda bipa a etiqueta da persiana**: o sistema liga a peça ao
+cliente. Numa devolução, bipa-se o saco e vê-se a história inteira daquela persiana.
+Fase própria, depois da 4.
+
+### 14.11 O que ainda espera o dono
+
+| # | Pergunta |
+|---|---|
+| B | O N dias da etiqueta parada (sugestão 15) |
+| C | A peça devolvida que volta à embalagem (`reembalar`) ganha etiqueta de persiana nova ou segue como peça antiga? (sugestão: segue como antiga até a fase 14.10) |
+
+---
+
 ## 11. Fases
 
 | Fase | O quê | Risco |
 |---|---|---|
 | **1** | **O roteiro na ficha**: a etapa de cada linha da 404 e as etapas de cada modelo | 🟡 |
-| **2** | **108 Preparo — corte** de tecido e de tubo e base: o maço de etiquetas, o lote (iniciar, assinalar, terminei), a pré-fabricação e o "já cortado" na 1101 e na 501 | 🔴 (schema, etiqueta) |
-| **3** | **107 Montagem**: em lote e uma por vez, bipando as duas etiquetas; a fila da revisão com origem | 🔴 |
-| **4** | **108 — kits** de comando e de instalação, com etiqueta; **a embalagem bipa as duas etiquetas de kit** no lugar do código fixo; a conferência da pré-fabricação (§6) | 🔴 (mexe no bipe da embalagem) |
+| **2** | **109 Etiquetas da produção** (tecido e tubo, pelo planejamento e fora dele, cancelar) + **108 Preparo — corte** de tecido e de tubo e base (1 ou N peças, início e fim pelo bipe, §14.5) + a pré-fabricação e o "já cortado" na 1101 e na 501 | 🔴 (schema, etiqueta) |
+| **3** | **A etiqueta da persiana em série** na 109 (§14.2) + **107 Montagem** (1 ou N, três bipes por peça, conferidos contra a ficha) + **a revisão pela etiqueta da persiana** (§14.6) | 🔴 |
+| **4** | **A embalagem bipa a etiqueta da persiana** (§14.7) + os **kits** com etiqueta (a embalagem bipa as duas, nasce desligado) + a conferência da pré-fabricação (§6) | 🔴 (mexe no bipe da embalagem) |
 | **5** | **Rejeição com etapa e pessoa** (101, 104) | 🟡 |
-| **6** | **O cartão de ponto** (a pausa) e os indicadores: tempo por unidade por etapa na 904 e na 905 | 🟡 |
+| **6** | **O cartão de ponto** (a pausa) e os indicadores: tempo por unidade por etapa e **os tempos parados de cada persiana** (§14.8) na 904 e na 905 | 🟡 |
+| **7** | **A Etiqueta de Venda bipa a etiqueta da persiana** (§14.10): a peça ligada ao cliente | 🔴 |
 
 ---
 
@@ -268,7 +431,8 @@ e desconta do lote aberto.
 | Tela | Nº | Módulo | Bloco | Liga-se a |
 |---|---|---|---|---|
 | Montagem | 107 | Produção | Medida padrão | 101 Revisão, 108 Preparo, 404 |
-| Preparo | 108 | Produção | Medida padrão | 401 (Corte e separação), 404, 107, 102, 1101, 501 |
+| Preparo | 108 | Produção | Medida padrão | 401 (Corte e separação), 404, 107, 102, 1101, 501, 109 |
+| Etiquetas da produção | 109 | Produção | Medida padrão | 401 e 101 (a lista do planejamento), 404 (a medida de corte), 107, 108, 101, 102, 402 (o motor da etiqueta) |
 
 Nenhuma aba nova; nenhum módulo novo. A caixinha da etapa (fase 1) é um campo na
 linha da 404; o "já cortado" é uma coluna na 1101 e uma linha na lista de compras
@@ -284,8 +448,8 @@ cadastro da pessoa (901).
 | Cortar tubo e base | `producao.cortar_tubo` | Operação | 108 | não |
 | Montar kit de comando | `producao.kit_comando` | Operação | 108 | não |
 | Montar kit de instalação | `producao.kit_instalacao` | Operação | 108 | não |
-| Imprimir maço de etiquetas | `producao.etiqueta` | Operação | 108 | não |
-| Conferir a pré-fabricação, marcar perdida, corrigir lote | `producao.corrigir` | Supervisor | 107 / 108 | **sim** |
+| Imprimir as etiquetas da produção (persiana, tecido, tubo), pelo planejamento e fora dele com motivo | `producao.etiqueta` | **Supervisor** (v7; era Operação na 108) | 109 | não |
+| Conferir a pré-fabricação, marcar perdida, corrigir lote, **cancelar etiqueta** | `producao.corrigir` | Supervisor | 107 / 108 / 109 | **sim** |
 
 Nenhuma chave mexe em saldo (o material baixa na embalagem, como hoje). Setores
 sugeridos (nascem vazios): Operador / Corte, Operador / Kits, Operador / Montagem.
