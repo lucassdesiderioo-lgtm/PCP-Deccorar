@@ -3,7 +3,7 @@
 > **STATUS — 25/11/2026: APROVADA PELO DONO** (*"p1 sim, p2 sim, p3 sim,
 > aprovado"*) · **fases 1 e 2 mescladas em 25/11/2026** (PR #375; o deploy é do
 > dono) · **fase 3 (a trava da 201) construída em 25/11/2026, falta subir** —
-> `teste_trava_dia.js` (65), cartões R-TRV-01 a 04; a D18 ficou como estava
+> `teste_trava_dia.js` (66), cartões R-TRV-01 a 04; a D18 ficou como estava
 > (o dono, 25/11/2026: a adiantada sem conferência também trava).
 >   Na construção (③ REVISÃO, vale o que está aqui): a caixa marcada "não
 >   encontrada" e depois reimpressa também abre a pendência da reimpressa (§7
@@ -11,7 +11,9 @@
 >   aceita depois de a caixa reimpressa baixar (o bipe ou o passivo das nunca
 >   conferidas), para o ajuste não baixar a mesma peça que o passivo; e a 201
 >   abre também com `expedicao.caixa_nao_encontrada` — quem só tem essa chave vê
->   só o quadro da trava, com o aviso de que imprimir pede outra permissão. Testes: `teste_carrinhos.js`
+>   só o quadro da trava, com o aviso de que imprimir pede outra permissão.
+>   E a caixa de várias com item cancelado pelo ML fica fora da trava (decisão do
+>   dono, 25/11/2026, linha em `docs/DECISOES.md`). Testes: `teste_carrinhos.js`
 > (44), `teste_entrega.js` (28), `teste_conferencia_tela.js` (38, num
 > Chromium), `teste_carregamento_tela.js` (11).
 >

@@ -120,6 +120,12 @@ const limpar = () => db.prepare("UPDATE lote SET estagio='carregado', conferido_
   r = await trava();
   ok('o sob medida impresso antes e sem bipe trava igual (D19)', r.caixas.some(c => c.id === sm));
 
+  // ── a caixa de várias com item cancelado fica fora (decisão do dono, 25/11/2026) ──
+  const cv = impressa(1, 'cancelada_varias=1');
+  ok('a caixa de várias com item cancelado pelo ML depois da etiqueta NÃO trava (decisão do dono)',
+     !(await trava()).caixas.some(c => c.id === cv));
+  db.prepare("UPDATE lote SET estagio='carregado', conferido_em=datetime('now','localtime') WHERE id=?").run(cv);
+
   // ── /api/embalar recusa, para todo mundo ──
   const nova = pendente();
   r = await chamar('POST /api/embalar', {id:nova}, ANA);

@@ -25,3 +25,4 @@ parametros:
 - 25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU
 - 25/11/2026 — trava: com caixa impressa num dia anterior e sem conferência, a etiqueta nova não sai até a caixa ser bipada na Conferência; a reimpressão continua liberada, e quem tem a permissão "Caixa não encontrada" solta a caixa perdida e decide a caixa reimpressa no dia seguinte
 - 25/11/2026 — "Persiana perdida" só aparece depois que a caixa reimpressa for bipada na Conferência; quem só decide a trava abre a tela e vê só o quadro
+- 25/11/2026 — a caixa de várias persianas com um item cancelado pelo Mercado Livre depois da etiqueta não trava mais a tela; ela continua esperando decisão no card das canceladas

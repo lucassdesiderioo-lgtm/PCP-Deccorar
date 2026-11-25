@@ -55,7 +55,13 @@ function erro(status, mensagem, extra){
 const ESPERANDO_BIPE = `l.estagio='embalado' AND l.conferido_em IS NULL AND l.embalado_em IS NOT NULL
   AND date(l.embalado_em) < date('now','localtime')
   AND l.saida_id IS NULL AND l.saiu_em IS NULL AND l.retirado_em IS NULL
-  AND COALESCE(l.teste,0)=0`;
+  AND COALESCE(l.teste,0)=0
+  AND COALESCE(l.cancelada_varias,0)=0`;
+/* ⚠️ A CAIXA DE VÁRIAS COM ITEM CANCELADO FICA FORA (decisão do dono,
+   25/11/2026): ela não é cancelada sozinha e espera decisão no card "Canceladas
+   depois da etiqueta"; travar a 201 por ela obrigaria a bipá-la (baixando a
+   peça cancelada) ou a marcá-la "não encontrada" com ela na mão. É a mesma
+   régua do passivo das nunca conferidas. */
 const TRAVA = ESPERANDO_BIPE + ' AND l.nao_encontrada_em IS NULL';
 
 function caixas(db){

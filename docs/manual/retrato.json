@@ -332,7 +332,7 @@
   "R-TRV-01": "411bda11eb7736e0",
   "R-TRV-02": "f2037286b6080e7a",
   "R-TRV-03": "d3f3a7bdfae17f1d",
-  "R-TRV-04": "732c1ceaab4eaed2",
+  "R-TRV-04": "c97842730e9da044",
   "R-URG-01": "01fd9216f36e2cfb",
   "R-URG-02": "e88c40a1019b0bf3",
   "R-VAL-01": "a481ffd1c1c39a27",
@@ -497,7 +497,8 @@
     "19/11/2026 — A etiqueta continua só reservando a peça. A caixa que saiu da fábrica sem passar pela Conferência passa a ter o estoque baixado quando o acerto das caixas não conferidas é feito, uma vez só.",
     "25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU",
     "25/11/2026 — trava: com caixa impressa num dia anterior e sem conferência, a etiqueta nova não sai até a caixa ser bipada na Conferência; a reimpressão continua liberada, e quem tem a permissão \"Caixa não encontrada\" solta a caixa perdida e decide a caixa reimpressa no dia seguinte",
-    "25/11/2026 — \"Persiana perdida\" só aparece depois que a caixa reimpressa for bipada na Conferência; quem só decide a trava abre a tela e vê só o quadro"
+    "25/11/2026 — \"Persiana perdida\" só aparece depois que a caixa reimpressa for bipada na Conferência; quem só decide a trava abre a tela e vê só o quadro",
+    "25/11/2026 — a caixa de várias persianas com um item cancelado pelo Mercado Livre depois da etiqueta não trava mais a tela; ela continua esperando decisão no card das canceladas"
    ],
    "situacao": "rascunho"
   },
