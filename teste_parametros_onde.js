@@ -74,7 +74,7 @@ console.log('\n── 4. a rota ──');
 const AT = ler('admin_telas.js');
 ok('GET /api/parametros/onde registrada no admin_telas.js', /app\.get\('\/api\/parametros\/onde'/.test(AT));
 const AC = ler('acesso.js');
-ok('   com linha no permDaRota: quem abre a 906', /eq\('\/api\/parametros\/onde'\)\)\s*return\s*\['sobmedida\.parametro\.ler',\s*'sobmedida\.parametro\.editar',\s*'@admin'\]/.test(AC));
+ok('   com linha no permDaRota: quem abre a 906', /eq\('\/api\/parametros\/onde'\)\)\s*return\s*\['sobmedida\.parametro\.ler',\s*'sobmedida\.parametro\.editar',\s*'producao\.corrigir',\s*'@admin'\]/.test(AC));
 
 console.log('\n── 5. a tela ──');
 const PAR = ler('public/parametros.html');

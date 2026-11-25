@@ -171,10 +171,34 @@ function usar(db, codigo, tipo){
   if(!t || t.desconhecida) throw new Recusa('Etiqueta não reconhecida: ' + limpar(codigo) + '.', 404);
   if(t.tipo !== tipo) throw new Recusa(rotulo(t) + ' não é etiqueta de ' + TIPOS[tipo] + '.');
   if(t.situacao === 'cancelada') throw new Recusa(rotulo(t) + ' foi cancelada (' + (t.cancelada_motivo || 'sem motivo') + ').', 409);
-  if(t.situacao !== 'livre') throw new Recusa(rotulo(t) + ' já foi usada em ' + (t.usada_em || '?') + '.', 409);
+  if(t.situacao !== 'livre') throw new Recusa(rotulo(t) + ' já foi usada' + ondeUsada(db, t) + '.', 409);
   db.prepare("UPDATE etiqueta_producao SET situacao='usada', usada_em=datetime('now','localtime') WHERE id=? AND situacao='livre'").run(t.id);
   return t;
 }
+/* "em 25/11 às 17:53, por Ana, como 1,50 × 1,50 BEGE" — a recusa diz quando,
+   por quem e como (§14.4), com a data de fabrica e nao a do banco (③ REVISAO). */
+function ondeUsada(db, t){
+  const quando = t.usada_em ? ' em ' + t.usada_em.slice(8, 10) + '/' + t.usada_em.slice(5, 7) + ' às ' + t.usada_em.slice(11, 16) : '';
+  let quem = '', como = '';
+  try{
+    if(t.tipo === 'PS'){
+      const p = db.prepare('SELECT montada_por FROM persiana WHERE etiqueta_id=?').get(t.id);
+      if(p && p.montada_por) quem = ', por ' + p.montada_por;
+      como = ', na persiana ' + rotulo(t);
+    } else {
+      const c = db.prepare('SELECT l.usuario_nome, l.descricao FROM corte_peca cp JOIN corte_lote l ON l.id=cp.lote_id WHERE cp.etiqueta_id=?').get(t.id);
+      if(c){ if(c.usuario_nome) quem = ', por ' + c.usuario_nome; if(c.descricao) como = ', como ' + c.descricao; }
+    }
+  }catch(e){}
+  return quando + quem + como;
+}
+/* A proxima etiqueta LIVRE do maco (a de cima da mesa), para a bancada. A
+   `proxima` e o proximo numero a IMPRIMIR, para a 401. */
+function proximaLivre(db, tipo){
+  const r = db.prepare("SELECT MIN(numero) n FROM etiqueta_producao WHERE tipo=? AND situacao='livre'").get(tipo);
+  return r && r.n ? tipo + ' ' + pad(r.n, 6) : null;
+}
+
 /* Devolver ao maco a etiqueta de um corte cancelado. */
 function soltar(db, id){
   db.prepare("UPDATE etiqueta_producao SET situacao='livre', usada_em=NULL WHERE id=? AND situacao='usada'").run(id);
@@ -265,6 +289,6 @@ function buscar(db, texto){
   return null;
 }
 
-module.exports = { Recusa, buscar, TIPOS, PARTES, MOTIVOS_FORA, MAX, DIAS_PARADA_PADRAO, garantirSchema,
+module.exports = { Recusa, buscar, proximaLivre, TIPOS, PARTES, MOTIVOS_FORA, MAX, DIAS_PARADA_PADRAO, garantirSchema,
   codigoDe, rotulo, limpar, reservado, traduzir, skuDoBipe, usar, soltar,
   imprimirMaco, imprimirPersianas, cancelar, naoUsadas, livres, proxima, historico, paraReimprimir, diasParada };

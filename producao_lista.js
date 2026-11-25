@@ -110,7 +110,12 @@ function contagens(db){
   db.prepare("SELECT UPPER(sku) c, COUNT(*) n FROM etiqueta_producao WHERE tipo='PS' AND situacao='livre' GROUP BY UPPER(sku)").all()
     .forEach(r => { livresPS[r.c] = r.n; });
   const up = o => { const m = {}; Object.keys(o).forEach(k => { m[k.toUpperCase()] = o[k]; }); return m; };
+  const bip = MONT.emMontagemBipado(db);
   return { carrinho:MONT.noCarrinho(db), montando:MONT.emMontagem(db), livresPS,
+    /* ③ REVISAO (25/11/2026): o corte e as etiquetas descontam do lote aberto
+       SO o que ele ja tirou (o ② do tecido, o ③ do tubo, o ① da etiqueta): o
+       resto ainda esta na prateleira (ou livre), e ja e descontado la. */
+    montTec:bip.tecido, montTub:bip.tubo, montPS:bip.ps,
     tecPrat:up(CORTE.naPrateleira(db, 'tecido')), tecCorte:up(CORTE.emCorte(db, 'tecido')),
     tubPrat:CORTE.naPrateleira(db, 'tubo'), tubCorte:CORTE.emCorte(db, 'tubo') };
 }
@@ -150,7 +155,7 @@ function listaTecido(db){
   const b = base(db), c = b.cont, itens = [];
   for(const { nec, p } of b.ok){
     const k = nec.codigo.toUpperCase();
-    const pronto = (c.carrinho[k] || 0) + (c.montando[k] || 0);
+    const pronto = (c.carrinho[k] || 0) + (c.montTec[k] || 0);
     const partes = descontar(descontar(nec, pronto), (c.tecPrat[k] || 0) + (c.tecCorte[k] || 0));
     const tot = partes.hoje + somaDias(partes) + partes.alvo;
     if(!tot) continue;
@@ -166,7 +171,7 @@ function listaTubo(db){
   const b = base(db), c = b.cont, grupos = new Map();
   for(const { nec, p } of b.ok){
     const k = nec.codigo.toUpperCase();
-    const partes = descontar(nec, (c.carrinho[k] || 0) + (c.montando[k] || 0));
+    const partes = descontar(nec, (c.carrinho[k] || 0) + (c.montTub[k] || 0));
     let g = grupos.get(p.tubo.item);
     if(!g){ g = { p, skus:[], nec:{ hoje:0, dias:b.dias.map(d => ({ dia:d.dia, rotulo:d.rotulo, n:0 })), alvo:0 } }; grupos.set(p.tubo.item, g); }
     g.skus.push(nec.codigo);
@@ -197,7 +202,7 @@ function etiquetas(db){
   const b = base(db), c = b.cont;
   const rows = b.ok.map(({ nec, p }) => {
     const k = nec.codigo.toUpperCase();
-    const partes = descontar(nec, (c.carrinho[k] || 0) + (c.montando[k] || 0) + (c.livresPS[k] || 0));
+    const partes = descontar(nec, (c.carrinho[k] || 0) + (c.montPS[k] || 0) + (c.livresPS[k] || 0));
     return { sku:nec.codigo, k, p, nec, partes };
   });
   const livreTec = {}, livreTub = {};
@@ -234,7 +239,7 @@ function etiquetas(db){
     alvo:{ itens:alvo, total:alvo.reduce((a, x) => a + x.n, 0), falta:alvo.reduce((a, x) => a + x.falta, 0),
            aberto:totalDia === 0 && faltaAmanha === 0 },
     conta: rows.map(r => ({ sku:r.sku, hoje:r.nec.hoje, na_embalagem:r.nec.na_embalagem, carrinho:c.carrinho[r.k] || 0,
-      montando:c.montando[r.k] || 0, impressas:c.livresPS[r.k] || 0, imprimir_hoje:r.partes.hoje,
+      montando:c.montPS[r.k] || 0, impressas:c.livresPS[r.k] || 0, imprimir_hoje:r.partes.hoje,
       tecido:c.tecPrat[r.k] || 0, tubo:c.tubPrat[r.p.tubo.item] || 0 })).filter(x => x.hoje || x.carrinho || x.impressas || x.imprimir_hoje),
     fora:b.fora
   };
@@ -243,17 +248,24 @@ function etiquetas(db){
 /* O que a impressao de uma parte imprime — a conta e do servidor, nunca da
    tela. No alvo, `quantidade` e quantas o Supervisor pediu (ex.: 20), e a
    reparticao segue a ordem do alvo. */
+/* No maximo ETQ.MAX por vez (③ REVISAO): acima disso a impressao sai em partes
+   — a tela pede de novo, e a conta devolve o que falta. Nunca trava. */
+function teto(l){
+  let resto = ETQ.MAX; const out = [];
+  for(const x of l){ if(resto <= 0) break; const q = Math.min(resto, x.quantidade); out.push({ sku:x.sku, quantidade:q }); resto -= q; }
+  return out;
+}
 function paraImprimir(db, parte, quantidade){
   const e = etiquetas(db);
   if(parte === 'dia'){
     if(!e.dia.total) throw new ETQ.Recusa('Toda a necessidade de hoje já tem etiqueta.', 409);
-    return e.dia.itens.map(x => ({ sku:x.sku, quantidade:x.n }));
+    return teto(e.dia.itens.map(x => ({ sku:x.sku, quantidade:x.n })));
   }
   if(parte === 'proximos'){
     if(!e.proximos.aberto) throw new ETQ.Recusa('Os próximos dias abrem quando toda a necessidade de hoje tiver etiqueta.', 409);
     const l = e.proximos.itens.filter(x => x.n > 0).map(x => ({ sku:x.sku, quantidade:x.n }));
     if(!l.length) throw new ETQ.Recusa(e.proximos.falta ? 'Não há tecido e tubo cortados livres para os próximos dias.' : 'Os próximos dias já têm etiqueta.', 409);
-    return l;
+    return teto(l);
   }
   if(parte === 'alvo'){
     if(!e.alvo.aberto) throw new ETQ.Recusa('O alvo abre quando o dia seguinte inteiro tiver etiqueta.', 409);
@@ -262,10 +274,27 @@ function paraImprimir(db, parte, quantidade){
     const l = [];
     for(const x of e.alvo.itens){ if(q <= 0) break; const k = Math.min(q, x.n); if(k > 0){ l.push({ sku:x.sku, quantidade:k }); q -= k; } }
     if(!l.length) throw new ETQ.Recusa(e.alvo.falta ? 'Não há tecido e tubo cortados livres para o alvo.' : 'O alvo está completo.', 409);
-    return l;
+    return teto(l);
   }
   throw new ETQ.Recusa('Parte desconhecida.');
 }
 
-module.exports = { garantirSchema, pecasDoSku, descreverItem, necessidade, descontar, listaMontagem, listaTecido, listaTubo,
+/* Os itens que a ficha conhece, com ou sem falta: a ENTRADA INICIAL da virada
+   (§14.10) lanca o que ja esta cortado, e a prateleira pode ter item que hoje
+   nao falta. O tecido e o SKU; o tubo, o material + a medida de corte. */
+function itensConhecidos(db, tipo){
+  const cache = {}, vistos = new Map();
+  const temAtivo = db.prepare('PRAGMA table_info(skus)').all().some(c => c.name === 'ativo');
+  for(const s of db.prepare('SELECT codigo FROM skus' + (temAtivo ? ' WHERE COALESCE(ativo,1)=1' : '') + ' ORDER BY codigo').all()){
+    const p = pecasDoSku(db, s.codigo, cache);
+    if(p.erro) continue;
+    if(tipo === 'tecido') vistos.set(p.tecido.item, { chave:p.tecido.item, titulo:p.final, cor:p.cor, sub:p.tecido.texto + ' · ' + s.codigo,
+      corte_l:p.tecido.corte_l, corte_a:p.tecido.corte_a, hoje:0, dias:[], proximos:0, alvo:0, primeiro_dia:'9999' });
+    else if(!vistos.has(p.tubo.item)) vistos.set(p.tubo.item, { chave:p.tubo.item, titulo:'Tubo ' + n2(p.largura_cm), cor:p.tubo.material + ' + base',
+      sub:p.tubo.texto, corte:p.tubo.corte, hoje:0, dias:[], proximos:0, alvo:0, primeiro_dia:'9999' });
+  }
+  return [...vistos.values()];
+}
+
+module.exports = { garantirSchema, itensConhecidos, pecasDoSku, descreverItem, necessidade, descontar, listaMontagem, listaTecido, listaTubo,
   etiquetas, paraImprimir };

@@ -158,7 +158,11 @@ module.exports=function(app,db){
     try{ pers=MONTP.paraRevisar(db,cod); }
     catch(e){ if(e instanceof MONTP.Recusa) return res.status(e.status).json({erro:e.message,motivo:'persiana'}); throw e; }
     if(pers) cod=pers.etiqueta.sku;
-    else if(ETQP.traduzir(db,cod)) return res.status(409).json({erro:'Esta etiqueta não é de persiana: bipe a etiqueta de SKU.',motivo:'persiana'});
+    else if(ETQP.traduzir(db,cod) && !db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(cod)){
+      /* o SKU antigo com a forma de etiqueta continua revisando pelo SKU (③) */
+      const t=ETQP.traduzir(db,cod);
+      return res.status(409).json({erro:t.desconhecida?'Etiqueta não reconhecida: '+cod+'.':'Esta etiqueta é de '+(t.tipo==='TC'?'tecido':'tubo')+': bipe a etiqueta de SKU da persiana.',motivo:'persiana'});
+    }
     if(!db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(cod)) return res.status(404).json({erro:'SKU não cadastrado: '+cod});
     /* TELA ÚNICA (REVISAO-TELA-UNICA, 23/11/2026): quem decide para que a peça
        serve é o servidor, no bipe que fecha — 'hoje' se ela cobre uma venda
@@ -180,7 +184,7 @@ module.exports=function(app,db){
       const id=db.prepare('INSERT INTO revisao (codigo,inicio,fim,segundos,usuario_id,usuario_nome,modo) VALUES (?,?,?,?,?,?,?)')
         .run(cod,inicio,fim,seg,q.usuario_id,q.usuario_nome,modo).lastInsertRowid;
       db.prepare('INSERT INTO fila (codigo,modo,revisao_id) VALUES (?,?,?)').run(cod,modo,id);
-      if(pers) MONTP.revisada(db,pers.persiana.id,id);
+      if(pers) MONTP.revisada(db,pers.persiana.id,id,pers.troca);
       novo=id;
     })();
     const est=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(cod);

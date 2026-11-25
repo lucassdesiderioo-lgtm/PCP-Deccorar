@@ -96,7 +96,7 @@ function marcar(db, d, quem, emTeste, filaId){
         VALUES ('devolvida_embalagem',?,?,?,?,?,?,?,?)`).run(rv.id, rv.codigo, rv.segundos, rv.modo,
         rv.inicio, rv.fim, quem.usuario_id, quem.usuario_nome);
       db.prepare('DELETE FROM revisao WHERE id=?').run(rv.id);
-      require('./montagem_persiana').revisaoApagada(db, rv.id);   // a persiana em serie volta ao carrinho (PRODUCAO-MAPA-E-MOTOR v7)
+      require('./montagem_persiana').revisaoApagada(db, rv.id, true);   // a persiana em serie volta ao carrinho (PRODUCAO-MAPA-E-MOTOR v7)
     }
   }
   const id = db.prepare(`INSERT INTO embalagem_defeito (codigo,fila_id,modo,motivo,obs,segundos,achou_por_id,achou_por,

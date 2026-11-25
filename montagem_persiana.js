@@ -38,7 +38,11 @@ function garantirSchema(db){
       situacao TEXT NOT NULL DEFAULT 'montando',
       inicio TEXT DEFAULT (datetime('now','localtime')), fim TEXT,
       montada_por TEXT, montada_por_id INTEGER,
-      revisao_id INTEGER, revisada_em TEXT, embalada_em TEXT)`);
+      revisao_id INTEGER, revisada_em TEXT, embalada_em TEXT,
+      voltou_defeito INTEGER DEFAULT 0)`);
+  /* a coluna no banco de antes desta revisao (③, 25/11/2026), no fim (§17) */
+  const cols = db.prepare('PRAGMA table_info(persiana)').all().map(c => c.name);
+  if(cols.indexOf('voltou_defeito') < 0) db.exec('ALTER TABLE persiana ADD COLUMN voltou_defeito INTEGER DEFAULT 0');
   db.exec(`CREATE INDEX IF NOT EXISTS ix_persiana_sku ON persiana(sku, situacao)`);
 }
 
@@ -73,9 +77,29 @@ function cabe(db, sku){
   const L = LISTA();
   const info = L.pecasDoSku(db, sku);
   if(info.erro) return { erro:info.erro, n:0 };
-  const tec = CORTE.naPrateleira(db, 'tecido')[info.tecido.item] || 0;
-  const tub = CORTE.naPrateleira(db, 'tubo')[info.tubo.item] || 0;
-  return { n:Math.min(tec, tub), tecido:tec, tubo:tub, info };
+  /* ③ REVISAO (25/11/2026): o que um lote aberto ainda vai tirar da prateleira
+     (as pecas dele sem o ② ou sem o ③) ja esta prometido — sem descontar, duas
+     pessoas abriam 3 cada com 3 cortados, e a segunda so descobria no ②. */
+  const res = reservado(db);
+  const tec = Math.max(0, (CORTE.naPrateleira(db, 'tecido')[info.tecido.item] || 0) - (res.tecido[info.tecido.item] || 0));
+  let tubRes = 0;
+  for(const k of Object.keys(res.tuboPorSku)){ const pi = L.pecasDoSku(db, k); if(!pi.erro && pi.tubo.item === info.tubo.item) tubRes += res.tuboPorSku[k]; }
+  const tub = Math.max(0, (CORTE.naPrateleira(db, 'tubo')[info.tubo.item] || 0) - tubRes);
+  return { n:Math.min(tec, tub), tecido:tec, tubo:tub, info,
+    tecido_prateleira:CORTE.naPrateleira(db, 'tecido')[info.tecido.item] || 0, tubo_prateleira:CORTE.naPrateleira(db, 'tubo')[info.tubo.item] || 0 };
+}
+/* O que os lotes abertos ainda vao tirar da prateleira: por SKU, as pecas do
+   lote que ainda nao tem o tecido (e o tubo). O tecido do item e o proprio SKU. */
+function reservado(db){
+  const tecido = {}, tuboPorSku = {};
+  db.prepare(`SELECT l.sku, l.quantidade,
+      (SELECT COUNT(*) FROM persiana p WHERE p.lote_id=l.id AND p.tecido_peca_id IS NOT NULL) ct,
+      (SELECT COUNT(*) FROM persiana p WHERE p.lote_id=l.id AND p.tubo_peca_id IS NOT NULL) cb
+    FROM montagem_lote l WHERE l.situacao='aberto'`).all().forEach(r => {
+      tecido[r.sku] = (tecido[r.sku] || 0) + Math.max(0, r.quantidade - r.ct);
+      tuboPorSku[r.sku] = (tuboPorSku[r.sku] || 0) + Math.max(0, r.quantidade - r.cb);
+    });
+  return { tecido, tuboPorSku };
 }
 
 function iniciar(db, d, quem){
@@ -87,6 +111,8 @@ function iniciar(db, d, quem){
   if(aberto(db, quem)) throw new Recusa('Termine ou cancele a montagem aberta antes.', 409);
   const c = cabe(db, s.codigo);
   if(c.erro) throw new Recusa(s.codigo + ': ' + c.erro);
+  if(c.n < 1 && (c.tecido < 1 ? c.tecido_prateleira : c.tubo_prateleira) > 0)
+    throw new Recusa('O ' + (c.tecido < 1 ? 'tecido' : 'tubo') + ' cortado para o ' + s.codigo + ' já está separado para outra montagem em andamento.', 409);
   if(c.n < 1) throw new Recusa('Não há ' + (c.tecido < 1 ? 'tecido' : 'tubo') + ' cortado para o ' + s.codigo + '. Ele precisa passar pel' + (c.tecido < 1 ? 'o corte de tecido (108)' : 'a serralheria (110)') + ' antes.', 409);
   if(q > c.n) throw new Recusa('Só há tecido e tubo cortados para ' + c.n + '.', 409);
   db.prepare('INSERT INTO montagem_lote (sku, quantidade, usuario_id, usuario_nome) VALUES (?,?,?,?)').run(s.codigo, q, p.id, p.nome);
@@ -125,6 +151,9 @@ function bipar(db, codigo, quem){
       if(t.desconhecida) throw new Recusa('Etiqueta não reconhecida: ' + t.codigo + '.', 404);
       if(t.sku !== l.sku) throw new Recusa(ETQ.rotulo(t) + ' é de outro SKU. Esta montagem é do ' + l.sku + '.');
       const e = ETQ.usar(db, t.codigo, 'PS');
+      /* O tempo e do PRIMEIRO ① ao ultimo ④ (§14.4): o toque no cartao e o OK
+         do teclado nao contam (③ REVISAO). */
+      if(!l.pecas.length) db.prepare("UPDATE montagem_lote SET inicio=datetime('now','localtime') WHERE id=?").run(l.id);
       db.prepare(`INSERT INTO persiana (etiqueta_id, codigo, sku, numero, lote_id) VALUES (?,?,?,?,?)`).run(e.id, e.codigo, e.sku, e.numero, l.id);
       return { aberto:aberto(db, quem) };
     }
@@ -168,7 +197,20 @@ function noCarrinho(db){
   db.prepare("SELECT sku, COUNT(*) n FROM persiana WHERE situacao='montada' GROUP BY sku").all().forEach(r => { m[String(r.sku).toUpperCase()] = r.n; });
   return m;
 }
-/* Sendo montadas agora: o lote aberto inteiro, ja e trabalho na mao de alguem. */
+/* O que os lotes abertos JA tiraram de cada lado (③ REVISAO, 25/11/2026): a
+   persiana com a etiqueta de SKU ja bipada (o ①), com o tecido (②), com o
+   tubo (③). A lista do corte desconta so isso — o resto do lote ainda esta na
+   prateleira, e descontar o lote inteiro contaria a mesma peca duas vezes. */
+function emMontagemBipado(db){
+  const ps = {}, tecido = {}, tubo = {};
+  db.prepare(`SELECT p.sku, COUNT(*) n, SUM(CASE WHEN p.tecido_peca_id IS NOT NULL THEN 1 ELSE 0 END) ct,
+      SUM(CASE WHEN p.tubo_peca_id IS NOT NULL THEN 1 ELSE 0 END) cb
+    FROM persiana p JOIN montagem_lote l ON l.id=p.lote_id WHERE l.situacao='aberto' AND p.situacao='montando' GROUP BY p.sku`).all()
+    .forEach(r => { const k = String(r.sku).toUpperCase(); ps[k] = r.n; tecido[k] = r.ct; tubo[k] = r.cb; });
+  return { ps, tecido, tubo };
+}
+/* Sendo montadas agora: o lote aberto inteiro, ja e trabalho na mao de alguem
+   (a lista da 107 desconta isto). */
 function emMontagem(db){
   const m = {};
   db.prepare(`SELECT l.sku, SUM(l.quantidade - (SELECT COUNT(*) FROM persiana p WHERE p.lote_id=l.id AND p.situacao<>'montando')) n
@@ -204,17 +246,42 @@ function paraRevisar(db, codigo){
   if(r.etiqueta.situacao === 'cancelada') throw new Recusa(rot + ' foi cancelada.', 409);
   if(!r.persiana) throw new Recusa(rot + ' ainda não passou pela montagem (107): monte a persiana antes de revisar.', 409);
   if(r.persiana.situacao === 'montando') throw new Recusa(rot + ' ainda está sendo montada.', 409);
-  if(r.persiana.situacao !== 'montada') throw new Recusa(rot + ' já foi revisada.', 409);
+  if(r.persiana.situacao === 'revisada'){
+    /* ③ REVISAO (25/11/2026): a Embalagem ainda nao sabe QUAL persiana devolveu
+       por defeito (fase 4): ela volta a linha mais antiga do SKU, e a persiana
+       daquela revisao vai para o carrinho marcada `voltou_defeito`. Se e OUTRA
+       que volta fisicamente a revisao, as duas trocam de lugar: esta passa a
+       ser a revisada de volta ao carrinho, e a marcada fica com a revisao dela. */
+    const troca = db.prepare("SELECT id FROM persiana WHERE sku=? AND situacao='montada' AND voltou_defeito=1 ORDER BY id LIMIT 1").get(r.persiana.sku);
+    if(!troca) throw new Recusa(rot + ' já foi revisada.', 409);
+    r.troca = troca.id;
+    return r;
+  }
+  if(r.persiana.situacao !== 'montada' && r.persiana.situacao !== 'problema') throw new Recusa(rot + ' já foi revisada.', 409);
   return r;
 }
-function revisada(db, persiana_id, revisao_id){
-  db.prepare("UPDATE persiana SET situacao='revisada', revisao_id=?, revisada_em=datetime('now','localtime') WHERE id=? AND situacao='montada'").run(revisao_id, persiana_id);
+function revisada(db, persiana_id, revisao_id, troca){
+  if(troca){
+    const p = db.prepare('SELECT revisao_id, revisada_em FROM persiana WHERE id=?').get(persiana_id);
+    db.prepare("UPDATE persiana SET situacao='revisada', revisao_id=?, revisada_em=?, voltou_defeito=0 WHERE id=?").run(p.revisao_id, p.revisada_em, troca);
+    db.prepare("UPDATE persiana SET situacao='montada', revisao_id=NULL, revisada_em=NULL WHERE id=?").run(persiana_id);
+  }
+  db.prepare("UPDATE persiana SET situacao='revisada', revisao_id=?, revisada_em=datetime('now','localtime'), voltou_defeito=0 WHERE id=? AND situacao IN ('montada','problema')").run(revisao_id, persiana_id);
+}
+/* A peca com problema na revisao (R-REV-06): a persiana sai do carrinho (a lista
+   do corte e da montagem voltam a pedir a peca), e volta a ser revisavel quando
+   for consertada. Quem a devolve a quem fez a etapa e a fase 5. */
+function comProblema(db, codigo){
+  const r = porEtiqueta(db, codigo);
+  if(!r || !r.persiana || r.persiana.situacao !== 'montada') return false;
+  db.prepare("UPDATE persiana SET situacao='problema' WHERE id=?").run(r.persiana.id);
+  return true;
 }
 /* A revisao apagada (o "Desfazer", a peca devolvida pela embalagem) devolve a
    persiana ao carrinho da revisao. Sem a tabela (banco antigo, teste), nada. */
-function revisaoApagada(db, revisao_id){
-  try{ db.prepare("UPDATE persiana SET situacao='montada', revisao_id=NULL, revisada_em=NULL WHERE revisao_id=?").run(revisao_id); }
+function revisaoApagada(db, revisao_id, porDefeito){
+  try{ db.prepare("UPDATE persiana SET situacao='montada', revisao_id=NULL, revisada_em=NULL, voltou_defeito=? WHERE revisao_id=?").run(porDefeito ? 1 : 0, revisao_id); }
   catch(e){ if(!/no such table/.test(e.message)) throw e; }
 }
 
-module.exports = { Recusa, garantirSchema, paraRevisar, revisada, revisaoApagada, aberto, iniciar, bipar, cancelar, noCarrinho, emMontagem, porEtiqueta, cabe, doDia };
+module.exports = { Recusa, garantirSchema, paraRevisar, revisada, revisaoApagada, comProblema, emMontagemBipado, reservado, aberto, iniciar, bipar, cancelar, noCarrinho, emMontagem, porEtiqueta, cabe, doDia };

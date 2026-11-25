@@ -69,11 +69,11 @@ const TELAS = [
   /* A PRODUCAO DA MEDIDA PADRAO (PRODUCAO-MAPA-E-MOTOR v7, §14.4, 25/11/2026):
      as bancadas no formato da 101 (a lista hoje → proximos dias → alvo). A rota
      /montagem e da Embalagem (102); a montagem da persiana e /montagem-persiana. */
-  { n:107, nome:'Montagem',              rota:'/montagem-persiana', nivel:'operacao', onde:'tablet',   perms:['producao.montar'],
+  { n:107, nome:'Montagem',              rota:'/montagem-persiana', nivel:'operacao', onde:'tablet',   perms:['producao.montar'],   area:'montagem_persiana',
     modulo:'producao', bloco:'medida_padrao', liga:[108, 110, 101, 404, 401] },
-  { n:108, nome:'Corte de tecido',       rota:'/corte-tecido',  nivel:'operacao',   onde:'tablet',     perms:['producao.cortar_tecido'],
+  { n:108, nome:'Corte de tecido',       rota:'/corte-tecido',  nivel:'operacao',   onde:'tablet',     perms:['producao.cortar_tecido'], area:'corte_tecido',
     modulo:'producao', bloco:'medida_padrao', liga:[401, 404, 107] },
-  { n:110, nome:'Serralheria',           rota:'/serralheria',   nivel:'operacao',   onde:'tablet',     perms:['producao.cortar_tubo'],
+  { n:110, nome:'Serralheria',           rota:'/serralheria',   nivel:'operacao',   onde:'tablet',     perms:['producao.cortar_tubo'], area:'serralheria',
     modulo:'producao', bloco:'medida_padrao', liga:[401, 404, 107] },
   { n:104, nome:'Problemas',             rota:'/admin/problemas', nivel:'admin',    onde:'computador', perms:['@admin'],                aba:'pb',
     modulo:'producao', bloco:'medida_padrao', liga:[101] },
@@ -219,7 +219,7 @@ const TELAS = [
    alcança decide. É a ordem que existia no `PADRAO`, e mudá-la mudaria para
    onde cada pessoa vai de manhã — por isso ela é uma lista própria, e não a
    ordem do mapa. O Admin (a porta '/admin') vem primeiro, como sempre. */
-const CHEGADA = [105, 101, 102, 201, 202, 103, 904, 401, 502, 303, 251, 252, 503];   // a 503 no fim: quem só tem volume.movimentar (revisão do PR #305)   // a 103 no lugar da 203 (05/11/2026)
+const CHEGADA = [105, 101, 102, 201, 202, 103, 904, 401, 502, 303, 251, 252, 503, 107, 108, 110];   // as bancadas da producao no fim (PRODUCAO-MAPA-E-MOTOR v7, ③): quem so tem a chave delas chega nelas   // a 503 no fim: quem só tem volume.movimentar (revisão do PR #305)   // a 103 no lugar da 203 (05/11/2026)
 
 const NIVEIS = ['operacao', 'supervisor', 'admin', 'admin_geral'];
 const NOME_NIVEL = { operacao:'Operação', supervisor:'Supervisor', admin:'Admin', admin_geral:'Admin Geral' };

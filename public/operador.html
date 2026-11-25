@@ -669,7 +669,7 @@ document.addEventListener('click',function(e){
   var ctl=(window.AbortController?new AbortController():null);
   var prazo=setTimeout(function(){ if(ctl) ctl.abort(); },20000);
   fetch('/api/rejeicao',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl?ctl.signal:undefined,
-    body:JSON.stringify({codigo:cur.codigo,motivo:motivo,obs:obs,segundos:seg,modo:null})})
+    body:JSON.stringify({codigo:cur.codigo,serie:cur.serie||null,motivo:motivo,obs:obs,segundos:seg,modo:null})})   // a persiana em série sai do carrinho (PRODUCAO-MAPA-E-MOTOR v7)
    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok&&!j.erro, j:j}; }); })
    .then(function(x){
      clearTimeout(prazo);

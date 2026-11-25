@@ -916,7 +916,7 @@ module.exports = function(app, db){
     // As telas que a pessoa abre (fase 5): cada um ve as proprias, so nome e endereco.
     if(eq('/api/telas/minhas')) return '@logado';
     /* Onde cada ajuste da 906 vale: de quem abre a 906 (AJUSTE de 24/11/2026). */
-    if(eq('/api/parametros/onde')) return ['sobmedida.parametro.ler', 'sobmedida.parametro.editar', '@admin'];
+    if(eq('/api/parametros/onde')) return ['sobmedida.parametro.ler', 'sobmedida.parametro.editar', 'producao.corrigir', '@admin'];   // + a etiqueta parada (PRODUCAO-MAPA-E-MOTOR v7)
     /* O MANUAL (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026): seis leituras. "Ver
        todas as telas" é chave própria (D8); o resto é de quem lê o manual. A tela
        /manual sai do mapa, como as outras. ANTES do pre('/api/manual'): a linha
@@ -1410,6 +1410,11 @@ module.exports = function(app, db){
     ['devolucao.acompanhar','devolucao_casos'], ['devolucao.lancar','devolucao_casos'], ['devolucao.dinheiro','devolucao_casos'],
     ['painel.ver','painel'], ['relatorios.ver','relatorios'], ['necessidade.ver','necessidade'],
     ['pedido.receber','recebimento'],
+    /* A producao da medida padrao (PRODUCAO-MAPA-E-MOTOR v7, ③ REVISAO): sem a
+       area, quem so tem a chave da bancada voltava ao login depois do PIN. A
+       etiqueta da 401 leva a area da 401 (necessidade). */
+    ['producao.montar','montagem_persiana'], ['producao.cortar_tecido','corte_tecido'], ['producao.cortar_tubo','serralheria'],
+    ['producao.etiqueta','necessidade'],
     // A 503 (revisão do PR #305): sem a área, quem só tem esta chave voltava ao login.
     ['volume.movimentar','almoxarifado'],
     /* A tela de conferencia (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA). A area

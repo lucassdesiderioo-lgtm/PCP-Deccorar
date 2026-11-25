@@ -20,7 +20,7 @@ const ETQ = require('./etiqueta_producao');
 const CORPO = {
   '/api/montagem':['codigo'], '/api/montagem/reservar':['codigo'], '/api/montagem/renovar':['codigo'],
   '/api/montagem/defeito':['codigo'], '/api/montagem/cancelar':['codigo'],
-  '/api/lote/conferir':['codigo'], '/api/carregar/peca':['sku'], '/api/carregamento/sobra':['skus'],
+  '/api/lote/conferir':['codigo'], '/api/carregar':['sku'], '/api/carregar/peca':['sku'], '/api/carregamento/sobra':['skus'],
   '/api/inventario/bipe':['codigo']
 };
 

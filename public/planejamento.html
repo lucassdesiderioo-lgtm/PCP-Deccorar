@@ -731,7 +731,7 @@ let EP=null, EP_MSG=null, EP_SKUS=null;
 function epEsc(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 function epHora(s){ return s ? String(s).slice(11,16) : ''; }
 async function etiquetasAba(){
-  if(EP && epDigitando()) return;   // §12: o redesenho nao apaga o que se digita
+  if(EP && epDigitando()) return;   // §12: com o foco num campo, espera (o resto o epDesenhar devolve)
   try{ const r=await fetch('/api/producao/etiquetas'); EP = r.ok ? await r.json() : { erro:(await r.json().catch(function(){ return {}; })).erro || ('erro '+r.status) }; }
   catch(e){ EP={ erro:'Não deu para falar com o servidor.' }; }
   if(!EP_SKUS){ try{ EP_SKUS=(await (await fetch('/api/skus')).json()).filter(function(s){ return s.ativo!==0 && s.largura_cm!=null; }).map(function(s){ return s.codigo; }); }catch(e){ EP_SKUS=[]; } }
@@ -740,6 +740,19 @@ async function etiquetasAba(){
 function epDigitando(){ const a=document.activeElement; return a && a.closest && a.closest('#epCorpo') && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName); }
 function epDesenhar(){
   const box=document.getElementById('epCorpo');
+  /* §12 (③ REVISAO): o redesenho devolve o que estava digitado e marcado, com
+     foco ou sem — a quantidade do maço, o fora do planejamento, a reimpressão e
+     as caixinhas das não usadas. */
+  const guardado={}, marcadas=new Set();
+  box.querySelectorAll('input[id],select[id]').forEach(function(x){ guardado[x.id]=x.value; });
+  box.querySelectorAll('[data-nu]:checked').forEach(function(x){ marcadas.add(x.getAttribute('data-nu')); });
+  try{ epDesenhar0(box); }
+  finally{
+    Object.keys(guardado).forEach(function(id){ const x=document.getElementById(id); if(x && box.contains(x)) x.value=guardado[id]; });
+    box.querySelectorAll('[data-nu]').forEach(function(x){ if(marcadas.has(x.getAttribute('data-nu'))) x.checked=true; });
+  }
+}
+function epDesenhar0(box){
   if(!EP || EP.erro){ box.innerHTML='<div class="eb"><div class="emsg err">Não deu para carregar a aba: '+epEsc(EP&&EP.erro)+'</div></div>'; return; }
   const a=EP.aba, h=[];
   if(EP_MSG) h.push('<div class="eb"><div class="emsg '+(EP_MSG.err?'err':'okk')+'">'+epEsc(EP_MSG.t)+'</div></div>');
@@ -801,7 +814,7 @@ async function epPost(url, corpo, ok){
 document.getElementById('epCorpo').addEventListener('click',function(e){
   const b=e.target.closest('[data-ep]'); if(!b) return;
   const k=b.getAttribute('data-ep'), v=function(id){ const x=document.getElementById(id); return x?x.value:''; };
-  const n=function(r){ return r.quantidade+' etiqueta'+(r.quantidade>1?'s':'')+' impressa'+(r.quantidade>1?'s':'')+'.'; };
+  const n=function(r){ return r.quantidade+' etiqueta'+(r.quantidade>1?'s':'')+' impressa'+(r.quantidade>1?'s':'')+'.'+(r.quantidade>=200?' O máximo por vez são 200: se ainda faltar, toque em Imprimir de novo.':''); };
   if(k==='dia'||k==='proximos'||k==='alvo') return epPost('/api/producao/etiquetas/imprimir',{ parte:k, quantidade: k==='alvo' ? +v('epAlvoQt') : undefined }, n);
   if(k==='maco') return epPost('/api/producao/etiquetas/maco',{ tipo:b.getAttribute('data-tipo'), quantidade:+v('epMaco'+b.getAttribute('data-tipo')) }, n);
   if(k==='fora') return epPost('/api/producao/etiquetas/fora',{ sku:v('epForaSku'), quantidade:+v('epForaQt'), motivo:v('epForaMot'), texto:v('epForaTxt') }, n);

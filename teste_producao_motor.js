@@ -258,11 +258,53 @@ async function chamar(m, rota, corpo, u, params){
   ok('as cinco chaves existem, com nível e tela', Object.keys(nv).every(k => { const p = REG.find(x => x.chave === k); return p && p.nivel === nv[k][0] && p.tela === nv[k][1]; }));
   ok('"corrigir" é sensível', REG.find(x => x.chave === 'producao.corrigir').sensivel === true);
   const src = require('fs').readFileSync(require('path').join(__dirname, 'acesso.js'), 'utf8');
-  const fora = src.split('\n').filter(l => /producao\.(cortar_tecido|cortar_tubo|montar|etiqueta|corrigir)/.test(l) && !/return /.test(l));
+  const fora = src.split('\n').filter(l => /producao\.(cortar_tecido|cortar_tubo|montar|etiqueta|corrigir)/.test(l) && !/return /.test(l) && !/\['producao\.[a-z_]+', *'[a-z_]+'\]/.test(l));   /* a linha do PERM_AREA (a área de chegada) não dá chave a ninguém */
   ok('nenhum setor nativo recebe as chaves novas pelo seed (só o Admin Geral, R-ALC-06)', fora.length === 0, fora.join(' | '));
   const T = require('./telas').TELAS;
   ok('107, 108 e 110 no mapa: Produção · Medida padrão · Operação', [107,108,110].every(nu => { const t = T.find(x => x.n === nu); return t && t.modulo === 'producao' && t.bloco === 'medida_padrao' && t.nivel === 'operacao'; }));
   ok('a 401 abre para o Supervisor com a chave das etiquetas', (t => t.nivel === 'supervisor' && t.perms.includes('producao.etiqueta'))(T.find(x => x.n === 401)));
+
+  console.log('\n── 11. o que a ③ REVISÃO achou ──');
+  /* a mesma peça não se desconta duas vezes: o tecido já bipado numa montagem
+     aberta sai da prateleira e conta uma vez só */
+  const tec0 = L.listaTecido(db).itens.find(x => x.chave === 'BK150150BEGE');
+  const mon0 = L.listaMontagem(db).itens.find(x => x.chave === 'BK150150BEGE');
+  MONT.iniciar(db, { sku:'BK150150BEGE', quantidade:1 }, JOAO);
+  MONT.bipar(db, psB[2], JOAO); MONT.bipar(db, 'TC000003', JOAO);
+  const tec1 = L.listaTecido(db).itens.find(x => x.chave === 'BK150150BEGE');
+  const mon1 = L.listaMontagem(db).itens.find(x => x.chave === 'BK150150BEGE');
+  eq('a montagem aberta sai da lista da montagem (uma peça)', (mon0 ? mon0.hoje + mon0.dias.reduce((s, d) => s + d.n, 0) + (mon0.alvo || 0) : 0) - (mon1 ? mon1.hoje + mon1.dias.reduce((s, d) => s + d.n, 0) + (mon1.alvo || 0) : 0), 1);
+  eq('...e a lista do tecido NÃO desconta a mesma peça duas vezes', JSON.stringify(tec1 && [tec1.hoje, tec1.alvo]), JSON.stringify(tec0 && [tec0.hoje, tec0.alvo]));
+  MONT.cancelar(db, JOAO);
+  /* dois lotes ao mesmo tempo não prometem o mesmo tecido */
+  const RUI = { id:7, nome:'Rui' };
+  MONT.iniciar(db, { sku:'BK150150CINZA', quantidade:1 }, ANA);
+  recusa('o segundo lote não pega o tecido que o primeiro reservou', () => MONT.iniciar(db, { sku:'BK150150CINZA', quantidade:1 }, RUI), /separado para outra montagem/);
+  MONT.cancelar(db, ANA);
+  /* a recusa da etiqueta usada diz quando, por quem, sem a data do banco */
+  recusa('a etiqueta usada diz "em dd/mm às hh:mm, por …"', () => CORTE.iniciar(db, { tipo:'tecido', item:'BK150150BEGE', quantidade:1, etiqueta:'TC000002' }, ANA), /em \d\d\/\d\d às \d\d:\d\d, por Ana/);
+  /* a bancada mostra a próxima LIVRE do maço */
+  const MARIA2 = { id:9, nome:'Maria', pode:['producao.corrigir','producao.cortar_tecido'] };
+  x = await chamar('GET', '/api/producao/corte/tecido', {}, MARIA2, { tipo:'tecido' });
+  eq('a "próxima etiqueta" é a menor livre do maço', x.body.proxima, ETQ.rotulo(db.prepare("SELECT * FROM etiqueta_producao WHERE tipo='TC' AND situacao='livre' ORDER BY numero LIMIT 1").get()));
+  ok('...e a entrada inicial recebe a lista do que se conhece', Array.isArray(x.body.itens_entrada) && x.body.itens_entrada.some(i => i.chave === 'BK150150BEGE'));
+  x = await chamar('POST', '/api/producao/corte/tecido/iniciar', { item:'INVENTADO', quantidade:1, etiqueta:'TC000022', entrada_inicial:true }, MARIA2, { tipo:'tecido' });
+  eq('a entrada inicial recusa item inventado (409)', x.status, 409);
+  eq('...e a etiqueta continua livre', db.prepare("SELECT situacao FROM etiqueta_producao WHERE codigo='TC000022'").get().situacao, 'livre');
+  /* o PDF que não sai não deixa etiqueta gravada */
+  db.prepare("INSERT INTO skus (codigo,cor_codigo,modelo_id,largura_cm,altura_cm) VALUES ('BKSEMMEDIDA','BEGE',1,NULL,NULL)").run();
+  const ps0 = db.prepare("SELECT COUNT(*) n FROM etiqueta_producao WHERE tipo='PS'").get().n;
+  x = await chamar('POST', '/api/producao/etiquetas/fora', { sku:'BKSEMMEDIDA', quantidade:2, motivo:'Teste' }, MARIA);
+  ok('o fora do planejamento de um SKU sem medida é recusado antes de gravar', x.status >= 400, JSON.stringify(x.body));
+  eq('...e nenhuma etiqueta nasce', db.prepare("SELECT COUNT(*) n FROM etiqueta_producao WHERE tipo='PS'").get().n, ps0);
+  /* o teto de 200 por vez */
+  recusa('mais de 200 de uma vez é recusado', () => ETQ.imprimirMaco(db, 'TC', 201, MARIA), /1 a 200/);
+  /* o tempo da montagem conta do primeiro ① */
+  MONT.iniciar(db, { sku:'BK150150BEGE', quantidade:1 }, JOAO);
+  db.prepare("UPDATE montagem_lote SET inicio='2000-01-01 00:00:00' WHERE situacao='aberto'").run();
+  MONT.bipar(db, psB[2], JOAO);
+  ok('o início do lote é o primeiro ① (e não a hora do "iniciar")', !/^2000/.test(db.prepare("SELECT inicio FROM montagem_lote WHERE situacao='aberto'").get().inicio));
+  MONT.cancelar(db, JOAO);
 
   console.log('\n' + (falhas ? falhas + ' de ' + n + ' casos FALHARAM' : 'todos os ' + n + ' casos passaram'));
   process.exit(falhas ? 1 : 0);

@@ -11,7 +11,7 @@
 const Database = require('better-sqlite3');
 let n = 0, falhas = 0;
 function ok(desc, cond, det){ n++; if(cond) console.log('  ok  ' + n + ' — ' + desc); else { falhas++; console.log('  FALHOU ' + n + ' — ' + desc + (det ? '\n         ' + det : '')); } }
-function eq(desc, a, e){ ok(desc, a === e, 'esperado ' + JSON.stringify(e) + ', veio ' + JSON.stringify(a)); }
+function eq(desc, a, e, d){ ok(desc, a === e, 'esperado ' + JSON.stringify(e) + ', veio ' + JSON.stringify(a) + (d ? ' ' + d : '')); }
 
 const db = new Database(':memory:');
 db.exec(`
@@ -114,6 +114,46 @@ q = passa('POST', '/api/montagem', { codigo:'TC000001' });
 eq('a etiqueta de tecido não vira SKU', q.body.codigo, 'TC000001');
 q = passa('POST', '/api/montagem', { codigo:'PS99999999' });
 eq('a etiqueta em série que não existe passa como veio', q.body.codigo, 'PS99999999');
+
+q = passa('POST', '/api/carregar', { code:'X', sku:ps[0] });
+eq('o bipe da Conferência (/api/carregar) também recebe o SKU', q.body.sku, 'BK150150BEGE');
+
+console.log('\n── 4. o que a ③ REVISÃO achou ──');
+r = chamar('POST', '/api/revisao', { codigo:'PS99999999', segundos:40 }, RUI);
+eq('a etiqueta em série que não existe é recusada (409)', r.status, 409);
+ok('...dizendo "Etiqueta não reconhecida"', /não reconhecida/.test(r.body.erro), r.body.erro);
+db.prepare("INSERT INTO skus (codigo,cor_codigo,modelo_id,largura_cm,altura_cm) VALUES ('PS12345678','BEGE',1,150,150)").run();
+r = chamar('POST', '/api/revisao', { codigo:'PS12345678', segundos:40 }, RUI);
+eq('o SKU antigo com a forma de etiqueta revisa como sempre (200)', r.status, 200);
+/* a persiana com defeito que volta não é a mesma que a fila escolheu */
+MONT.iniciar(db, { sku:'BK150150BEGE', quantidade:1 }, JOAO);
+MONT.bipar(db, ps[1], JOAO); MONT.bipar(db, 'TC000002', JOAO); MONT.bipar(db, 'TB000002', JOAO); MONT.bipar(db, ps[1], JOAO);
+r = chamar('POST', '/api/revisao', { codigo:ps[1], segundos:40 }, RUI);
+eq('a segunda persiana revisa', r.status, 200);
+const rev0 = db.prepare('SELECT revisao_id FROM persiana WHERE codigo=?').get(ps[0]).revisao_id;
+const rev1 = db.prepare('SELECT revisao_id FROM persiana WHERE codigo=?').get(ps[1]).revisao_id;
+MONT.revisaoApagada(db, rev0, true);   // a embalagem devolveu por defeito; a fila escolheu a revisão da 1ª
+eq('a da revisão apagada volta ao carrinho, marcada', db.prepare('SELECT situacao||voltou_defeito s FROM persiana WHERE codigo=?').get(ps[0]).s, 'montada1');
+r = chamar('POST', '/api/revisao', { codigo:ps[1], segundos:40 }, RUI);
+eq('mas quem voltou fisicamente foi a 2ª: bipá-la revisa (200), sem "já revisada"', r.status, 200, JSON.stringify(r.body));
+const a0 = db.prepare('SELECT situacao, revisao_id FROM persiana WHERE codigo=?').get(ps[0]);
+const a1 = db.prepare('SELECT situacao, revisao_id FROM persiana WHERE codigo=?').get(ps[1]);
+ok('...e as duas trocam de lugar: a 1ª fica com a revisão da 2ª', a0.situacao === 'revisada' && a0.revisao_id === rev1, JSON.stringify(a0));
+ok('...e a 2ª com a revisão nova', a1.situacao === 'revisada' && a1.revisao_id > rev1, JSON.stringify(a1));
+eq('nenhuma fica marcada', db.prepare('SELECT COUNT(*) n FROM persiana WHERE voltou_defeito=1').get().n, 0);
+/* a peça com problema sai do carrinho */
+CORTE.iniciar(db, { tipo:'tecido', item:'BK150150BEGE', quantidade:1, etiqueta:'TC000003' }, ANA); CORTE.bipar(db, 'TC000003', ANA);
+CORTE.iniciar(db, { tipo:'tubo', item:'c2:147', quantidade:1, etiqueta:'TB000003' }, JOAO); CORTE.bipar(db, 'TB000003', JOAO);
+MONT.iniciar(db, { sku:'BK150150BEGE', quantidade:1 }, JOAO);
+MONT.bipar(db, ps[2], JOAO);
+const tcLivre = db.prepare("SELECT e.codigo FROM corte_peca cp JOIN etiqueta_producao e ON e.id=cp.etiqueta_id WHERE cp.situacao='prateleira' AND cp.tipo='tecido' LIMIT 1").get();
+const tbLivre = db.prepare("SELECT e.codigo FROM corte_peca cp JOIN etiqueta_producao e ON e.id=cp.etiqueta_id WHERE cp.situacao='prateleira' AND cp.tipo='tubo' LIMIT 1").get();
+ok('há tecido e tubo para a 3ª', !!(tcLivre && tbLivre));
+if(tcLivre && tbLivre){ MONT.bipar(db, tcLivre.codigo, JOAO); MONT.bipar(db, tbLivre.codigo, JOAO); MONT.bipar(db, ps[2], JOAO); }
+const car0 = MONT.noCarrinho(db).BK150150BEGE || 0;
+ok('a peça com problema sai do carrinho', MONT.comProblema(db, ps[2]) && (MONT.noCarrinho(db).BK150150BEGE || 0) === car0 - 1);
+r = chamar('POST', '/api/revisao', { codigo:ps[2], segundos:40 }, RUI);
+eq('...e volta a ser revisável depois de consertada', r.status, 200);
 
 console.log('\n' + (falhas ? falhas + ' de ' + n + ' casos FALHARAM' : 'todos os ' + n + ' casos passaram'));
 process.exit(falhas ? 1 : 0);

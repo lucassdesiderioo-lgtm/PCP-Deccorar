@@ -14,6 +14,7 @@
   var C = window.BANCADA;
   var $ = function(s){ return document.querySelector(s); };
   var esc = function(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); };
+  var CONF_CANC = false;
   var DADOS = null, ERRO_LISTA = false, SEL = null, DIG = '', ENTRADA = false, MSG = null, FIM = null, PERDA = false, ENVIANDO = false, SEMANA = false;
   var MONT = C.tipo === 'montagem';
 
@@ -49,10 +50,14 @@
       : (x.prateleira ? '<div class="d">já há ' + x.prateleira + ' cortad' + (x.prateleira > 1 ? 'as' : 'a') + ' na prateleira</div>' : '');
     var dias = grupo !== 'hoje' && x.dias.length ? '<div class="d">' + x.dias.map(function(d){ return d.rotulo + ' ' + d.n; }).join(' · ') + '</div>' : '';
     return '<button type="button" class="cd' + (act ? ' active' : '') + '" data-item="' + esc(x.chave) + '"><div class="m">' + esc(x.titulo) + '</div><div class="c">' + esc(x.cor) + '</div>' +
-      '<div class="sk">' + esc(x.sub) + '</div><div class="n"><b>' + n + '</b><small>' + (grupo === 'hoje' ? 'faltam hoje' : 'faltam') + '</small></div>' + dias + extra + '</button>';
+      '<div class="sk">' + esc(x.sub).split(' · ').join('<br>') + '</div><div class="n"><b>' + n + '</b><small>' + (grupo === 'hoje' ? 'faltam hoje' : 'faltam') + '</small></div>' + dias + extra + '</button>';
   }
   function mini(x, campo){ return '<button type="button" class="' + (SEL && SEL.chave === x.chave ? 'active' : '') + '" data-item="' + esc(x.chave) + '">' + esc(x.titulo + ' ' + (MONT || C.tipo === 'tecido' ? x.cor.toLowerCase() : '')) + '<b>' + x[campo] + '</b></button>'; }
   function lista(){
+    /* Na entrada inicial (§14.10) a lista e de TODO item que a ficha conhece:
+       a prateleira pode ter o que hoje nao falta. */
+    if(DADOS && ENTRADA && DADOS.itens_entrada) return '<div class="foco fp"><div class="fcab"><span class="ft">Entrada inicial</span><span class="fs">escolha o que já está cortado na prateleira</span></div><div class="gd">' +
+      DADOS.itens_entrada.map(function(x){ return '<button type="button" class="cd' + (SEL && SEL.chave === x.chave ? ' active' : '') + '" data-item="' + esc(x.chave) + '"><div class="m">' + esc(x.titulo) + '</div><div class="c">' + esc(x.cor) + '</div><div class="sk">' + esc(x.sub).split(' · ').join('<br>') + '</div></button>'; }).join('') + '</div></div>';
     if(!DADOS) return ERRO_LISTA ? '<div class="aviso">Não deu para carregar a lista. A tela tenta de novo sozinha.</div>' : '<div class="muted">Carregando a lista…</div>';
     var L = DADOS.lista.itens, h = ERRO_LISTA ? '<div class="aviso">Não deu para atualizar a lista agora; os números podem estar velhos.</div>' : '';
     var H = L.filter(function(x){ return x.hoje > 0; }).sort(function(a, b){ return b.hoje - a.hoje; });
@@ -175,7 +180,7 @@
   }
 
   // ── o que a pessoa faz ─────────────────────────────────────────────────
-  function achar(chave){ return DADOS && DADOS.lista.itens.find(function(x){ return x.chave === chave; }); }
+  function achar(chave){ if(!DADOS) return null; var l = (ENTRADA && DADOS.itens_entrada) ? DADOS.itens_entrada : DADOS.lista.itens; return l.find(function(x){ return x.chave === chave; }); }
   async function bipe(v){
     if(ENVIANDO) return;
     MSG = null;
@@ -196,7 +201,7 @@
   document.addEventListener('click', async function(e){
     var b = e.target.closest('button,[data-item],input[type=checkbox]');
     if(!b){ manter(); return; }
-    if(b.id === 'entrada'){ ENTRADA = b.checked; return; }
+    if(b.id === 'entrada'){ ENTRADA = b.checked; SEL = null; desenhar(); return; }
     var item = b.getAttribute('data-item'), dig = b.getAttribute('data-dig'), acao = b.getAttribute('data-acao');
     if(item){
       if(DADOS && DADOS.aberto){ MSG = { t:'Termine ou cancele ' + (MONT ? 'esta montagem' : 'este corte') + ' antes.' }; beep(false); desenhar(); return; }
@@ -221,10 +226,14 @@
     }
     if(acao === 'voltar'){ SEL = null; DIG = ''; desenhar(); return; }
     if(acao === 'semana'){ SEMANA = !SEMANA; desenhar(); return; }
+    if(acao !== 'cancelar') CONF_CANC = false;
     if(acao === 'perda'){ PERDA = true; desenhar(); var m = $('#motivo'); if(m) m.focus(); return; }
     if(acao === 'perdaNao'){ PERDA = false; desenhar(); return; }
     if(acao === 'perdaOk'){ var mo = $('#motivo') ? $('#motivo').value : ''; PERDA = false; resposta(await post('perdida', { motivo:mo })); return; }
-    if(acao === 'cancelar'){ var rc = await post('cancelar', {}); if(rc.erro){ MSG = { t:rc.erro }; beep(false); } SEL = null; FIM = null; await carregar(); return; }
+    if(acao === 'cancelar' && !MONT && DADOS && DADOS.aberto && DADOS.aberto.pecas.length > 1 && !CONF_CANC){
+      /* ③ REVISAO: cancelar solta as etiquetas bipadas — so se as pecas NAO foram cortadas. */
+      CONF_CANC = true; MSG = { t:'As ' + DADOS.aberto.pecas.length + ' etiquetas bipadas voltam para o maço, e as peças saem do sistema. Só cancele se elas NÃO foram cortadas. Toque em Cancelar corte de novo para confirmar.' }; beep(false); desenhar(); return; }
+    if(acao === 'cancelar'){ CONF_CANC = false; var rc = await post('cancelar', {}); if(rc.erro){ MSG = { t:rc.erro }; beep(false); } SEL = null; FIM = null; await carregar(); return; }
   });
 
   /* O bipe: o campo visivel (iPad), Enter ou Tab, e o leitor em rajada fora

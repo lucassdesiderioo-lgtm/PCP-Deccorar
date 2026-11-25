@@ -230,11 +230,22 @@ async function gerar(sku, quantidade){
   return Buffer.from(await doc.save());
 }
 
+/* O que impede a etiqueta EM SERIE: a medida do SKU (o cadastro) e as barras
+   do CODIGO DA ETIQUETA, e nao as do SKU — o SKU comprido vai escrito, nao nas
+   barras (③ REVISAO, 25/11/2026: um SKU de 32 letras derrubava o lote inteiro). */
+function conferirSerie(sku, codigo){
+  const problemas = [];
+  const c = conteudo(sku);
+  if(c.erro) problemas.push(c.erro);
+  const b = medidaDasBarras(codigo || 'PS00000000'); if(b.erro) problemas.push(b.erro);
+  return { pronta: problemas.length === 0, problemas };
+}
+
 /* As etiquetas de SKU EM SERIE (§14.2): uma pagina por etiqueta, cada uma com
    o seu SKU e o seu numero. `lista` = [{ sku (a linha do banco), codigo, numero }]. */
 async function gerarSerie(lista){
   if(!Array.isArray(lista) || !lista.length) throw new Error('nada para imprimir');
-  for(const x of lista){ const v = conferir(x.sku, 1); if(!v.pronta){ const e = new Error(v.problemas[0]); e.problemas = v.problemas; throw e; } }
+  for(const x of lista){ const v = conferirSerie(x.sku, x.codigo); if(!v.pronta){ const e = new Error(v.problemas[0]); e.problemas = v.problemas; throw e; } }
   const doc = await PDFDocument.create();
   doc.setTitle('Etiquetas de SKU em série');
   const fonte = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -282,4 +293,4 @@ async function gerarMaco(lista){
   return Buffer.from(await doc.save());
 }
 
-module.exports = { conteudo, conferir, desenho, gerar, gerarSerie, gerarMaco, MAX, ETIQUETA };
+module.exports = { conteudo, conferir, conferirSerie, desenho, gerar, gerarSerie, gerarMaco, MAX, ETIQUETA };

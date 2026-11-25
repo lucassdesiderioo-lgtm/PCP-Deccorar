@@ -30,6 +30,17 @@ module.exports = function(app, db){
 
   /* O PDF das etiquetas de SKU em serie: a linha do SKU como o cadastro a
      imprime (sku_cad_route.js). */
+  /* Antes de GRAVAR (o numero nao volta): o PDF tem que poder sair. Sem isto a
+     etiqueta ficava gravada e sem papel, e a reimpressao falhava igual (③). */
+  function conferirAntes(itens){
+    for(const it of itens){
+      const s = db.prepare(`SELECT s.*, COALESCE(m.exige_medida,1) exige_medida FROM skus s LEFT JOIN modelo m ON m.id=s.modelo_id
+        WHERE UPPER(s.codigo)=UPPER(?)`).get(String(it.sku || ''));
+      if(!s) throw new ETQ.Recusa('SKU não cadastrado: ' + it.sku + '.', 404);
+      const v = PDF.conferirSerie(s, null);
+      if(!v.pronta) throw new ETQ.Recusa(s.codigo + ': ' + v.problemas[0], 409);
+    }
+  }
   async function pdfPersianas(lista){
     const sku = c => db.prepare(`SELECT s.*, COALESCE(t.nome, t.codigo) tecido_nome, m.nome modelo_nome,
         COALESCE(m.exige_medida,1) exige_medida
@@ -57,7 +68,7 @@ module.exports = function(app, db){
   app.post('/api/producao/etiquetas/imprimir', async (req, res) => {
     const b = req.body || {};
     let r;
-    try{ r = ETQ.imprimirPersianas(db, LISTA.paraImprimir(db, b.parte, b.quantidade), b.parte, QUEM.pessoa(req)); }
+    try{ const itens = LISTA.paraImprimir(db, b.parte, b.quantidade); conferirAntes(itens); r = ETQ.imprimirPersianas(db, itens, b.parte, QUEM.pessoa(req)); }
     catch(e){ return erro(res, e, 'imprimir'); }
     try{ mandaPdf(res, await pdfPersianas(r.etiquetas), 'etiquetas-' + b.parte + '.pdf', { quantidade:r.etiquetas.length }); }
     catch(e){ erro(res, e, 'gerar o PDF (as etiquetas foram gravadas: reimprima pelo histórico)'); }
@@ -77,6 +88,7 @@ module.exports = function(app, db){
       let motivo = String(b.motivo || '').trim();
       if(ETQ.MOTIVOS_FORA.indexOf(motivo) < 0) throw new ETQ.Recusa('Escolha o motivo na lista.');
       if(motivo === 'Outro'){ const t = String(b.texto || '').trim(); if(!t) throw new ETQ.Recusa('Em "Outro", escreva o motivo.'); motivo = 'Outro: ' + t; }
+      conferirAntes([{ sku:b.sku }]);
       r = ETQ.imprimirPersianas(db, [{ sku:b.sku, quantidade:b.quantidade }], 'fora', QUEM.pessoa(req), motivo);
     }catch(e){ return erro(res, e, 'imprimir fora do planejamento'); }
     try{ mandaPdf(res, await pdfPersianas(r.etiquetas), 'etiquetas-fora.pdf', { quantidade:r.etiquetas.length }); }
@@ -126,8 +138,10 @@ module.exports = function(app, db){
   app.get('/api/producao/corte/' + t, (req, res) => {
     try{
       res.json({ lista:listaDe(t), aberto:CORTE.aberto(db, QUEM.pessoa(req), t), dia:CORTE.doDia(db, QUEM.pessoa(req), t),
-        motivos:CORTE.MOTIVOS_PERDA[t], proxima:ETQ.proxima(db, CORTE.TIPOS[t]).rotulo,
-        pode_entrada:pode(req, 'producao.corrigir') });
+        motivos:CORTE.MOTIVOS_PERDA[t], proxima:ETQ.proximaLivre(db, CORTE.TIPOS[t]),
+        pode_entrada:pode(req, 'producao.corrigir'),
+        /* a entrada inicial lanca qualquer item que a ficha conhece (§14.10) */
+        itens_entrada: pode(req, 'producao.corrigir') ? LISTA.itensConhecidos(db, t) : undefined });
     }catch(e){ erro(res, e, 'montar a lista do corte'); }
   });
   app.post('/api/producao/corte/' + t + '/iniciar', (req, res) => {
@@ -137,12 +151,10 @@ module.exports = function(app, db){
       if(b.entrada_inicial && !pode(req, 'producao.corrigir')) throw new ETQ.Recusa('A entrada inicial é de quem tem a permissão de corrigir a produção (Supervisor).', 403);
       /* O item tem que estar na lista — ou, na entrada inicial, ser um item
          que a ficha conhece. A descricao e a da lista, nunca a da tela. */
-      const it = listaDe(t).itens.find(x => x.chave === String(b.item || ''));
-      let desc = it ? it.titulo + ' ' + it.cor : null;
-      if(!it){
-        if(!b.entrada_inicial) throw new ETQ.Recusa('Este item não está na lista do que cortar.', 409);
-        desc = LISTA.descreverItem(db, t, b.item);
-      }
+      let it = listaDe(t).itens.find(x => x.chave === String(b.item || ''));
+      if(!it && b.entrada_inicial) it = LISTA.itensConhecidos(db, t).find(x => x.chave === String(b.item || ''));
+      if(!it) throw new ETQ.Recusa(b.entrada_inicial ? 'A ficha técnica não conhece este item.' : 'Este item não está na lista do que cortar.', 409);
+      const desc = it.titulo + ' ' + it.cor;
       res.json({ ok:true, aberto:CORTE.iniciar(db, { tipo:t, item:String(b.item), descricao:desc, quantidade:b.quantidade,
         etiqueta:b.etiqueta, entrada_inicial:!!b.entrada_inicial }, QUEM.pessoa(req)) });
     }catch(e){ erro(res, e, 'iniciar o corte'); }
