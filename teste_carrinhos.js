@@ -174,6 +174,35 @@ const vol = (buyer, mod, extra, sku) => {
   const dA = (r.destinos||[]).find(d => d.codigo === 'A'), dAG = (r.destinos||[]).find(d => d.codigo === 'AG');
   ok('os destinos dizem quantas caixas cada um tem', dA && dA.n === 2 && dAG && dAG.n === 1, JSON.stringify(r.destinos));
 
+  // ── ③ REVISÃO (25/11/2026): os achados confirmados, travados ──
+  // a caixa conferida SEM carrinho não conta em "nos carrinhos": tem linha própria
+  const c5 = vol('Cinco','coleta'); await chamar('POST /api/carregar', {code:'PCinco'}, ANA);   // página antiga: sem carrinho
+  r = await chamar('GET /api/conferencia/dia', {}, ANA);
+  ok('a barra separa "nos carrinhos" de "conferidas sem carrinho"',
+     r.barras.entrega.nos_carrinhos === 4 && r.barras.entrega.sem_carrinho === 1 && r.barras.entrega.total === 8, JSON.stringify(r.barras.entrega));
+  // a viagem aberta pela página antiga aparece na tela nova
+  db.prepare("INSERT INTO saida (tipo, aberta_por) VALUES ('agencia','Tablet velho')").run();
+  r = await chamar('GET /api/conferencia/dia', {}, ANA);
+  ok('a tela nova sabe da viagem/saída aberta pela página antiga', (r.abertas_antigas||[]).length === 1 && r.abertas_antigas[0].tipo === 'agencia', JSON.stringify(r.abertas_antigas));
+  db.prepare("DELETE FROM saida WHERE fechada_em IS NULL").run();
+  // a recontagem acha uma caixa impressa e nunca conferida no carrinho
+  r = await chamar('POST /api/carrinho/recontar', {carrinho:'A', codes:['PUm','PTres','PSemBipe']}, BETO);
+  ok('a impressa não conferida achada no carrinho vem em "nao_conferidas", e não como código desconhecido',
+     (r.nao_conferidas||[]).length === 1 && r.nao_conferidas[0].buyer === 'SemBipe' && !(r.desconhecidos||[]).length, JSON.stringify(r));
+  // o "a coleta não passou" marca a caixa, e a lista a traz em cima com o dia
+  require('./fim_dia').registrar(db, [c2], ANA);
+  db.prepare("UPDATE fim_dia SET dia=date('now','localtime','-1 day')").run();
+  r = await chamar('GET /api/conferencia/dia', {}, ANA);
+  ok('a caixa que ficou do "a coleta não passou" vem EM CIMA, com o dia (R-FIM-01)',
+     r.faltam[0] && r.faltam[0].id === c2 && !!r.faltam[0].ficou_de, JSON.stringify(r.faltam.map(x=>[x.id,x.ficou_de])));
+  // §17: as colunas novas no CREATE do dono da tabela
+  { const d2 = new Database(':memory:');
+    require('./exp_route')({ get(){}, post(){}, delete(){}, use(){}, locals:{} }, d2);
+    require('./saida_schema').garantirSaida(d2);
+    const col = (t,c) => !!d2.prepare('SELECT 1 FROM pragma_table_info(?) WHERE name=?').get(t,c);
+    ok('§17: lote.carrinho e nao_achada_em nascem com o exp_route (o dono do lote)', col('lote','carrinho') && col('lote','nao_achada_em') && col('lote','nao_achada_por_id'));
+    ok('§17: saida.carrinhos nasce com o saida_schema', col('saida','carrinhos')); }
+
   console.log('\n' + (casos - falhas) + ' de ' + casos + ' casos passaram');
   try{ fs.rmSync(tmp, {recursive:true, force:true}); }catch(e){}
   process.exit(falhas ? 1 : 0);

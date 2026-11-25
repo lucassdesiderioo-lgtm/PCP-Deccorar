@@ -109,10 +109,16 @@ const estaNaFabrica = (db, id) => !!db.prepare(`SELECT 1 FROM lote WHERE id=? AN
 function recontar(db, carrinho, codes, quem, ids){
   const c = norm(carrinho);
   const esperadas = noDestino(db, c);
-  const achadas = new Map(), desconhecidos = [];
+  const achadas = new Map(), desconhecidos = [], naoConferidas = new Map();
   for(const code of (Array.isArray(codes) ? codes : [])){
-    const v = acharVolumes(db, String(code||'').trim()).find(x => estaNaFabrica(db, x.id));
-    if(v) achadas.set(v.id, v); else if(String(code||'').trim()) desconhecidos.push(String(code).trim());
+    const batem = acharVolumes(db, String(code||'').trim());
+    const v = batem.find(x => estaNaFabrica(db, x.id));
+    /* A caixa impressa e nunca conferida achada no carrinho não é "código
+       desconhecido": é uma caixa a conferir (③ REVISÃO). */
+    const semConf = !v && batem.find(x => x.estagio === 'embalado' && !x.conferido_em);
+    if(v) achadas.set(v.id, v);
+    else if(semConf) naoConferidas.set(semConf.id, semConf);
+    else if(String(code||'').trim()) desconhecidos.push(String(code).trim());
   }
   /* "Achei" na tela: a caixa que a recontagem não achou e a pessoa achou no
      carrinho entra pelo id (o código dela não está na tela). */
@@ -129,7 +135,8 @@ function recontar(db, carrinho, codes, quem, ids){
     VALUES (?,?,?,?,?,?,?,?,?)`).run(c, quem && quem.nome || null, quem && quem.id || null, esperadas.length, contadas,
       bateu ? 1 : 0, JSON.stringify(faltam.map(x => x.id)), JSON.stringify(sobraram.map(x => x.id)),
       JSON.stringify(desconhecidos)).lastInsertRowid;
-  return { id, carrinho:c, esperadas:esperadas.length, contadas, bateu, faltam, sobraram, desconhecidos };
+  return { id, carrinho:c, esperadas:esperadas.length, contadas, bateu, faltam, sobraram, desconhecidos,
+           nao_conferidas:[...naoConferidas.values()].map(marca) };
 }
 
 function passar(db, loteId, carrinho){
@@ -158,16 +165,20 @@ function barras(db){
   const SEM_TESTE = "COALESCE(teste,0)=0";
   const semEtiqueta = n(`SELECT COUNT(*) n FROM lote WHERE estagio IN ('pendente','bloqueado') AND codigo IS NOT NULL AND ${VENCE_HOJE} AND ${SEM_TESTE}`);
   const semBipe = n(`SELECT COUNT(*) n FROM lote WHERE estagio='embalado' AND conferido_em IS NULL AND ${SEM_TESTE}`);
-  const nos = n(`SELECT COUNT(*) n FROM lote WHERE ${NA_FABRICA}`);
+  const nos = n(`SELECT COUNT(*) n FROM lote WHERE carrinho IS NOT NULL AND ${NA_FABRICA}`);
+  /* A conferida sem carrinho (a de antes do deploy, a da página antiga, a não
+     achada na recontagem) tem linha própria: somada em "nos carrinhos", a barra
+     diria um número que a soma dos carrinhos não dá (③ REVISÃO). */
+  const sem = n(`SELECT COUNT(*) n FROM lote WHERE carrinho IS NULL AND ${NA_FABRICA}`);
   const SAIU_HOJE = "date(COALESCE(saiu_em, retirado_em))=date('now','localtime')";
   const entregues = n(`SELECT COUNT(*) n FROM lote WHERE estagio='carregado' AND ${SAIU_HOJE} AND ${SEM_TESTE}`);
-  const total = semEtiqueta + semBipe + nos + entregues;
+  const total = semEtiqueta + semBipe + nos + sem + entregues;
   const IMP_HOJE = `date(embalado_em)=date('now','localtime') AND estagio IN ('embalado','carregado') AND ${SEM_TESTE}`;
   const impressas = n(`SELECT COUNT(*) n FROM lote WHERE ${IMP_HOJE}`);
   const bipadas = n(`SELECT COUNT(*) n FROM lote WHERE ${IMP_HOJE} AND conferido_em IS NOT NULL`);
   const antes = n(`SELECT COUNT(*) n FROM lote WHERE estagio='embalado' AND conferido_em IS NULL AND date(embalado_em)<date('now','localtime') AND ${SEM_TESTE}`);
   return {
-    entrega:{ total, entregues, nos_carrinhos:nos, sem_bipe:semBipe, sem_etiqueta:semEtiqueta, faltam:total - entregues },
+    entrega:{ total, entregues, nos_carrinhos:nos, sem_carrinho:sem, sem_bipe:semBipe, sem_etiqueta:semEtiqueta, faltam:total - entregues },
     bipe:{ impressas, bipadas, faltam:impressas - bipadas, antes_sem_bipe:antes }
   };
 }
@@ -195,8 +206,10 @@ function validarEntrega(db, b){
   if(para === 'agencia' && ds.some(d => d !== AG))
     return { motivo:'para_invalido', aviso:'Carrinho de coleta vai ao motorista do Mercado Livre, não à agência.' };
   for(const d of ds) if(!noDestino(db, d).length) return { motivo:'vazio', aviso:nomeDe(d)+' está vazio.' };
-  const numero = parseInt(b.numero, 10);
-  if(!(numero >= 0) || String(b.numero).trim() === '') return { motivo:'sem_numero', aviso:'Digite quantas caixas o '+(para==='agencia'?'atendente':'motorista')+' bipou.' };
+  /* Só número inteiro: "5abc" não vira 5 (③ REVISÃO). */
+  const txt = String(b.numero == null ? '' : b.numero).trim();
+  const numero = /^\d+$/.test(txt) ? parseInt(txt, 10) : NaN;
+  if(!(numero >= 0)) return { motivo:'sem_numero', aviso:'Digite quantas caixas o '+(para==='agencia'?'atendente':'motorista')+' bipou.' };
   return { destinos:ds, para, numero };
 }
 

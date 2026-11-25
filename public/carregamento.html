@@ -49,7 +49,7 @@
   .leg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted)}
   .leg span{display:inline-flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}.leg b{color:var(--txt)}
   .sq{width:12px;height:12px;border-radius:3px;display:inline-block}
-  .k-ent{background:var(--green)}.k-car{background:var(--blue)}.k-imp{background:var(--amber)}.k-sem{background:var(--gray)}
+  .k-ent{background:var(--green)}.k-car{background:var(--blue)}.k-imp{background:var(--amber)}.k-sem{background:var(--gray)}.k-fora{background:var(--violet)}
   .faixa{background:var(--amberbg);border:2px solid var(--amber);color:#4a2c00;border-radius:10px;padding:9px 14px;font-weight:700}
   /* o corpo */
   .corpo{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;align-items:start}
@@ -111,6 +111,8 @@
   .hist{display:flex;flex-direction:column;gap:6px;font-size:14px}
   .hist div{padding:7px 10px;border-left:3px solid var(--line);background:var(--panel);border-radius:0 6px 6px 0}
   .nota{font-size:13px;color:var(--muted)}
+  /* "Etiqueta feita por" em linha própria (R-SEG-03): grudado no número, lia-se como parte dele. */
+  .quem{display:block;margin-top:2px;font-size:13px;color:var(--muted)}
 </style></head><body>
 <header><div class="mark">C</div><div><h1>202 Conferência</h1><div class="sub">Bipe as caixas com etiqueta, coloque nos carrinhos e entregue</div></div>
 <div class="links"><span class="par" id="parSegundo">Segundo bipe (SKU): …</span>
@@ -142,6 +144,7 @@ var aguardando=null;          // segundo bipe: a etiqueta esperando o SKU
 var caixaPecas=null;          // a caixa de várias sendo conferida peça a peça
 var filtro='faltam', verHist=false;
 var ENT=null, REC=null, CANC=null, pessoas=null;
+var last={c:'',t:0}, ultimaPeca={c:'',t:0};
 function $(s){ return document.querySelector(s); }
 function esc0(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 function nomeDest(c){ return c==='AG'?'Carro da agência':'Carrinho '+c; }
@@ -160,18 +163,35 @@ function banner(kind,t,s){ $('#banner').className='banner '+(kind||''); $('#bann
 function beep(ok){ try{ var a=new (window.AudioContext||window.webkitAudioContext)(), o=a.createOscillator(), g=a.createGain();
   o.connect(g); g.connect(a.destination); o.frequency.value=ok?820:240; g.gain.value=.05; o.start();
   setTimeout(function(){ o.stop(); a.close(); }, ok?100:220); }catch(e){} }
-function pecasDe(itens){ return (itens||[]).reduce(function(s,i){ return s+Math.max(1,(i&&i.qtd)||1); },0); }
+/* A CAIXA DE VÁRIAS PERSIANAS (R-PEC-02, R-VOL-02): a lista do que vai na
+   caixa APARECE, contando persiana (soma das `qtd`), nunca linha. Na caixa de
+   várias o código solto sai da linha, porque sozinho fazia dois SKUs parecerem
+   um; a lista vem embaixo, por `pecasLinhas`. */
+function pecasDeC(itens){ return (itens||[]).reduce(function(s,i){ return s+Math.max(1,(i&&i.qtd)||1); },0); }
+function ehVarias(f){ return pecasDeC(f&&f.itens)>1; }
+function skuDaLinha(f){ return ehVarias(f) ? '' : ' · '+esc0(f.codigo||''); }
+function pecasLinhas(itens){
+  if(pecasDeC(itens)<2) return '';
+  return '<div style="margin-top:3px"><span class="chip c-am">📦 '+pecasDeC(itens)+' persianas</span>'
+    +(itens||[]).map(function(i){ return '<div style="font-size:13px;margin-top:2px"><b>'+Math.max(1,i.qtd||1)+' ×</b> <span class="mono">'+esc0(i.codigo||'')+'</span></div>'; }).join('')+'</div>';
+}
+var pecasDe=pecasDeC;
 function dataBR(s){ var m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]):''; }
 function horaDe(s){ var p=String(s||'').split(' '); return (p[1]||'').slice(0,5); }
-function linha(c,dir){
-  var n=pecasDe(c.itens);
-  var sku=n>1?'<span class="chip c-am">📦 '+n+' persianas</span>':'<span class="mono">'+esc0(c.codigo||'')+'</span>';
-  var mod=c.coleta?'<span class="chip c-col">🟣 Coleta</span>':'<span class="chip c-ag">🚗 Agência</span>';
-  return '<div class="cx"><div><div class="cli">'+esc0(c.buyer||'(sem nome)')
-    +(c.antiga&&!c.conferido_por?' <span class="chip c-am">de antes</span>':'')
-    +(c.adiantada?' <span class="chip c-mu">despacha '+dataBR(c.despachar_em)+'</span>':'')+'</div>'
-    +'<div class="det">'+sku+'<span>NF '+esc0(c.nf||'—')+'</span>'+mod
-    +(c.impresso_por?'<span>impressa por '+esc0(c.impresso_por)+'</span>':'')+'</div></div><div class="dir">'+(dir||'')+'</div></div>';
+/* O selo do "a coleta não passou" (R-FIM-01): "de ontem" quando ficou ontem. */
+function ontem(){ var d=new Date(); d.setDate(d.getDate()-1); var z=function(n){ return (n<10?'0':'')+n; };
+  return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); }
+function seloFicou(f){ if(!f.ficou_de) return '';
+  return ' <span class="chip c-am">🌙 '+(f.ficou_de===ontem()?'de ontem':'ficou '+dataBR(f.ficou_de))+' — a coleta não passou</span>'; }
+function linha(f,dir){
+  var mod=f.coleta?'<span class="chip c-col">🟣 Coleta</span>':'<span class="chip c-ag">🚗 Agência</span>';
+  return '<div class="cx"><div><div class="cli">'+esc0(f.buyer||'(sem nome)')+seloFicou(f)
+    +(f.antiga&&!f.conferido_por&&!f.ficou_de?' <span class="chip c-am">de antes</span>':'')
+    +(f.adiantada?' <span class="chip c-mu">despacha '+dataBR(f.despachar_em)+'</span>':'')+'</div>'
+    +'<div class="det">'+mod+'<span>NF '+esc0(f.nf||'—')+skuDaLinha(f)+'</span></div>'
+    +pecasLinhas(f.itens)
+    +(f.impresso_por?'<div class="quem">Etiqueta feita por <b>'+esc0(f.impresso_por)+'</b></div>':'')
+    +'</div><div class="dir">'+(dir||'')+'</div></div>';
 }
 
 /* ===================== LEITURA ===================== */
@@ -180,7 +200,9 @@ async function carregar(){
   if(!d || !d.barras) return;
   D=d;
   var cods=(d.destinos||[]).filter(function(x){ return x.codigo!=='AG'; }).map(function(x){ return x.codigo; });
-  if(!ativo || cods.indexOf(ativo)<0) setAtivo(cods[0]||null);
+  /* Ninguém escolhe o carrinho pela pessoa (R-CRR-02): sem um escolhido neste
+     aparelho, a caixa de coleta é recusada dizendo para escolher. */
+  if(ativo && cods.indexOf(ativo)<0) ativo=null;
   $('#parSegundo').innerHTML='Segundo bipe (SKU): <b>'+(d.segundo_bipe?'ligado':'desligado')+'</b> · muda na 906 Parâmetros';
   desenharBarras(); desenharFaixa(); desenharLista(); desenharHist();
   if(estado==='bipar') desenharPainel();
@@ -195,8 +217,9 @@ function desenharBarras(){
   $('#barras').innerHTML=
     '<div class="bx"><div class="cab"><span class="tit">Entrega do dia</span><span class="de">'+e.entregues+' de '+e.total+' entregues</span></div>'
    +'<div class="falta">'+e.faltam+' <small>faltam entregar</small></div>'
-   +'<div class="trilho">'+seg(e.entregues,e.total,'k-ent')+seg(e.nos_carrinhos,e.total,'k-car')+seg(e.sem_bipe,e.total,'k-imp')+seg(e.sem_etiqueta,e.total,'k-sem')+'</div>'
+   +'<div class="trilho">'+seg(e.entregues,e.total,'k-ent')+seg(e.nos_carrinhos,e.total,'k-car')+seg(e.sem_carrinho,e.total,'k-fora')+seg(e.sem_bipe,e.total,'k-imp')+seg(e.sem_etiqueta,e.total,'k-sem')+'</div>'
    +'<div class="leg"><span><i class="sq k-ent"></i>entregues <b>'+e.entregues+'</b></span><span><i class="sq k-car"></i>nos carrinhos <b>'+e.nos_carrinhos+'</b></span>'
+   +(e.sem_carrinho?'<span><i class="sq k-fora"></i>conferidas fora do carrinho <b>'+e.sem_carrinho+'</b></span>':'')
    +'<span><i class="sq k-imp"></i>impressas sem bipe <b>'+e.sem_bipe+'</b></span><span><i class="sq k-sem"></i>sem etiqueta ainda <b>'+e.sem_etiqueta+'</b></span></div></div>'
    +'<div class="bx"><div class="cab"><span class="tit">Bipar o que foi impresso hoje</span><span class="de">'+b.bipadas+' de '+b.impressas+' bipadas</span></div>'
    +'<div class="falta">'+b.faltam+' <small>faltam bipar</small></div>'
@@ -206,9 +229,14 @@ function desenharBarras(){
 }
 function desenharFaixa(){
   var l=(D.destinos||[]).filter(function(x){ return x.n; });
-  var f=$('#faixa');
-  if(!l.length || estado==='entrega'){ f.hidden=true; return; }
-  f.hidden=false; f.textContent='⚠ '+l.map(function(x){ return x.nome+' com '+x.n; }).join(' · ')+' — falta entregar';
+  var f=$('#faixa'), t=[];
+  /* A saída ou a viagem aberta por um aparelho com a página antiga: as caixas
+     dela saem dos carrinhos até alguém fechá-la lá (③ REVISÃO). */
+  (D.abertas_antigas||[]).forEach(function(a){ t.push('⚠ '+(a.tipo==='agencia'?'Viagem à agência':'Saída do caminhão')+' aberta pela tela antiga'
+    +(a.aberta_por?' ('+a.aberta_por+')':'')+': recarregue aquele aparelho e feche ou cancele por lá.'); });
+  if(l.length && estado!=='entrega') t.push('⚠ '+l.map(function(x){ return x.nome+' com '+x.n; }).join(' · ')+' — falta entregar');
+  if(!t.length){ f.hidden=true; return; }
+  f.hidden=false; f.textContent=t.join('  ·  ');
 }
 function desenharLista(){
   var n={faltam:(D.faltam||[]).length, nos:(D.nos||[]).length, sem:(D.sem_carrinho||[]).length, entregues:(D.entregues||[]).length, etq:(D.sem_etiqueta||[]).length};
@@ -253,7 +281,7 @@ function desenharPainel(){
       +'<div class="l">'+(ag?'caixas de agência entram aqui':at?'ATIVO — o bipe da coleta vem para cá':'bipe a etiqueta do carrinho para usar')+'</div>'
       +'<div class="acoes">'+(!ag&&!at?'<button class="btn sm" onclick="usar(\''+d.codigo+'\')">Usar este</button>':'')
       +(d.n?'<button class="btn sm" onclick="abrirRecontar(\''+d.codigo+'\')">🔁 Recontar</button><button class="btn sm ok" onclick="abrirEntrega(\''+d.codigo+'\')">Entregar →</button>':'')+'</div></div>';
-  }).join('')+'</div><div class="nota">Os carrinhos vêm do cadastro "Carrinhos da expedição" (902 Cadastros). Bipar a etiqueta do carrinho troca o ativo.</div>';
+  }).join('')+'</div>'+(ativo?'':'<div class="banner warn"><div class="bt">Escolha o carrinho</div><div class="bs">Bipe a etiqueta colada no carrinho, ou toque em "Usar este".</div></div>')+'<div class="nota">Os carrinhos vêm do cadastro "Carrinhos da expedição" (902 Cadastros). Bipar a etiqueta do carrinho troca o ativo.</div>';
 }
 function usar(c){ setAtivo(c); banner('ok','Agora a coleta vai para o '+nomeDest(c),''); beep(true); desenharPainel(); $('#scan').focus(); }
 function voltarBipar(){ estado='bipar'; ENT=null; REC=null; CANC=null; banner('','Pronto','Bipe a etiqueta de venda da caixa.'); desenharPainel(); desenharFaixa(); $('#scan').focus(); }
@@ -270,12 +298,21 @@ async function bip(code){
   if(estado==='recontar') return bipRecontar(code);
   if(estado==='cancelada') return bipCancelada(code);
   if(caixaPecas) return bipPeca(code);
-  var corpo=aguardando?{code:aguardando.code, sku:code, carrinho:ativo||''}:{code:code, carrinho:ativo||''};
+  var agora=Date.now(); if(last.c===code && agora-last.t<600) return; last={c:code,t:agora};
+  /* Com a entrega aberta, a caixa bipada (a que o motorista levou sem bipe, ou
+     a que faltava) vai para o carrinho QUE ESTÁ SENDO ENTREGUE, e entra na
+     conta dela — e não no carrinho ativo (③ REVISÃO). A de agência vai para o
+     Carro da agência, como sempre. */
+  var destino=ativo||'';
+  if(estado==='entrega' && ENT){ var cs=ENT.sel.filter(function(c){ return c!=='AG'; }); if(cs.length) destino=cs[0]; }
+  var corpo=aguardando?{code:aguardando.code, sku:code, carrinho:destino}:{code:code, carrinho:destino};
   var r=await postJ('/api/carregar',corpo);
   aguardando=null;
   mostrar(r, corpo.code);
   carregar();
-  if(estado==='entrega' && ENT) atualizarPrevia();
+  if(estado==='entrega' && ENT){
+    if(r.ok && ENT.passo===3 && ENT.res){ ENT.res=null; banner('ok','✓ Conferida — no '+esc0(nomeDest(r.carrinho||destino)),'Agora toque em <b>Comparar e fechar</b> de novo.'); }
+    atualizarPrevia(); }
 }
 function quem(r){ var p=r.pedido||{}; return esc0(p.buyer||'')+(p.nf?' · NF '+esc0(p.nf):''); }
 function mostrar(r, enviado){
@@ -307,13 +344,18 @@ function desenharPecas(r, erro){
     +'<div class="acoes" style="margin-top:8px"><button class="btn" onclick="recomecarCaixa()">↺ Recomeçar esta caixa</button><button class="btn" onclick="sairDaCaixa()">Deixar esta caixa para depois</button></div>');
 }
 async function bipPeca(code){
+  /* O LEITOR QUE REPETE NÃO VIRA PERSIANA A MAIS (R-PEC-04): o mesmo código em
+     menos de 700 ms é a mesma leitura. O servidor não tem trava própria. */
+  var agora=Date.now();
+  if(ultimaPeca.c===code && agora-ultimaPeca.t<700) return;
+  ultimaPeca={c:code,t:agora};
   var r=await postJ('/api/carregar/peca',{lote_id:caixaPecas.id, sku:code, carrinho:ativo||''});
   if(r.ok && r.bipadas<r.pecas_total){ caixaPecas.r=r; desenharPecas(r,''); beep(true); return; }
   if(r.ok){ caixaPecas=null; banner('ok','✓ Caixa de '+r.pecas_total+' persianas no '+esc0(nomeDest(r.carrinho||'?')),quem(r)); beep(true); carregar(); return; }
   if(r.motivo==='peca_divergente'){ caixaPecas.r=Object.assign({},caixaPecas.r,{pecas:r.pecas,bipadas:r.bipadas}); desenharPecas(caixaPecas.r,r.aviso); beep(false); return; }
   caixaPecas=null; mostrar(r);
 }
-async function recomecarCaixa(){ if(!caixaPecas) return;
+async function recomecarCaixa(){ if(!caixaPecas) return; ultimaPeca={c:'',t:0};
   var r=await postJ('/api/carregar/recomecar',{lote_id:caixaPecas.id});
   caixaPecas.r=Object.assign({},caixaPecas.r,{pecas:r.pecas,bipadas:r.bipadas}); desenharPecas(caixaPecas.r,''); $('#scan').focus(); }
 function sairDaCaixa(){ caixaPecas=null; banner('','Pronto','Bipe a etiqueta de venda da caixa.'); $('#scan').focus(); }
@@ -321,10 +363,16 @@ function sairDaCaixa(){ caixaPecas=null; banner('','Pronto','Bipe a etiqueta de 
 /* ===================== RECONTAGEM (cega) ===================== */
 function abrirRecontar(c, daEntrega){ estado='recontar'; REC={c:c, codes:[], fim:null, daEntrega:!!daEntrega};
   banner('esp','Bipe cada caixa do '+nomeDest(c),'Contagem cega: a tela não mostra quantas deveria ter. Conte o que está no carrinho.'); desenharPainel(); $('#scan').focus(); }
-function bipRecontar(code){
-  if(REC.fim) return;
+async function bipRecontar(code){
   var k=code.toUpperCase();
   if(REC.codes.indexOf(k)>=0){ banner('warn','Já bipada nesta recontagem',''); beep(false); return; }
+  /* Depois de "Terminei", o bipe é o "achei" da caixa que faltou: a conta se
+     refaz no servidor com ela (③ REVISÃO: antes o bipe era ignorado, calado). */
+  if(REC.fim){ REC.codes.push(k);
+    var r=await postJ('/api/carrinho/recontar',{carrinho:REC.c, codes:REC.codes, ids:REC.ids||[]});
+    if(r.ok){ REC.fim=r; banner(r.bateu?'ok':'warn', r.bateu?'Recontagem bateu':'✓ Contada — a conta foi refeita',''); beep(true); desenharRecontar(); carregar(); }
+    else { banner('err','Não deu',esc0(r.aviso||'')); beep(false); }
+    return; }
   REC.codes.push(k); banner('ok','✓ Contada','Bipadas: '+REC.codes.length); beep(true); desenharRecontar();
 }
 function desenharRecontar(){
@@ -340,6 +388,8 @@ function desenharRecontar(){
       +'<div class="lista">'+f.faltam.map(function(c){ return linha(c,'<button class="btn sm ok" onclick="recAchei('+c.id+')">Achei</button><button class="btn sm red" onclick="recNao('+c.id+')">Não achei</button>'); }).join('')+'</div>';
     if(f.sobraram.length) h+='<div class="banner warn"><div class="bt">'+f.sobraram.length+' caixa de outro carrinho</div><div class="bs">Estava aqui, mas a conferência pôs em outro lugar.</div></div>'
       +'<div class="lista">'+f.sobraram.map(function(c){ return linha(c,'<button class="btn sm pri" onclick="recPassar('+c.id+')">Passar para o '+esc0(nomeDest(R.c))+'</button>'); }).join('')+'</div>';
+    if(f.nao_conferidas && f.nao_conferidas.length) h+='<div class="banner warn"><div class="bt">'+f.nao_conferidas.length+' caixa sem conferência no carrinho</div><div class="bs">Ela foi impressa e ninguém bipou. Termine a recontagem e confira a caixa no bipe normal.</div></div>'
+      +'<div class="lista">'+f.nao_conferidas.map(function(c){ return linha(c); }).join('')+'</div>';
     if(f.desconhecidos && f.desconhecidos.length) h+='<div class="nota">Códigos que não são caixa conferida: '+f.desconhecidos.map(esc0).join(', ')+'. Tire do carrinho e deixe separado.</div>';
     var pend=f.faltam.length||f.sobraram.length;
     h+='<div class="acoes"><button class="btn ok big"'+(pend?' disabled':'')+' onclick="fimRecontar()">'+(R.daEntrega?'Voltar para a entrega':'Concluir')+'</button></div>';
@@ -352,8 +402,8 @@ async function terminarRecontar(){
   REC.fim=r; banner(r.bateu?'ok':'warn', r.bateu?'Recontagem bateu':'Recontagem não bateu',''); desenharRecontar(); carregar();
 }
 async function recAchei(id){
-  /* "Achei": a caixa estava no carrinho. A recontagem refaz no servidor, com
-     ela junto, e a linha nova fica gravada. */
+  /* "Achei" (ou o bipe dela): a caixa estava no carrinho. A recontagem refaz
+     no servidor, com ela junto, e a linha nova fica gravada. */
   REC.ids=(REC.ids||[]).concat([id]);
   var r=await postJ('/api/carrinho/recontar',{carrinho:REC.c, codes:REC.codes, ids:REC.ids});
   if(r.ok){ REC.fim=r; desenharRecontar(); carregar(); } else { banner('err','Não deu',esc0(r.aviso||'')); beep(false); } }
@@ -387,7 +437,7 @@ function desenharEntrega(){
   var h='<div class="passos">'+['Antes de entregar','Carrinhos','Foto','Número'].map(function(n,i){ return '<span class="'+(E.passo===i?'on':E.passo>i?'feito':'')+'">'+n+'</span>'; }).join('')+'</div>';
   if(E.passo===0){
     var pend=(E.previa&&E.previa.faltam_bipar)||[];
-    h+='<div class="banner warn"><div class="bt">Ainda faltam '+pend.length+' caixa'+(pend.length===1?'':'s')+' impressas sem bipar</div><div class="bs">Bipe agora se estiverem aí. Elas não entram nesta entrega sem o bipe.</div></div>'
+    h+='<div class="banner warn"><div class="bt">'+(pend.length===1?'Ainda falta 1 caixa impressa sem bipar':'Ainda faltam '+pend.length+' caixas impressas sem bipar')+'</div><div class="bs">Bipe agora se estiverem aí. Elas não entram nesta entrega sem o bipe.</div></div>'
       +'<div class="lista">'+pend.map(function(c){ return linha(Object.assign({coleta:c.modalidade==='coleta'},c)); }).join('')+'</div>'
       +'<div class="acoes"><button class="btn" onclick="voltarBipar()">Voltar</button><button class="btn" onclick="ENT.passo=1;desenharEntrega()">Seguir sem elas →</button></div>';
   } else if(E.passo===1){
@@ -398,6 +448,9 @@ function desenharEntrega(){
       +'<button class="btn sm'+(E.para==='agencia'?' pri':'')+'" onclick="setPara(\'agencia\')">🚗 Agência</button></div>';
     h+='<div class="dest">'+disp.map(function(d){ var on=E.sel.indexOf(d.codigo)>=0;
       return '<button class="dc'+(on?' ativo':'')+'" onclick="selDest(\''+d.codigo+'\')"><span class="n">'+(on?'☑ ':'☐ ')+esc0(d.nome)+'</span><span class="q">'+d.n+'</span><span class="l">caixas'+(d.recontado?' · recontado ✓':'')+'</span></button>'; }).join('')+'</div>'
+      +(function(){ var ad=((E.previa&&E.previa.caixas)||[]).filter(function(c){ return c.adiantada; });
+        return ad.length?'<div class="banner warn"><div class="bt">'+ad.length+' caixa'+(ad.length===1?' adiantada':'s adiantadas')+' nesta entrega</div><div class="bs">'
+          +ad.map(function(c){ return esc0(c.buyer)+' (despacha '+dataBR(c.despachar_em)+')'; }).join(' · ')+'</div></div>':''; })()
       +'<div class="acoes"><button class="btn" onclick="voltarBipar()">Voltar</button><button class="btn ok big"'+(E.sel.length?'':' disabled')+' onclick="ENT.passo=2;desenharEntrega()">Continuar →</button></div>';
   } else if(E.passo===2){
     h+='<div class="banner"><div class="bt">Foto da tela do '+quemRecebe+'</div><div class="bs">A tela do celular dele com a quantidade que ele bipou. Sem a foto não fecha.</div></div>'
@@ -417,8 +470,9 @@ function desenharEntrega(){
           ?'O '+quemRecebe+' bipou a mais: uma caixa foi sem o bipe. <b>Ache a caixa e bipe-a agora</b> — ela entra no carrinho e na conta.'
           :'Pode ter ficado caixa no carrinho. Reconte antes de liberar.')+'</div></div>'
         +'<div class="acoes">'+E.sel.map(function(c){ return '<button class="btn" onclick="abrirRecontar(\''+c+'\',true)">🔁 Recontar '+esc0(nomeDest(c))+'</button>'; }).join('')+'</div>'
-        +'<div class="card" style="background:var(--panel)"><b>Liberar com divergência</b><div class="nota">Só quem tem a permissão de liberar, com o motivo.</div>'
+        +'<div class="card" data-perm="saida.liberar" style="background:var(--panel)"><b>Liberar com divergência</b><div class="nota">Só quem tem a permissão de liberar, com o motivo.</div>'
         +'<input class="txt" id="motivoLib" placeholder="Por que está liberando com número diferente?" maxlength="300" value="'+esc0(E.motivo)+'" oninput="ENT.motivo=this.value">'
+        +(E.res.aviso_lib?'<div style="font-weight:700;color:var(--red)">'+esc0(E.res.aviso_lib)+'</div>':'')
         +'<div class="acoes"><button class="btn red" data-perm="saida.liberar" onclick="fecharEntrega(true)">Liberar com divergência</button></div></div>';
     } else if(E.res && E.res.aviso){
       h+='<div class="banner err"><div class="bt">Não fechou</div><div class="bs">'+esc0(E.res.aviso)+'</div></div>';
@@ -433,7 +487,7 @@ function desenharEntrega(){
   if(E.passo===3 && E.para==='agencia' && !pessoas) carregarPessoas();
 }
 function setPara(p){ ENT.para=p; ENT.sel=p==='agencia'?ENT.sel.filter(function(c){ return c==='AG'; }):ENT.sel; desenharEntrega(); }
-function selDest(c){ var i=ENT.sel.indexOf(c); if(i>=0) ENT.sel.splice(i,1); else ENT.sel.push(c); desenharEntrega(); }
+function selDest(c){ var i=ENT.sel.indexOf(c); if(i>=0) ENT.sel.splice(i,1); else ENT.sel.push(c); atualizarPrevia(); }
 /* Quem levou: as pessoas ativas do cadastro. Chegam depois do passo aberto, e
    por isso preenchem SÓ a lista — redesenhar o passo apagaria o número e o
    motivo que a pessoa já está digitando (§12). */
@@ -460,6 +514,9 @@ async function fecharEntrega(liberar){
   if(r.__status===403){ banner('err','Sem permissão','Liberar com número diferente é de quem tem a permissão de liberar a saída.'); beep(false); return; }
   if(r.ok){ banner('ok','✓ Entrega fechada','Sistema '+r.sistema+' · '+(E.para==='agencia'?'atendente':'motorista')+' '+r.numero+(r.divergente?' · liberado com divergência':'')+'. As caixas saíram da fábrica.');
     beep(true); ENT=null; estado='bipar'; carregar(); desenharPainel(); desenharFaixa(); $('#scan').focus(); return; }
+  /* A recusa do liberar (sem motivo) não apaga o bloco da divergência: o
+     motivo se escreve ali mesmo (③ REVISÃO). */
+  if(r.motivo==='sem_motivo' && E.res && E.res.motivo==='divergente'){ E.res.aviso_lib=r.aviso; beep(false); desenharEntrega(); return; }
   E.res=r; beep(false); desenharEntrega();
 }
 
@@ -526,8 +583,11 @@ async function decidir(id, acao){
 /* ===================== A COLETA NÃO PASSOU ===================== */
 function abrirNaoPassou(){ estado=estado==='naopassou'?'bipar':'naopassou'; if(estado==='bipar') return voltarBipar(); desenharPainel(); }
 function desenharNaoPassou(){
-  var n=((D&&D.nos)||[]).filter(function(c){ return c.coleta; }).length + ((D&&D.faltam)||[]).filter(function(c){ return c.coleta; }).length;
-  $('#painel').innerHTML='<div class="banner warn"><div class="bt">'+n+' caixas de coleta ficam na fábrica</div><div class="bs">Fica registrado quem marcou e quais caixas. Amanhã elas aparecem em cima, com o selo "de ontem". Nada muda no estoque, e as caixas continuam nos carrinhos.</div></div>'
+  /* O mesmo conjunto que o servidor registra (o fimdia): toda caixa com
+     etiqueta ainda na fábrica — impressa sem bipe, nos carrinhos e conferida
+     fora deles, coleta e agência (③ REVISÃO: a frase dizia só as de coleta). */
+  var n=((D&&D.nos)||[]).length + ((D&&D.faltam)||[]).length + ((D&&D.sem_carrinho)||[]).length;
+  $('#painel').innerHTML='<div class="banner warn"><div class="bt">'+(n===1?'1 caixa com etiqueta fica':n+' caixas com etiqueta ficam')+' na fábrica</div><div class="bs">Fica registrado quem marcou e quais caixas. Amanhã elas aparecem em cima, com o selo "de ontem". Nada muda no estoque, e as caixas continuam nos carrinhos.</div></div>'
     +'<div class="acoes"><button class="btn" onclick="voltarBipar()">Voltar</button><button class="btn pri big" onclick="naoPassou()">Confirmar: a coleta não passou</button></div>';
 }
 async function naoPassou(){
@@ -542,6 +602,15 @@ function voltarBiparSemBanner(){ estado='bipar'; desenharPainel(); desenharFaixa
 var scan=$('#scan');
 scan.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); var v=scan.value.trim(); scan.value=''; if(v) bip(v).catch(semConexao); } });
 scan.focus();
+/* O CAMPO DO BIPE NÃO FICA SEM DONO (§12, ③ REVISÃO): o leitor digita no que
+   tem o foco. Depois de tocar num botão, num filtro ou no vazio, o foco volta
+   ao bipe — menos quando a pessoa está num campo de digitar. preventScroll:
+   devolver o foco não arrasta a tela. */
+function keep(){ var a=document.activeElement; if(a===scan) return;
+  if(a && (DIGITACAO.indexOf(a.id)>=0 || a.id==='fotoIn' || a.tagName==='SELECT' || (a.tagName==='INPUT' && a.type!=='button'))) return;
+  scan.focus({preventScroll:true}); }
+scan.addEventListener('blur',function(){ setTimeout(keep,50); });
+document.addEventListener('click',function(e){ if(!e.target.closest('input,select,label,textarea')) setTimeout(keep,50); });
 /* A atualização de 4 s espera quem está digitando: redesenhar por baixo de um
    campo com foco fecha o teclado do iPad (§12). O campo do bipe não conta. */
 var DIGITACAO=['numEnt','motivoLib','cancTexto','quemLevou'];

@@ -55,6 +55,16 @@ module.exports = function(app, db){
     const semEtiqueta = db.prepare(`SELECT * FROM lote WHERE estagio IN ('pendente','bloqueado') AND codigo IS NOT NULL
       AND ${require('./fila_dia').VENCE_HOJE} AND ${SEM_TESTE} ORDER BY despachar_em, id`).all().map(marca);
     const sem = C.semCarrinho(db).map(marca);
+    /* O "a coleta não passou" (R-FIM-01): a caixa marcada vem EM CIMA, com o
+       dia, em toda lista. */
+    try{ const marcas = require('./fim_dia').marcas(db);
+      const poe = l => { l.forEach(v => { if(marcas.has(v.id)) v.ficou_de = marcas.get(v.id); });
+        l.sort((a, b) => (b.ficou_de ? 1 : 0) - (a.ficou_de ? 1 : 0)); };
+      [faltam, nos, sem].forEach(poe); }catch(e){}
+    /* A saída ou a viagem aberta por um tablet com a página antiga: as caixas
+       dela saem dos destinos até alguém fechá-la lá. A tela nova avisa (③ REVISÃO). */
+    let abertas = [];
+    try{ abertas = db.prepare(`SELECT id, tipo, aberta_em, aberta_por FROM saida WHERE fechada_em IS NULL AND tipo IN ('coleta','agencia')`).all(); }catch(e){}
     let segundo = false;
     try{ const c = db.prepare("SELECT valor FROM config WHERE chave='conf_carregamento'").get(); segundo = !!(c && String(c.valor) === '1'); }catch(e){}
     /* O histórico do dia: as saídas fechadas hoje (as da tela nova e as das
@@ -68,7 +78,7 @@ module.exports = function(app, db){
         carrinhos:(()=>{ try{ return JSON.parse(x.carrinhos||'[]'); }catch(e){ return []; } })(),
         foto:x.foto ? '/api/saida/foto/'+x.id : null })); }catch(e){ saidas = []; }
     res.json({ barras:C.barras(db), destinos, faltam, nos, entregues, sem_etiqueta:semEtiqueta, sem_carrinho:sem,
-      segundo_bipe:segundo, saidas_hoje:saidas });
+      segundo_bipe:segundo, saidas_hoje:saidas, abertas_antigas:abertas });
   });
 
   // ── a recontagem cega (R-CRR-04) ──
@@ -111,7 +121,9 @@ module.exports = function(app, db){
   app.get('/api/entrega/previa', (req, res) => {
     const ds = String((req.query||{}).destinos||'').split(',');
     const p = C.previa(db, ds);
-    res.json({ ok:true, destinos:p.destinos, sistema:p.sistema, caixas:p.caixas.map(marca), faltam_bipar:p.faltam_bipar });
+    const porId = id => db.prepare('SELECT * FROM lote WHERE id=?').get(id);
+    res.json({ ok:true, destinos:p.destinos, sistema:p.sistema, caixas:p.caixas.map(marca),
+      faltam_bipar:p.faltam_bipar.map(v => marca(porId(v.id))) });
   });
 
   function fechar(req, res, liberar){

@@ -77,6 +77,9 @@ const bipa = (buyer, carrinho) => chamar('POST /api/carregar', {code:'P'+buyer, 
   ok('a prévia diz quantas caixas o carrinho tem', r.ok === true && r.sistema === 2, JSON.stringify(r));
   ok('...e as impressas sem bipe da coleta', (r.faltam_bipar||[]).length === 1 && r.faltam_bipar[0].id === solta, JSON.stringify(r.faltam_bipar));
 
+  ok('a prévia traz as peças da caixa (a de várias conta persiana, R-VOL-02)', Array.isArray((r.faltam_bipar[0]||{}).itens), JSON.stringify(r.faltam_bipar[0]));
+  ok('...e cada caixa do destino diz se é adiantada', r.caixas.every(c => 'adiantada' in c), JSON.stringify(r.caixas[0]));
+
   // ── validações ──
   r = await chamar('POST /api/entrega/fechar', {destinos:[], para:'motorista', numero:2, foto:FOTO}, ANA);
   ok('sem destino não fecha', r.ok === false && r.motivo === 'sem_destino', JSON.stringify(r));
@@ -84,6 +87,8 @@ const bipa = (buyer, carrinho) => chamar('POST /api/carregar', {code:'P'+buyer, 
   ok('sem foto não fecha', r.ok === false && r.motivo === 'sem_foto' && !lote(a1).saida_id, JSON.stringify(r));
   r = await chamar('POST /api/entrega/fechar', {destinos:['A'], para:'agencia', numero:2, foto:FOTO, quem_levou_id:1}, ANA);
   ok('carrinho de coleta não vai à agência', r.ok === false && r.motivo === 'para_invalido', JSON.stringify(r));
+  r = await chamar('POST /api/entrega/fechar', {destinos:['A'], para:'motorista', numero:'2abc', foto:FOTO}, ANA);
+  ok('número que não é número ("2abc") é recusado, e não lido como 2', r.ok === false && r.motivo === 'sem_numero', JSON.stringify(r));
   r = await chamar('POST /api/entrega/fechar', {destinos:['A'], para:'motorista', numero:3, foto:FOTO}, ANA);
   ok('número diferente não fecha', r.ok === false && r.motivo === 'divergente' && r.sistema === 2, JSON.stringify(r));
   ok('...e não grava nada', !lote(a1).saida_id && !lote(a2).saida_id && q1('SELECT COUNT(*) n FROM saida').n === 0);

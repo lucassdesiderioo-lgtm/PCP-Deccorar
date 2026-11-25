@@ -122,12 +122,18 @@ const srv = app.listen(0, async () => {
     await abrir();
     ok('as duas barras aparecem', /Entrega do dia/.test(await texto('#barras')) && /Bipar o que foi impresso hoje/.test(await texto('#barras')), await texto('#barras'));
     ok('os destinos: Carrinho A, Carrinho B e Carro da agência', /Carrinho A/.test(await texto('#painel')) && /Carrinho B/.test(await texto('#painel')) && /Carro da agência/.test(await texto('#painel')));
-    ok('o A nasce ativo', /ATIVO/.test(await texto('.dc:has-text("Carrinho A")')));
+    ok('nenhum carrinho nasce ativo: a tela pede para escolher (R-CRR-02)', !/ATIVO/.test(await texto('#painel')) && /Escolha o carrinho/.test(await texto('#painel')), await texto('#painel'));
     ok('"Faltam bipar" traz a agência e a coleta impressas', /Agencia Um Conferir/.test(await texto('#lista')) && /Coleta Um Bancada/.test(await texto('#lista')), await texto('#lista'));
     ok('o topo diz o segundo bipe e onde muda', /Segundo bipe \(SKU\): desligado · muda na 906 Parâmetros/.test(await texto('#parSegundo')), await texto('#parSegundo'));
 
     secao('2. o bipe sem modo');
     const s0 = saldo('BK140140BEGE');
+    await bipar(co1.code);
+    ok('coleta sem carrinho escolhido: recusada, e nada baixa', /Escolha o carrinho/.test(await texto('#banner')) && saldo('BK140140BEGE') === s0, await texto('#banner'));
+    await p.click('#filtros button:has-text("Nos carrinhos")'); await p.waitForTimeout(200);
+    ok('depois de tocar num filtro, o foco volta ao campo do bipe', await p.evaluate(() => document.activeElement && document.activeElement.id) === 'scan');
+    await p.keyboard.type('CARRINHO-A'); await p.keyboard.press('Enter'); await p.waitForTimeout(700);
+    ok('o leitor (teclado, sem clicar no campo) troca o ativo para o A', /ATIVO/.test(await texto('.dc:has-text("Carrinho A")')), await texto('#painel'));
     await bipar(co1.code);
     ok('coleta: conferida no Carrinho A', /Conferida — no Carrinho A/.test(await texto('#banner')), await texto('#banner'));
     eq('   o carrinho A tem 1', await destino('Carrinho A'), '1');
@@ -150,6 +156,12 @@ const srv = app.listen(0, async () => {
     await bipar(co2.code);
     await p.click('text=Terminei a recontagem'); await p.waitForTimeout(700);
     ok('faltou uma: a lista aparece', /Faltam 1 no carrinho/.test(await texto('#painel')) && /Coleta Quatro Recusar/.test(await texto('#painel')), await texto('#painel'));
+    await bipar(co4.code);
+    ok('o bipe depois de "Terminei" é o achei: a conta refaz e bate', /Bateu/.test(await texto('#painel')), await texto('#painel'));
+    await p.click('#painel button:has-text("Concluir")'); await p.waitForTimeout(400);
+    await p.click('.dc:has-text("Carrinho B") button:has-text("Recontar")'); await p.waitForTimeout(300);
+    await bipar(co2.code);
+    await p.click('text=Terminei a recontagem'); await p.waitForTimeout(700);
     const s2 = saldo('BK120120BEGE');
     await p.click('#painel .cx:has-text("Coleta Quatro Recusar") button:has-text("Não achei")'); await p.waitForTimeout(700);
     ok('"não achei" tira do carrinho', lote(co4.id).carrinho === null && !!lote(co4.id).nao_achada_em);
@@ -163,10 +175,29 @@ const srv = app.listen(0, async () => {
     await p.click('#painel button:has-text("Continuar")'); await p.waitForTimeout(300);
     await p.setInputFiles('#fotoIn', FOTO); await p.waitForTimeout(800);
     await p.click('#painel button:has-text("Continuar")'); await p.waitForTimeout(300);
-    await p.fill('#numEnt', '2'); await p.click('text=Comparar e fechar'); await p.waitForTimeout(800);
+    await p.fill('#numEnt', '3'); await p.click('#painel button:has-text("Comparar e fechar")'); await p.waitForTimeout(800);
     ok('número diferente: não bateu, e o liberar aparece', /Não bateu/.test(await texto('#painel')) && !!(await p.$('#painel button:has-text("Liberar com divergência")')), await texto('#painel'));
     eq('   nada saiu', lote(co1.id).saida_id, null);
-    await p.fill('#numEnt', '1'); await p.click('text=Comparar e fechar'); await p.waitForTimeout(900);
+    /* O botão é do nav.js (data-perm) e este Express não manda o menu: o clique
+       sai pela função da tela, como o botão faria. */
+    await p.evaluate(() => fecharEntrega(true)); await p.waitForTimeout(700);
+    ok('liberar sem motivo: o bloco da divergência e o campo continuam', !!(await p.$('#motivoLib')) && /Escreva o motivo/.test(await texto('#painel')), await texto('#painel'));
+    // a caixa a mais é bipada na hora: vai para o carrinho entregue (A), não para o ativo (B)
+    await p.click('#painel button:has-text("Recontar Carrinho A")').catch(()=>{});
+    await p.waitForTimeout(200);
+    if(/Recontar/.test(await texto('#titEsq'))){ await p.click('text=Desistir'); await p.waitForTimeout(300); }
+    ok('(o ativo continua o B)', /ATIVO/.test(await texto('.dc:has-text("Carrinho B")')));
+    await p.click('.dc:has-text("Carrinho A") button:has-text("Entregar")'); await p.waitForTimeout(800);
+    if(/Seguir sem elas/.test(await texto('#painel'))){ await p.click('text=Seguir sem elas →'); await p.waitForTimeout(300); }
+    await p.click('#painel button:has-text("Continuar")'); await p.waitForTimeout(300);
+    await p.setInputFiles('#fotoIn', FOTO); await p.waitForTimeout(800);
+    await p.click('#painel button:has-text("Continuar")'); await p.waitForTimeout(300);
+    await p.fill('#numEnt', '2'); await p.click('#painel button:has-text("Comparar e fechar")'); await p.waitForTimeout(800);
+    const extra = caixa('Coleta Extra No Caminhao', { estagio:'embalado', modalidade:'coleta' });
+    await bipar(extra.code);
+    ok('na divergência, a caixa achada vai para o carrinho entregue (A)', lote(extra.id).carrinho === 'A', lote(extra.id).carrinho);
+    ok('...e a tela pede para comparar de novo', /Comparar e fechar/.test(await texto('#banner')) && !/Não bateu/.test(await texto('#painel')), await texto('#banner'));
+    await p.fill('#numEnt', '2'); await p.click('#painel button:has-text("Comparar e fechar")'); await p.waitForTimeout(900);
     ok('número certo: entrega fechada', /Entrega fechada/.test(await texto('#banner')) && !!lote(co1.id).saida_id && lote(co1.id).saiu_por === 'coleta', await texto('#banner'));
     await p.click('.dc:has-text("Carro da agência") button:has-text("Entregar")'); await p.waitForTimeout(800);
     if(/Seguir sem elas/.test(await texto('#painel'))){ await p.click('text=Seguir sem elas →'); await p.waitForTimeout(300); }
@@ -175,7 +206,7 @@ const srv = app.listen(0, async () => {
     await p.click('#painel button:has-text("Continuar")'); await p.waitForTimeout(500);
     ok('agência: pede quem levou', !!(await p.$('#quemLevou')));
     await p.selectOption('#quemLevou', '2'); await p.fill('#numEnt', '1');
-    await p.click('text=Comparar e fechar'); await p.waitForTimeout(900);
+    await p.click('#painel button:has-text("Comparar e fechar")'); await p.waitForTimeout(900);
     ok('agência fechada com quem levou', /Entrega fechada/.test(await texto('#banner')) && lote(ag1.id).saiu_por === 'agencia', await texto('#banner'));
     await p.click('text=Histórico do dia'); await p.waitForTimeout(400);
     ok('o histórico do dia mostra as duas entregas', (await texto('#hist')).split('entregou').length - 1 === 2, await texto('#hist'));

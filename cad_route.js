@@ -85,7 +85,9 @@ module.exports=function(app,db){
     const l=db.prepare('SELECT tipo,valor FROM listas WHERE id=?').get(req.params.id);
     if(l && l.tipo==='carrinho_expedicao'){
       let n=0;
-      try{ const C=require('./carrinho_dominio'); n=C.noDestino(db,l.valor).length; }catch(e){ n=0; }
+      try{ const C=require('./carrinho_dominio'); n=C.noDestino(db,l.valor).length; }
+      catch(e){ console.log('[listas] conta do carrinho falhou: '+e.message);
+        return res.status(500).json({erro:'Não consegui conferir se o carrinho tem caixas. Nada foi desativado.'}); }
       if(n) return res.status(409).json({erro:'O carrinho '+String(l.valor).toUpperCase()+' tem '+n+' caixa(s) dentro. Entregue ou passe as caixas antes de desativar.'});
     }
     db.prepare('UPDATE listas SET ativo=0 WHERE id=?').run(req.params.id);
