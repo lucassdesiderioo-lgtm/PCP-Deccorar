@@ -52,10 +52,11 @@ function erro(status, mensagem, extra){
 /* A RÉGUA, numa frase só. `embalado` e sem `conferido_em` é a caixa impressa
    esperando o bipe (a conferida de coleta vira `carregado`; a de agência fica
    `embalado` COM `conferido_em`). */
-const TRAVA = `l.estagio='embalado' AND l.conferido_em IS NULL AND l.embalado_em IS NOT NULL
+const ESPERANDO_BIPE = `l.estagio='embalado' AND l.conferido_em IS NULL AND l.embalado_em IS NOT NULL
   AND date(l.embalado_em) < date('now','localtime')
   AND l.saida_id IS NULL AND l.saiu_em IS NULL AND l.retirado_em IS NULL
-  AND COALESCE(l.teste,0)=0 AND l.nao_encontrada_em IS NULL`;
+  AND COALESCE(l.teste,0)=0`;
+const TRAVA = ESPERANDO_BIPE + ' AND l.nao_encontrada_em IS NULL';
 
 function caixas(db){
   return db.prepare(`SELECT l.id, l.codigo, l.buyer, l.nf, l.envio, l.impresso_por, l.embalado_em,
@@ -79,7 +80,7 @@ function travada(db){
   return { travada: c.length > 0, n: c.length, caixas: c };
 }
 function frase(n){
-  return 'Etiqueta de Venda travada: ' + n + (n === 1 ? ' caixa impressa num dia anterior ainda não foi conferida'
+  return n + (n === 1 ? ' caixa impressa num dia anterior ainda não foi conferida'
     : ' caixas impressas em dias anteriores ainda não foram conferidas') +
     '. Bipe essas caixas na Conferência para liberar.';
 }
@@ -123,8 +124,12 @@ function resolverNaoEncontrada(db, { id, resposta, quem }){
    DENTRO da transação dela, e ANTES de gravar: depois da reimpressão a caixa
    continua travando do mesmo jeito, então a pergunta é a mesma. Uma pendência
    aberta por caixa. */
+/* ⚠️ A "NÃO ENCONTRADA" TAMBÉM CONTA (③ REVISÃO, 25/11/2026): ela saiu da trava,
+   mas continua sendo a caixa de um dia anterior sem bipe — e é a mais provável de
+   ser reposta e reimpressa. Pela régua da trava ela escapava, e a persiana
+   perdida não deixava rastro. */
 function registrarReimpressa(db, { lote_id, quem }){
-  if(!estaTravando(db, lote_id)) return null;
+  if(!db.prepare('SELECT 1 FROM lote l WHERE l.id=? AND ' + ESPERANDO_BIPE).get(lote_id)) return null;
   if(db.prepare("SELECT 1 FROM caixa_reimpressa WHERE lote_id=? AND status='pendente'").get(lote_id)) return null;
   return db.prepare('INSERT INTO caixa_reimpressa (lote_id,reimpresso_por,reimpresso_por_id) VALUES (?,?,?)')
     .run(lote_id, quem.usuario_nome || quem.nome || '', quem.usuario_id != null ? quem.usuario_id : (quem.id != null ? quem.id : null)).lastInsertRowid;
@@ -153,9 +158,15 @@ function pecasPorSku(db, lote_id){
 
 function decidirReimpressa(db, { id, decisao, quem }){
   if(!DECISOES[decisao]) throw erro(400, 'escolha: achei a caixa velha, persiana perdida ou foi só a etiqueta');
-  const c = db.prepare('SELECT c.*, l.nf FROM caixa_reimpressa c JOIN lote l ON l.id=c.lote_id WHERE c.id=?').get(Number(id));
+  const c = db.prepare('SELECT c.*, l.nf, l.conferido_em FROM caixa_reimpressa c JOIN lote l ON l.id=c.lote_id WHERE c.id=?').get(Number(id));
   if(!c) throw erro(404, 'pendência não encontrada');
   if(c.status !== 'pendente') throw erro(409, 'esta caixa já foi decidida (' + (DECISOES[c.status] || c.status) + ')');
+  /* ⚠️ "PERDIDA" SÓ DEPOIS DO BIPE (③ REVISÃO, 25/11/2026): a perda é a SEGUNDA
+     persiana — a reposição, que baixou ao ser bipada. Com a caixa ainda sem bipe
+     a reposição pode nem acontecer, e mais tarde o passivo das nunca conferidas
+     daria a baixa dela: o −1 do ajuste baixaria a mesma peça de novo. */
+  if(decisao === 'perdida' && !c.conferido_em)
+    throw erro(409, 'bipe a caixa reimpressa na Conferência antes: a persiana só está perdida depois que a reposta saiu');
   return db.transaction(() => {
     const feitos = [];
     if(decisao === 'perdida'){
@@ -182,6 +193,6 @@ function contarReimpressas(db){
   const r = reimpressas(db); return { n:r.length, desde:r.length ? r[0].reimpressa_em : null };
 }
 
-module.exports = { garantirSchema, TRAVA, caixas, travada, estaTravando, frase, marcarNaoEncontrada,
+module.exports = { garantirSchema, TRAVA, ESPERANDO_BIPE, caixas, travada, estaTravando, frase, marcarNaoEncontrada,
   naoEncontradas, resolverNaoEncontrada, registrarReimpressa, reimpressas, decidirReimpressa, DECISOES,
   contarNaoEncontradas, contarReimpressas, erro };

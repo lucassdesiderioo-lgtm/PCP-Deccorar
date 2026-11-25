@@ -157,6 +157,7 @@ const limpar = () => db.prepare("UPDATE lote SET estagio='carregado', conferido_
   r = await chamar('POST /api/etiqueta/reimpressa/decidir', {id:cr[0].id, decisao:'xyz'}, SUP);
   ok('decisão fora da lista: 400', r.__status === 400, JSON.stringify(r));
   const sAntes = saldo('BK140140BEGE');
+  db.prepare("UPDATE lote SET conferido_em=datetime('now','localtime'), estagio='carregado' WHERE id=?").run(o1);
   r = await chamar('POST /api/etiqueta/reimpressa/decidir', {id:cr[0].id, decisao:'perdida'}, SUP);
   ok('"perdida" abre o PEDIDO de ajuste −1 do SKU', r.ok === true, JSON.stringify(r));
   const ped = db.prepare("SELECT * FROM ajuste_pedido WHERE codigo='BK140140BEGE' AND status='pendente'").get();
@@ -190,6 +191,7 @@ const limpar = () => db.prepare("UPDATE lote SET estagio='carregado', conferido_
   db.prepare("DELETE FROM ajuste_pedido").run();
   await chamar('POST /api/reimprimir', {id:vv}, ANA);
   const crv = db.prepare('SELECT id FROM caixa_reimpressa WHERE lote_id=?').get(vv).id;
+  db.prepare("UPDATE lote SET conferido_em=datetime('now','localtime'), estagio='carregado' WHERE id=?").run(vv);
   r = await chamar('POST /api/etiqueta/reimpressa/decidir', {id:crv, decisao:'perdida'}, SUP);
   const pv = db.prepare("SELECT codigo,delta FROM ajuste_pedido WHERE status='pendente' ORDER BY codigo").all();
   ok('a perdida da caixa de várias abre um pedido por SKU, pelo número de peças',
@@ -198,6 +200,7 @@ const limpar = () => db.prepare("UPDATE lote SET estagio='carregado', conferido_
   const vw = impressa(1, null, 'BK140140BEGE');
   await chamar('POST /api/reimprimir', {id:vw}, ANA);
   const crw = db.prepare('SELECT id FROM caixa_reimpressa WHERE lote_id=?').get(vw).id;
+  db.prepare("UPDATE lote SET conferido_em=datetime('now','localtime'), estagio='carregado' WHERE id=?").run(vw);
   r = await chamar('POST /api/etiqueta/reimpressa/decidir', {id:crw, decisao:'perdida'}, SUP);
   ok('com pedido de ajuste já aberto do SKU, "perdida" é recusada e nada grava',
      r.__status === 409 && db.prepare('SELECT status FROM caixa_reimpressa WHERE id=?').get(crw).status === 'pendente', JSON.stringify(r));
@@ -207,6 +210,7 @@ const limpar = () => db.prepare("UPDATE lote SET estagio='carregado', conferido_
   await chamar('POST /api/reimprimir', {id:s2}, ANA);
   const crs = db.prepare('SELECT id FROM caixa_reimpressa WHERE lote_id=?').get(s2).id;
   const pedS = q1('SELECT COUNT(*) n FROM ajuste_pedido').n;
+  db.prepare("UPDATE lote SET conferido_em=datetime('now','localtime'), estagio='carregado' WHERE id=?").run(s2);
   r = await chamar('POST /api/etiqueta/reimpressa/decidir', {id:crs, decisao:'perdida'}, SUP);
   ok('...fecha como perdida sem pedido de ajuste', r.ok === true && q1('SELECT COUNT(*) n FROM ajuste_pedido').n === pedS, JSON.stringify(r));
 
@@ -226,6 +230,34 @@ const limpar = () => db.prepare("UPDATE lote SET estagio='carregado', conferido_
   ok('...e não mexe em estoque nem no estágio', saldo('SOBMEDIDA') === sSm && lote(sm).estagio === 'embalado');
   r = await chamar('POST /api/etiqueta/trava/nao-encontrada', {id:sm, motivo:'de novo'}, SUP);
   ok('marcar de novo: 409', r.__status === 409);
+
+  // ── ③ REVISÃO 1: a "não encontrada" reposta e reimpressa abre a pendência ──
+  const ne = impressa(1, null, 'BK120160CINZA');
+  PODE = new Set(['expedicao.caixa_nao_encontrada']);
+  await chamar('POST /api/etiqueta/trava/nao-encontrada', {id:ne, motivo:'sumiu'}, SUP);
+  PODE = new Set();
+  await chamar('POST /api/reimprimir', {id:ne}, ANA);
+  ok('a caixa marcada "não encontrada" e depois reimpressa também abre a pendência da reimpressa (③ REVISÃO)',
+     q1(`SELECT COUNT(*) n FROM caixa_reimpressa WHERE lote_id=${ne}`).n === 1);
+  db.prepare("UPDATE caixa_reimpressa SET status='so_etiqueta' WHERE lote_id=?").run(ne);
+  db.prepare("UPDATE lote SET nao_encontrada_resolvida_em=datetime('now','localtime') WHERE id=?").run(ne);
+  // ── ③ REVISÃO 2: "perdida" só depois de a caixa ser bipada ──
+  const pb = impressa(1, null, 'BK120160CINZA');
+  await chamar('POST /api/reimprimir', {id:pb}, ANA);
+  const crb = db.prepare('SELECT id FROM caixa_reimpressa WHERE lote_id=?').get(pb).id;
+  PODE = new Set(['expedicao.caixa_nao_encontrada']);
+  db.prepare("DELETE FROM ajuste_pedido WHERE codigo='BK120160CINZA'").run();
+  r = await chamar('POST /api/etiqueta/reimpressa/decidir', {id:crb, decisao:'perdida'}, SUP);
+  ok('"persiana perdida" com a caixa ainda sem bipe é recusada, dizendo para bipar antes (③ REVISÃO)',
+     r.__status === 409 && /bip/i.test(r.erro||'') && q1("SELECT COUNT(*) n FROM ajuste_pedido WHERE codigo='BK120160CINZA'").n === 0, JSON.stringify(r));
+  db.prepare("UPDATE lote SET conferido_em=datetime('now','localtime'), estagio='carregado' WHERE id=?").run(pb);
+  r = await chamar('POST /api/etiqueta/reimpressa/decidir', {id:crb, decisao:'perdida'}, SUP);
+  ok('...e depois de bipada, aceita', r.ok === true, JSON.stringify(r));
+  db.prepare("DELETE FROM ajuste_pedido WHERE codigo='BK120160CINZA'").run();
+  // ── ③ REVISÃO 4: quem tem só a chave abre a 201 ──
+  const tela201 = require('./telas').TELAS.find(t => t.n === 201);
+  ok('a 201 abre também com expedicao.caixa_nao_encontrada (o Supervisor decide lá)',
+     tela201 && (tela201.perms||[]).indexOf('expedicao.caixa_nao_encontrada') >= 0, JSON.stringify(tela201 && tela201.perms));
 
   // ── a pendência na central ──
   const P = require('./pendencias_dominio');
@@ -247,8 +279,10 @@ const limpar = () => db.prepare("UPDATE lote SET estagio='carregado', conferido_
 
   // ── bipar na 202 solta ──
   db.prepare("UPDATE lote SET impresso_por_id=9, impresso_por='Zé' WHERE id IN (?,?,?,?,?,?)").run(o1,o2,o3,vv,vw,s2);
-  r = await chamar('POST /api/carregar', {code:'P'+lote(o1).packId.slice(1), carrinho:'A'}, ANA);
-  ok('a caixa de ontem bipada na Conferência sai da trava', r.ok === true && !(await trava()).caixas.some(c => c.id === o1), JSON.stringify(r));
+  const ob = impressa(1, "impresso_por_id=9, impresso_por='Zé'");
+  ok('(a caixa nova de ontem trava)', (await trava()).caixas.some(c => c.id === ob));
+  r = await chamar('POST /api/carregar', {code:lote(ob).packId, carrinho:'A'}, ANA);
+  ok('a caixa de ontem bipada na Conferência sai da trava', r.ok === true && !(await trava()).caixas.some(c => c.id === ob), JSON.stringify(r));
   // separar como venda cancelada solta
   db.prepare("UPDATE lote SET estagio='cancelado' WHERE id=?").run(o2);
   ok('a caixa separada como cancelada sai da trava', !(await trava()).caixas.some(c => c.id === o2));

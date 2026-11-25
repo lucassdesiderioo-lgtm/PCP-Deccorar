@@ -155,10 +155,6 @@
        e a venda da folha sem etiqueta que pode atrasar no ML (a NF 8301).
        Quem resolve e a aba; aqui e o sinal. pendencias_aviso.js -->
   <div id="pendAviso"></div>
-  <!-- A TRAVA DO DIA SEGUINTE (CONFERENCIA-CARRINHOS fase 3, R-TRV-01): com
-       caixa impressa num dia anterior e sem conferência, nenhuma etiqueta nova
-       sai. O quadro diz quais são; quem tem "Caixa não encontrada" decide aqui. -->
-  <div id="trava"></div>
   <div class="colunas">
     <div>
       <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="bipe aqui">
@@ -166,6 +162,12 @@
            hoje manda, o resto e contexto. -->
       <div id="resumo"></div>
       <div class="banner" id="banner"></div>
+      <!-- A TRAVA DO DIA SEGUINTE (CONFERENCIA-CARRINHOS fase 3, R-TRV-01): com
+           caixa impressa num dia anterior e sem conferência, nenhuma etiqueta nova
+           sai. O quadro diz quais são; quem tem "Caixa não encontrada" decide aqui.
+           ⚠️ FICA DEBAIXO DO BIPE (③ REVISÃO): em cima, com várias caixas, ele
+           empurrava o #scan para fora da tela do iPad (§12, campo invisível). -->
+      <div id="trava"></div>
       <!-- Reimprimir mora do lado do bipe, e nao no fim da pagina: as duas
            coisas sao a MESMA mao no mesmo momento — imprimiu, o papel enroscou,
            reimprime. Descer pra buscar isso no rodape e atrito na pior hora. -->
@@ -1051,8 +1053,6 @@ relogioDesp();
 
 // O Subir PDF saiu desta tela em 05/11/2026 (D2): o upload é só na 103 Lançar produção.
 
-/* A ETIQUETA DE SKU EM SERIE (PRODUCAO-MAPA-E-MOTOR v7, §14.2): o bipe da
-   etiqueta por fora da persiana nova vira o SKU dela antes do resto. */
 /* ── A TRAVA DO DIA SEGUINTE (CONFERENCIA-CARRINHOS fase 3) ──────────────
    O quadro vermelho: as caixas impressas em dias anteriores e sem conferência
    (R-TRV-01) — a conta é do servidor (trava_dominio), a tela só desenha. Para
@@ -1089,7 +1089,7 @@ function desenharTrava(){
       if(t.pode_resolver){
         if(travaAbre[c.id]) h+='<div><input class="mot" id="tvMot'+c.id+'" placeholder="por que não foi encontrada?" autocomplete="off">'
           +' <button class="primary" onclick="naoEncontrada('+c.id+')">Confirmar</button>'
-          +' <button class="ghost" onclick="travaAbre['+c.id+']=0;desenharTrava()">Voltar</button></div>';
+          +' <button class="ghost" onclick="travaAbre['+c.id+']=0;desenharTrava();voltaBipe()">Voltar</button></div>';
         else h+='<button class="ghost" onclick="travaAbre['+c.id+']=1;desenharTrava();var i=$(\'#tvMot'+c.id+'\');if(i)i.focus()">Caixa não encontrada</button>';
       }
       h+='</div>';
@@ -1120,6 +1120,12 @@ function desenharTrava(){
   el.innerHTML=h;
   Object.keys(guardado).forEach(function(k){ var i=document.getElementById(k); if(i) i.value=guardado[k]; });
 }
+/* ⚠️ O FOCO VOLTA AO BIPE depois de cada ação do quadro (③ REVISÃO): o
+   redesenho tira o botão tocado, o foco cai no body, e o #scan — que já tinha
+   perdido o foco para o motivo — não recebia o bipe seguinte, calado (§12). */
+function voltaBipe(){ setTimeout(function(){ var a=document.activeElement;
+  if(a && a.closest && a.closest('#trava') && /^(INPUT|TEXTAREA)$/.test(a.tagName)) return;
+  scan.focus({preventScroll:true}); }, 0); }
 async function travaPost(url,body,btn){
   if(btn){ btn.disabled=true; }
   try{
@@ -1136,7 +1142,7 @@ async function naoEncontrada(id){
   if(!r) return;
   travaAbre[id]=0; if(i) i.value='';
   banner('ok','Caixa marcada como não encontrada','A trava soltou para esta caixa. Ela ficou nas pendências para decidir com o Mercado Livre.');
-  beep(true); carregarTrava(true);
+  beep(true); await carregarTrava(true); voltaBipe();
 }
 async function resolverNaoEncontrada(id,btn){
   var i=document.getElementById('tvRes'+id), t=i?i.value.trim():'';
@@ -1144,7 +1150,7 @@ async function resolverNaoEncontrada(id,btn){
   var r=await travaPost('/api/etiqueta/trava/nao-encontrada/resolver',{id:id,resposta:t},btn);
   if(!r) return;
   if(i) i.value='';
-  banner('ok','Resolvida','A pendência saiu da lista.'); beep(true); carregarTrava(true);
+  banner('ok','Resolvida','A pendência saiu da lista.'); beep(true); await carregarTrava(true); voltaBipe();
 }
 async function decidirReimpressa(id,decisao,btn){
   var r=await travaPost('/api/etiqueta/reimpressa/decidir',{id:id,decisao:decisao},btn);
@@ -1152,9 +1158,11 @@ async function decidirReimpressa(id,decisao,btn){
   banner('ok','Decidido', decisao==='perdida'
     ? 'Ficou o pedido de ajuste '+(r.ajustes||[]).map(function(a){ return esc(a.codigo)+' '+a.delta; }).join(', ')+' — outra pessoa aprova na 301 Estoque.'
     : 'Nada muda no estoque.');
-  beep(true); carregarTrava(true);
+  beep(true); await carregarTrava(true); voltaBipe();
 }
 carregarTrava(); setInterval(carregarTrava,15000);
+/* A ETIQUETA DE SKU EM SERIE (PRODUCAO-MAPA-E-MOTOR v7, §14.2): o bipe da
+   etiqueta por fora da persiana nova vira o SKU dela antes do resto. */
 (function(){ var h0=scanSku; scanSku=async function(c){ return h0(window.codigoSerie ? await window.codigoSerie.sku(c) : c); }; })();
 </script><script src="/nav.js"></script>
 </body></html>

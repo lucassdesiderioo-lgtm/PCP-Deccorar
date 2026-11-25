@@ -481,7 +481,9 @@ eq('mas .html NAO e arquivo de apoio — herda a tela', AC.permDaRota('/operador
 
 console.log('\n── 13. a gemea .html vale o mesmo que a tela ──');
 const GEMEAS = [['/operador','revisao.executar'],['/montagem','embalagem.executar'],
-  ['/embalagem','etiqueta.emitir'],['/carregamento','carregamento.executar'],
+  /* A 201 abre tambem com `expedicao.caixa_nao_encontrada` (CONFERENCIA-CARRINHOS
+     fase 3, 25/11/2026): o Supervisor decide a trava la. */
+  ['/embalagem',['etiqueta.emitir','expedicao.caixa_nao_encontrada']],['/carregamento','carregamento.executar'],
   ['/devolucao','devolucao.registrar'],
   ['/painel','painel.ver'],['/relatorios','relatorios.ver'],
   /* A 401 abre tambem com `producao.etiqueta` (PRODUCAO-MAPA-E-MOTOR v7, 25/11/2026). */

@@ -139,9 +139,6 @@ const LINHAS = [
       return { n:l.length, desde:maisAntiga(l.map(x => x.cancelada_em)),
                canceladas:l.filter(x => x.de === 'cancelada').map(x => x.id) };
     } },
-  /* CONFERENCIA-CARRINHOS (25/11/2026): a caixa conferida que a recontagem não
-     achou no carrinho. O estoque não mexeu (ela foi bipada); resolve-se
-     achando a caixa e bipando-a num carrinho na 202. */
   /* A TRAVA DA 201 (CONFERENCIA-CARRINHOS fase 3): a caixa marcada "não
      encontrada" solta a trava e deixa a venda parada (decidir com o ML); a
      reimpressa no dia seguinte pode ser uma persiana perdida (§7). */
@@ -153,6 +150,9 @@ const LINHAS = [
     nome:'Etiqueta de Venda — caixa reimpressa no dia seguinte', perm:['expedicao.caixa_nao_encontrada'], onde:{ url:'/embalagem' },
     ajuda:'achei a caixa velha · persiana perdida (pedido de ajuste −1) · foi só a etiqueta',
     contar(db){ return require('./trava_dominio').contarReimpressas(db); } },
+  /* CONFERENCIA-CARRINHOS (25/11/2026): a caixa conferida que a recontagem não
+     achou no carrinho. O estoque não mexeu (ela foi bipada); resolve-se
+     achando a caixa e bipando-a num carrinho na 202. */
   { chave:'carrinho_nao_achada', tela:202, frase:['caixa conferida não foi achada no carrinho','caixas conferidas não foram achadas no carrinho'],
     nome:'Conferência — caixa não achada no carrinho', perm:['carregamento.executar'], onde:{ url:'/carregamento' },
     ajuda:'caixas conferidas que a recontagem do carrinho não achou: procurar e bipar num carrinho',
