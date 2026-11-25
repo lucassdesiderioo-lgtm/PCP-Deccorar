@@ -313,6 +313,7 @@ function telaPacote(r,extras){
    CONFERENCIA-E-BAIXA a caixa impressa so reserva a peca: ela sai na
    Conferencia. O numero e o placar da bancada (`embalado_em` de hoje). */
 async function stats(){
+  if(SEM_EMITIR) return;   // quem só decide a trava não lê esta lista (③ REVISÃO: 403 a cada volta)
   var d=null;
   try{ var rq=await fetch('/api/fila/resumo'); if(!rq.ok) return; d=await rq.json(); }catch(e){ return; }
   var el=$('#resumo'); if(!el) return;
@@ -688,6 +689,7 @@ function caixaNaColuna(v){
     +'</div>';
 }
 async function listaPend(){
+  if(SEM_EMITIR) return;   // quem só decide a trava não lê esta lista (③ REVISÃO: 403 a cada volta)
   var l=[], cx=[];
   try{
     var rs=await Promise.all([fetch("/api/pendentes"), fetch("/api/pendentes/varias")]);
@@ -791,6 +793,7 @@ function faltamDias(s){
    o filtro Agência/Coleta redesenha na hora, sem ida ao servidor. */
 var futCache=[], futCxCache=[];
 async function listaFut(){
+  if(SEM_EMITIR) return;   // quem só decide a trava não lê esta lista (③ REVISÃO: 403 a cada volta)
   try{
     var rs=await Promise.all([fetch("/api/pendentes/futuros"),
                               fetch("/api/pendentes/varias?quando=depois")]);
@@ -909,6 +912,7 @@ function horaDe(s){
 }
 function termoImp(){ return ((document.getElementById('impBusca')||{}).value||'').trim(); }
 async function listaImp(){
+  if(SEM_EMITIR) return;   // quem só decide a trava não lê esta lista (③ REVISÃO: 403 a cada volta)
   var dias=(document.getElementById('impDias')||{}).value||'1';
   try{
     var r=await fetch('/api/impressos?dias='+dias), l=await r.json();
@@ -1008,6 +1012,7 @@ setInterval(listaImp,15000);
 listaImp();
 
 async function relogioDesp(){
+  if(SEM_EMITIR) return;   // quem só decide a trava não lê esta lista (③ REVISÃO: 403 a cada volta)
   var d=null;
   try{ var rq=await fetch("/api/expedicao/status"); if(!rq.ok) return; d=await rq.json(); }catch(e){ return; }
   var el=document.getElementById("despBox");
