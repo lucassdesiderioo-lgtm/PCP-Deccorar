@@ -1600,7 +1600,7 @@ ou fornecedor criado na bancada (606).
 (`pendencias_pcp.test.js`) ao mexer no `pendencias_pcp.js`, na porta, nas linhas
 `sm_*`, no `abre_tela.js` ou nas rotas de lá vigiadas.**
 
-**Rode `node teste_pendencias_caminho.js` (78) ao mexer no `pendencias_vigia.js`, no
+**Rode `node teste_pendencias_caminho.js` (81) ao mexer no `pendencias_vigia.js`, no
 `tela`/`frase` das linhas da central, na caixinha do `pendencias_aviso.js` ou na
 ordem do `server.js`** — e `node teste_pendencias.js`. **E `node teste_pendencias_menu.js` (49)** ao mexer no `minhas`, na rota `/minhas`, na bolinha do `menu_telas.js` ou na chamada dela nos dois `nav.js`.
 
@@ -2845,7 +2845,7 @@ motorista ou na venda cancelada: `node teste_sobra.js`. Nas fases 2 a 4 da
 `CONFERENCIA-EXPEDICAO` (viagem com quem levou, fim do dia, cancelamento em
 duas pessoas): `node teste_conferencia_expedicao.js` (91). No carrinho e na
 entrega (`carrinho_dominio.js`, `carrinho_route.js`): `node teste_carrinhos.js`
-(37) e `node teste_entrega.js` (28); na tela, `node teste_conferencia_tela.js`
+(44) e `node teste_entrega.js` (28); na tela, `node teste_conferencia_tela.js`
 (38) e `node teste_carregamento_tela.js` (11). No `POST /api/embalar`, no
 `POST /api/reimprimir` ou no `fechar_saida_passivo.js`: `node teste_saida.js`.
 Em `saida.liberar` ou outra chave: `node teste_acesso.js` e `node

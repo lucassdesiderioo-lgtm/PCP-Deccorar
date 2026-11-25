@@ -443,8 +443,8 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 ### R-ENT-04 · A agência pelo carro fecha com quem levou
 - **Regra:** a entrega à agência (só o Carro da agência) exige quem levou, pessoa **ativa** do cadastro (R-VIA-02), e grava `saiu_por='agencia'`. O Carro da agência também pode ir ao **motorista**, junto com os carrinhos: sai com `saiu_por='coleta'` e a modalidade não muda (R-MOD-04).
 - **Por quê:** a caixa de agência ainda pode ir no caminhão (decisão do dono, 24/11/2026).
-- **Exceções:** nenhuma.
-- **Teste que trava:** `teste_entrega.js`.
+- **Exceções:** ⚠️ **a caixa adiantada (despacho futuro) que foi bipada vai na entrega do dia, com aviso**: o passo de escolher os carrinhos mostra "N caixas adiantadas nesta entrega", com o dia de cada uma, e deixa seguir (decisão do dono, 25/11/2026). Na viagem antiga a venda futura não entrava sozinha no carro (#9); aqui ela só entra se alguém a bipou.
+- **Teste que trava:** `teste_entrega.js` (a prévia diz se a caixa é adiantada) · ⚠ o aviso na tela não tem teste.
 - **Status:** construído em 25/11/2026, falta subir.
 
 ### R-ENT-05 · As duas barras do dia não têm conta própria de prazo

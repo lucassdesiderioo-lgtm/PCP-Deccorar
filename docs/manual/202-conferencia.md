@@ -20,6 +20,8 @@ parametros: conf_carregamento = Segundo bipe na Conferência (1 = ligado)
 ## Perguntas frequentes
 
 ## Mudanças
+- 25/11/2026 — O segundo bipe (o SKU da persiana depois da etiqueta) liga e desliga na 906 Parâmetros; a Conferência só mostra no topo se ele está ligado.
+- 25/11/2026 — A caixa de agência com despacho futuro que foi bipada vai na entrega do dia, e a tela avisa quantas são adiantadas e para que dia, antes de continuar.
 - 25/11/2026 — Ajustes da conferência nos carrinhos: a tela não escolhe mais o carrinho sozinha (pede para bipar a etiqueta do carrinho), o foco volta sempre ao campo do bipe, a caixa achada durante a entrega entra no carrinho que está sendo entregue, a caixa de várias persianas mostra cada SKU, o nome de quem imprimiu sai em linha própria e a caixa do "a coleta não passou" volta a aparecer em cima, com o selo "de ontem".
 - 25/11/2026 — A tela passou a conferir nos carrinhos: a caixa de coleta vai para o carrinho escolhido (bipar a etiqueta do carrinho troca), a de agência vai sozinha para o Carro da agência, e em cima aparecem duas barras (quanto falta entregar no dia e quanto falta bipar do que foi impresso). A entrega é por carrinho, com a foto e o número do motorista; não se bipam mais as sobras, e a caixa a mais do motorista é bipada na hora. Cada carrinho pode ser recontado sem ver o número esperado, e a caixa não achada vira pendência sem mexer no estoque.
 - 21/11/2026 — ficha criada em rascunho

@@ -488,7 +488,7 @@ function desenharEntrega(){
   var fi=document.getElementById('fotoIn');
   if(fi) fi.onchange=async function(){ var f=fi.files&&fi.files[0]; if(!f) return;
     try{ ENT.foto=await reduzirFoto(f); }catch(e){ ENT.foto=null; banner('err','Não deu para ler a foto','Tente de novo.'); }
-    desenharEntrega(); };
+    desenharEntrega(); semKeepAte=0; keep(); };   // a foto chegou: o foco volta ao bipe
   if(E.passo===3 && E.para==='agencia' && !pessoas) carregarPessoas();
 }
 function setPara(p){ ENT.para=p; ENT.sel=p==='agencia'?ENT.sel.filter(function(c){ return c==='AG'; }):ENT.sel; desenharEntrega(); }
@@ -591,8 +591,13 @@ function desenharNaoPassou(){
   /* O mesmo conjunto que o servidor registra (o fimdia): toda caixa com
      etiqueta ainda na fábrica — impressa sem bipe, nos carrinhos e conferida
      fora deles, coleta e agência (③ REVISÃO: a frase dizia só as de coleta). */
-  var hoje=function(c){ return !c.adiantada; };   // a venda futura não "ficou": o servidor não a registra
-  var n=((D&&D.nos)||[]).filter(hoje).length + ((D&&D.faltam)||[]).filter(hoje).length + ((D&&D.sem_carrinho)||[]).filter(hoje).length;
+  /* A MESMA RÉGUA DO /api/carregamento/fimdia (③ REVISÃO, rodada 3): a coleta
+     conferida (no carrinho ou fora dele) entra sempre, mesmo adiantada — é o
+     "aguardando o caminhão"; a impressa sem bipe e a de agência entram só se
+     não forem venda futura. */
+  var fica=function(c){ return !c.adiantada; };
+  var conf=function(c){ return c.coleta || !c.adiantada; };
+  var n=((D&&D.nos)||[]).filter(conf).length + ((D&&D.sem_carrinho)||[]).filter(conf).length + ((D&&D.faltam)||[]).filter(fica).length;
   $('#painel').innerHTML='<div class="banner warn"><div class="bt">'+(n===1?'1 caixa com etiqueta fica':n+' caixas com etiqueta ficam')+' na fábrica</div><div class="bs">Fica registrado quem marcou e quais caixas. Amanhã elas aparecem em cima, com o selo "de ontem". Nada muda no estoque, e as caixas continuam nos carrinhos.</div></div>'
     +'<div class="acoes"><button class="btn" onclick="voltarBipar()">Voltar</button><button class="btn pri big" onclick="naoPassou()">Confirmar: a coleta não passou</button></div>';
 }

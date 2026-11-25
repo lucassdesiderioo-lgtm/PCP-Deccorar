@@ -3,7 +3,7 @@
 > **STATUS — 25/11/2026: APROVADA PELO DONO** (*"p1 sim, p2 sim, p3 sim,
 > aprovado"*) · **fases 1 e 2 construídas juntas (decisão do dono), falta
 > subir** · fase 3 (a trava da 201) não começou. Testes: `teste_carrinhos.js`
-> (37), `teste_entrega.js` (28), `teste_conferencia_tela.js` (38, num
+> (44), `teste_entrega.js` (28), `teste_conferencia_tela.js` (38, num
 > Chromium), `teste_carregamento_tela.js` (11).
 >
 > **O que mudou na construção** (vale o que está aqui):
@@ -239,6 +239,7 @@ O dono liga o segundo bipe na 906 quando quiser (não depende de fase).
 
 | D18 | A **venda futura adiantada** impressa em dia anterior e não bipada também trava a 201 (25/11/2026) |
 | D19 | O **sob medida** entra na trava igual às outras caixas (25/11/2026) |
+| D20 | A caixa de agência **adiantada** que foi bipada vai na entrega do dia, **com aviso** (25/11/2026, achado da ③ REVISÃO) |
 
 ## 10. Onde mora (R-ORG-13)
 
