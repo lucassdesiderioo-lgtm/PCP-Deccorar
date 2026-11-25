@@ -78,11 +78,11 @@
   "R-COR-05": "e83e38d8f2f91db2",
   "R-COR-06": "1f20da268078d144",
   "R-COR-07": "37fe295fd852527a",
-  "R-CRR-01": "fcc0acfa75212fce",
-  "R-CRR-02": "ecf7463f378306a6",
-  "R-CRR-03": "e34349413f76c0c8",
-  "R-CRR-04": "d3d3606b9cdcac4a",
-  "R-CRR-05": "aab186c544535186",
+  "R-CRR-01": "6903d57b10603470",
+  "R-CRR-02": "7890dcf4fced2af9",
+  "R-CRR-03": "c0435d5f6da06db2",
+  "R-CRR-04": "f7f71f0eadfb8c00",
+  "R-CRR-05": "8e638877409e3931",
   "R-EMB-01": "22ad1a743cbde25d",
   "R-EMB-02": "e12038f15c20049f",
   "R-EMB-03": "ac98d7177936c841",
@@ -96,11 +96,11 @@
   "R-EMB-11": "3ea97ab5f438fd8c",
   "R-EMB-12": "440684358b2635e1",
   "R-EMB-13": "3b62c7fdf3dacf64",
-  "R-ENT-01": "30c70163c4c2a7a6",
-  "R-ENT-02": "5c8935ceca9a919c",
-  "R-ENT-03": "1d2956f76a4249ef",
-  "R-ENT-04": "bc3f9d5a6c320921",
-  "R-ENT-05": "b86c29b5c158acbe",
+  "R-ENT-01": "8c1d2c458828596a",
+  "R-ENT-02": "228705614c79542f",
+  "R-ENT-03": "1c7e43311eb7f0c0",
+  "R-ENT-04": "ba4d8d68664a1251",
+  "R-ENT-05": "1db0b6134be36dd5",
   "R-EST-01": "6cb7de19b6e17f38",
   "R-EST-02": "50fcc9282e44164a",
   "R-EST-03": "044d524d09846887",
@@ -329,10 +329,10 @@
   "R-SMX-04": "41be51711be75b4f",
   "R-SMX-05": "0496de5819fbffba",
   "R-TEM-01": "fc5cf3c7c63539e6",
-  "R-TRV-01": "411bda11eb7736e0",
-  "R-TRV-02": "f2037286b6080e7a",
-  "R-TRV-03": "d3f3a7bdfae17f1d",
-  "R-TRV-04": "c97842730e9da044",
+  "R-TRV-01": "51945484bce5bbab",
+  "R-TRV-02": "1b1ff7bbc58212f0",
+  "R-TRV-03": "1ccdf48344431959",
+  "R-TRV-04": "dfe21efefdfec8c9",
   "R-URG-01": "01fd9216f36e2cfb",
   "R-URG-02": "e88c40a1019b0bf3",
   "R-VAL-01": "a481ffd1c1c39a27",
@@ -498,7 +498,8 @@
     "25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU",
     "25/11/2026 — trava: com caixa impressa num dia anterior e sem conferência, a etiqueta nova não sai até a caixa ser bipada na Conferência; a reimpressão continua liberada, e quem tem a permissão \"Caixa não encontrada\" solta a caixa perdida e decide a caixa reimpressa no dia seguinte",
     "25/11/2026 — \"Persiana perdida\" só aparece depois que a caixa reimpressa for bipada na Conferência; quem só decide a trava abre a tela e vê só o quadro",
-    "25/11/2026 — a caixa de várias persianas com um item cancelado pelo Mercado Livre depois da etiqueta não trava mais a tela; ela continua esperando decisão no card das canceladas"
+    "25/11/2026 — a caixa de várias persianas com um item cancelado pelo Mercado Livre depois da etiqueta não trava mais a tela; ela continua esperando decisão no card das canceladas",
+    "25/11/2026 — no ar: a conferência nos carrinhos, a entrega por carrinho e a trava do dia seguinte passaram a valer na fábrica"
    ],
    "situacao": "rascunho"
   },
@@ -516,7 +517,8 @@
     "25/11/2026 — A tela passou a conferir nos carrinhos: a caixa de coleta vai para o carrinho escolhido (bipar a etiqueta do carrinho troca), a de agência vai sozinha para o Carro da agência, e em cima aparecem duas barras (quanto falta entregar no dia e quanto falta bipar do que foi impresso). A entrega é por carrinho, com a foto e o número do motorista; não se bipam mais as sobras, e a caixa a mais do motorista é bipada na hora. Cada carrinho pode ser recontado sem ver o número esperado, e a caixa não achada vira pendência sem mexer no estoque.",
     "21/11/2026 — ficha criada em rascunho",
     "19/11/2026 — A caixa que saiu sem ninguém conferir e é fechada depois pelo acerto das caixas não conferidas tem o estoque baixado nesse acerto, uma vez só, como se tivesse sido conferida aqui.",
-    "25/11/2026 — aceita a etiqueta de SKU em série no bipe de cada persiana"
+    "25/11/2026 — aceita a etiqueta de SKU em série no bipe de cada persiana",
+    "25/11/2026 — no ar: a conferência nos carrinhos, a entrega por carrinho e a trava do dia seguinte passaram a valer na fábrica"
    ],
    "situacao": "rascunho"
   },
@@ -932,7 +934,8 @@
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
     "25/11/2026 — Nova lista \"Carrinhos da expedição\" (nasce com A e B), com o botão da etiqueta de código de barras de cada carrinho. Carrinho com caixa dentro não pode ser removido.",
-    "21/11/2026 — ficha criada em rascunho"
+    "21/11/2026 — ficha criada em rascunho",
+    "25/11/2026 — no ar: a conferência nos carrinhos, a entrega por carrinho e a trava do dia seguinte passaram a valer na fábrica"
    ],
    "situacao": "rascunho"
   },
