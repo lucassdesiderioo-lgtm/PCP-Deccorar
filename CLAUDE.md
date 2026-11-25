@@ -1495,7 +1495,7 @@ caixinha para clicar e ir para a tela de pendência — em todas as telas"*.
 
 - **Quem sabe é o servidor** (`pendencias_vigia.js`): para as ações da lista
   `VIGIA` (o upload da 103, a venda cancelada da 202, o pedido de ajuste da 301,
-  o terminar do Inventário, o salvar SKU, o pedido acima da alçada e a compra
+  o terminar do Inventário, a caixa não encontrada e a reimpressão de caixa que trava a 201, o salvar SKU, o pedido acima da alçada e a compra
   rápida, o recebimento e o "fechar com falta", o terminar da 504 e o salvar
   material), ele conta as linhas da central **antes** e
   **depois**; se uma subiu, a resposta de sucesso ganha `pendencias` (frase,
@@ -1624,9 +1624,9 @@ ou fornecedor criado na bancada (606).
 (`pendencias_pcp.test.js`) ao mexer no `pendencias_pcp.js`, na porta, nas linhas
 `sm_*`, no `abre_tela.js` ou nas rotas de lá vigiadas.**
 
-**Rode `node teste_pendencias_caminho.js` (81) ao mexer no `pendencias_vigia.js`, no
+**Rode `node teste_pendencias_caminho.js` (87) ao mexer no `pendencias_vigia.js`, no
 `tela`/`frase` das linhas da central, na caixinha do `pendencias_aviso.js` ou na
-ordem do `server.js`** — e `node teste_pendencias.js`. **E `node teste_pendencias_menu.js` (49)** ao mexer no `minhas`, na rota `/minhas`, na bolinha do `menu_telas.js` ou na chamada dela nos dois `nav.js`.
+ordem do `server.js`** — e `node teste_pendencias.js`. **E `node teste_pendencias_menu.js` (52)** ao mexer no `minhas`, na rota `/minhas`, na bolinha do `menu_telas.js` ou na chamada dela nos dois `nav.js`.
 
 Ferramentas que só leem: `node rastrear.js --lote` (os sete degraus do PDF até a
 tela), `node rastrear.js --auditar [dias]`, `node conferir_nf.js --pdf` e `node
@@ -2794,10 +2794,47 @@ parece bug e não é:
 lista da 902 — e `node teste_conferencia_tela.js` (38, num Chromium; sem navegador
 diz PULADO) e `node teste_carregamento_tela.js` (11) ao mexer na tela.**
 
-⚠️ **Construído, falta subir.** A fase 3 (a trava da 201 para caixa de dia
-anterior sem conferência) não começou. Ainda não provado com dado real: a
-primeira conferência nos carrinhos com o leitor, a primeira entrega de carrinho
-com a foto do motorista, e as caixas do canto de antes entrando num carrinho.
+⚠️ **Fases 1 e 2 mescladas em 25/11/2026** (PR #375); o deploy é do dono. Ainda
+não provado com dado real: a primeira conferência nos carrinhos com o leitor, a
+primeira entrega de carrinho com a foto do motorista, e as caixas do canto de
+antes entrando num carrinho.
+
+### ⚠️ A 201 TRAVA COM CAIXA DE DIA ANTERIOR SEM CONFERÊNCIA (fase 3, 25/11/2026)
+
+Cartões **R-TRV-01 a 04** em [`docs/regras/carregamento.md`](docs/regras/carregamento.md).
+O dono: *"a tela de etiqueta de venda não pode deixar avançar se tiver peças que
+não foram conferidas"*. O que parece bug e não é:
+
+- **A adiantada trava também** (D18): as 15 adiantadas de hoje para a coleta de
+  amanhã, se amanhã cedo não tiverem bipe, travam a 201. A impressa **hoje** não
+  trava. O sob medida trava igual (D19), e a trava vale para todo mundo (D11).
+- **`trava_dominio.js` é o dono único** da régua (caixa `embalado`, sem
+  `conferido_em`, impressa antes de hoje, fora de saída, sem "não encontrada").
+  O `/api/embalar` recusa com 409 `trava_dia` e a lista; o `/api/proximo` manda
+  `trava` para a tela avisar no bipe.
+- **A reimpressão nunca trava** (R-TRV-02), mas a reimpressão de uma caixa que
+  está travando abre a pendência **"caixa reimpressa no dia seguinte"** (§7 da
+  spec): *achei a caixa velha* · *foi só a etiqueta* · *persiana perdida*, que só
+  abre o **pedido** de ajuste −1 por peça — outra pessoa aprova (R-EST-20); nada
+  aqui mexe em saldo.
+- **"Caixa não encontrada"** (`expedicao.caixa_nao_encontrada`, Supervisor,
+  sensível, tela 201, nasce só para o Admin Geral) solta a trava com motivo; a
+  caixa não muda de estágio nem de saldo (continua reservando a peça) e fica na
+  204 até alguém escrever o que foi decidido com o ML, ou até ser bipada.
+- **A conta que falhar não derruba a bancada**: vai ao log e a 201 diz *"não
+  consegui conferir a trava"* (só num banco sem as colunas, que o de produção
+  não é).
+- ⚠️ **No primeiro dia depois do deploy a 201 já pode amanhecer travada.** Antes,
+  rode `node diagnosticar_trava.js` (só lê, copia o banco): ele lista as caixas
+  que travariam. As muito antigas saem pelo passivo das nunca conferidas
+  (`fechar_saida_passivo.js --nao-bipadas --ate …`, que dá a baixa).
+
+**Rode `node teste_trava_dia.js` (59) ao mexer no `trava_dominio.js`, no
+`trava_route.js`, na `/api/embalar`, na `/api/reimprimir` ou no quadro da 201.**
+
+⚠️ **Construído, falta subir.** Ainda não provado com dado real: a primeira
+manhã com a 201 travada por caixa de ontem e solta pelo bipe na 202, e a
+primeira caixa reimpressa no dia seguinte decidida.
 
 | Cartão | Regra em uma linha |
 |---|---|
@@ -2859,6 +2896,10 @@ com a foto do motorista, e as caixas do canto de antes entrando num carrinho.
 | R-ENT-03 | Não existe "foi sem conferir": a caixa a mais é bipada no caminhão; senão, `saida.liberar` com motivo |
 | R-ENT-04 | A agência pelo carro fecha com quem levou; o Carro da agência pode ir ao motorista |
 | R-ENT-05 | As duas barras do dia saem do `carrinho_dominio.barras`, sem conta própria de prazo |
+| R-TRV-01 | A 201 não imprime etiqueta nova com caixa de dia anterior sem conferência, adiantada ou não (25/11/2026) |
+| R-TRV-02 | A reimpressão nunca trava |
+| R-TRV-03 | Solta: o bipe na 202, a venda cancelada, ou "caixa não encontrada" com motivo (vira pendência) |
+| R-TRV-04 | Fora da trava a conferida, a cancelada, a que saiu; a reimpressa no dia seguinte vira pendência, e "perdida" só pede ajuste |
 
 **Ao mexer em** `parse.js` (modalidade): `node teste_parse.js` (caso 15) e `node
 teste_etiqueta_envios.js` (o formato "Etiqueta válida para envíos"). Na
@@ -3899,7 +3940,7 @@ logado"*. Linhas em `docs/DECISOES.md`.
 > recusado na bancada, um desfazer de verdade e a primeira sessão nova gravada
 > em `sessao`. Prova que não foi feita se escreve como não feita.
 
-**Rode `node teste_quem.js` (341) ao criar QUALQUER rota de escrita, mexer no
+**Rode `node teste_quem.js` (344) ao criar QUALQUER rota de escrita, mexer no
 `quem.js` ou num `require` de módulo de rotas.** Ele sobe os módulos na ordem do
 `server.js` e chama cada escrita sem login; rota nova que não passa pelo `quem.js`
 reprova no mesmo minuto em que é escrita.
@@ -4602,7 +4643,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). ~~**Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa~~ — **fechado em 08/11/2026**: a 905 Minha produção e a aba Por pessoa da 904 (§21) · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (27 casos), `teste_carga.js` (63), `teste_divergencia.js` (70) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (86), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (378), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (158), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (87), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (341), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (11), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (122), `teste_upload.js` (84), `teste_impressos.js` (42), `teste_quantidade.js` (42), `teste_casos_reais.js` (85), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (67), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (91) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (46), `teste_nivel.js` (98), `teste_admin_telas.js` (66), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (109), `teste_501_so_compra.js` (93), `teste_custo_historico.js` (15), `teste_parametros.js` (113), `teste_gravar_nf_da_nota.js` (28), `teste_pendencias_caminho.js` (81), `teste_fichas_material.js` (64), `teste_pendencias_menu.js` (49), `teste_pendencias_sobmedida.js` (67), `teste_roteiro.js` (25), `teste_diagnosticar_diferenca_telas.js` (27), `teste_tempo_operador.js` (28), `teste_tempos_minimos.js` (35), `teste_parametros_onde.js` (62), `teste_defeito_volta.js` (65), `teste_embalagem_prioridade.js` (89), `teste_revisao_problema_tela.js` (29, precisa de navegador), `teste_revisao_tela_unica.js` (66), `teste_revisao_tela_unica_tela.js` (37, precisa de navegador); `teste_etiqueta_producao.js` (63), `teste_producao_motor.js` (112), `teste_producao_revisao.js` (47), `teste_carrinhos.js` (44), `teste_entrega.js` (28); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (27 casos), `teste_carga.js` (63), `teste_divergencia.js` (70) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (86), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (378), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (158), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (87), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (344), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (11), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (122), `teste_upload.js` (84), `teste_impressos.js` (42), `teste_quantidade.js` (42), `teste_casos_reais.js` (85), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (67), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (91) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (46), `teste_nivel.js` (98), `teste_admin_telas.js` (66), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (109), `teste_501_so_compra.js` (93), `teste_custo_historico.js` (15), `teste_parametros.js` (113), `teste_gravar_nf_da_nota.js` (28), `teste_pendencias_caminho.js` (87), `teste_fichas_material.js` (64), `teste_pendencias_menu.js` (52), `teste_pendencias_sobmedida.js` (67), `teste_roteiro.js` (25), `teste_diagnosticar_diferenca_telas.js` (27), `teste_tempo_operador.js` (28), `teste_tempos_minimos.js` (35), `teste_parametros_onde.js` (62), `teste_defeito_volta.js` (65), `teste_embalagem_prioridade.js` (89), `teste_revisao_problema_tela.js` (29, precisa de navegador), `teste_revisao_tela_unica.js` (66), `teste_revisao_tela_unica_tela.js` (37, precisa de navegador); `teste_etiqueta_producao.js` (63), `teste_producao_motor.js` (112), `teste_producao_revisao.js` (47), `teste_carrinhos.js` (44), `teste_entrega.js` (28), `teste_trava_dia.js` (59); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |

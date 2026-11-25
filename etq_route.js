@@ -19,6 +19,9 @@ module.exports=function(app,db){
      ordem de `require` — carregado sozinho, num script ou num teste, a baixa
      bateria numa coluna que nao existe (§10, o `config` do acesso.js). */
   BAIXA.garantirSchema(db);
+  /* A trava da 201 (fase 3) le colunas e a tabela do trava_dominio: o modulo
+     garante o schema para subir sozinho, como a baixa. */
+  require('./trava_dominio').garantirSchema(db);
   const pecasDaCaixa=require('./pecas_caixa')(db);
   app.get('/api/proximo/:sku',(req,res)=>{
     const sku=(req.params.sku||'').trim().toUpperCase();
@@ -117,7 +120,10 @@ module.exports=function(app,db){
     /* O LIVRE, e nao o saldo (CONFERENCIA-E-BAIXA, fase 2-A): a peca que ja esta
        numa caixa etiquetada continua no saldo ate a conferencia, e a tela que
        mostrasse o saldo deixaria bipar o que o servidor vai recusar. */
-    res.json({cadastrado:true,estoque:s.sob_medida?s.estoque:BAIXA.disponivel(db,s.codigo),total,pendentes:pend,futuros:fut,
+    /* A trava vai junto (R-TRV-01): a tela avisa no bipe, antes de oferecer o
+       "Imprimir" que o servidor vai recusar. */
+    let trava=null; try{ const t=require('./trava_dominio').travada(db); trava={n:t.n}; }catch(e){}
+    res.json({trava,cadastrado:true,estoque:s.sob_medida?s.estoque:BAIXA.disponivel(db,s.codigo),total,pendentes:pend,futuros:fut,
               pedido:p||null,peca,sob_medida:!!s.sob_medida,adiantado,coleta,
               /* ⚠️ O CRITERIO E PERSIANA, NAO LINHA. Uma caixa com 2 unidades do
                  MESMO SKU tem UMA linha em `lote_item` — com `itens.length>1`
@@ -194,6 +200,14 @@ module.exports=function(app,db){
     if(o.estagio!=='pendente') return res.json({erro:'Esta venda ja foi processada ('+o.estagio+').'});
     const tt=BAIXA.travaTeste(db,o);
     if(tt) return res.json({erro:tt.aviso, motivo:tt.motivo});
+    /* A TRAVA DO DIA SEGUINTE (CONFERENCIA-CARRINHOS fase 3, R-TRV-01): com
+       caixa impressa num dia anterior e sem conferencia — adiantada ou nao
+       (D18), sob medida igual (D19) —, nenhuma etiqueta NOVA sai, para ninguem
+       (D11). A reimpressao nao passa por aqui (R-TRV-02). A regua e do
+       trava_dominio, dono unico. */
+    const TRV=require('./trava_dominio').travada(db);
+    if(TRV.travada) return res.status(409).json({erro:require('./trava_dominio').frase(TRV.n),
+      motivo:'trava_dia', caixas:TRV.caixas});
 
     /* ── A CAIXA COM MAIS DE UMA PERSIANA (§5-B) ────────────────────────────
        Uma etiqueta, varias pecas. O que muda aqui e tudo o que depende de

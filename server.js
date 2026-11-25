@@ -106,6 +106,7 @@ app.get('/embalagem',(req,res)=>res.sendFile(path.join(__dirname,'public','embal
 require('./carreg_route')(app, db);
 require('./saida_route')(app, db);   // a saida do caminhao da coleta (fase 3 da SAIDA-E-DUPLA-CONFERENCIA)
 require('./carrinho_route')(app, db);   // o carrinho e a entrega da 202 (spec CONFERENCIA-CARRINHOS)
+require('./trava_route')(app, db);
 app.get('/carregamento',(req,res)=>res.sendFile(path.join(__dirname,'public','carregamento.html')));
 require('./backup_route')(app, db);
 require('./rel_route')(app, db);

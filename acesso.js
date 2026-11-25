@@ -968,6 +968,11 @@ module.exports = function(app, db){
     if(M !== 'GET' && pre('/api/revisao/defeitos')) return 'revisao.rejeitar';
     if(eq('/api/revisao/defeitos')) return 'revisao.executar';
     if(M !== 'GET' && eq('/api/embalar')) return 'etiqueta.emitir';
+    /* A trava da 201 (CONFERENCIA-CARRINHOS fase 3): ler e da bancada e do
+       admin; soltar e decidir, da chave nova (a rota confere de novo). */
+    if(eq('/api/etiqueta/trava') && M === 'GET') return ['etiqueta.emitir','expedicao.caixa_nao_encontrada','@admin'];
+    if(M !== 'GET' && (eq('/api/etiqueta/trava/nao-encontrada') || eq('/api/etiqueta/trava/nao-encontrada/resolver')
+       || eq('/api/etiqueta/reimpressa/decidir'))) return 'expedicao.caixa_nao_encontrada';
     if(M !== 'GET' && eq('/api/carregar')) return 'carregamento.executar';
     /* A caixa de varias peca a peca e o "Recomecar" (CARREGAMENTO-SEGUNDA-PESSOA
        fase 2): o mesmo bipe da area e do canto, com a mesma chave. */
