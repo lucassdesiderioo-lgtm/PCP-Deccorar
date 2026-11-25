@@ -66,6 +66,15 @@ const TELAS = [
      a tela (tirá-la mudaria quem abre — #13), sem lista nenhuma. */
   { n:103, nome:'Subir PDF de vendas',   rota:'/admin/producao', nivel:'operacao',  onde:'computador', perms:['producao.lancar','pdf.subir'], area:'expedicao', aba:'prod',
     modulo:'comercial', bloco:'mercado_livre', liga:[201, 401, 'lote (vendas do PDF)'] },
+  /* A PRODUCAO DA MEDIDA PADRAO (PRODUCAO-MAPA-E-MOTOR v7, §14.4, 25/11/2026):
+     as bancadas no formato da 101 (a lista hoje → proximos dias → alvo). A rota
+     /montagem e da Embalagem (102); a montagem da persiana e /montagem-persiana. */
+  { n:107, nome:'Montagem',              rota:'/montagem-persiana', nivel:'operacao', onde:'tablet',   perms:['producao.montar'],
+    modulo:'producao', bloco:'medida_padrao', liga:[108, 110, 101, 404, 401] },
+  { n:108, nome:'Corte de tecido',       rota:'/corte-tecido',  nivel:'operacao',   onde:'tablet',     perms:['producao.cortar_tecido'],
+    modulo:'producao', bloco:'medida_padrao', liga:[401, 404, 107] },
+  { n:110, nome:'Serralheria',           rota:'/serralheria',   nivel:'operacao',   onde:'tablet',     perms:['producao.cortar_tubo'],
+    modulo:'producao', bloco:'medida_padrao', liga:[401, 404, 107] },
   { n:104, nome:'Problemas',             rota:'/admin/problemas', nivel:'admin',    onde:'computador', perms:['@admin'],                aba:'pb',
     modulo:'producao', bloco:'medida_padrao', liga:[101] },
   /* A 106 (FICHAS-NO-CADASTRO-UNICO §3-G, 11/11/2026): o Supervisor decide se a
@@ -116,8 +125,11 @@ const TELAS = [
   { n:303, nome:'Inventário',            rota:'/inventario',    nivel:'operacao',   onde:'tablet',     perms:['contagem.contar','contagem.desempatar'], area:'inventario',
     modulo:'estoque', bloco:'medida_padrao', liga:[302, 301] },
   // ── 400 · Planejamento ──
-  { n:401, nome:'Planejamento',          rota:'/planejamento',  nivel:'admin',      onde:'computador', perms:['planilha.importar'],     area:'necessidade', aba:'plan',
-    modulo:'planejamento', bloco:'medida_padrao', liga:[101, 404, 'venda_futura (planilha do ML)'] },
+  /* A 401 abre tambem para o Supervisor com `producao.etiqueta`, que ve SO a aba
+     "Etiquetas da producao" (PRODUCAO-MAPA-E-MOTOR v7, §14.3, 25/11/2026). As
+     outras abas continuam de nivel Admin: as rotas delas recusam. */
+  { n:401, nome:'Planejamento',          rota:'/planejamento',  nivel:'supervisor', onde:'computador', perms:['planilha.importar','producao.etiqueta'], area:'necessidade', aba:'plan',
+    modulo:'planejamento', bloco:'medida_padrao', liga:[101, 404, 107, 108, 110, 'venda_futura (planilha do ML)'] },
   { n:402, nome:'Cadastro de SKU',       rota:'/admin/skus',    nivel:'admin',      onde:'computador', perms:['sku.cadastrar','sku.excluir','modelo.cadastrar'], aba:'cad',
     modulo:'cadastros', bloco:'medida_padrao', liga:[403, 404, 'skus'] },
   { n:403, nome:'SKU incompleto',        rota:'/admin/sku-incompleto', nivel:'admin', onde:'computador', perms:['sku.cadastrar'],      aba:'pend',

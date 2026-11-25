@@ -93,6 +93,26 @@
   .ct .fora{color:var(--muted);font-size:13px}
   .ct .ctopo{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
   .ct .ctopo button{border:1px solid var(--line);border-radius:9px;padding:10px 16px;font-weight:700;cursor:pointer;background:transparent;color:var(--txt)}
+  /* A ABA "ETIQUETAS DA PRODUCAO" (PRODUCAO-MAPA-E-MOTOR v7, §14.3, 25/11/2026) */
+  .ep .eb{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:12px}
+  .ep .eb h2{font-size:15px;margin:0 0 8px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+  .ep .el{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding:10px 0}
+  .ep .el:first-of-type{border-top:0}
+  .ep .el .en{flex:1;min-width:200px}.ep .el .en b{font-size:15px}
+  .ep .el.trava{opacity:.55}
+  .ep button{border:0;border-radius:9px;font-weight:700;padding:10px 16px;cursor:pointer}
+  .ep button.prim{background:var(--blue);color:#04121f}
+  .ep button.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+  .ep button.perigo{background:transparent;color:#ff8c84;border:1px solid #6b2a26}
+  .ep input,.ep select{padding:9px;border-radius:8px;border:1px solid var(--line);background:#0b0f14;color:var(--txt)}
+  .ep input[type=number]{width:80px;text-align:center}
+  .ep .chip{font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px;background:#11161d;color:var(--muted);border:1px solid var(--line)}
+  .ep .chip.ok{color:#7ee2a0;border-color:#2b5a3a}.ep .chip.am{color:#ffd85c;border-color:#6b5a12}
+  .ep .novas{background:#3a1416;border:1px solid #8a2a26;color:#ffb4ae;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-weight:700}
+  .ep .macos{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+  .ep table{min-width:0}
+  .ep .emsg{font-size:13px;margin-top:6px}.ep .emsg.err{color:#ff8c84}.ep .emsg.okk{color:#7ee2a0}
+  .ep .parada td{color:#ffd85c}
   /* A FOLHA DA BANCADA SO NO BOTAO "Imprimir" DA ABA (③ REVISAO): a classe
      vai no body ao clicar e sai no afterprint. O Ctrl+P de outra aba continua
      imprimindo a aba aberta, como antes. */
@@ -151,6 +171,7 @@
     <button class="tab" data-t="dia">Vendas por dia</button>
     <button class="tab" data-t="produzir">O que produzir</button>
     <button class="tab" data-t="corte">Corte e separação</button>
+    <button class="tab" data-t="etiquetas">Etiquetas da produção</button>
     <button class="tab" data-t="janelas">Médias por janela</button>
     <button class="tab" data-t="comparar">Planilha × sistema</button>
   </div>
@@ -229,6 +250,14 @@
     </div>
     <div id="ctCorpo"><div class="dim" style="padding:18px">carregando…</div></div>
   </div>
+  </section>
+
+  <section id="secEtiquetas" class="aba" style="display:none">
+  <!-- ETIQUETAS DA PRODUCAO (PRODUCAO-MAPA-E-MOTOR v7, §14.3, 25/11/2026): so a
+       impressao em bloco. A conta e do producao_lista.js (#12), que parte da
+       lista da 101; a tela so desenha e manda imprimir. O Supervisor abre a 401
+       e ve so esta aba. -->
+  <div class="ep" id="epCorpo"><div class="dim" style="padding:18px">carregando…</div></div>
   </section>
 
   <section id="secJanelas" class="aba" style="display:none">
@@ -654,6 +683,7 @@ window.addEventListener('afterprint',function(){ document.body.classList.remove(
 const ABAS={ dia:{sec:'secDia', carregar:function(){ futuras(); }},
              produzir:{sec:'secProduzir', carregar:function(){ load(); }},
              corte:{sec:'secCorte', carregar:function(){ corte(); }},
+             etiquetas:{sec:'secEtiquetas', carregar:function(){ etiquetasAba(); }},
              janelas:{sec:'secJanelas', carregar:function(){ janelas(); }},
              comparar:{sec:'secComparar', carregar:function(){ comparar(); }} };
 let ABA='dia';
@@ -681,6 +711,7 @@ function atualizarSozinha(){
   if(ABA==='produzir'){ load(); return; }
   if(ABA==='dia'){ load(); futuras(); }
   if(ABA==='corte'){ load(); corte(); }
+  if(ABA==='etiquetas') etiquetasAba();
 }
 setInterval(atualizarSozinha, 60000);
 document.getElementById('tabs').addEventListener('click',function(e){
@@ -691,7 +722,114 @@ window.addEventListener('hashchange',function(){
   if(ABAS[h]){ if(h!==ABA) abrirAba(h, true); }
   else { try{ history.replaceState(null,'','#'+ABA); }catch(e){} }   // endereço inválido volta a dizer a aba aberta
 });
-(function(){
+/* ── A ABA "ETIQUETAS DA PRODUCAO" (PRODUCAO-MAPA-E-MOTOR v7, §14.3) ──────
+   So a impressao em bloco: o dia num botao; os proximos dias e o alvo abrem
+   depois (a regra F, do servidor); os macos em branco de tecido e de tubo; o
+   fora do planejamento; as nao usadas, com o cancelar; o historico, com a
+   reimpressao. Quem diz QUANTAS e o servidor: a tela so manda a parte. */
+let EP=null, EP_MSG=null, EP_SKUS=null;
+function epEsc(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function epHora(s){ return s ? String(s).slice(11,16) : ''; }
+async function etiquetasAba(){
+  if(EP && epDigitando()) return;   // §12: o redesenho nao apaga o que se digita
+  try{ const r=await fetch('/api/producao/etiquetas'); EP = r.ok ? await r.json() : { erro:(await r.json().catch(function(){ return {}; })).erro || ('erro '+r.status) }; }
+  catch(e){ EP={ erro:'Não deu para falar com o servidor.' }; }
+  if(!EP_SKUS){ try{ EP_SKUS=(await (await fetch('/api/skus')).json()).filter(function(s){ return s.ativo!==0 && s.largura_cm!=null; }).map(function(s){ return s.codigo; }); }catch(e){ EP_SKUS=[]; } }
+  epDesenhar();
+}
+function epDigitando(){ const a=document.activeElement; return a && a.closest && a.closest('#epCorpo') && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName); }
+function epDesenhar(){
+  const box=document.getElementById('epCorpo');
+  if(!EP || EP.erro){ box.innerHTML='<div class="eb"><div class="emsg err">Não deu para carregar a aba: '+epEsc(EP&&EP.erro)+'</div></div>'; return; }
+  const a=EP.aba, h=[];
+  if(EP_MSG) h.push('<div class="eb"><div class="emsg '+(EP_MSG.err?'err':'okk')+'">'+epEsc(EP_MSG.t)+'</div></div>');
+  if(a.dia.novas) h.push('<div class="novas">🔔 '+a.dia.novas.n+' etiqueta'+(a.dia.novas.n>1?'s novas':' nova')+' para hoje desde a última impressão ('+epHora(a.dia.novas.desde)+') — imprima só a diferença.</div>');
+  const linha=function(nome, txt, botao, trava){ return '<div class="el'+(trava?' trava':'')+'"><div class="en"><b>'+nome+'</b><div class="sub">'+txt+'</div></div>'+botao+'</div>'; };
+  const skus=function(l){ return l.filter(function(x){ return x.n>0; }).map(function(x){ return epEsc(x.titulo)+' '+x.n; }).join(' · '); };
+  let dia = a.dia.total ? linha('Necessidade do dia', a.dia.total+' etiquetas · '+skus(a.dia.itens)+(a.dia.itens.some(function(x){ return x.sem_cortado; })?' · <span style="color:#ffd85c">há SKU sem tecido ou tubo cortado</span>':''),
+      '<button class="prim" data-ep="dia">Imprimir '+a.dia.total+'</button>')
+    : linha('Necessidade do dia', 'toda impressa ✓', '<span class="chip ok">impressa</span>');
+  let prox = !a.proximos.aberto ? linha('Próximos dias', a.proximos.falta+' faltam', '<span class="chip am">🔒 depois do dia</span>', true)
+    : a.proximos.total ? linha('Próximos dias', a.proximos.total+' etiquetas'+(a.proximos.falta>a.proximos.total?' de '+a.proximos.falta+' (o resto espera tecido e tubo cortados)':'')+' · '+skus(a.proximos.itens), '<button class="prim" data-ep="proximos">Imprimir '+a.proximos.total+'</button>')
+    : linha('Próximos dias', a.proximos.falta ? a.proximos.falta+' faltam, mas não há tecido e tubo cortados livres' : 'todos impressos ✓', a.proximos.falta?'<span class="chip am">espera o corte</span>':'<span class="chip ok">impressos</span>');
+  let alvo = !a.alvo.aberto ? linha('Completar o alvo', a.alvo.falta+' faltam', '<span class="chip am">🔒 depois do dia seguinte</span>', true)
+    : a.alvo.total ? linha('Completar o alvo', 'até '+a.alvo.total+' (o tecido e o tubo cortados livres) de '+a.alvo.falta+' que faltam',
+        '<input type="number" id="epAlvoQt" min="1" max="'+a.alvo.total+'" value="'+Math.min(20,a.alvo.total)+'" aria-label="quantas do alvo"> <button class="prim" data-ep="alvo">Imprimir</button>')
+    : linha('Completar o alvo', a.alvo.falta ? a.alvo.falta+' faltam, mas não há tecido e tubo cortados livres' : 'completo ✓', '<span class="chip '+(a.alvo.falta?'am':'ok')+'">'+(a.alvo.falta?'espera o corte':'completo')+'</span>');
+  h.push('<div class="eb"><h2>Etiquetas de SKU em série</h2>'+dia+prox+alvo+
+    '<details><summary class="sub" style="cursor:pointer">Ver a conta SKU a SKU</summary><div class="tbwrap" style="margin-top:8px"><table><thead><tr class="cols"><th class="l">SKU</th><th>Falta hoje</th><th>Na embalagem</th><th>No carrinho da revisão</th><th>Sendo montadas</th><th>Etiquetas livres</th><th>Imprimir hoje</th><th>Tecido cortado</th><th>Tubo cortado</th></tr></thead><tbody>'+
+    (a.conta.map(function(x){ return '<tr><td class="l code">'+epEsc(x.sku)+'</td><td>'+x.hoje+'</td><td>'+x.na_embalagem+'</td><td>'+x.carrinho+'</td><td>'+x.montando+'</td><td>'+x.impressas+'</td><td><b>'+x.imprimir_hoje+'</b></td><td>'+x.tecido+'</td><td>'+x.tubo+'</td></tr>'; }).join('')||'<tr><td class="l dim" colspan="9">Nada a mostrar.</td></tr>')+
+    '</tbody></table></div></details>'+
+    (a.fora.length?'<details><summary class="sub" style="cursor:pointer">Ficou fora ('+a.fora.length+')</summary><div class="sub" style="margin-top:6px">'+a.fora.map(function(x){ return '<div><b class="code">'+epEsc(x.codigo)+'</b> · '+x.falta+' · '+epEsc(x.motivo)+'</div>'; }).join('')+'</div></details>':'')+'</div>');
+  h.push('<div class="macos">'+[['TC','tecido','o corte de tecido (108)'],['TB','tubo','a serralheria (110)']].map(function(m){ const x=EP.macos[m[0]];
+    return '<div class="eb"><h2>Maço de '+m[1]+' ('+m[0]+')</h2><div class="sub">Em branco e sequencial: '+m[2]+' liga cada etiqueta à peça no bipe.</div>'+
+      '<div class="el"><div class="en">Próxima: <b class="code">'+epEsc(x.proxima)+'</b> <span class="sub">· '+x.livres+' impressas e não usadas</span></div>'+
+      '<input type="number" id="epMaco'+m[0]+'" min="1" max="200" value="50" aria-label="quantas"> <button class="prim" data-ep="maco" data-tipo="'+m[0]+'">Imprimir</button></div></div>'; }).join('')+'</div>');
+  h.push('<div class="eb"><h2>Fora do planejamento</h2><div class="el"><select id="epForaSku" aria-label="SKU">'+(EP_SKUS||[]).map(function(c){ return '<option>'+epEsc(c)+'</option>'; }).join('')+'</select>'+
+    '<input type="number" id="epForaQt" min="1" max="200" value="1" aria-label="quantas">'+
+    '<select id="epForaMot" aria-label="motivo">'+EP.motivos_fora.map(function(m){ return '<option>'+epEsc(m)+'</option>'; }).join('')+'</select>'+
+    '<input type="text" id="epForaTxt" placeholder="se Outro, qual" aria-label="motivo escrito"> <button class="ghost" data-ep="fora">Imprimir</button></div>'+
+    '<div class="sub">A etiqueta fica marcada "fora do planejamento" nos relatórios.</div></div>');
+  const nu=EP.nao_usadas;
+  h.push('<div class="eb"><h2>Impressas e ainda não usadas <span class="chip">'+nu.length+'</span></h2>'+(nu.length?
+    '<div class="tbwrap"><table><thead><tr class="cols">'+(EP.pode_cancelar?'<th></th>':'')+'<th class="l">Etiqueta</th><th class="l">Imprimiu</th><th>Parada há</th><th></th></tr></thead><tbody>'+
+    nu.map(function(e){ return '<tr class="'+(e.parada?'parada':'')+'">'+(EP.pode_cancelar?'<td><input type="checkbox" data-nu="'+e.id+'" aria-label="marcar"></td>':'')+
+      '<td class="l code">'+epEsc(e.rotulo)+(e.tipo!=='PS'?' <span class="sub">(em branco)</span>':'')+'</td><td class="l">'+epEsc(e.imprimiu||'—')+'</td><td>'+e.dias+(e.dias===1?' dia':' dias')+'</td>'+
+      '<td><button class="ghost" data-ep="reimp" data-id="'+e.id+'">Reimprimir</button></td></tr>'; }).join('')+'</tbody></table></div>'+
+    (EP.pode_cancelar?'<div class="el"><select id="epCancMot" aria-label="motivo"><option>Perdida</option><option>Estragada</option><option>Impressa por engano</option></select> <button class="perigo" data-ep="cancelar">Cancelar as marcadas</button></div>':'')+
+    '<div class="sub">Em âmbar e em cima: parada há mais de '+EP.dias_parada+' dias (muda-se na 906 Parâmetros).</div>' : '<div class="sub">Nenhuma.</div>')+'</div>');
+  h.push('<div class="eb"><h2>Histórico de impressão de hoje</h2>'+(EP.historico.length?'<div class="tbwrap"><table><thead><tr class="cols"><th class="l">Hora</th><th class="l">Quem</th><th class="l">O quê</th><th class="l">Etiquetas</th><th>Qtd</th></tr></thead><tbody>'+
+    EP.historico.map(function(x){ return '<tr><td class="l">'+epHora(x.em)+'</td><td class="l">'+epEsc(x.por||'—')+'</td><td class="l">'+epEsc(x.reimpressao?'Reimpressão':({dia:'Necessidade do dia',proximos:'Próximos dias',alvo:'Completar o alvo',fora:'Fora do planejamento',maco:'Maço',entrada:'Entrada inicial'})[x.parte]||x.descricao||'')+'</td><td class="l">'+epEsc(x.reimpressao?x.descricao:(x.numeros||x.descricao||''))+'</td><td>'+x.quantidade+'</td></tr>'; }).join('')+
+    '</tbody></table></div>':'<div class="sub">Nada impresso hoje.</div>')+
+    '<div class="el"><input type="text" id="epReimpTxt" placeholder="TC 000123 ou BK160140BEGE Nº 45" aria-label="etiqueta a reimprimir" style="min-width:260px"> <button class="ghost" data-ep="reimpTxt">Reimprimir com o mesmo número</button></div></div>');
+  box.innerHTML=h.join('');
+}
+function epPdf(r){
+  const bin=atob(r.arquivo), u8=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+  const w=window.open(URL.createObjectURL(new Blob([u8],{type:'application/pdf'})),'_blank');
+  if(!w) EP_MSG={ err:true, t:'O navegador bloqueou a janela do PDF. Libere o pop-up; as etiquetas já foram gravadas e se reimprimem pelo histórico.' };
+}
+async function epPost(url, corpo, ok){
+  let r;
+  try{ const x=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)}); r=await x.json(); }
+  catch(e){ EP_MSG={ err:true, t:'Não deu para falar com o servidor. Confira o histórico antes de imprimir de novo: a impressão pode ter sido gravada.' }; epDesenhar(); return; }
+  if(r.erro){ EP_MSG={ err:true, t:r.erro }; }
+  else { EP_MSG={ t:ok(r) }; if(r.tipo==='pdf') epPdf(r); }
+  EP=null; etiquetasAba();
+}
+document.getElementById('epCorpo').addEventListener('click',function(e){
+  const b=e.target.closest('[data-ep]'); if(!b) return;
+  const k=b.getAttribute('data-ep'), v=function(id){ const x=document.getElementById(id); return x?x.value:''; };
+  const n=function(r){ return r.quantidade+' etiqueta'+(r.quantidade>1?'s':'')+' impressa'+(r.quantidade>1?'s':'')+'.'; };
+  if(k==='dia'||k==='proximos'||k==='alvo') return epPost('/api/producao/etiquetas/imprimir',{ parte:k, quantidade: k==='alvo' ? +v('epAlvoQt') : undefined }, n);
+  if(k==='maco') return epPost('/api/producao/etiquetas/maco',{ tipo:b.getAttribute('data-tipo'), quantidade:+v('epMaco'+b.getAttribute('data-tipo')) }, n);
+  if(k==='fora') return epPost('/api/producao/etiquetas/fora',{ sku:v('epForaSku'), quantidade:+v('epForaQt'), motivo:v('epForaMot'), texto:v('epForaTxt') }, n);
+  if(k==='reimp') return epPost('/api/producao/etiquetas/reimprimir',{ ids:[+b.getAttribute('data-id')] }, function(){ return 'Reimpressa com o mesmo número.'; });
+  if(k==='reimpTxt') return epPost('/api/producao/etiquetas/reimprimir',{ texto:v('epReimpTxt') }, function(){ return 'Reimpressa com o mesmo número.'; });
+  if(k==='cancelar'){
+    const ids=[].map.call(document.querySelectorAll('#epCorpo [data-nu]:checked'),function(c){ return +c.getAttribute('data-nu'); });
+    return epPost('/api/producao/etiquetas/cancelar',{ ids:ids, motivo:v('epCancMot') }, function(r){ return r.canceladas+' etiqueta(s) cancelada(s). O número não volta.'; });
+  }
+});
+
+/* QUEM ABRE A 401 (PRODUCAO-MAPA-E-MOTOR v7, §14.3): o Supervisor abre e ve so
+   a aba de etiquetas; as outras sao de nivel Admin (as rotas delas continuam
+   recusando). Quem nao tem a chave das etiquetas nao ve a aba. */
+(async function(){
+  let soEtq=false, semEtq=false;
+  try{ const t=await (await fetch('/api/telas/minhas')).json();
+    const p=new Set(t.perms||[]);
+    if(!t.admin_geral && !t.nivel_admin) soEtq=true;
+    if(!t.admin_geral && !p.has('producao.etiqueta')) semEtq=true;
+  }catch(e){}
+  if(semEtq){ delete ABAS.etiquetas; const b=document.querySelector('#tabs [data-t="etiquetas"]'); if(b) b.remove(); }
+  if(soEtq){
+    Object.keys(ABAS).forEach(function(k){ if(k!=='etiquetas'){ delete ABAS[k]; const b=document.querySelector('#tabs [data-t="'+k+'"]'); if(b) b.remove(); } });
+    document.querySelectorAll('.topo,#recorte,section.aba').forEach(function(x){ if(x.id!=='secEtiquetas') x.style.display='none'; });
+    if(ABAS.etiquetas) abrirAba('etiquetas', true);
+    return;
+  }
   let a=location.hash.slice(1);
   if(!ABAS[a]){ try{ a=localStorage.getItem('plan_aba')||''; }catch(e){ a=''; } }
   if(!ABAS[a]) a='dia';

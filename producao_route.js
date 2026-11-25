@@ -90,7 +90,15 @@ module.exports = function(app, db){
   app.post('/api/producao/etiquetas/reimprimir', async (req, res) => {
     const b = req.body || {};
     let l;
-    try{ l = ETQ.paraReimprimir(db, b.ids, QUEM.pessoa(req)); }
+    try{
+      let ids = b.ids;
+      if(b.texto != null){
+        const e = ETQ.buscar(db, b.texto);
+        if(!e) throw new ETQ.Recusa('Não achei a etiqueta "' + String(b.texto).trim() + '". Escreva como está nela: "TC 000123" ou "BK160140BEGE Nº 45".', 404);
+        ids = [e.id];
+      }
+      l = ETQ.paraReimprimir(db, ids, QUEM.pessoa(req));
+    }
     catch(e){ return erro(res, e, 'reimprimir'); }
     try{ mandaPdf(res, l[0].tipo === 'PS' ? await pdfPersianas(l) : await pdfMaco(l), 'reimpressao.pdf', { quantidade:l.length }); }
     catch(e){ erro(res, e, 'gerar o PDF'); }

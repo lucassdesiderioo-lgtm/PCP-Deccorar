@@ -248,6 +248,23 @@ function paraReimprimir(db, ids, quem){
   return l;
 }
 
-module.exports = { Recusa, TIPOS, PARTES, MOTIVOS_FORA, MAX, DIAS_PARADA_PADRAO, garantirSchema,
+/* Achar uma etiqueta pelo que a pessoa escreve para reimprimir: o codigo de
+   barras, "TC 000123" ou "BK160140BEGE Nº 45" (a etiqueta perdida nao se bipa). */
+function buscar(db, texto){
+  const t = String(texto == null ? '' : texto).trim();
+  if(!t) return null;
+  const direto = traduzir(db, t);
+  if(direto && !direto.desconhecida) return direto;
+  let m = t.toUpperCase().match(/^(TC|TB)\s*0*(\d+)$/);
+  if(m) return db.prepare('SELECT * FROM etiqueta_producao WHERE tipo=? AND numero=?').get(m[1], +m[2]) || null;
+  m = t.match(/^(.+?)\s+(?:N[ºo°.]?\s*)?(\d+)$/i);
+  if(m){
+    const s = db.prepare('SELECT codigo FROM skus WHERE UPPER(codigo)=UPPER(?)').get(m[1].trim());
+    if(s) return db.prepare("SELECT * FROM etiqueta_producao WHERE tipo='PS' AND sku=? AND numero=?").get(s.codigo, +m[2]) || null;
+  }
+  return null;
+}
+
+module.exports = { Recusa, buscar, TIPOS, PARTES, MOTIVOS_FORA, MAX, DIAS_PARADA_PADRAO, garantirSchema,
   codigoDe, rotulo, limpar, reservado, traduzir, skuDoBipe, usar, soltar,
   imprimirMaco, imprimirPersianas, cancelar, naoUsadas, livres, proxima, historico, paraReimprimir, diasParada };
