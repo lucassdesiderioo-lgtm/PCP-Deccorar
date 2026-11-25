@@ -1,7 +1,23 @@
 # CONFERENCIA-CARRINHOS — a 202 Conferência com carrinhos, as barras do dia e a trava do dia seguinte
 
 > **STATUS — 25/11/2026: APROVADA PELO DONO** (*"p1 sim, p2 sim, p3 sim,
-> aprovado"*) · **planejada, nada construído** · próxima: fase 1. Tipo: `REGRA` + `NOVIDADE` · risco 🔴 (estoque, etiqueta,
+> aprovado"*) · **fases 1 e 2 construídas juntas (decisão do dono), falta
+> subir** · fase 3 (a trava da 201) não começou. Testes: `teste_carrinhos.js`
+> (37), `teste_entrega.js` (25), `teste_conferencia_tela.js` (30, num
+> Chromium), `teste_carregamento_tela.js` (10).
+>
+> **O que mudou na construção** (vale o que está aqui):
+> - **"Não achei" na recontagem NÃO volta a caixa para "faltam bipar"** (decisão
+>   do dono, 25/11/2026): ela já baixou quando foi conferida. Sai do carrinho,
+>   continua conferida, o estoque não mexe, e vira pendência na 204; achada,
+>   entra num carrinho pelo bipe sem baixar de novo (R-CRR-04 e 05);
+> - a caixa **conferida sem carrinho** (a de antes do deploy, a da página antiga
+>   em cache) aparece no filtro "Conferidas sem carrinho" e entra num carrinho
+>   pelo bipe, sem baixar de novo;
+> - a página antiga em cache (sem a chave `carrinho`) continua conferindo; as
+>   rotas da saída do caminhão e da viagem ficam no ar para ela;
+> - os cartões novos são **R-CRR-01 a 05** e **R-ENT-01 a 05** (a spec listava
+>   R-ENT-01 a 07; a numeração juntou o que era uma regra só). Tipo: `REGRA` + `NOVIDADE` · risco 🔴 (estoque, etiqueta,
 > permissão). Desenhada em conversa com o dono em 24/11/2026, com o protótipo
 > clicável aprovado (*"ficou bom"*):
 > https://claude.ai/artifact/47UkW1LpH96RSss5JQj6AQ

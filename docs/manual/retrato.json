@@ -78,6 +78,11 @@
   "R-COR-05": "e83e38d8f2f91db2",
   "R-COR-06": "1f20da268078d144",
   "R-COR-07": "37fe295fd852527a",
+  "R-CRR-01": "fdc80a00b5032f6b",
+  "R-CRR-02": "87faabe27e2172fe",
+  "R-CRR-03": "e34349413f76c0c8",
+  "R-CRR-04": "fe8a1da096b3ddb7",
+  "R-CRR-05": "aab186c544535186",
   "R-EMB-01": "22ad1a743cbde25d",
   "R-EMB-02": "e12038f15c20049f",
   "R-EMB-03": "ac98d7177936c841",
@@ -91,6 +96,11 @@
   "R-EMB-11": "3ea97ab5f438fd8c",
   "R-EMB-12": "440684358b2635e1",
   "R-EMB-13": "3b62c7fdf3dacf64",
+  "R-ENT-01": "2f89e4c94d095738",
+  "R-ENT-02": "5c8935ceca9a919c",
+  "R-ENT-03": "9e216cf6c300e503",
+  "R-ENT-04": "c994949780bc3153",
+  "R-ENT-05": "b8bff6cf3eab105e",
   "R-EST-01": "6cb7de19b6e17f38",
   "R-EST-02": "50fcc9282e44164a",
   "R-EST-03": "044d524d09846887",
@@ -457,6 +467,7 @@
    ],
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
+    "25/11/2026 — A tela passou a conferir nos carrinhos: a caixa de coleta vai para o carrinho escolhido (bipar a etiqueta do carrinho troca), a de agência vai sozinha para o Carro da agência, e em cima aparecem duas barras (quanto falta entregar no dia e quanto falta bipar do que foi impresso). A entrega é por carrinho, com a foto e o número do motorista; não se bipam mais as sobras, e a caixa a mais do motorista é bipada na hora. Cada carrinho pode ser recontado sem ver o número esperado, e a caixa não achada vira pendência sem mexer no estoque.",
     "21/11/2026 — ficha criada em rascunho",
     "19/11/2026 — A caixa que saiu sem ninguém conferir e é fechada depois pelo acerto das caixas não conferidas tem o estoque baixado nesse acerto, uma vez só, como se tivesse sido conferida aqui."
    ],
@@ -866,6 +877,7 @@
    ],
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
+    "25/11/2026 — Nova lista \"Carrinhos da expedição\" (nasce com A e B), com o botão da etiqueta de código de barras de cada carrinho. Carrinho com caixa dentro não pode ser removido.",
     "21/11/2026 — ficha criada em rascunho"
    ],
    "situacao": "rascunho"
