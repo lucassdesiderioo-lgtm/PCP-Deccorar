@@ -994,6 +994,11 @@ module.exports = function(app, db){
        chave `saida.liberar`, de novo ANTES do `pre`. */
     if(M !== 'GET' && eq('/api/viagem/liberar')) return 'saida.liberar';
     if(M !== 'GET' && pre('/api/viagem')) return 'carregamento.executar';
+    /* O CARRINHO E A ENTREGA (spec CONFERENCIA-CARRINHOS, 25/11/2026): a mesma
+       regra — a bancada reconta, passa e entrega; liberar com número diferente
+       é `saida.liberar`, ANTES do `pre`. */
+    if(M !== 'GET' && eq('/api/entrega/liberar')) return 'saida.liberar';
+    if(M !== 'GET' && (pre('/api/entrega') || pre('/api/carrinho'))) return 'carregamento.executar';
     // Fechar a coleta com o motorista e ato da mesma bancada que bipa a caixa:
     // quem carrega e quem confere o numero na frente do caminhao.
     if(M !== 'GET' && pre('/api/coleta')) return 'carregamento.executar';
@@ -1321,6 +1326,10 @@ module.exports = function(app, db){
     /* A FOTO DA COLETA É PROVA (§8-B), e estava legível por qualquer pessoa
        logada: é a tela do celular do motorista, com a contagem dele. */
     if(eq('/api/carregamento') || pre('/api/coleta') || pre('/api/saida') || pre('/api/viagem')) return ['carregamento.executar','@admin'];
+    /* As leituras da 202 nova. A etiqueta do carrinho é de quem cadastra as
+       listas (902) e de quem confere. */
+    if(M === 'GET' && pre('/api/carrinho/etiqueta')) return ['listas.editar','carregamento.executar'];
+    if(eq('/api/conferencia/dia') || eq('/api/carrinhos') || pre('/api/entrega')) return ['carregamento.executar','@admin'];
     if(pre('/api/revisao')) return ['revisao.executar','@admin'];
     /* A lista de ordens do dia: a tela vermelha do operador mostra o que foi
        lançado, e o admin mostra a mesma coisa na aba de lançar. Lançar (POST)

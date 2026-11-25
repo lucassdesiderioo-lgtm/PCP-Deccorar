@@ -123,8 +123,9 @@ const MINHAS_OP = { telas:[ { n:101, nome:'Revisão', rota:'/operador', modulo:'
   const MARCAS = [
     ['public/operador.html',  "b.id='rjBt'",                                   'revisao.rejeitar'],
     /* a caixa "Subir PDF" da 201 saiu em 05/11/2026: o upload é só na 103 (D2) */
-    ['public/carregamento.html', 'onclick="fecharSaida(true)"',                'saida.liberar'],
-    ['public/carregamento.html', 'onclick="fecharViagem(true)"',               'saida.liberar'],
+    /* Desde 25/11/2026 (CONFERENCIA-CARRINHOS) a saída do caminhão e a viagem
+       viraram a ENTREGA por carrinho: um botão "Liberar com divergência" só. */
+    ['public/carregamento.html', 'onclick="fecharEntrega(true)"',              'saida.liberar'],
     ['public/index.html', "data-resolvediv=\"'+r.id+'\" data-sku=\"'+esc(sug.codigo)", 'sku.cadastrar'],
     ['public/index.html', "data-resolvediv=\"'+r.id+'\" data-sku=\"'+esc(outras[k2].codigo)", 'sku.cadastrar'],
     ['public/index.html', "data-resolveoutro=\"'+r.id+'\">Confirmar",       'sku.cadastrar'],

@@ -152,14 +152,11 @@ const codeDe = id => JSON.parse(lote(id).codes)[0];
   eq('   e a tela recebe o dia de hoje, para dizer "de ontem"', r.hoje, HOJE);
   ok('caixa sem marcacao continua na lista, como "nao saiu" (nunca cancelada)',
      (r.faltam||[]).some(v => v.id === semMarca) && lote(semMarca).estagio === 'embalado');
+  /* Desde 25/11/2026 (CONFERENCIA-CARRINHOS) a lista da 202 vem do
+     `/api/conferencia/dia`, que poe a caixa marcada EM CIMA, com o dia
+     (teste_carrinhos.js); a tela desenha o selo "de ontem". */
   const h = fs.readFileSync(path.join(__dirname,'public','carregamento.html'),'utf8');
-  const m = h.match(/function listaUnica\([\s\S]*?\n\}/);
-  if(m){
-    const f = new Function(m[0] + '; return listaUnica;')();
-    const u = f(r);
-    ok('na lista unica, a marcada vem EM CIMA', u.conferidas[0] && u.conferidas[0].ficou_de === ONTEM, u.conferidas.slice(0,3));
-    ok('   e na de esperando tambem', u.esperando[0] && u.esperando[0].ficou_de === ONTEM, u.esperando.slice(0,3));
-  } else ok('a tela tem a listaUnica', false);
+  ok('a tela desenha o selo do "a coleta não passou"', /function seloFicou\(/.test(h) && /de ontem/.test(h));
 
   /* ════════════════════════ FASE 4 ════════════════════════ */
   console.log('\n=== FASE 4 · a venda cancelada em duas pessoas ===\n');

@@ -3356,7 +3356,11 @@ var CDTIPOS=[
   /* AS CATEGORIAS DE MATERIAL (AJUSTE de 11/11/2026, o dono: "deveríamos ter um
      campo para cadastrar novas categorias"). A lista já existia (R-CMP-04) e não
      tinha tela. Ela só filtra e agrupa a compra programada — não decide regra. */
-  {t:'categoria_material',n:'Categorias de material (a 501 Compras → Materiais usa ao cadastrar)'}
+  {t:'categoria_material',n:'Categorias de material (a 501 Compras → Materiais usa ao cadastrar)'},
+  /* OS CARRINHOS DA EXPEDIÇÃO (spec CONFERENCIA-CARRINHOS): a 202 põe cada caixa
+     conferida num carrinho desta lista. Cada um tem a etiqueta de código de
+     barras que se cola nele (CARRINHO-A); bipar a etiqueta troca o carrinho. */
+  {t:'carrinho_expedicao',n:'Carrinhos da expedição (a 202 Conferência põe as caixas conferidas neles) — só letras ou números, ex.: C',etiqueta:true}
 ];
 async function carregarCad(){
   var el=document.getElementById('cdBox');
@@ -3367,7 +3371,9 @@ async function carregarCad(){
     var l=[]; try{ l=await (await fetch('/api/listas/'+tp.t)).json(); }catch(e){}
     h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:12px">'+tp.n+'</div>';
     for(var j=0;j<l.length;j++){
-      h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span>'+l[j].valor+'</span><button class="ghost small cdDel" data-perm="listas.editar" data-id="'+l[j].id+'">remover</button></div>';
+      h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span>'+(tp.etiqueta?'Carrinho ':'')+l[j].valor+'</span><span style="display:flex;gap:8px">'
+        +(tp.etiqueta?'<a class="ghost small" style="text-decoration:none;padding:6px 10px;border:1px solid var(--line);border-radius:8px" target="_blank" rel="noopener" href="/api/carrinho/etiqueta/'+encodeURIComponent(l[j].valor)+'">etiqueta</a>':'')
+        +'<button class="ghost small cdDel" data-perm="listas.editar" data-id="'+l[j].id+'">remover</button></span></div>';
     }
     h+='<div style="display:flex;gap:8px;margin-top:14px"><input id="cdIn_'+tp.t+'" placeholder="novo item" style="flex:1"><button class="primary cdAdd" data-perm="listas.editar" data-t="'+tp.t+'">Adicionar</button></div>';
     h+='</div>';
@@ -3609,13 +3615,15 @@ document.addEventListener('click',async function(e){
     var inp=document.getElementById('cdIn_'+tp);
     var v=(inp.value||'').trim();
     if(!v) return;
-    await fetch('/api/listas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:tp,valor:v})});
+    var ra=await fetch('/api/listas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:tp,valor:v})});
+    if(!ra.ok){ var ja={}; try{ ja=await ra.json(); }catch(err){} alert(ja.erro||'Não deu para adicionar.'); return; }
     carregarCad(); return;
   }
   var d=e.target.closest('.cdDel');
   if(d){
     if(!confirm('Remover este item? Registros antigos que já usaram ele continuam intactos.')) return;
-    await fetch('/api/listas/'+d.getAttribute('data-id'),{method:'DELETE'});
+    var rd=await fetch('/api/listas/'+d.getAttribute('data-id'),{method:'DELETE'});
+    if(!rd.ok){ var jd={}; try{ jd=await rd.json(); }catch(err){} alert(jd.erro||'Não deu para remover.'); return; }
     carregarCad(); return;
   }
   if(e.target.closest('#cdKitBt')){
