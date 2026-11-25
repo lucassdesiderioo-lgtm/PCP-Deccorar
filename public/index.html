@@ -3993,6 +3993,32 @@ function corIrMesa(){
   var t=document.querySelector('.tab[data-t="cor"]');
   if(t && !t.classList.contains('active')) t.click();
 }
+/* ⚠️ O CLIQUE DA 204 QUE LEVA À 205 LEVA O PEDIDO NO ENDEREÇO (CONSERTO de
+   25/11/2026). Desde que o Admin virou telas, "ir para a aba Correções" TROCA
+   DE PÁGINA, e o segundo passo do clique (abrir o quadro do bloco, abrir o
+   volume) rodava na página que estava sendo deixada e se perdia: a 205 abria
+   vazia, e o "Fechar vencidos em bloco" não fazia nada. Agora o pedido vai em
+   `#abrir=...` e a 205 o executa ao abrir (`corPedidoDoEndereco`). Na página
+   com as abas (sem TELA), segue abrindo na mesma página. */
+function corIr(pedido){
+  if(TELA && TELA.aba!=='cor' && ROTA_DA_ABA.cor){
+    location.href=ROTA_DA_ABA.cor+'#abrir='+encodeURIComponent(pedido); return;
+  }
+  corIrMesa(); corFazerPedido(pedido);
+}
+function corFazerPedido(pedido){
+  var m=/^(lote|fila)-(\d+)$/.exec(String(pedido||''));
+  if(pedido==='vencidos') corVencidos();
+  else if(pedido==='conferencias') corConferencias();
+  else if(m) corAbrir(m[1], +m[2]);
+}
+function corPedidoDoEndereco(){
+  var m=/^#abrir=([a-z]+(?:-\d+)?)$/.exec(location.hash||'');
+  if(!m) return;
+  /* limpa o endereço: recarregar a 205 não reabre um pedido velho */
+  try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+  corFazerPedido(decodeURIComponent(m[1]));
+}
 
 async function corPassivo(){
   var box=$('#corPassivo'); if(!box) return;
@@ -4013,14 +4039,14 @@ async function corPassivo(){
        +(x.cancelada_varias?' <span class="sub">(caixa de várias — só um item cancelado)</span>':''); }},
     {k:'vencidos', um:'pendente vencido', muitos:'pendentes vencidos', lista:'os vencidos',
      ajuda:'despacho já passou e a etiqueta nunca saiu — ou saiu por fora, ou é venda atrasada',
-     extra:'<div style="margin:8px 0"><button class="btn" onclick="corIrMesa();corVencidos()">Fechar vencidos em bloco…</button> '
+     extra:'<div style="margin:8px 0"><button class="btn" onclick="corIr(\'vencidos\')">Fechar vencidos em bloco…</button> '
        +'<span class="sub">ou abra um volume para dar saída só nele</span></div>',
      linha:function(x){ return corFrase(x)+(x.despachar_em?' <span class="sub">despachava '+esc(x.despachar_em)+'</span>'
        :' <span class="sub">sem despacho lido</span>'); }},
     {k:'conferencias', um:'caixa impressa sem conferência', muitos:'caixas impressas sem conferência',
      lista:'as caixas sem conferência',
      ajuda:'etiqueta impressa num dia anterior e nunca conferida — a linha âmbar da Conferência',
-     extra:'<div style="margin:8px 0"><button class="btn" onclick="corIrMesa();corConferencias()">Fechar conferências antigas em bloco…</button> '
+     extra:'<div style="margin:8px 0"><button class="btn" onclick="corIr(\'conferencias\')">Fechar conferências antigas em bloco…</button> '
        +'<span class="sub">ou abra uma caixa para dar saída só nela</span></div>',
      linha:function(x){ return corFrase(x)+' <span class="sub">impressa '+esc(String(x.embalado_em||x.data||'').slice(0,10))+'</span>'
        +(String(x.modalidade||'').toLowerCase()==='coleta'?' <span class="sub">(coleta)</span>':''); }},
@@ -4053,7 +4079,7 @@ async function corPassivo(){
       +esc(b.lista)+'</summary>'+(b.extra||'')
       +'<div style="margin-top:8px">'+it.map(function(x){
           return '<div style="padding:5px 0;border-bottom:1px solid var(--bd)">'
-            +'<a href="#" class="corLink" onclick="corIrMesa();corAbrir(\''+(b.tipo||'lote')+'\','+x.id+');return false">'+b.linha(x)+'</a></div>'; }).join('')
+            +'<a href="#" class="corLink" onclick="corIr(\''+(b.tipo||'lote')+'-'+x.id+'\');return false">'+b.linha(x)+'</a></div>'; }).join('')
       +'</div></details>';
   });
   if(!blocos.some(function(b){ return ((d[b.k]||{}).n||0)>0; }))
@@ -4331,6 +4357,7 @@ async function corHistorico(){
    mesma carga que o clique da pessoa fazia. No fim do script, para todas as
    funções já existirem. */
 if(TELA){ var tt=document.querySelector('.tab[data-t="'+TELA.aba+'"]'); if(tt) tt.click(); }
+if(naTela('cor')) setTimeout(corPedidoDoEndereco,0);
 </script>
 <script src="/nav.js"></script>
 </body></html>
