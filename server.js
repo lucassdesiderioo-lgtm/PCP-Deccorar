@@ -19,6 +19,9 @@ require('./admin_telas')(app, db);
    linhas da central antes e depois das ações que criam pendência. Tem que vir
    ANTES de qualquer rota — middleware registrado depois não roda para ela. */
 require('./pendencias_vigia')(app, db);
+/* O tradutor da etiqueta de SKU em serie (PRODUCAO-MAPA-E-MOTOR v7, §14.2):
+   ANTES das rotas que bipam SKU, senao nao roda para elas. */
+require('./codigo_serie')(app, db);
 app.use(express.static(path.join(__dirname, 'public'), { index:false }));
 
 /* O cadastro de SKU (GET, POST e DELETE /api/skus) mora no

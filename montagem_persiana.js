@@ -195,4 +195,26 @@ function doDia(db, quem){
   return db.prepare(`SELECT COUNT(*) n FROM persiana WHERE situacao<>'montando' AND montada_por_id IS ? AND date(fim)=date('now','localtime')`).get(p.id).n;
 }
 
-module.exports = { Recusa, garantirSchema, aberto, iniciar, bipar, cancelar, noCarrinho, emMontagem, porEtiqueta, cabe, doDia };
+/* A revisao (101) com a etiqueta em serie (§14.5). A persiana tem que estar
+   no carrinho (montada, ainda nao revisada). Devolve o SKU dela, ou a recusa. */
+function paraRevisar(db, codigo){
+  const r = porEtiqueta(db, codigo);
+  if(!r) return null;
+  const rot = ETQ.rotulo(r.etiqueta);
+  if(r.etiqueta.situacao === 'cancelada') throw new Recusa(rot + ' foi cancelada.', 409);
+  if(!r.persiana) throw new Recusa(rot + ' ainda não passou pela montagem (107): monte a persiana antes de revisar.', 409);
+  if(r.persiana.situacao === 'montando') throw new Recusa(rot + ' ainda está sendo montada.', 409);
+  if(r.persiana.situacao !== 'montada') throw new Recusa(rot + ' já foi revisada.', 409);
+  return r;
+}
+function revisada(db, persiana_id, revisao_id){
+  db.prepare("UPDATE persiana SET situacao='revisada', revisao_id=?, revisada_em=datetime('now','localtime') WHERE id=? AND situacao='montada'").run(revisao_id, persiana_id);
+}
+/* A revisao apagada (o "Desfazer", a peca devolvida pela embalagem) devolve a
+   persiana ao carrinho da revisao. Sem a tabela (banco antigo, teste), nada. */
+function revisaoApagada(db, revisao_id){
+  try{ db.prepare("UPDATE persiana SET situacao='montada', revisao_id=NULL, revisada_em=NULL WHERE revisao_id=?").run(revisao_id); }
+  catch(e){ if(!/no such table/.test(e.message)) throw e; }
+}
+
+module.exports = { Recusa, garantirSchema, paraRevisar, revisada, revisaoApagada, aberto, iniciar, bipar, cancelar, noCarrinho, emMontagem, porEtiqueta, cabe, doDia };

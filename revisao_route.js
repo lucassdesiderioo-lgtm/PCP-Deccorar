@@ -137,6 +137,8 @@ const TEMPO = require('./tempo_operador');
 const DEFEITO = require('./defeito_dominio');
 const QUEM = require('./quem');
 const LISTA = require('./revisao_lista');
+const MONTP=require('./montagem_persiana');
+const ETQP=require('./etiqueta_producao');
 module.exports=function(app,db){
   /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
      registrada neste modulo passa pelo quem.js antes do handler — a de amanha
@@ -149,7 +151,14 @@ module.exports=function(app,db){
     const q=exigir(req,res); if(!q) return;
     const {codigo,segundos=0,inicio=null,fim=null}=req.body||{};
     if(!codigo) return res.status(400).json({erro:'codigo'});
-    const cod=String(codigo).trim().toUpperCase();
+    /* A ETIQUETA DE SKU EM SERIE (PRODUCAO-MAPA-E-MOTOR v7, §14.5): a peca
+       que veio da montagem (107) se revisa pela etiqueta dela, e a revisao
+       fica ligada a persiana. A peca antiga, pelo SKU, como sempre (§14.7). */
+    let pers=null, cod=String(codigo).trim().toUpperCase();
+    try{ pers=MONTP.paraRevisar(db,cod); }
+    catch(e){ if(e instanceof MONTP.Recusa) return res.status(e.status).json({erro:e.message,motivo:'persiana'}); throw e; }
+    if(pers) cod=pers.etiqueta.sku;
+    else if(ETQP.traduzir(db,cod)) return res.status(409).json({erro:'Esta etiqueta não é de persiana: bipe a etiqueta de SKU.',motivo:'persiana'});
     if(!db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(cod)) return res.status(404).json({erro:'SKU não cadastrado: '+cod});
     /* TELA ÚNICA (REVISAO-TELA-UNICA, 23/11/2026): quem decide para que a peça
        serve é o servidor, no bipe que fecha — 'hoje' se ela cobre uma venda
@@ -171,6 +180,7 @@ module.exports=function(app,db){
       const id=db.prepare('INSERT INTO revisao (codigo,inicio,fim,segundos,usuario_id,usuario_nome,modo) VALUES (?,?,?,?,?,?,?)')
         .run(cod,inicio,fim,seg,q.usuario_id,q.usuario_nome,modo).lastInsertRowid;
       db.prepare('INSERT INTO fila (codigo,modo,revisao_id) VALUES (?,?,?)').run(cod,modo,id);
+      if(pers) MONTP.revisada(db,pers.persiana.id,id);
       novo=id;
     })();
     const est=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(cod);
@@ -185,8 +195,9 @@ module.exports=function(app,db){
   app.post('/api/revisao/cancelar',(req,res)=>{
     const q=exigir(req,res); if(!q) return;
     const b=req.body||{};
-    const cod=String(b.codigo||'').trim().toUpperCase();
+    let cod=String(b.codigo||'').trim().toUpperCase();
     if(!cod) return res.status(400).json({erro:'codigo'});
+    { const t=ETQP.skuDoBipe(db,cod); if(t.etiqueta && t.sku) cod=t.sku; }
     evento(db,'cancelada',q,{codigo:cod,segundos:Math.round(+b.segundos||0),modo:LISTA.modoPara(db,cod),inicio:b.inicio,fim:b.fim});
     res.json({ok:true});
   });
@@ -238,6 +249,7 @@ module.exports=function(app,db){
         if(s.motivo){ motivo=s.motivo; throw new Error(s.motivo); }
         evento(db,'desfeita',q,{revisao_id:alvo.id,codigo:alvo.codigo,segundos:alvo.segundos,modo:alvo.modo,inicio:alvo.inicio,fim:alvo.fim});
         db.prepare('DELETE FROM revisao WHERE id=?').run(alvo.id);
+        MONTP.revisaoApagada(db,alvo.id);   // a persiana em serie volta ao carrinho (§14.5)
         const del=db.prepare("DELETE FROM fila WHERE id=? AND situacao='aguardando'").run(s.fila.id);
         if(del.changes!==1){ motivo='embalada'; throw new Error('embalada'); }
       })();
