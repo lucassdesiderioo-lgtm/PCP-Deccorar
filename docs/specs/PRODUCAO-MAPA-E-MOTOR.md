@@ -1,5 +1,5 @@
 > **STATUS · 12/11/2026 — APROVADA pelo dono (v6)** · **fase 1 construída, falta subir** (o roteiro na ficha: `etapas.js`, `ficha_formula.etapa`, a 404; `teste_roteiro.js`, 25; ③ REVISÃO: modelo sem ficha e sob medida ficam sem roteiro, decisão de construção; **REGRA do dono em 12/11/2026: toda linha da ficha tem etapa de preparo — sem "sai direto na embalagem" —, e o kit passa só por montagem e embalagem**, linha em `docs/DECISOES.md`) · próxima: fase 2
-> **v7 · 25/11/2026 — decisões do dono no protótipo, escritas no §14** (as três etiquetas, a aba "Etiquetas da produção" da 401, a 108 Corte de tecido, a 110 Serralheria e a 107 Montagem no formato da 101, a revisão e a embalagem pelo SKU em série, o rastreio na 904). **Falta o dono responder a H (§14.9)** e aprovar o texto. **Onde o §14 e o resto desta spec divergirem, vale o §14.**
+> **v7 · 25/11/2026 — decisões do dono no protótipo, escritas no §14** (as três etiquetas, a aba "Etiquetas da produção" da 401, a 108 Corte de tecido, a 110 Serralheria e a 107 Montagem no formato da 101, a revisão e a embalagem pelo SKU em série, o rastreio na 904). **Falta o dono aprovar o texto.** **Onde o §14 e o resto desta spec divergirem, vale o §14.**
 > Reescrita sobre o processo que o dono descreveu em 11/11/2026 e as respostas de
 > 12/11/2026 (§10). A versão de 17/08/2026 está em
 > `docs/arquivo/PRODUCAO-MAPA-E-MOTOR-v1.md` (histórico, não é regra). Absorve a
@@ -428,8 +428,22 @@ pronto na prateleira.
   a tela pergunta **quantos ficaram prontos** (já vem com o número do início; se
   algum se perdeu, corrige, e o que falta volta para a lista). O tempo por kit é o
   do lote ÷ os prontos.
-- ⚠️ **Isto muda o que a spec dizia dos kits** (a etiqueta sequencial KC e KI e a
-  embalagem bipando os dois, §4 e fase 4): pergunta H.
+- **A conta da lista** (o dono, 25/11/2026: *"se temos 100 no estoque e 90 para
+  embalar, sobram 10"*): toda persiana que ainda vai ser embalada pede um kit e um
+  comando da medida dela. A necessidade é a do planejamento — **Hoje**, depois os
+  **próximos dias**, depois o **alvo** —, e os **prontos na prateleira** abatem
+  primeiro o de hoje, depois os próximos dias, depois o alvo (a régua da 101). Com
+  100 kits prontos e 90 persianas de hoje, Hoje fica zerado e os 10 abatem os
+  próximos dias. O comando, igual, **por medida da corrente**. Nenhuma conta nova
+  (#12): a necessidade sai da mesma lista da 101 e da ficha.
+- **Os prontos na prateleira** = os montados na 111 menos os usados na embalagem
+  (cada persiana embalada usa um kit e um comando da sua medida). No dia em que a
+  111 entrar, a prateleira começa por uma **contagem** dos kits e comandos prontos.
+- **Os kits não levam etiqueta** (H, o dono, 25/11/2026): a embalagem continua
+  bipando o código fixo do kit, como hoje (R-EMB-01), e a etiqueta KC/KI e o bipe
+  dos dois kits na embalagem **saem da spec** (§4 e fase 4). O dono: *"se alguma
+  acabar se perdendo vamos ter que correr esse risco; depois vamos pensar em
+  controlar de outra forma"*.
 
 ### 14.5 A revisão (101) e a embalagem (102)
 
@@ -475,7 +489,7 @@ cliente. Numa devolução, bipa-se o saco e vê-se a história inteira daquela p
 | E | ✅ "Voltou para você" na tela de quem fez; conserta e bipa o SKU |
 | F | ✅ A regra do §14.3 "Quando abre cada parte" (o dono, 25/11/2026) |
 | G | ✅ A **111 Kits**, as duas coisas na mesma tela (§14.4) |
-| H | Os kits **ainda levam etiqueta sequencial** (KC/KI) e a embalagem os bipa (a fase 4, desligada), ou ficam **sem etiqueta**, e a embalagem continua bipando o código fixo do kit como hoje? |
+| H | ✅ Os kits **não levam etiqueta**; a embalagem bipa o código fixo do kit, como hoje. A lista abate os prontos na ordem hoje → próximos dias → alvo |
 
 ---
 
@@ -486,7 +500,7 @@ cliente. Numa devolução, bipa-se o saco e vê-se a história inteira daquela p
 | **1** | **O roteiro na ficha**: a etapa de cada linha da 404 e as etapas de cada modelo | 🟡 |
 | **2** | **A aba "Etiquetas da produção" da 401** (os maços TC e TB, as não usadas, o histórico) + **108 Corte de tecido** e **110 Serralheria** no formato da 101 (§14.4) + a pré-fabricação e o "já cortado" na 1101 e na 501 | 🔴 (schema, etiqueta) |
 | **3** | **A etiqueta da persiana em série** na aba da 401, com a dinâmica do dia e a bolinha do ☰ Menu (§14.2, §14.3) + **107 Montagem** (§14.4) + **a revisão pela etiqueta da persiana** (§14.5) | 🔴 |
-| **4** | **A embalagem bipa a etiqueta da persiana** (§14.5) + a **111 Kits** (§14.4; a etiqueta dos kits é a pergunta H) + a conferência da pré-fabricação (§6) | 🔴 (mexe no bipe da embalagem) |
+| **4** | **A embalagem bipa a etiqueta da persiana** (§14.5) + a **111 Kits** (§14.4, sem etiqueta; a prateleira começa por uma contagem) + a conferência da pré-fabricação (§6) | 🔴 (mexe no bipe da embalagem) |
 | **5** | **Rejeição com etapa e pessoa** (101, 104) | 🟡 |
 | **6** | **O cartão de ponto** (a pausa), os indicadores (tempo por unidade por etapa na 904 e na 905) e a **aba "Rastreio da produção" da 904** (§14.6) | 🟡 |
 | **7** | **A Etiqueta de Venda bipa a etiqueta da persiana** (§14.8): a peça ligada ao cliente, e a "parada no estoque" | 🔴 |
