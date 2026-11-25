@@ -388,7 +388,7 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 - **Regra:** o bipe da conferência grava em `lote.carrinho` o destino da caixa: um carrinho da coleta (A, B…) ou `AG`, o Carro da agência. Some "na área" e "no canto". A baixa continua no mesmo bipe, por peça, uma vez só (R-EST-03), e "quem imprimiu não confere" continua (R-SEG-01). Quem decide o destino é o `carrinho_dominio.js`, dono único.
 - **Por quê:** decisão do dono (24/11/2026): a conferência é feita de uma vez, quando o processo termina ou o caminhão chega, no lugar dos carrinhos; o motorista leva o carrinho inteiro.
 - **Exceções:** a página antiga em cache não manda o carrinho: a caixa é conferida e fica **sem carrinho**, e entra num pelo próximo bipe (R-CRR-05).
-- **Teste que trava:** `teste_carrinhos.js` (43) · `teste_conferencia_tela.js`.
+- **Teste que trava:** `teste_carrinhos.js` (44) · `teste_conferencia_tela.js`.
 - **Status:** construído em 25/11/2026, falta subir.
 
 ### R-CRR-02 · O bipe não tem modo

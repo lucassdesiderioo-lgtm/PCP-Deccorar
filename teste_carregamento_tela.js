@@ -172,6 +172,18 @@ caso('REDE CAIDA no meio da caixa de varias: o aviso manda recomecar a caixa (o 
   tem(tela.$('banner').innerHTML,/Recome[cç]ar esta caixa/,'caminho para recomecar');
 });
 
+secao('\n── a caixa de varias durante a entrega ───────────────────────────────\n');
+caso('com a entrega do A aberta e nenhum carrinho ativo, as pecas da caixa de varias vao para o A', async()=>{
+  const corpos=[];
+  const tela=abrir(rotas({
+    '/api/carregar':c=>{ corpos.push(c); return {ok:false,motivo:'conferir_pecas',pedido:{id:9,buyer:'Ana',nf:'1'},pecas_total:2,bipadas:0,pecas:[]}; },
+    '/api/carregar/peca':c=>{ corpos.push(c); return {ok:true,bipadas:1,pecas_total:2,pecas:[],pedido:{id:9}}; },
+    '/api/entrega/previa?destinos=A':()=>({ok:true,sistema:1,caixas:[],faltam_bipar:[]})}));
+  await tela.ate(); tela.t().estado='entrega'; tela.t().ENT=divergente(); tela.t().desenhar();
+  await tela.bipar('ETIQ-VENDA'); await tela.bipar('SKU-A');
+  igual(corpos.map(c=>c.carrinho),['A','A'],'carrinho mandado na caixa e na peca');
+});
+
 secao('\n── o volume bloqueado ────────────────────────────────────────────────\n');
 
 caso('BLOQUEADO diz que esta bloqueado, com o motivo do servidor, e nao "etiqueta nao reconhecida"', async()=>{

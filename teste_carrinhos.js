@@ -193,6 +193,10 @@ const vol = (buyer, mod, extra, sku) => {
   require('./fim_dia').registrar(db, [c2], ANA);
   db.prepare("UPDATE fim_dia SET dia=date('now','localtime','-1 day')").run();
   r = await chamar('GET /api/conferencia/dia', {}, ANA);
+  require('./fim_dia').registrar(db, [c3], ANA);
+  db.prepare("UPDATE fim_dia SET dia=date('now','localtime','-1 day')").run();
+  { const d2 = await chamar('GET /api/conferencia/dia', {}, ANA);
+    ok('...e também em "nos carrinhos"', d2.nos[0] && d2.nos[0].id === c3 && !!d2.nos[0].ficou_de, JSON.stringify(d2.nos.map(x=>[x.id,x.ficou_de]))); }
   ok('a caixa que ficou do "a coleta não passou" vem EM CIMA, com o dia (R-FIM-01)',
      r.faltam[0] && r.faltam[0].id === c2 && !!r.faltam[0].ficou_de, JSON.stringify(r.faltam.map(x=>[x.id,x.ficou_de])));
   // §17: as colunas novas no CREATE do dono da tabela
