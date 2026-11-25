@@ -116,14 +116,50 @@ module.exports=function(app,db){
     if(!code) return res.status(400).json({erro:'sem codigo'});
     /* A busca do volume pelo codigo mora no carga.js (acharVolumes): a saida
        do caminhao (fase 3) bipa as sobras pela MESMA regua. */
+    /* O CARRINHO (spec CONFERENCIA-CARRINHOS, 25/11/2026). A tela nova manda o
+       carrinho ativo em `carrinho` (vazio quando nenhum foi escolhido); a
+       pagina antiga em cache nao manda a chave, e continua conferindo como
+       antes — a caixa fica sem carrinho e entra num pelo proximo bipe. */
+    const CAR=require('./carrinho_dominio');
+    const comCarrinho=Object.prototype.hasOwnProperty.call(req.body||{},'carrinho');
+    const pedidoCarrinho=comCarrinho?req.body.carrinho:null;
+    /* A etiqueta colada no carrinho nao e caixa: diz a tela qual e o ativo. */
+    const cBip=CAR.carrinhoDoBipe(code);
+    if(cBip){
+      if(!CAR.existe(db,cBip)) return res.json({ok:false,motivo:'carrinho_invalido',lido:code,
+        aviso:'O carrinho "'+cBip+'" não está no cadastro "Carrinhos da expedição".'});
+      return res.json({ok:true,trocar_carrinho:cBip,nome:CAR.nomeDe(cBip)});
+    }
     const batem=acharVolumes(db,code);
     /* Duplicata do mesmo codigo existe (§5, os fantasmas). Entre irmaos, o que
        esta pra carregar manda: bipar a caixa certa nao pode dar "ja carregado"
        so porque um irmao fantasma andou antes. */
-    const alvo = batem.find(r=>r.estagio==='embalado') || batem[0] || null;
+    const alvo = batem.find(r=>r.estagio==='embalado'&&!r.conferido_em) || batem.find(r=>r.estagio==='embalado') || batem[0] || null;
     if(!alvo) return res.json({ok:false,motivo:'nao_encontrado',lido:code});
+    /* A CAIXA JA CONFERIDA E AINDA NA FABRICA. Num carrinho: o bipe diz onde
+       ela esta, e nao troca (trocar e o "passar" da recontagem). Sem carrinho
+       (a de antes do deploy, ou a nao achada na recontagem): o bipe a poe no
+       carrinho, SEM baixar de novo — ela ja baixou quando foi conferida. */
+    if(comCarrinho && CAR.estaNaFabrica(db,alvo.id)){
+      const ped={id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city};
+      if(alvo.carrinho) return res.json({ok:false,motivo:'ja_no_carrinho',carrinho:alvo.carrinho,pedido:ped,
+        aviso:'Esta caixa já está no '+CAR.nomeDe(alvo.carrinho)+'.'});
+      const d=CAR.destinoPara(db,alvo,pedidoCarrinho);
+      if(d.motivo) return res.json(Object.assign({ok:false,pedido:ped},d));
+      db.transaction(()=>CAR.colocar(db,alvo.id,d.destino))();
+      try{ const ac=app.locals.acesso;
+           if(ac&&ac.auditar) ac.auditar(req,'expedicao','carrinho_recolocada','NF '+(alvo.nf||alvo.id),
+             'conferida sem carrinho, posta no '+CAR.nomeDe(d.destino)+' — sem baixar de novo'); }catch(e){}
+      return res.json({ok:true,recolocada:true,carrinho:d.destino,pedido:alvo,itens:pecasDaCaixa(alvo.id),coleta:ehColeta(alvo)});
+    }
     const barra=barrar(req,alvo);
     if(barra) return res.json(barra);
+    let destino;
+    if(comCarrinho){
+      const d=CAR.destinoPara(db,alvo,pedidoCarrinho);
+      if(d.motivo) return res.json(Object.assign({ok:false,pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}},d));
+      destino=d.destino;
+    }
     /* A CAIXA DE VARIAS PERSIANAS E CONFERIDA PECA A PECA, AS CEGAS (spec
        CARREGAMENTO-SEGUNDA-PESSOA, fase 2, 02/10/2026). A bancada imprime e
        nao repara que a venda leva mais de uma persiana; aqui, com outra pessoa
@@ -135,7 +171,7 @@ module.exports=function(app,db){
     const pc=pecasCarga(alvo.id);
     if(pc.total>1){
       if(pc.bipadas<pc.total) return res.json(pedirPecas(alvo,pc));
-      return res.json(db.transaction(()=>concluir(req,alvo))());
+      return res.json(db.transaction(()=>concluir(req,alvo,destino))());
     }
     if(conferenciaLigada()){
       const esperado=soCodigo(alvo.codigo);
@@ -154,7 +190,7 @@ module.exports=function(app,db){
           pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}});
       }
     }
-    res.json(db.transaction(()=>concluir(req,alvo))());
+    res.json(db.transaction(()=>concluir(req,alvo,destino))());
   });
 
   /* As barreiras do bipe, na ordem de sempre — e as MESMAS no bipe de peca:
@@ -242,8 +278,12 @@ module.exports=function(app,db){
 
   /* O fim do bipe: a caixa conferida (agencia, fica na area) ou levada pro
      canto (coleta). Devolve a resposta. */
-  function concluir(req,alvo){
+  function concluir(req,alvo,destino){
     const quemBipou=QUEM.nomeDe(req)||null;
+    /* O destino (carrinho ou Carro da agencia) entra na MESMA transacao da
+       baixa e da marca de conferida. */
+    if(destino) require('./carrinho_dominio').colocar(db,alvo.id,destino);
+    const comDestino=o=>(destino?Object.assign(o,{carrinho:destino}):o);
     const quemId=QUEM.idDe(req);
     /* ⚠️ A BAIXA E AQUI (spec CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026): a
        etiqueta so reservou a peca, e ela sai do estoque quando a conferencia
@@ -261,7 +301,7 @@ module.exports=function(app,db){
         .run(quemBipou, quemId, alvo.id);
       const p2=progresso();
       const hoje2=db.prepare("SELECT date('now','localtime') d").get().d;
-      return ({ok:true,conferida:true,pedido:alvo,itens:pecasDaCaixa(alvo.id),carregados:p2.carregados,total:p2.total,
+      return comDestino({ok:true,conferida:true,pedido:alvo,itens:pecasDaCaixa(alvo.id),carregados:p2.carregados,total:p2.total,
         prontas:p2.carro.prontas,coleta:false,adiantado:futuro(alvo,hoje2),impresso_por:nomeLimpo(alvo.impresso_por)});
     }
     db.prepare(`UPDATE lote SET estagio='carregado', carregado_em=datetime('now','localtime'),
@@ -280,7 +320,7 @@ module.exports=function(app,db){
        caixa ainda vai pro canto; a conta do adiantado so anda quando o
        caminhao leva (carga.js), mas o aviso vale desde ja. */
     const hojeD=db.prepare("SELECT date('now','localtime') d").get().d;
-    return ({ok:true,pedido:alvo,itens:pecasDaCaixa(alvo.id),carregados:p.carregados,total:p.total,
+    return comDestino({ok:true,pedido:alvo,itens:pecasDaCaixa(alvo.id),carregados:p.carregados,total:p.total,
               coleta:ehColeta(alvo), coleta_aguardando:p.coleta.aguardando.length,
               adiantado:futuro(alvo,hojeD), impresso_por:nomeLimpo(alvo.impresso_por)});
   }
@@ -326,6 +366,14 @@ module.exports=function(app,db){
     if(!alvo) return res.json({ok:false,motivo:'nao_encontrado'});
     const barra=barrar(req,alvo);
     if(barra) return res.json(barra);
+    /* O carrinho da caixa de varias (CONFERENCIA-CARRINHOS): o mesmo do bipe
+       da caixa. Sem a chave (pagina antiga), a caixa fica sem carrinho. */
+    let destino;
+    if(Object.prototype.hasOwnProperty.call(req.body||{},'carrinho')){
+      const d=require('./carrinho_dominio').destinoPara(db,alvo,req.body.carrinho);
+      if(d.motivo) return res.json(Object.assign({ok:false,pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}},d));
+      destino=d.destino;
+    }
     const pc=pecasCarga(alvo.id);
     if(pc.total<=1) return res.json({ok:false,motivo:'nao_varias',
       aviso:'Esta caixa leva uma persiana só: bipe a etiqueta de venda dela.'});
@@ -357,7 +405,7 @@ module.exports=function(app,db){
         return {ok:true,bipadas:agora.bipadas,pecas_total:agora.total,coleta:ehColeta(alvo),
           pecas:pecasVistas(alvo,agora),
           pedido:{id:alvo.id,buyer:alvo.buyer,nf:alvo.nf,city:alvo.city}};
-      return Object.assign(concluir(req,alvo),{bipadas:agora.bipadas,pecas_total:agora.total});
+      return Object.assign(concluir(req,alvo,destino),{bipadas:agora.bipadas,pecas_total:agora.total});
     })();
     res.json(r);
   });

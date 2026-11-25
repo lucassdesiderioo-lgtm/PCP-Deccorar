@@ -139,6 +139,13 @@ const LINHAS = [
       return { n:l.length, desde:maisAntiga(l.map(x => x.cancelada_em)),
                canceladas:l.filter(x => x.de === 'cancelada').map(x => x.id) };
     } },
+  /* CONFERENCIA-CARRINHOS (25/11/2026): a caixa conferida que a recontagem não
+     achou no carrinho. O estoque não mexeu (ela foi bipada); resolve-se
+     achando a caixa e bipando-a num carrinho na 202. */
+  { chave:'carrinho_nao_achada', tela:202, frase:['caixa conferida não foi achada no carrinho','caixas conferidas não foram achadas no carrinho'],
+    nome:'Conferência — caixa não achada no carrinho', perm:['carregamento.executar'], onde:{ url:'/carregamento' },
+    ajuda:'caixas conferidas que a recontagem do carrinho não achou: procurar e bipar num carrinho',
+    contar(db){ const r = require('./carrinho_dominio').naoAchadas(db); return { n:r.n, desde:r.desde }; } },
   /* COMPRAS-E-RECEBIMENTO fase 1 (R-CMP-05): material sem almoxarifado padrão
      não sabe para onde vai no Recebimento nem em que contagem entra. */
   { chave:'material_sem_almox', tela:1101, frase:['material ficou sem almoxarifado','materiais ficaram sem almoxarifado'], nome:'Material sem almoxarifado', perm:['componente.cadastrar'], onde:{ url:'/admin/materiais' },

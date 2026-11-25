@@ -283,16 +283,11 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **História:** armadilha #27.
 
 ### R-CAR-03 · O segundo bipe do carregamento, quando ligado, é cego
-- **Regra:** com `config.conf_carregamento='1'`, carregar pede a etiqueta de venda e o SKU da mesma caixa; o SKU esperado não aparece antes. Nasce desligada.
-- **Por quê:** quem sabe a resposta bipa o que for para fechar a linha.
+- **Regra:** com `config.conf_carregamento='1'`, carregar pede a etiqueta de venda e o SKU da mesma caixa; o SKU esperado não aparece antes. Liga e desliga na **906 Parâmetros** (nunca na 202, que só mostra se está ligado). Nasceu desligada; ⚠️ **o dono decidiu ligá-la em 24/11/2026** (DECISOES): o passo é ligar na 906 depois do deploy da CONFERENCIA-CARRINHOS, e ainda não foi feito.
+- **Por quê:** quem sabe a resposta bipa o que for para fechar a linha. O ganho é pegar a etiqueta colada na caixa errada.
 - **Exceções:** a caixa de várias substitui este bipe pelo bipe de cada peça (§8-B).
-- **Teste que trava:** ⚠ **sem teste**.
-- **Status:** no ar, desligada.
-
----
-
-## A Mesa de correções e o passivo
-
+- **Teste que trava:** `teste_carrinhos.js` (pede o SKU sem dizer qual, recusa o errado, aceita o certo).
+- **Status:** no ar, desligada até o dono ligar na 906.
 ### R-COR-01 · A Mesa corrige pela ação, nunca pela linha
 - **Regra:** cada objeto mostra só as ações que valem para ele; a que não vale aparece desabilitada com o motivo. A prévia não grava. Executar exige motivo e grava em `correcao`. Desfazer compara os sete campos de "andou" e recusa nomeando o campo; bloco é tudo ou nada.
 - **Por quê:** apagar linha à mão quebra saldo e fila em silêncio.

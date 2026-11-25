@@ -37,7 +37,8 @@ function garantirSaida(db){
     quem_levou TEXT,
     aberta_por_id INTEGER,
     fechado_por_id INTEGER,
-    liberado_por_id INTEGER);`);
+    liberado_por_id INTEGER,
+    carrinhos TEXT);`);
   /* Fase 3 (26/09/2026): quem abriu, as caixas de fora que "foram no
      caminhao" (troca de porta) e o "nao ficou nada" — o passo das sobras
      precisa ser DECLARADO, senao pular o bipe das sobras passaria calado.
@@ -49,7 +50,9 @@ function garantirSaida(db){
                   "quem_levou_id INTEGER", "quem_levou TEXT",
                   /* QUEM-FEZ-E-REVISAO fase 4 (05/11/2026): o id de quem abriu,
                      fechou e liberou, ao lado dos nomes. */
-                  "aberta_por_id INTEGER", "fechado_por_id INTEGER", "liberado_por_id INTEGER"]){
+                  "aberta_por_id INTEGER", "fechado_por_id INTEGER", "liberado_por_id INTEGER",
+                  /* CONFERENCIA-CARRINHOS (25/11/2026): os carrinhos que a entrega levou. */
+                  "carrinhos TEXT"]){
     try{ db.exec('ALTER TABLE saida ADD COLUMN ' + c); }catch(e){}
   }
 }

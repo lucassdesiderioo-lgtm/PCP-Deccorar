@@ -24,7 +24,7 @@ module.exports=function(app,db){
      tambem. */
   app = QUEM.portao(app);
 
-  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, cancelada_em TEXT, cancelada_origem TEXT, cancelada_estagio TEXT, cancelada_motivo TEXT, cancelada_varias INTEGER DEFAULT 0, cancelada_aviso_em TEXT, cancelada_resolvida_em TEXT, cancelada_resolvida_por TEXT, cancelada_voltou INTEGER, cancelada_por TEXT, baixado_em TEXT, impresso_por_id INTEGER, conferido_por_id INTEGER, no_carro_por_id INTEGER, resolvido_por_id INTEGER, horario_id INTEGER, envio TEXT);");
+  db.exec("CREATE TABLE IF NOT EXISTS lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, cor TEXT DEFAULT '', buyer TEXT DEFAULT '', city TEXT DEFAULT '', nf TEXT, packId TEXT, venda TEXT, codes TEXT DEFAULT '[]', srcfile TEXT, labelPage INTEGER, danfePage INTEGER, estagio TEXT DEFAULT 'pendente', embalado_em TEXT, carregado_em TEXT, data TEXT DEFAULT (date('now','localtime')), criado_em TEXT DEFAULT (datetime('now','localtime')), teste INTEGER DEFAULT 0, reimpressoes INTEGER DEFAULT 0, reimpresso_em TEXT, bloqueio TEXT, descricao TEXT, despachar_em TEXT, bloqueio_resolvido TEXT, resolvido_por TEXT, resolvido_em TEXT, modalidade TEXT, retirado_em TEXT, impresso_por TEXT, conferido_por TEXT, conferido_em TEXT, no_carro_em TEXT, no_carro_por TEXT, saida_id INTEGER, saiu_em TEXT, saiu_por TEXT, cancelada_em TEXT, cancelada_origem TEXT, cancelada_estagio TEXT, cancelada_motivo TEXT, cancelada_varias INTEGER DEFAULT 0, cancelada_aviso_em TEXT, cancelada_resolvida_em TEXT, cancelada_resolvida_por TEXT, cancelada_voltou INTEGER, cancelada_por TEXT, baixado_em TEXT, impresso_por_id INTEGER, conferido_por_id INTEGER, no_carro_por_id INTEGER, resolvido_por_id INTEGER, horario_id INTEGER, envio TEXT, carrinho TEXT, carrinho_em TEXT, nao_achada_em TEXT, nao_achada_por TEXT, nao_achada_por_id INTEGER);");
   // Reimpressao (impressora enroscou, etiqueta saiu borrada). As duas colunas
   // sao so historia: quantas vezes o volume voltou pra impressora e quando foi a
   // ultima. O ALTER mora aqui, no dono da tabela (§17 do CLAUDE.md), com a
@@ -129,6 +129,12 @@ module.exports=function(app,db){
      unica chave dela, e e por ele que o upload sabe que a venda ja entrou.
      Gravado em toda caixa nova que o tiver. No CREATE e aqui, no fim (§17). */
   try{ db.exec("ALTER TABLE lote ADD COLUMN envio TEXT"); }catch(e){}
+  /* O carrinho da 202 (spec CONFERENCIA-CARRINHOS, 25/11/2026): o destino da
+     caixa conferida e a marca da recontagem. No CREATE e no ALTER (§17), DEPOIS do
+     envio, que e a ordem do CREATE (o teste_quem confere a ordem); o carrinho_dominio repete o ALTER para subir sozinho. */
+  for(const c of ['carrinho TEXT','carrinho_em TEXT','nao_achada_em TEXT','nao_achada_por TEXT','nao_achada_por_id INTEGER'])
+    try{ db.exec('ALTER TABLE lote ADD COLUMN '+c); }catch(e){}
+  try{ db.exec('CREATE INDEX IF NOT EXISTS lote_carrinho ON lote(carrinho)'); }catch(e){}
   try{ db.exec("CREATE INDEX IF NOT EXISTS ix_lote_envio ON lote(envio)"); }catch(e){}
   const SAIDAS=require('./coleta_horario'); SAIDAS.garantirSchema(db);
   /* A BAIXA NA CONFERENCIA (spec CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026):
