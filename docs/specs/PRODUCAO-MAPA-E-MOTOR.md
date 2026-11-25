@@ -1,5 +1,5 @@
 > **STATUS · 12/11/2026 — APROVADA pelo dono (v6)** · **fase 1 construída, falta subir** (o roteiro na ficha: `etapas.js`, `ficha_formula.etapa`, a 404; `teste_roteiro.js`, 25; ③ REVISÃO: modelo sem ficha e sob medida ficam sem roteiro, decisão de construção; **REGRA do dono em 12/11/2026: toda linha da ficha tem etapa de preparo — sem "sai direto na embalagem" —, e o kit passa só por montagem e embalagem**, linha em `docs/DECISOES.md`) · próxima: fase 2
-> **v7 · 25/11/2026 — decisões do dono no protótipo, escritas no §14** (as três etiquetas, a aba "Etiquetas da produção" da 401, a 108 Corte de tecido, a 110 Serralheria e a 107 Montagem no formato da 101, a revisão e a embalagem pelo SKU em série, o rastreio na 904). **Falta o dono aprovar o texto.** **Onde o §14 e o resto desta spec divergirem, vale o §14.**
+> **v7 APROVADA pelo dono em 25/11/2026** (*"aprovado. Pode aprovar o projeto completo e a spec completa"*), desenhada no protótipo clicável e escrita no §14. **Onde o §14 e o resto desta spec divergirem, vale o §14.** Próxima: o PLANO das fases 2 e 3 (entram juntas, §14.10).
 > Reescrita sobre o processo que o dono descreveu em 11/11/2026 e as respostas de
 > 12/11/2026 (§10). A versão de 17/08/2026 está em
 > `docs/arquivo/PRODUCAO-MAPA-E-MOTOR-v1.md` (histórico, não é regra). Absorve a
@@ -474,6 +474,43 @@ A peça sem etiqueta em série (o estoque de hoje, a devolução, o saco com a e
 comum) **continua revisada e embalada pelo SKU, como hoje**, até acabar. **A peça
 devolvida que volta à embalagem segue como peça antiga** até a fase 7.
 
+### 14.10 A virada — como entra o que já está em andamento (proposta de 25/11/2026)
+
+**As fases 2 e 3 entram no ar JUNTAS, num dia só.** A lista do corte desconta o que está
+cortado na prateleira, e quem tira da prateleira é o bipe da montagem (107). Com o corte
+no sistema e a montagem fora, a prateleira só cresceria e o corte pararia de pedir peça.
+E a primeira persiana com etiqueta em série chega à revisão, à embalagem, à Etiqueta de
+Venda e à Conferência no mesmo dia: **o tradutor (§14.2) entra em todas as telas que hoje
+leem o SKU nesse mesmo deploy**, aceitando o código em série e a etiqueta comum.
+
+**Antes da virada (a semana anterior):**
+
+1. **A ficha técnica de todo SKU produzido**, na 404: a etapa de cada linha e a medida de
+   corte do tecido, do tubo e da corrente. SKU sem ficha não aparece em lista nenhuma.
+2. **As chaves** na tela de Acessos: quem corta tecido, quem corta tubo, quem monta kit,
+   quem monta persiana, e o Supervisor que imprime.
+3. **O treino** com o protótipo, por bancada.
+
+**O dia da virada** (sábado, ou segunda antes de a bancada começar — fora do horário de
+expedição, §0):
+
+1. Deploy, com backup antes (§13).
+2. O Supervisor imprime na 401 os **maços de tecido e de tubo** e as **etiquetas de SKU
+   em série do dia**.
+3. **Entrada inicial — o que já está cortado na prateleira:** na 108 e na 110, a mesma
+   tela, com o botão "Entrada inicial" (só na virada, para quem tem `producao.corrigir`):
+   escolhe o cartão, digita quantas há na prateleira e **cola e bipa uma etiqueta em
+   cada peça**. Não conta tempo nem produtividade. A partir daí a prateleira bate.
+4. **Entrada inicial — kits e comandos prontos:** na 111, a contagem por número (kit de
+   instalação e cada medida de corrente), sem etiqueta.
+5. **A montagem que estava aberta termina do jeito de antes**, antes de a 107 começar.
+6. **O que já está montado, revisado, embalado ou no estoque não se lança**: é peça
+   antiga (§14.7) e segue pelo SKU até acabar.
+
+**Depois da virada:** a primeira semana com o Supervisor olhando a lista do corte e a
+prateleira contra o que está na mesa; a primeira divergência vira caso, e não ajuste
+calado.
+
 ### 14.8 Para depois — fase 7 (o dono: "essa é a ideia")
 
 A **Etiqueta de Venda bipa a etiqueta da persiana**: o sistema liga a peça ao
@@ -498,7 +535,7 @@ cliente. Numa devolução, bipa-se o saco e vê-se a história inteira daquela p
 | Fase | O quê | Risco |
 |---|---|---|
 | **1** | **O roteiro na ficha**: a etapa de cada linha da 404 e as etapas de cada modelo | 🟡 |
-| **2** | **A aba "Etiquetas da produção" da 401** (os maços TC e TB, as não usadas, o histórico) + **108 Corte de tecido** e **110 Serralheria** no formato da 101 (§14.4) + a pré-fabricação e o "já cortado" na 1101 e na 501 | 🔴 (schema, etiqueta) |
+| **2 + 3** | **Entram juntas (§14.10).** Fase 2: **a aba "Etiquetas da produção" da 401** (os maços TC e TB, as não usadas, o histórico) + **108 Corte de tecido** e **110 Serralheria** no formato da 101 (§14.4) + a pré-fabricação e o "já cortado" na 1101 e na 501 | 🔴 (schema, etiqueta) |
 | **3** | **A etiqueta da persiana em série** na aba da 401, com a dinâmica do dia e a bolinha do ☰ Menu (§14.2, §14.3) + **107 Montagem** (§14.4) + **a revisão pela etiqueta da persiana** (§14.5) | 🔴 |
 | **4** | **A embalagem bipa a etiqueta da persiana** (§14.5) + a **111 Kits** (§14.4, sem etiqueta; a prateleira começa por uma contagem) + a conferência da pré-fabricação (§6) | 🔴 (mexe no bipe da embalagem) |
 | **5** | **Rejeição com etapa e pessoa** (101, 104) | 🟡 |
