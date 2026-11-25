@@ -167,7 +167,10 @@ const todas=()=>db.prepare("SELECT COUNT(*) n FROM pdf_conta_aberta").get().n;
   const cor=idx.slice(idx.indexOf('<div id="v-cor"'), idx.indexOf('<div id="v-tst"'));
   ok('a Mesa (o passivo) é desenhada na aba Pendências', blq.indexOf('id="corPassivo"')>=0 && cor.indexOf('id="corPassivo"')<0);
   ok('a decisão continua na tela da Mesa', cor.indexOf('id="corObjeto"')>=0 && blq.indexOf('id="corObjeto"')<0);
-  ok('o link da Mesa leva para onde se decide', /corIrMesa\(\);corAbrir/.test(idx) && /corIrMesa\(\);corVencidos/.test(idx) && /corIrMesa\(\);corConferencias/.test(idx));
+  /* desde 25/11/2026 o pedido vai no endereço (#abrir=...), porque ir à 205
+     troca de página; quem confere o clique de verdade é o teste_mesa_ir_tela.js */
+  ok('o link da Mesa leva para onde se decide', /corIr\(\\'vencidos\\'\)/.test(idx) && /corIr\(\\'conferencias\\'\)/.test(idx)
+    && /onclick="corIr\(\\''\+\(b\.tipo\|\|'lote'\)\+'-'\+x\.id/.test(idx) && /corPedidoDoEndereco/.test(idx));
   const marc=idx.replace(/<script[\s\S]*?<\/script>/g,'');
   const ids={}; (marc.match(/\bid="[^"]+"/g)||[]).forEach(x=>{ ids[x]=(ids[x]||0)+1; });
   const rep=Object.keys(ids).filter(k=>ids[k]>1);

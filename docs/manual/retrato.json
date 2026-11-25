@@ -527,7 +527,8 @@
    ],
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
-    "21/11/2026 — ficha criada em rascunho"
+    "21/11/2026 — ficha criada em rascunho",
+    "25/11/2026 — Os botões \"Fechar vencidos em bloco…\" e \"Fechar conferências antigas em bloco…\" e o clique num volume da lista voltaram a abrir o quadro (ou o volume) já na tela de Correções. Desde a separação do Admin em telas, a tela de Correções abria vazia."
    ],
    "situacao": "rascunho"
   },
@@ -538,7 +539,8 @@
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
     "21/11/2026 — ficha criada em rascunho",
-    "19/11/2026 — O fechamento das caixas que saíram sem conferência passa a baixar o estoque da caixa que nunca baixou; a data de corte é no máximo ontem; a venda cancelada e a caixa de várias persianas com item cancelado ficam de fora."
+    "19/11/2026 — O fechamento das caixas que saíram sem conferência passa a baixar o estoque da caixa que nunca baixou; a data de corte é no máximo ontem; a venda cancelada e a caixa de várias persianas com item cancelado ficam de fora.",
+    "25/11/2026 — Os botões \"Fechar vencidos em bloco…\" e \"Fechar conferências antigas em bloco…\" e o clique num volume da lista voltaram a abrir o quadro (ou o volume) já na tela de Correções. Desde a separação do Admin em telas, a tela de Correções abria vazia."
    ],
    "situacao": "rascunho"
   },
