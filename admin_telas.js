@@ -111,5 +111,9 @@ module.exports = function(app, db){
       modulos: MO.MODULOS.map(m => ({ chave:m.chave, nome:m.nome })), blocos: MO.BLOCOS });
   });
 
+  /* Onde cada ajuste da 906 vale (AJUSTE de 24/11/2026): número, nome e
+     endereço da tela, pelo `parametros_onde.js`. Só leitura, sem dado de pessoa. */
+  app.get('/api/parametros/onde', (req, res) => res.json(require('./parametros_onde').mapa()));
+
   app.locals.telasDe = telasDe;
 };

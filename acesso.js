@@ -915,6 +915,8 @@ module.exports = function(app, db){
     if(eq('/devolucoes')) return ['devolucao.registrar','devolucao.acompanhar','devolucao.lancar','devolucao.dinheiro','devolucao.baixar'];
     // As telas que a pessoa abre (fase 5): cada um ve as proprias, so nome e endereco.
     if(eq('/api/telas/minhas')) return '@logado';
+    /* Onde cada ajuste da 906 vale: de quem abre a 906 (AJUSTE de 24/11/2026). */
+    if(eq('/api/parametros/onde')) return ['sobmedida.parametro.ler', 'sobmedida.parametro.editar', 'producao.corrigir', '@admin'];   // + a etiqueta parada (PRODUCAO-MAPA-E-MOTOR v7)
     /* O MANUAL (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026): seis leituras. "Ver
        todas as telas" é chave própria (D8); o resto é de quem lê o manual. A tela
        /manual sai do mapa, como as outras. ANTES do pre('/api/manual'): a linha
@@ -942,6 +944,17 @@ module.exports = function(app, db){
     if(eq('/api/revisao/cancelar') || eq('/api/revisao/desfazer') || eq('/api/revisao/ultima')) return 'revisao.executar';
     if(M !== 'GET' && eq('/api/rejeicao')) return 'revisao.rejeitar';
     if(pre('/api/material-extra')) return 'material.extra';   // a 106 (FICHAS-NO-CADASTRO-UNICO)
+    /* A PRODUCAO DA MEDIDA PADRAO (PRODUCAO-MAPA-E-MOTOR v7, §14): a aba de
+       etiquetas da 401 e do Supervisor; cancelar etiqueta e corrigir. A bolinha
+       do ☰ Menu pergunta so o numero. As bancadas, cada uma a sua chave. O
+       tradutor e quem fez a persiana sao leitura de quem bipa. */
+    if(eq('/api/producao/etiquetas/cancelar')) return 'producao.corrigir';
+    if(pre('/api/producao/etiquetas')) return 'producao.etiqueta';
+    if(pre('/api/producao/corte/tecido')) return 'producao.cortar_tecido';
+    if(pre('/api/producao/corte/tubo')) return 'producao.cortar_tubo';
+    if(pre('/api/producao/montagem')) return 'producao.montar';
+    if(pre('/api/producao/traduzir')) return '@logado';
+    if(pre('/api/producao/persiana')) return ['revisao.executar','producao.montar','embalagem.executar','relatorios.ver','@admin'];
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';
     /* Cancelar a embalagem em andamento (21/11/2026): a mesma bancada. */
     if(eq('/api/montagem/cancelar')) return 'embalagem.executar';
@@ -1262,6 +1275,13 @@ module.exports = function(app, db){
     // Ligar/desligar a conferencia dupla muda o que a expedicao e obrigada a
     // fazer — e decisao de quem responde pela operacao, nao de quem carrega.
     if(M !== 'GET' && eq('/api/config/conferencia')) return '@admin';
+    /* Os dois tempos minimos da bancada (906, AJUSTE de 24/11/2026): ler e
+       mudar sao do nivel Admin, como o segundo bipe. */
+    if(eq('/api/config/tempos-minimos')) return '@admin';
+    /* Os dias da etiqueta de producao parada (PRODUCAO-MAPA-E-MOTOR v7,
+       §14.3): le quem imprime ou corrige; muda quem corrige, na 906. */
+    if(M !== 'GET' && eq('/api/config/etiqueta-parada')) return 'producao.corrigir';
+    if(eq('/api/config/etiqueta-parada')) return ['producao.etiqueta','producao.corrigir','@admin'];
     /* ⚠️ ANTES do `pre('/api/kit')`, senao a impressao cai em `kit.editar` e a
        chave nova nao manda em nada — a ponta que some em silencio (§5,
        armadilha #23). Imprimir e tirar copia do que ja foi decidido; editar e
@@ -1399,6 +1419,11 @@ module.exports = function(app, db){
     ['devolucao.acompanhar','devolucao_casos'], ['devolucao.lancar','devolucao_casos'], ['devolucao.dinheiro','devolucao_casos'],
     ['painel.ver','painel'], ['relatorios.ver','relatorios'], ['necessidade.ver','necessidade'],
     ['pedido.receber','recebimento'],
+    /* A producao da medida padrao (PRODUCAO-MAPA-E-MOTOR v7, ③ REVISAO): sem a
+       area, quem so tem a chave da bancada voltava ao login depois do PIN. A
+       etiqueta da 401 leva a area da 401 (necessidade). */
+    ['producao.montar','montagem_persiana'], ['producao.cortar_tecido','corte_tecido'], ['producao.cortar_tubo','serralheria'],
+    ['producao.etiqueta','necessidade'],
     // A 503 (revisão do PR #305): sem a área, quem só tem esta chave voltava ao login.
     ['volume.movimentar','almoxarifado'],
     /* A tela de conferencia (fase 2 da ESTOQUE-LIVRO-E-CONFERENCIA). A area

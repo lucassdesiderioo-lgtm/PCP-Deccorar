@@ -92,6 +92,11 @@ app.post('/api/skus', (req,res)=>{
   if(!codigo||!codigo.trim()) return res.status(400).json({erro:'código obrigatório'});
   const cod=codigo.trim().toUpperCase();
   const atual=db.prepare('SELECT descricao,cor,estoque,alvo,modelo_id,largura_cm,altura_cm,cor_codigo,tecido_codigo,tem_ficha,custo_direto FROM skus WHERE codigo=?').get(cod)||{};
+  /* O codigo com a forma de uma etiqueta da producao (PS + 8 digitos, TC/TB +
+     6) nao nasce como SKU (PRODUCAO-MAPA-E-MOTOR v7, §14.2): o bipe nao saberia
+     se e o SKU ou a etiqueta. O que ja existe continua editavel. */
+  if(!atual.descricao && atual.estoque===undefined && require('./etiqueta_producao').reservado(cod))
+    return res.status(400).json({erro:'O código '+cod+' tem a forma de uma etiqueta da produção (PS, TC ou TB seguido de números) e não pode ser SKU.'});
   const manda=(k,novo)=> (k in b) ? novo : (atual[k]===undefined?null:atual[k]);
 
   /* Os quatro campos soltos, pela mesma regra das medidas (regra 1 do topo).

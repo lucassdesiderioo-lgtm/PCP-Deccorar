@@ -2,7 +2,7 @@
 tela: 102
 titulo: Embalagem
 situacao: rascunho
-atualizada_em: 2026-11-24
+atualizada_em: 2026-11-25
 cartoes: R-EMB-01, R-EMB-02, R-EMB-03, R-EMB-04, R-EMB-05, R-EMB-06, R-EMB-07, R-EMB-08, R-EMB-09, R-EMB-10, R-EST-02, R-EST-05, R-KIT-03, R-TEM-01, R-EMB-11, R-EMB-12, R-EMB-13
 parametros: kit_codigo = Código do kit de instalação, emb_minimo_seg = Tempo mínimo da embalagem (segundos)
 ---
@@ -35,3 +35,5 @@ parametros: kit_codigo = Código do kit de instalação, emb_minimo_seg = Tempo 
 - 24/11/2026 — O cartão do bloco vermelho mostra só o que embalar: o número grande é "para embalar", sem o que já está no estoque nem o que ainda está na produção. O produto do dia sem peça para embalar sai do vermelho, e a peça a mais vai para a Reposição. O topo diz quantas peças do dia faltam embalar.
 - 24/11/2026 — Quando todas as peças de um produto do dia estão com outra pessoa, ele não aparece na lista, e o bipe dele diz quem está com a peça.
 - 24/11/2026 — Quando a peça que estava com outra pessoa volta a ficar livre, a tela não a anuncia mais como peça nova da Revisão.
+- 24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo.
+- 25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU

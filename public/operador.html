@@ -255,8 +255,41 @@ function loadStats(){
 function fmt(seg){ seg=+seg||0; const m=Math.floor(seg/60),s=seg%60; return (m?m+'m':'')+s+'s'; }
 function mmss(ms){ const t=Math.floor(ms/1000),m=Math.floor(t/60),s=t%60; return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); }
 function banner(kind,title,sub,timer,extra){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(timer?'<div class="timer" id="timer">00:00</div>':'')+(extra||''); }
+/* A ETIQUETA DE SKU EM SERIE (PRODUCAO-MAPA-E-MOTOR v7, §14.5, 25/11/2026): a
+   peca que veio da montagem (107) se revisa pela etiqueta dela. O servidor diz
+   o SKU e QUEM FEZ (o tecido, o tubo, a montagem), e a revisao abre com os
+   nomes — se der problema, a peca volta para quem fez a etapa. A peca antiga
+   continua pelo SKU (§14.7). Inicio e fim pela MESMA etiqueta. */
+var SERIE_RE=/^PS\d{8}$/;
+async function abrirSerie(codigo){
+  var r;
+  try{ var x=await fetch('/api/producao/persiana/'+encodeURIComponent(codigo)); r=await x.json(); if(!x.ok) r={erro:r.erro||('erro '+x.status)}; }
+  catch(e){ banner('err','Sem conexão','Não deu para ler a etiqueta. Bipe de novo.'); beep(false); return; }
+  if(r.erro){ banner('err','Etiqueta não reconhecida',escH(r.erro)); beep(false); return; }
+  if(!r.montada){ banner('err',escH(r.rotulo),'Esta persiana ainda não passou pela montagem (107): monte antes de revisar.'); beep(false); return; }
+  if(r.revisavel===false || (r.revisavel===undefined && r.situacao!=='montada')){ banner('err',escH(r.rotulo),escH(r.motivo||(r.situacao==='montando'?'Esta persiana ainda está sendo montada.':'Esta persiana já foi revisada.'))); beep(false); return; }
+  if(!skuInfo(r.sku)){ banner('err','SKU não cadastrado',escH(r.sku)); beep(false); return; }
+  var dst=destino(r.sku);
+  emRev={codigo:r.sku,serie:codigo,rotulo:r.rotulo,quem:r,cor:(skuInfo(r.sku)||{}).cor||'',inicio:Date.now(),fora:!!(dst&&dst.cls==='fora'),destino:dst};
+  renderTiles(); abrirRev(emRev); beep(true);
+}
+function quemFez(q){
+  if(!q) return '';
+  var c=function(t,x){ return '<div style="background:#fff;border-radius:10px;padding:8px 10px;text-align:left"><div style="font-size:11px;font-weight:700;color:#5a6472;text-transform:uppercase;letter-spacing:.5px">'+t+'</div><div style="font-size:18px;font-weight:800">'+escH(x&&x.nome||'—')+'</div>'+(x&&x.em?'<div style="font-size:12px;color:#5a6472">'+escH(String(x.em).slice(8,10)+'/'+String(x.em).slice(5,7)+' · '+String(x.em).slice(11,16))+(x.etiqueta?' · '+escH(x.etiqueta):'')+'</div>':'')+'</div>'; };
+  return '<div id="quemFez" style="margin-top:12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">'+c('Tecido cortado por',q.tecido)+c('Tubo cortado por',q.tubo)+c('Montado por',q.montagem)+'</div>';
+}
 function toggle(codigo){
   codigo=(codigo||'').trim().toUpperCase(); if(!codigo) return;
+  if(SERIE_RE.test(codigo)){
+    if(!emRev) return abrirSerie(codigo);
+    if(emRev.serie!==codigo){ beep(false); var bs0=document.querySelector('#banner .bs');
+      if(bs0 && !document.getElementById('outroAviso')) bs0.insertAdjacentHTML('beforeend','<div class="aviso" id="outroAviso" style="margin-top:10px">'+(emRev.serie?'Para terminar, bipe de novo a mesma etiqueta ('+escH(emRev.rotulo)+').':'Esta revisão começou pelo SKU: termine bipando o SKU.')+'</div>');
+      return; }
+    return finish();
+  }
+  if(emRev && emRev.serie){ beep(false); var bs1=document.querySelector('#banner .bs');
+    if(bs1 && !document.getElementById('outroAviso')) bs1.insertAdjacentHTML('beforeend','<div class="aviso" id="outroAviso" style="margin-top:10px">Para terminar, bipe de novo a etiqueta de SKU em série ('+escH(emRev.rotulo)+').</div>');
+    return; }
   if(!emRev){ const info=skuInfo(codigo);
     if(!info){ banner('err','SKU não cadastrado',codigo+' — cadastre no Admin antes'); beep(false); return; }
     /* `a_produzir`, nao `falta`: ordem cuja venda ja saiu do estoque nao pede
@@ -291,8 +324,8 @@ lerUltima();
 function abrirRev(cur){
   var md=medidaDe(cur.codigo);
   var dst=cur.destino||destino(cur.codigo);
-  banner('rev', md? md.medida+'  '+md.cor : cur.codigo, escH(cur.codigo)+' — bipe de novo ao terminar'
-    +(dst?'<br><span class="para '+dst.cls+'">'+escH(dst.txt)+'</span>':''), true);
+  banner('rev', md? md.medida+'  '+md.cor : cur.codigo, (cur.serie?escH(cur.rotulo)+' — bipe a mesma etiqueta ao terminar':escH(cur.codigo)+' — bipe de novo ao terminar')
+    +(dst?'<br><span class="para '+dst.cls+'">'+escH(dst.txt)+'</span>':''), true, cur.serie?quemFez(cur.quem):'');
   var bn=$('#banner');
   var lin=document.createElement('div'); lin.id='revAcoes';
   lin.style.cssText='margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap';
@@ -319,7 +352,7 @@ function rapidoDemais(seg, minimo){
 async function finish(){
   const cur=emRev;
   const seg=Math.round((Date.now()-cur.inicio)/1000);
-  const corpo=JSON.stringify({codigo:cur.codigo,segundos:seg,modo:null,inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()});
+  const corpo=JSON.stringify({codigo:cur.serie||cur.codigo,segundos:seg,modo:null,inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()});
   if(seg<REV_MIN){
     /* A revisao NAO fecha: so avisa, e o servidor grava o bipe rapido. */
     rapidoDemais(seg, REV_MIN);
@@ -335,7 +368,7 @@ async function finish(){
       emRev=cur; renderTiles(); abrirRev(cur); rapidoDemais(seg, r.minimo); return;
     }
     if(r.erro){ banner('err','Erro',r.erro); beep(false); return; }
-    banner('ok','Revisada ✓ ('+fmt(seg)+')', escH(cur.codigo)+' · liberada para a EMBALAGEM'+(r.modo?'<br><span class="para '+(r.modo==='hoje'?'hoje':'prox')+'">● '+(r.modo==='hoje'?'Foi para: venda de hoje':'Foi para: estoque')+'</span>':''), false, (window.tempoBancada?tempoBancada(r.tempo):''));
+    banner('ok','Revisada ✓ ('+fmt(seg)+')', escH(cur.serie?cur.rotulo:cur.codigo)+' · liberada para a EMBALAGEM'+(r.modo?'<br><span class="para '+(r.modo==='hoje'?'hoje':'prox')+'">● '+(r.modo==='hoje'?'Foi para: venda de hoje':'Foi para: estoque')+'</span>':''), false, (window.tempoBancada?tempoBancada(r.tempo):''));
     beep(true); load();
     await lerUltima(); mostrarDesfazer();
   }catch(e){ banner('err','Falha de conexão',String(e)); beep(false); }
@@ -636,7 +669,7 @@ document.addEventListener('click',function(e){
   var ctl=(window.AbortController?new AbortController():null);
   var prazo=setTimeout(function(){ if(ctl) ctl.abort(); },20000);
   fetch('/api/rejeicao',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl?ctl.signal:undefined,
-    body:JSON.stringify({codigo:cur.codigo,motivo:motivo,obs:obs,segundos:seg,modo:null})})
+    body:JSON.stringify({codigo:cur.codigo,serie:cur.serie||null,motivo:motivo,obs:obs,segundos:seg,modo:null})})   // a persiana em série sai do carrinho (PRODUCAO-MAPA-E-MOTOR v7)
    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok&&!j.erro, j:j}; }); })
    .then(function(x){
      clearTimeout(prazo);

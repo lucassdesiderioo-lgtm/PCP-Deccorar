@@ -484,10 +484,12 @@ const GEMEAS = [['/operador','revisao.executar'],['/montagem','embalagem.executa
   ['/embalagem','etiqueta.emitir'],['/carregamento','carregamento.executar'],
   ['/devolucao','devolucao.registrar'],
   ['/painel','painel.ver'],['/relatorios','relatorios.ver'],
-  ['/planejamento','planilha.importar'],['/recebimento','pedido.receber']];
+  /* A 401 abre tambem com `producao.etiqueta` (PRODUCAO-MAPA-E-MOTOR v7, 25/11/2026). */
+  ['/planejamento',['planilha.importar','producao.etiqueta']],['/recebimento','pedido.receber']];
 let gemeasOk = 0;
 for(const [rota,chave] of GEMEAS){
-  if(AC.permDaRota(rota,'GET') === chave && AC.permDaRota(rota+'.html','GET') === chave) gemeasOk++;
+  const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  if(igual(AC.permDaRota(rota,'GET'), chave) && igual(AC.permDaRota(rota+'.html','GET'), chave)) gemeasOk++;
   else console.log('       ' + rota + ': rota=' + AC.permDaRota(rota,'GET') + ' gemea=' + AC.permDaRota(rota+'.html','GET'));
 }
 eq('as 9 telas e as 9 gemeas pedem a MESMA chave (a 203 /expedicao saiu em 05/11/2026)', gemeasOk, GEMEAS.length);

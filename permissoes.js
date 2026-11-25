@@ -25,6 +25,21 @@ module.exports = [
   { chave:'material.extra',       grupo:'Produção',   tela:106, nivel:'supervisor',
     rotulo:'Decidir material extra', desc:'Dizer se a peça refeita usou material, e baixar',
     sensivel:true },
+  /* A PRODUCAO DA MEDIDA PADRAO (PRODUCAO-MAPA-E-MOTOR v7, §14, 25/11/2026).
+     As bancadas, cada uma a sua chave; a aba de etiquetas da 401 e do
+     Supervisor; corrigir (cancelar etiqueta, a entrada inicial da virada) e
+     sensivel. Tudo nasce so para o Admin Geral (R-ALC-06). */
+  { chave:'producao.cortar_tecido', grupo:'Produção', tela:108, nivel:'operacao',
+    rotulo:'Cortar tecido',       desc:'Cortar o tecido pela lista, bipando a etiqueta de cada peça' },
+  { chave:'producao.cortar_tubo', grupo:'Produção',   tela:110, nivel:'operacao',
+    rotulo:'Cortar tubo e base',  desc:'Cortar o tubo e a base pela lista, bipando a etiqueta de cada tubo' },
+  { chave:'producao.montar',      grupo:'Produção',   tela:107, nivel:'operacao',
+    rotulo:'Montar persianas',    desc:'Montar a persiana bipando o SKU em série, o tecido e o tubo' },
+  { chave:'producao.etiqueta',    grupo:'Produção',   tela:401, nivel:'supervisor',
+    rotulo:'Imprimir etiquetas da produção', desc:'Imprimir o SKU em série e os maços de tecido e de tubo; reimprimir' },
+  { chave:'producao.corrigir',    grupo:'Produção',   tela:401, nivel:'supervisor',
+    rotulo:'Corrigir a produção', desc:'Cancelar etiqueta impressa e lançar a entrada inicial do corte',
+    sensivel:true },
 
   // ─── EXPEDIÇÃO ──────────────────────────────────────────────
   { chave:'pdf.subir',            grupo:'Expedição',  tela:103, nivel:'operacao',

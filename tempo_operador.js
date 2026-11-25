@@ -18,9 +18,23 @@
 const { mediana } = require('./produtividade_dominio');
 
 const JANELA_DIAS = 30;
-const ATIVIDADES = { revisao:'revisao', montagem:'montagem' };
+/* As do corte e da montagem da persiana (PRODUCAO-MAPA-E-MOTOR v7, §14.4): o
+   tempo e do LOTE, e a peca vale o lote ÷ as pecas boas. A entrada inicial da
+   virada (§14.10) nao conta. */
+const LOTE_CORTE = tipo => ({ sql:`SELECT CAST(segundos AS REAL)/(quantidade - perdidas) s FROM corte_lote
+    WHERE usuario_id=? AND tipo='${tipo}' AND situacao='fechado' AND entrada_inicial=0 AND segundos>0
+      AND (quantidade - perdidas)>0 AND id<>? AND date(fim) >= date('now','localtime','-${JANELA_DIAS} days')`, campo:'item' });
+const ATIVIDADES = { revisao:'revisao', montagem:'montagem',
+  corte_tecido:LOTE_CORTE('tecido'), corte_tubo:LOTE_CORTE('tubo'),
+  montagem_persiana:{ sql:`SELECT CAST(segundos AS REAL)/quantidade s FROM montagem_lote
+    WHERE usuario_id=? AND situacao='fechado' AND segundos>0 AND quantidade>0 AND id<>?
+      AND date(fim) >= date('now','localtime','-${JANELA_DIAS} days')`, campo:'sku' } };
 
 function tempos(db, tabela, uid, codigo, excluirId){
+  if(typeof tabela === 'object'){
+    const args = [uid, excluirId == null ? -1 : excluirId]; if(codigo) args.push(String(codigo).toUpperCase());
+    return db.prepare(tabela.sql + (codigo ? ' AND UPPER(' + tabela.campo + ')=?' : '')).all(...args).map(r => Math.round(+r.s));
+  }
   const sql = `SELECT segundos s FROM ${tabela}
     WHERE usuario_id=? AND COALESCE(teste,0)=0 AND segundos>0 AND id<>?
       AND data >= date('now','localtime','-${JANELA_DIAS} days')`

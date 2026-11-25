@@ -54,7 +54,7 @@ console.log('\n── A. o leitor e o formato ──');
 const L = MAN.lerTudo();
 ok('A1 o manual.js lê docs/manual/ sem erro de leitura', L.erros.length === 0, L.erros.join(' · '));
 const telas = MAN.telasTodas();
-ok('   as duas operações estão no mapa que o manual lê (36 + 17 = 53 telas)', telas.length === 53, 'achou ' + telas.length);
+ok('   as duas operações estão no mapa que o manual lê (39 + 17 = 56 telas)', telas.length === 56, 'achou ' + telas.length);
 const fichas = Array.from(L.fichas.values());
 const cab = fichas.filter(f => !(f.n > 0 && f.titulo && ['pronta','rascunho'].includes(f.situacao) && /^\d{4}-\d{2}-\d{2}$/.test(f.atualizada_em || '') && Array.isArray(f.cartoes) && Array.isArray(f.parametros)));
 ok('   toda ficha tem o cabeçalho inteiro (tela, titulo, situacao, atualizada_em, cartoes, parametros)', !cab.length, lista(cab.map(f => f.arquivo)));
@@ -382,8 +382,8 @@ ok('   e 403 para a Ana (Admin), que opera quase tudo mas não tem a chave', tod
 const idSergio = B.pessoas.find(p => p.nome.indexOf('Sergio') === 0).id;
 B.db.prepare('INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,?,1)').run(idSergio, 'manual.ver_todas');
 const todasSergio = chamar('/api/manual/todas', user('Sergio'));
-ok('   com a chave (Supervisor, por exceção), volta as 53 fichas', todasSergio.status === 200 && todasSergio.body.fichas.length === 53, todasSergio.status + ' ' + (todasSergio.body.fichas || []).length);
-ok('   e cada ficha das 53 diz se ele a opera (opera:true/false), para a tela marcar', todasSergio.body.fichas.some(f => f.opera === true) && todasSergio.body.fichas.some(f => f.opera === false));
+ok('   com a chave (Supervisor, por exceção), volta as 56 fichas', todasSergio.status === 200 && todasSergio.body.fichas.length === 56, todasSergio.status + ' ' + (todasSergio.body.fichas || []).length);
+ok('   e cada ficha das 56 diz se ele a opera (opera:true/false), para a tela marcar', todasSergio.body.fichas.some(f => f.opera === true) && todasSergio.body.fichas.some(f => f.opera === false));
 ok('   com a chave, a ficha de uma tela que ele NÃO opera vem inteira', chamar('/api/manual/ficha/:n', user('Sergio'), { params:{ n:'1302' } }).body.secoes !== undefined);
 const idEdv = B.pessoas.find(p => p.nome.indexOf('Edvaldo') === 0).id;
 B.db.prepare('INSERT INTO usuario_excecao (usuario_id,chave,concede) VALUES (?,?,1)').run(idEdv, 'manual.ver_todas');
@@ -392,7 +392,7 @@ B.db.prepare("DELETE FROM usuario_excecao WHERE chave='manual.ver_todas'").run()
 
 /* C5: o mapa */
 const mapa = chamar('/api/manual/mapa', user('Edvaldo')).body;
-ok('C5 /api/manual/mapa volta as 53 telas só com número, nome, módulo, bloco e nível — nenhuma seção', mapa.telas.length === 53 && mapa.telas.every(t => t.n && t.nome && t.modulo && !t.secoes && !t.corpo), JSON.stringify(mapa.telas[0]));
+ok('C5 /api/manual/mapa volta as 56 telas só com número, nome, módulo, bloco e nível — nenhuma seção', mapa.telas.length === 56 && mapa.telas.every(t => t.n && t.nome && t.modulo && !t.secoes && !t.corpo), JSON.stringify(mapa.telas[0]));
 ok('   com as ligações (de → para) e opera:true só nas da pessoa', Array.isArray(mapa.ligacoes) && mapa.ligacoes.some(l => l.de === 101 && l.para === 102) && mapa.telas.filter(t => t.opera).map(t => t.n).sort().join(',') === edv.fichas.map(f => f.n).sort().join(','));
 
 /* C6: o que mudou */

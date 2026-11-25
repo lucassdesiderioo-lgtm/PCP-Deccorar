@@ -1,7 +1,7 @@
 # REVISAO-TELA-UNICA — a 101 Revisão numa tela só, ligada ao planejamento
 
 > **STATUS — 23/11/2026: APROVADA PELO DONO** (*"pode seguir"*, 23/11/2026) ·
-> **fases 1 e 2 construídas juntas, falta subir** · fase 3 (a demanda vinda da
+> **fases 1 e 2 no ar desde 24/11/2026** (PR #366, *"deu tudo certo no deploy"*) · fase 3 (a demanda vinda da
 > Montagem) espera a `PRODUCAO-MAPA-E-MOTOR`. Tipo: `REGRA` + `NOVIDADE` · risco
 > 🟡. Muda os cartões **R-REV-01**, **R-REV-02** e **R-REV-03** de
 > `docs/regras/estoque.md`; três linhas em `docs/DECISOES.md`.
@@ -10,7 +10,8 @@
 > embalada sai **primeiro de Hoje** (*"tem 29 na embalagem, já tem 9 … deveria
 > aparecer 20"*), e só o que sobra sai dos próximos dias e do alvo; o cartão
 > diz quantas estão na embalagem, e a peça revisada com o Hoje coberto vai como
-> reposição. Vale sobre o item da construção abaixo. `teste_revisao_tela_unica.js` (66).
+> reposição. Vale sobre o item da construção abaixo. **No ar desde 24/11/2026**
+> (PR #368): o dono viu o "(K na embalagem)" no cartão. `teste_revisao_tela_unica.js` (66).
 > Testes: `teste_revisao_tela_unica.js` (66), `teste_revisao_tela_unica_tela.js`
 > (37, num Chromium; sem navegador diz PULADO) e `teste_revisao.js` (122, a
 > seção 2 mudou: o modo é do servidor).
@@ -212,8 +213,8 @@ evidência (o rascunho interativo ficou com ele):
 
 | Fase | O quê | Situação |
 |---|---|---|
-| **1** | A regra: tela única, a lista em três partes, a decisão do modo no servidor, "Ver a semana", os avisos | construída, falta subir |
-| **2** | O design da §10, e o "↩ Devoluções" com a volta na 251 | construída, falta subir |
+| **1** | A regra: tela única, a lista em três partes, a decisão do modo no servidor, "Ver a semana", os avisos | no ar (24/11/2026, PR #366) |
+| **2** | O design da §10, e o "↩ Devoluções" com a volta na 251 | no ar (24/11/2026, PR #366) |
 | **3** | A demanda vindo da Montagem (107), e a ideia da peça reservada | com a `PRODUCAO-MAPA-E-MOTOR` |
 
 ## 11. Onde mora

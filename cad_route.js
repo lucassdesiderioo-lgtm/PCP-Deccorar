@@ -101,8 +101,12 @@ module.exports=function(app,db){
     if(!cod||!b.motivo) return res.status(400).json({erro:'faltam dados'});
     /* A conta mora no rejeicao_dominio.js (dono unico): a peca com problema da
        Revisao e a que volta da Embalagem por defeito passam pelo mesmo lugar. */
-    db.transaction(()=>require('./rejeicao_dominio').registrar(db,{codigo:cod,motivo:b.motivo,obs:b.obs,
-      segundos:b.segundos,modo:b.modo,origem:'revisao'},q))();
+    db.transaction(()=>{
+      require('./rejeicao_dominio').registrar(db,{codigo:cod,motivo:b.motivo,obs:b.obs,
+        segundos:b.segundos,modo:b.modo,origem:'revisao'},q);
+      /* A persiana em serie (PRODUCAO-MAPA-E-MOTOR v7): sai do carrinho da revisao. */
+      if(b.serie) require('./montagem_persiana').comProblema(db,String(b.serie));
+    })();
     res.json({ok:true});
   });
 
