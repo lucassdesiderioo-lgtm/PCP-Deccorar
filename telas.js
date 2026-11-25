@@ -180,7 +180,7 @@ const TELAS = [
      Os horários de corte e despacho saíram daqui em 11/11/2026 (AJUSTE): moram
      na 206, que é o assunto deles. */
   { n:906, nome:'Parâmetros',            rota:'/parametros',    nivel:'supervisor', onde:'computador', perms:['sobmedida.parametro.ler','sobmedida.parametro.editar','producao.corrigir','@admin'],
-    modulo:'administracao', bloco:'comum', liga:[202, 602, 609, 610, 611] },
+    modulo:'administracao', bloco:'comum', liga:[202, 401, 602, 609, 610, 611] },
   /* A 907 MANUAL (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026): a ficha de cada
      tela, em língua de fábrica, lida pelo "?" de toda tela e por esta. Cada
      pessoa vê só as telas que opera (D7); "ver todas" é a chave
