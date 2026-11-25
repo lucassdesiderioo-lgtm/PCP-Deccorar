@@ -77,6 +77,7 @@
   }
   function tituloTela(t){
     if(!t.n && t.erro) return 'Não deu para contar as pendências desta tela';
+    if(t.etiquetas && t.etiquetas === t.n) return t.n + ' ' + pl(t.n, 'etiqueta de hoje a imprimir', 'etiquetas de hoje a imprimir');
     return t.n + ' ' + pl(t.n, 'pendência esperando você', 'pendências esperando você')
       + (t.dias == null ? '' : ' — a mais antiga ' + (t.dias === 0 ? 'é de hoje' : 'há ' + t.dias + ' ' + pl(t.dias, 'dia', 'dias')))
       + (t.erro ? ' (e uma linha não deu para contar)' : '');
@@ -93,7 +94,10 @@
     });
     if(botao){
       var vb = botao.querySelector('.mnPend'); if(vb) vb.remove();
-      if(p.total) botao.insertAdjacentHTML('beforeend', bolinha(String(p.total), p.total + ' ' + pl(p.total, 'pendência esperando você', 'pendências esperando você') + (p.erro ? ' (e uma linha não deu para contar)' : '')));
+      var etq = (por['401'] && por['401'].etiquetas) || 0, pen = p.total - etq;
+      var tit = [pen > 0 ? pen + ' ' + pl(pen, 'pendência esperando você', 'pendências esperando você') : '',
+        etq > 0 ? etq + ' ' + pl(etq, 'etiqueta de hoje a imprimir', 'etiquetas de hoje a imprimir') : ''].filter(Boolean).join(' e ');
+      if(p.total) botao.insertAdjacentHTML('beforeend', bolinha(String(p.total), tit + (p.erro ? ' (e uma linha não deu para contar)' : '')));
       else if(p.erro) botao.insertAdjacentHTML('beforeend', bolinha('?', 'Não deu para contar as pendências'));
     }
   }
@@ -101,10 +105,25 @@
   function pedirPendencias(){
     if(typeof fetch === 'undefined' || (typeof document !== 'undefined' && document.hidden)) return;
     PEND.ultima = Date.now();
-    fetch('/api/pendencias/minhas', { credentials:'same-origin' })
-      .then(function(r){ return r.ok ? r.json() : null; })
-      .then(function(d){ if(d){ PEND.dados = d; etiquetas(PEND.painel, PEND.botao, d); } })
-      .catch(function(){});
+    var tm = (typeof window !== 'undefined') ? window.TELAS_MINHAS : null;
+    /* AS ETIQUETAS DE HOJE A IMPRIMIR (PRODUCAO-MAPA-E-MOTOR v7, §14.3): a
+       bolinha da 401, para quem imprime. Nao e pendencia da 204: so soma na
+       bolinha. Quem conta e o servidor (producao_lista.js). */
+    var imprime = !!(tm && (tm.admin_geral || (tm.perms || []).indexOf('producao.etiqueta') >= 0));
+    var pPend = fetch('/api/pendencias/minhas', { credentials:'same-origin' }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
+    var pEtq = imprime ? fetch('/api/producao/etiquetas/contar', { credentials:'same-origin' }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }) : Promise.resolve(null);
+    Promise.all([pPend, pEtq]).then(function(x){
+      var d = x[0], e = x[1];
+      if(!d && !(e && e.hoje)) return;
+      if(e && e.hoje > 0){
+        d = JSON.parse(JSON.stringify(d || { por_tela:{}, total:0 }));
+        d.por_tela = d.por_tela || {};
+        var t = d.por_tela['401'] || { n:0, dias:null };
+        t.n = (t.n || 0) + e.hoje; t.etiquetas = e.hoje; d.por_tela['401'] = t;
+        d.total = (d.total || 0) + e.hoje;
+      }
+      PEND.dados = d; etiquetas(PEND.painel, PEND.botao, d);
+    }).catch(function(){});
   }
   /* Os dois nav.js chamam depois de desenhar o menu: guarda onde desenhar,
      redesenha com o último número (o menu acabou de ser refeito) e, na

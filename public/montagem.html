@@ -95,6 +95,7 @@
      que o servidor recusa no dia em que uma das duas mudasse. -->
 <script src="/kit_bipe.js"></script>
 <script src="/tempo_bancada.js"></script>
+<script src="/codigo_serie.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[], avisoFixo=false;
@@ -532,5 +533,8 @@ scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); co
 scan.focus();
 function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=ok?820:240;g.gain.value=.05;o.start();setTimeout(()=>{o.stop();a.close();},ok?100:220);}catch(e){} }
 load(); setInterval(()=>{ if(!emb) load(); },4000);
+/* A ETIQUETA DE SKU EM SERIE (PRODUCAO-MAPA-E-MOTOR v7, §14.2): o bipe da
+   etiqueta por fora da persiana nova vira o SKU dela antes do resto. */
+(function(){ var h0=handle; handle=async function(c){ return h0(window.codigoSerie ? await window.codigoSerie.sku(c) : c); }; })();
 </script><script src="/nav.js"></script>
 </body></html>

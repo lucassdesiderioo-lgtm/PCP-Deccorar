@@ -177,6 +177,7 @@
 <!-- antes do bloco de baixo: e dele que vem pecaTexto -->
 <script src="/sku.js"></script>
 <script src="/pendencias_aviso.js"></script>
+<script src="/codigo_serie.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 let confirmar=null, last={c:null,t:0};
@@ -1026,5 +1027,8 @@ relogioDesp();
 
 // O Subir PDF saiu desta tela em 05/11/2026 (D2): o upload é só na 103 Lançar produção.
 
+/* A ETIQUETA DE SKU EM SERIE (PRODUCAO-MAPA-E-MOTOR v7, §14.2): o bipe da
+   etiqueta por fora da persiana nova vira o SKU dela antes do resto. */
+(function(){ var h0=scanSku; scanSku=async function(c){ return h0(window.codigoSerie ? await window.codigoSerie.sku(c) : c); }; })();
 </script><script src="/nav.js"></script>
 </body></html>

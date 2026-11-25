@@ -36,7 +36,7 @@ const existe = f => fs.existsSync(path.join(__dirname, f));
    saíram da 906 e moram na 206 Horários de coleta, como "Horário padrão da
    semana" — mesmo assunto (horário de saída). A 906 fica com o segundo bipe e o
    sob medida. */
-const ABRE = ['sobmedida.parametro.ler','sobmedida.parametro.editar','@admin'];
+const ABRE = ['sobmedida.parametro.ler','sobmedida.parametro.editar','@admin', 'producao.corrigir'];   // + a etiqueta parada (PRODUCAO-MAPA-E-MOTOR v7)
 
 console.log('\n── 1. a 906 no mapa ──');
 const t = M.porNumero(906);

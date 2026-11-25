@@ -53,7 +53,7 @@ ok('o banco novo do sob medida tem parâmetros', chavesSm.length > 0, String(cha
 const semTela = chavesSm.filter(c => !(O.ONDE[c] && O.ONDE[c].length));
 ok('todo parâmetro do sob medida diz a tela onde vale', semTela.length === 0, semTela.join(', '));
 /* ③ REVISÃO: a ligação conferida contra quem LÊ cada número (grep no código de lá). */
-const MEDIDA_PADRAO = ['emb_minimo_seg', 'rev_minimo_seg', 'conf_carregamento', 'feriados'];
+const MEDIDA_PADRAO = ['emb_minimo_seg', 'rev_minimo_seg', 'conf_carregamento', 'feriados', 'etiqueta_parada_dias'];   // a etiqueta parada: PRODUCAO-MAPA-E-MOTOR v7
 const sobra = Object.keys(O.ONDE).filter(c => MEDIDA_PADRAO.indexOf(c) < 0 && chavesSm.indexOf(c) < 0);
 ok('nenhuma chave no ONDE que não seja parâmetro (a esquecida)', chavesSm.length === 0 || sobra.length === 0, sobra.join(', '));
 const igual = (c, v) => JSON.stringify(O.ONDE[c]) === JSON.stringify(v);
@@ -74,7 +74,7 @@ console.log('\n── 4. a rota ──');
 const AT = ler('admin_telas.js');
 ok('GET /api/parametros/onde registrada no admin_telas.js', /app\.get\('\/api\/parametros\/onde'/.test(AT));
 const AC = ler('acesso.js');
-ok('   com linha no permDaRota: quem abre a 906', /eq\('\/api\/parametros\/onde'\)\)\s*return\s*\['sobmedida\.parametro\.ler',\s*'sobmedida\.parametro\.editar',\s*'@admin'\]/.test(AC));
+ok('   com linha no permDaRota: quem abre a 906', /eq\('\/api\/parametros\/onde'\)\)\s*return\s*\['sobmedida\.parametro\.ler',\s*'sobmedida\.parametro\.editar',\s*'producao\.corrigir',\s*'@admin'\]/.test(AC));
 
 console.log('\n── 5. a tela ──');
 const PAR = ler('public/parametros.html');

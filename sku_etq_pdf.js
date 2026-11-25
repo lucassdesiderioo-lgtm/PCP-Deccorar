@@ -148,10 +148,14 @@ function quebrar(fonte, texto, tam, max){
 
 /* O DESENHO: a lista do que vai na etiqueta, em mm, medida de cima para
    baixo. O PDF so traduz esta lista — e o teste confere a lista e o PDF. */
-async function desenho(sku, fonteDada){
+/* `serie` (PRODUCAO-MAPA-E-MOTOR v7, §14.2, 25/11/2026): a etiqueta da
+   persiana EM SERIE. O mesmo desenho; muda so o rodape: as barras levam o
+   codigo da etiqueta na fabrica (serie.codigo, PS + 8 digitos), que NAO vai
+   escrito, e embaixo delas sai o SKU com o "Nº 45" em destaque. */
+async function desenho(sku, fonteDada, serie){
   const c = conteudo(sku);
   if(c.erro) throw new Error(c.erro);
-  const b = medidaDasBarras(c.codigo);
+  const b = medidaDasBarras(serie ? serie.codigo : c.codigo);
   if(b.erro) throw new Error(b.erro);
   const fonte = fonteDada || await (await PDFDocument.create()).embedFont(StandardFonts.HelveticaBold);
 
@@ -167,7 +171,7 @@ async function desenho(sku, fonteDada){
   if(c.comMedida) texto(c.destaque, [19, 16, 14]);
   else texto(c.destaque, [12, 11, 10], true);
   if(c.info) texto(c.info, [7.5, 6.5, 6]);
-  const tamCodigo = 8, capCodigo = tamCodigo*CAP*PT;
+  const tamCodigo = serie ? 10 : 8, capCodigo = tamCodigo*CAP*PT;
 
   /* O vertical: os blocos de texto em cima, as barras e o codigo embaixo, e a
      sobra repartida por igual entre eles — o `space-between` da pagina antiga. */
@@ -197,7 +201,7 @@ async function desenho(sku, fonteDada){
     itens.push({ tipo:'ret', x:x0 + i*m, topo:y, largura:(j-i)*m, altura:barra });
     i = j;
   }
-  const cod = escrevivel(fonte, c.codigo), wc = largura(fonte, cod, tamCodigo);
+  const cod = escrevivel(fonte, serie ? c.codigo + '   Nº ' + serie.numero : c.codigo), wc = largura(fonte, cod, tamCodigo);
   itens.push({ tipo:'texto', texto:cod, tam:tamCodigo, cap:capCodigo, x:(ETIQUETA.largura - wc)/2,
                base:y + barra + BARRA_ATE_CODIGO + capCodigo, largura:wc });
   return { itens, modulo:m };
@@ -226,4 +230,67 @@ async function gerar(sku, quantidade){
   return Buffer.from(await doc.save());
 }
 
-module.exports = { conteudo, conferir, desenho, gerar, MAX, ETIQUETA };
+/* O que impede a etiqueta EM SERIE: a medida do SKU (o cadastro) e as barras
+   do CODIGO DA ETIQUETA, e nao as do SKU — o SKU comprido vai escrito, nao nas
+   barras (③ REVISAO, 25/11/2026: um SKU de 32 letras derrubava o lote inteiro). */
+function conferirSerie(sku, codigo){
+  const problemas = [];
+  const c = conteudo(sku);
+  if(c.erro) problemas.push(c.erro);
+  const b = medidaDasBarras(codigo || 'PS00000000'); if(b.erro) problemas.push(b.erro);
+  return { pronta: problemas.length === 0, problemas };
+}
+
+/* As etiquetas de SKU EM SERIE (§14.2): uma pagina por etiqueta, cada uma com
+   o seu SKU e o seu numero. `lista` = [{ sku (a linha do banco), codigo, numero }]. */
+async function gerarSerie(lista){
+  if(!Array.isArray(lista) || !lista.length) throw new Error('nada para imprimir');
+  for(const x of lista){ const v = conferirSerie(x.sku, x.codigo); if(!v.pronta){ const e = new Error(v.problemas[0]); e.problemas = v.problemas; throw e; } }
+  const doc = await PDFDocument.create();
+  doc.setTitle('Etiquetas de SKU em série');
+  const fonte = await doc.embedFont(StandardFonts.HelveticaBold);
+  const preto = rgb(0,0,0);
+  for(const x of lista){
+    const { itens } = await desenho(x.sku, fonte, { codigo:x.codigo, numero:x.numero });
+    const pag = doc.addPage([ETIQUETA.largura*MM, ETIQUETA.altura*MM]);
+    for(const it of itens){
+      if(it.tipo === 'ret')
+        pag.drawRectangle({ x:it.x*MM, y:(ETIQUETA.altura - it.topo - it.altura)*MM,
+                            width:it.largura*MM, height:it.altura*MM, color:preto });
+      else
+        pag.drawText(it.texto, { x:it.x*MM, y:(ETIQUETA.altura - it.base)*MM, size:it.tam, font:fonte, color:preto });
+    }
+  }
+  return Buffer.from(await doc.save());
+}
+
+/* O MACO em branco de tecido ou de tubo (§14.2): o tipo em cima, o numero
+   grande, as barras e nada mais — a medida nao vai, o corte liga a etiqueta a
+   peca no bipe. Mesmas regras de barras da etiqueta de SKU. */
+async function gerarMaco(lista){
+  if(!Array.isArray(lista) || !lista.length) throw new Error('nada para imprimir');
+  const doc = await PDFDocument.create();
+  doc.setTitle('Maço de etiquetas');
+  const fonte = await doc.embedFont(StandardFonts.HelveticaBold);
+  const preto = rgb(0,0,0);
+  for(const x of lista){
+    const b = medidaDasBarras(x.codigo);
+    if(b.erro) throw new Error(b.erro);
+    const pag = doc.addPage([ETIQUETA.largura*MM, ETIQUETA.altura*MM]);
+    const escreve = (t, tam, base) => { const w = largura(fonte, t, tam);
+      pag.drawText(t, { x:((ETIQUETA.largura - w)/2)*MM, y:(ETIQUETA.altura - base)*MM, size:tam, font:fonte, color:preto }); };
+    escreve(x.titulo, 8, CIMA + 8*CAP*PT);
+    escreve(x.rotulo, 20, CIMA + 4 + 20*CAP*PT);
+    const m = b.modulo, lb = b.bits.length*m, topo = 19.5;
+    const x0 = Math.round(((ETIQUETA.largura - lb)/2)*PONTOS_POR_MM)/PONTOS_POR_MM;
+    for(let i=0; i<b.bits.length; ){
+      if(b.bits[i] !== '1'){ i++; continue; }
+      let j = i; while(j < b.bits.length && b.bits[j] === '1') j++;
+      pag.drawRectangle({ x:(x0 + i*m)*MM, y:(ETIQUETA.altura - topo - 12)*MM, width:(j-i)*m*MM, height:12*MM, color:preto });
+      i = j;
+    }
+  }
+  return Buffer.from(await doc.save());
+}
+
+module.exports = { conteudo, conferir, conferirSerie, desenho, gerar, gerarSerie, gerarMaco, MAX, ETIQUETA };

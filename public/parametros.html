@@ -128,6 +128,24 @@ function avisoTempo(c,k){
   else { m.className='msg'; m.textContent=''; }
 }
 
+/* ── A etiqueta da produção parada (PRODUCAO-MAPA-E-MOTOR v7, §14.3) ────────
+   Muda quem corrige a produção. Inteiro de 1 a 365; quem decide é o servidor. */
+async function partEtqParada(){
+  var c=card('pEtq'), x=await jget('/api/config/etiqueta-parada');
+  if(x.s!==200 || !x.j){ c.innerHTML='<h2>Etiqueta da produção parada</h2><div class="msg err">Não deu para ler ('+x.s+').</div>'; return; }
+  c.innerHTML='<h2>Etiqueta da produção parada</h2><p class="ajuda">A etiqueta impressa e ainda não usada há mais destes dias fica em <b>âmbar</b> e em cima, na lista das não usadas.</p>'
+    +valeNa('etiqueta_parada_dias')
+    +'<div class="rola"><table><tr><td><b>Dias</b></td><td><input class="num" inputmode="numeric" id="etqDias" value="'+esc(x.j.dias)+'"> <button class="g" type="button" id="etqSalvar">Salvar</button><div class="msg" id="etqMsg"></div></td></tr></table></div>';
+  document.getElementById('etqSalvar').onclick=async function(){
+    var i=document.getElementById('etqDias'), m=document.getElementById('etqMsg'), t=String(i.value).trim();
+    i.classList.remove('erro');
+    if(!/^\d+$/.test(t) || +t<1 || +t>365){ i.classList.add('erro'); m.className='msg err'; m.textContent='Digite um número inteiro de 1 a 365.'; return; }
+    var r=await jsend('/api/config/etiqueta-parada','POST',{dias:+t});
+    if(r.s===200 && r.j && r.j.ok){ i.value=r.j.dias; m.className='msg ok'; m.textContent='Salvo: '+r.j.dias+' dias.'; }
+    else { i.classList.add('erro'); m.className='msg err'; m.textContent=erroDe(r); }
+  };
+}
+
 /* ── Os parâmetros do sob medida: o corte e o prazo (rota de lá) ─────────── */
 function linhaParam(p, pode, extenso){
   return '<tr><td><b>'+esc(p.rotulo||p.chave)+'</b>'+(p.unidade?' <span class="nota">('+esc(p.unidade)+')</span>':'')+'<br><span class="nota">'+esc(p.ajuda||'')+'</span>'+valeNa(p.chave)+'</td>'
@@ -254,6 +272,7 @@ async function iniciar(){
     var nh=card('pHor'); nh.innerHTML='<h2>Horários de corte e despacho</h2><p class="ajuda">Moram na tela <b>206 Horários de coleta</b>, no bloco "Horário padrão da semana", ao lado das coletas lançadas. <a href="/coleta-horarios" style="color:var(--amb)">Abrir a 206 →</a></p>';
   }
   if(EU.admin){ await partBipe(); await partTempos(); }
+  if(tem('producao.corrigir')){ algum=true; await partEtqParada(); }
   if(tem('sobmedida.parametro.ler') || tem('sobmedida.parametro.editar')){
     algum=true;
     var px=await jget('/sobmedida/api/parametros');

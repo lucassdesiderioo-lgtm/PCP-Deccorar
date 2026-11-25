@@ -59,7 +59,7 @@ const MODULOS = ['auth','admin_telas','sku_cad_route','ajuste_route','revisao_ro
   'mont_route','carreg_route','saida_route','backup_route','rel_route','alvo_route','est_route','plan_route',
   'modo_route','cruz_route','cont_route','inventario_route','etq_route','correcao_route','dev_route',
   'devcaso_route','cad_route','sku_route','compras_route','ficha_route','pedido_route','receb_route','material_route','compra_route','recebimento_route','nota_route','almox_route','contagem_material_route','programada_route','dfe_route',
-  'ger_route','st_route','pendencias_route','acesso','teste_route'];
+  'ger_route','st_route','pendencias_route','producao_route','acesso','teste_route'];
 const deQuem = {};
 for(const m of MODULOS){
   const n0 = rotas.length;

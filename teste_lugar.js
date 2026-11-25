@@ -134,6 +134,7 @@ const INV = {   // as 45 telas do §5 da spec, sem faltar nenhuma (③ REVISÃO:
   101:['producao','medida_padrao'], 102:['producao','medida_padrao'], 103:['comercial','mercado_livre'],
   104:['producao','medida_padrao'], 105:['producao','medida_padrao'],
   106:['producao','comum'],   // FICHAS-NO-CADASTRO-UNICO (11/11/2026): o material extra, das duas operacoes
+  107:['producao','medida_padrao'], 108:['producao','medida_padrao'], 110:['producao','medida_padrao'],   // PRODUCAO-MAPA-E-MOTOR v7 (25/11/2026): as bancadas da medida padrao
   201:['expedicao','comum'], 202:['expedicao','comum'], 204:['expedicao','comum'], 205:['expedicao','comum'], 206:['expedicao','comum'],
   251:['posvenda','mercado_livre'], 252:['posvenda','mercado_livre'], 253:['posvenda','mercado_livre'],
   301:['estoque','medida_padrao'], 302:['estoque','medida_padrao'], 303:['estoque','medida_padrao'],
@@ -152,7 +153,7 @@ const INV = {   // as 45 telas do §5 da spec, sem faltar nenhuma (③ REVISÃO:
   /* MANUAL-DO-SISTEMA fase 1 (21/11/2026): a 907 Manual, o "Onde mora" da spec */
   907:['administracao','comum'] };
 const semInv = TODAS.filter(t => !INV[t.n]).map(t => t.n), semMapa = Object.keys(INV).filter(k => !NUMS.has(+k));
-ok('o inventário tem as telas do mapa, e só elas (as 45 de 10/11/2026, as 6 da fase 2 e a 906 da fase 3 da ARRUMAR-O-LUGAR, e a 106; a 903 saiu em 11/11/2026)', !semInv.length && !semMapa.length,
+ok('o inventário tem as telas do mapa, e só elas (as 45 de 10/11/2026, as 6 da fase 2 e a 906 da fase 3 da ARRUMAR-O-LUGAR, e a 106; a 903 saiu em 11/11/2026; a 107, a 108 e a 110 em 25/11/2026)', !semInv.length && !semMapa.length,
   (semInv.length ? 'tela nova fora do inventário: ' + lista(semInv) + ' — declare-a no INV com o módulo e o bloco do "Onde mora" da spec dela. ' : '')
   + (semMapa.length ? 'no inventário e fora do mapa: ' + lista(semMapa) : ''));
 const divergeInv = Object.entries(INV).filter(([num, [mod, bl]]) => {
