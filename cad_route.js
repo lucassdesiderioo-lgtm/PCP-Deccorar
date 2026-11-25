@@ -54,18 +54,40 @@ module.exports=function(app,db){
      decidem regra nenhuma. */
   acrescentar('seed_categoria_material_1','categoria_material',require('./material_dominio').CATEGORIAS);
 
+  /* OS CARRINHOS DA EXPEDICAO (spec CONFERENCIA-CARRINHOS, 25/11/2026): a 202
+     poe cada caixa conferida num carrinho desta lista. Nasce com A e B, pelo
+     acrescimo de uma vez so; o C entra pela 902. */
+  acrescentar('seed_carrinho_expedicao_1','carrinho_expedicao',['A','B']);
   app.get('/api/listas/:tipo',(req,res)=>
     res.json(db.prepare('SELECT id,valor FROM listas WHERE tipo=? AND ativo=1 ORDER BY ordem,id').all(req.params.tipo)));
 
   app.post('/api/listas',(req,res)=>{
     const b=req.body||{};
     if(!b.tipo||!b.valor) return res.status(400).json({erro:'faltam dados'});
+    /* O carrinho vira código de barras (CARRINHO-A): só letras e números, sem
+       repetir e sem "AG" (o Carro da agência). */
+    if(b.tipo==='carrinho_expedicao'){
+      const v=String(b.valor).trim().toUpperCase();
+      if(!/^[A-Z0-9]{1,8}$/.test(v)) return res.status(400).json({erro:'O nome do carrinho é só letras ou números, até 8 (ex.: C).'});
+      if(v==='AG') return res.status(400).json({erro:'"AG" é o Carro da agência: escolha outro nome.'});
+      if(db.prepare("SELECT 1 FROM listas WHERE tipo='carrinho_expedicao' AND ativo=1 AND UPPER(valor)=?").get(v))
+        return res.status(400).json({erro:'Já existe o Carrinho '+v+'.'});
+      b.valor=v;
+    }
     const n=db.prepare('SELECT COALESCE(MAX(ordem),0)+1 o FROM listas WHERE tipo=?').get(b.tipo).o;
     db.prepare('INSERT INTO listas (tipo,valor,ordem) VALUES (?,?,?)').run(b.tipo,b.valor.trim(),n);
     res.json({ok:true});
   });
 
   app.delete('/api/listas/:id',(req,res)=>{
+    /* Carrinho com caixa dentro nao se desativa: a caixa sumiria da tela da
+       Conferencia sem ter saido da fabrica (R-CRR-03). */
+    const l=db.prepare('SELECT tipo,valor FROM listas WHERE id=?').get(req.params.id);
+    if(l && l.tipo==='carrinho_expedicao'){
+      let n=0;
+      try{ const C=require('./carrinho_dominio'); n=C.noDestino(db,l.valor).length; }catch(e){ n=0; }
+      if(n) return res.status(409).json({erro:'O carrinho '+String(l.valor).toUpperCase()+' tem '+n+' caixa(s) dentro. Entregue ou passe as caixas antes de desativar.'});
+    }
     db.prepare('UPDATE listas SET ativo=0 WHERE id=?').run(req.params.id);
     res.json({ok:true});
   });

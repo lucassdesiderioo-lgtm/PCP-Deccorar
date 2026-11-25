@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /* teste_conferencia_tela.js — a TELA de Conferência (/carregamento) num
- * navegador de verdade, com as rotas de verdade (spec CONFERENCIA-EXPEDICAO,
- * fases 1 a 4, 03/11/2026).
+ * navegador de verdade, com as rotas de verdade. Desde 25/11/2026 é a tela
+ * dos CARRINHOS (spec CONFERENCIA-CARRINHOS, fases 1 e 2); até ali ela
+ * conferia a tela da CONFERENCIA-EXPEDICAO (lista única, viagem, sobras).
  *
  *   node teste_conferencia_tela.js
  *
@@ -9,14 +10,14 @@
  * producao): monta um Express so com as rotas da expedicao, num banco
  * temporario e numa porta livre, e o Chromium clica como a bancada clicaria:
  *
- *   1  a lista unica, com a marcacao, e sem os blocos que sairam
- *   2  o bipe de conferencia move a caixa de "Esperando" para "Conferidas"
- *   3  a viagem a agencia: abrir, bipar o que ficou, fechar com foto,
- *      numero e QUEM LEVOU
- *   4  o fim do dia: "a coleta nao passou" e o selo "de ontem" no dia seguinte
- *   5  a venda cancelada: o operador separa (bipe + SKU) sem mexer no saldo,
- *      a gestao confirma (o saldo volta) ou recusa (a caixa volta a lista)
- *   6  a 400 px nada rola de lado; e nenhum erro de script em tudo isso
+ *   1  as duas barras, os destinos (A, B e Carro da agência) e a lista
+ *   2  o bipe sem modo: coleta no carrinho ativo, agência no Carro da agência,
+ *      a etiqueta do carrinho troca o ativo, a conferida sem carrinho entra
+ *      sem baixar de novo
+ *   3  a recontagem cega e o "não achei" (sem mexer no estoque)
+ *   4  a entrega: carrinho, foto, número e fechar; a agência com quem levou
+ *   5  a venda cancelada separada (bipe + SKU), sem mexer no saldo
+ *   6  a 400, 768 e 1024 px nada rola de lado; nenhum erro de script
  *
  * Sem Playwright/Chromium diz "PULADO" e sai sem falhar — o CI do GitHub nao
  * tem navegador, e la esta tela nao e conferida.
@@ -61,6 +62,8 @@ app.get('/api/teste/ativo', (req, res) => res.json({ ativo:false }));
 require('./exp_route')(app, db);
 require('./carreg_route')(app, db);
 require('./saida_route')(app, db);
+require('./cad_route')(app, db);
+require('./carrinho_route')(app, db);
 const ESTOQUE = require('./estoque_dominio'); ESTOQUE.garantirSchema(db); ESTOQUE.abertura(db);
 require('./correcoes').garantirSchema(db);
 app.get('/carregamento', (req, res) => res.sendFile(path.join(__dirname, 'public', 'carregamento.html')));
@@ -86,6 +89,18 @@ const co2 = caixa('Coleta Dois No Canto', { estagio:'carregado', modalidade:'col
 const co3 = caixa('Coleta Tres Cancelar', { estagio:'carregado', modalidade:'coleta', carregado_em:H9, conferido_em:H9, conferido_por:'Joao', baixado_em:H9 });
 const co4 = caixa('Coleta Quatro Recusar', { codigo:'BK120120BEGE', estagio:'carregado', modalidade:'coleta', carregado_em:H9, conferido_em:H9, conferido_por:'Joao', baixado_em:H9 });
 
+/* A foto da tela do motorista: um PNG de 200×200 com ruído — a tela reduz e
+   recomprime em JPEG, e o servidor recusa foto de menos de 2 KB. */
+const FOTO = path.join(tmp, 'foto.png');
+(function(){ const zlib = require('zlib'), W = 200, H = 200;
+  const crc = b => { let c, t = []; for(let n=0;n<256;n++){ c=n; for(let k=0;k<8;k++) c = c&1 ? 0xedb88320^(c>>>1) : c>>>1; t[n]=c>>>0; }
+    let x = 0xffffffff; for(const v of b) x = t[(x^v)&0xff]^(x>>>8); return (x^0xffffffff)>>>0; };
+  const bloco = (tipo, dados) => { const l = Buffer.alloc(4); l.writeUInt32BE(dados.length);
+    const td = Buffer.concat([Buffer.from(tipo), dados]); const c = Buffer.alloc(4); c.writeUInt32BE(crc(td)); return Buffer.concat([l, td, c]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(W,0); ihdr.writeUInt32BE(H,4); ihdr[8]=8; ihdr[9]=2;
+  const cru = Buffer.alloc((W*3+1)*H); for(let i=0;i<cru.length;i++) cru[i] = (i % (W*3+1)) ? (i*7919)&255 : 0;
+  fs.writeFileSync(FOTO, Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), bloco('IHDR',ihdr), bloco('IDAT',zlib.deflateSync(cru)), bloco('IEND',Buffer.alloc(0))]));
+})();
 const srv = app.listen(0, async () => {
   const B = 'http://127.0.0.1:' + srv.address().port;
   let b;
@@ -96,106 +111,90 @@ const srv = app.listen(0, async () => {
     const ctx = await b.newContext({ viewport:{ width:1440, height:1000 } });
     const p = await ctx.newPage();
     p.on('pageerror', e => erros.push(e.message));
-    let respostaDialogo = null;
-    p.on('dialog', d => d.accept(respostaDialogo == null ? undefined : respostaDialogo));
+    p.on('dialog', d => d.accept());
     const abrir = async () => { await p.goto(B + '/carregamento'); await p.waitForTimeout(900); };
     const texto = async sel => (await p.textContent(sel)) || '';
     const bipar = async code => { await p.fill('#scan', code); await p.press('#scan', 'Enter'); await p.waitForTimeout(700); };
+    const filtro = async t => { await p.click('#filtros button:has-text("'+t+'")'); await p.waitForTimeout(200); };
+    const destino = async nome => texto('.dc:has-text("'+nome+'") .q');
 
-    /* ═════ 1 ═════ */
-    secao('1. a lista única, e os blocos que saíram');
+    secao('1. as barras, os destinos e a lista');
     await abrir();
-    const esp = await texto('#espL'), conf = await texto('#confL');
-    ok('Esperando conferência traz as de agência e as de coleta', /Agencia Um Conferir/.test(esp) && /Coleta Um Bancada/.test(esp), esp);
-    ok('Conferidas traz a agência conferida e a coleta no canto', /Agencia Dois Conferida/.test(conf) && /Coleta Dois No Canto/.test(conf), conf);
-    ok('cada caixa leva a marcação Coleta ou Agência', (await p.$$('#espL .tag.col')).length === 1 && (await p.$$('#espL .tag.age')).length === 1);
-    for(const id of ['nCar','nFal','nAdi','pendAviso','sobrasCard','pFalD'])
-      ok('saiu da tela: #' + id, !(await p.$('#' + id)));
-    ok('o "Conferir carga do carro" saiu', !/Conferir carga do carro/.test(await texto('body')));
+    ok('as duas barras aparecem', /Entrega do dia/.test(await texto('#barras')) && /Bipar o que foi impresso hoje/.test(await texto('#barras')), await texto('#barras'));
+    ok('os destinos: Carrinho A, Carrinho B e Carro da agência', /Carrinho A/.test(await texto('#painel')) && /Carrinho B/.test(await texto('#painel')) && /Carro da agência/.test(await texto('#painel')));
+    ok('o A nasce ativo', /ATIVO/.test(await texto('.dc:has-text("Carrinho A")')));
+    ok('"Faltam bipar" traz a agência e a coleta impressas', /Agencia Um Conferir/.test(await texto('#lista')) && /Coleta Um Bancada/.test(await texto('#lista')), await texto('#lista'));
+    ok('o topo diz o segundo bipe e onde muda', /Segundo bipe \(SKU\): desligado · muda na 906 Parâmetros/.test(await texto('#parSegundo')), await texto('#parSegundo'));
 
-    /* ═════ 2 ═════ */
-    secao('2. o bipe de conferência');
-    await bipar(ag1.code);
-    ok('o banner diz que conferiu', /conferi|área|ÁREA/i.test(await texto('#banner')), await texto('#banner'));
-    await p.waitForTimeout(500); await abrir();
-    ok('a caixa passou de Esperando para Conferidas', !/Agencia Um Conferir/.test(await texto('#espL')) && /Agencia Um Conferir/.test(await texto('#confL')));
-
-    /* ═════ 3 ═════ */
-    secao('3. a viagem à agência: abrir, bipar o que ficou, fechar com quem levou');
-    QUEM = 2; await abrir();
-    await p.click('text=🚗 Viagem à agência'); await p.waitForTimeout(900);
-    ok('abrir põe no carro as três conferidas de agência', /3 no carro/.test(await texto('#banner')), await texto('#banner'));
-    ok('a faixa diz que o bipe é o que FICOU', /FICOU NA FÁBRICA/.test(await texto('#modoBar')), await texto('#modoBar'));
-    await bipar(ag3.code);
-    ok('bipar a caixa que ficou tira ela do carro', /Ficou na fábrica/.test(await texto('#banner')) && !lote(ag3.id).saida_id, await texto('#banner'));
-    const opcoes = await p.$$eval('#quemLevou option', os => os.map(o => o.textContent));
-    ok('"Quem levou" lista as pessoas do cadastro', opcoes.includes('Beto Carro') && opcoes.includes('Ana Bancada'), opcoes);
-    const foto = path.join(tmp, 'atendente.png'); fs.writeFileSync(foto, await p.screenshot());
-    await p.setInputFiles('#fotoInV', foto); await p.waitForTimeout(500);
-    await p.fill('#atQtd', '2');
-    await p.click('text=Fechar viagem'); await p.waitForTimeout(600);
-    ok('sem quem levou, a tela pede e não fecha', /Quem levou/.test(await texto('#banner')) && !db.prepare("SELECT 1 FROM saida WHERE tipo='agencia' AND fechada_em IS NOT NULL").get(), await texto('#banner'));
-    await p.selectOption('#quemLevou', { label:'Beto Carro' });
-    await p.click('text=Fechar viagem'); await p.waitForTimeout(900);
-    const sv = db.prepare("SELECT * FROM saida WHERE tipo='agencia' AND fechada_em IS NOT NULL").get() || {};
-    ok('fechou: a viagem tem a foto, os números e quem levou', !!sv.foto && sv.qtd_sistema === 2 && sv.qtd_externa === 2 && sv.quem_levou === 'Beto Carro', sv);
-    eq('   e quem fechou é o login', sv.fechado_por, 'Beto Carro');
-    ok('o histórico da viagem mostra quem levou', /levou: Beto Carro/.test(await texto('#viagemHist')), await texto('#viagemHist'));
-
-    /* ═════ 4 ═════ */
-    secao('4. o fim do dia: a coleta não passou');
-    const antes = JSON.stringify(lote(co2.id));
-    await p.click('#btnNaoPassou'); await p.waitForTimeout(800);
-    ok('registrar avisa quantas ficaram', /a coleta não passou/i.test(await texto('#banner')), await texto('#banner'));
-    ok('a linha do fim do dia diz quem registrou', /Registrado hoje por/.test(await texto('#fimInfo')), await texto('#fimInfo'));
-    eq('a caixa não mudou nada', JSON.stringify(lote(co2.id)), antes);
-    db.prepare('UPDATE fim_dia SET dia=?').run(ONTEM);
-    await abrir();
-    const primeira = await p.$eval('#confL .row', e => e.textContent).catch(() => '');
-    ok('no dia seguinte, a que ficou vem EM CIMA com o selo "de ontem"', /de ontem/.test(primeira), primeira);
-
-    /* ═════ 5 ═════ */
-    secao('5. a venda cancelada: separa, e outra pessoa confirma ou recusa');
-    QUEM = 1; await abrir();
+    secao('2. o bipe sem modo');
     const s0 = saldo('BK140140BEGE');
-    await p.click('#btnSobrou'); await p.waitForTimeout(300);
-    ok('a faixa vira VENDA CANCELADA', /VENDA CANCELADA/.test(await texto('#modoBar')), await texto('#modoBar'));
-    await bipar(co3.code);
-    await bipar('BK140140BEGE');
-    await p.click('#banner button:text-is("Venda cancelada")'); await p.waitForTimeout(300);
-    await p.click('text=Separar como venda cancelada'); await p.waitForTimeout(900);
-    ok('separada: o banner manda separar e esperar a confirmação', /Separada/.test(await texto('#banner')) && /confirma/i.test(await texto('#banner')), await texto('#banner'));
-    eq('   separar NÃO mexe no saldo', saldo('BK140140BEGE'), s0);
-    ok('   e a caixa saiu da lista de saída', !/Coleta Tres Cancelar/.test(await texto('#confL')));
-    ok('a lista "aguardando confirmação" mostra a caixa, sem botões para quem não pode',
-       /Coleta Tres Cancelar/.test(await texto('#cancL')) && !(await p.$('#cancL >> text=Confirmar no ML')), await texto('#cancL'));
-    // a mesma pessoa separa a segunda, para a gestao recusar
-    await p.click('#btnSobrou'); await p.waitForTimeout(200);
-    await bipar(co4.code); await bipar('BK120120BEGE');
-    await p.click('#banner button:text-is("Motorista recusou")'); await p.waitForTimeout(300);
-    await p.click('text=Separar como venda cancelada'); await p.waitForTimeout(900);
-    QUEM = 3; await abrir();
-    ok('para a gestão, os botões aparecem', !!(await p.$('#cancL >> text=Confirmar no ML')) && !!(await p.$('#cancL >> text=Recusar')));
-    await p.click('#cancL .row:has-text("Coleta Tres Cancelar") button:text-is("Confirmar no ML")'); await p.waitForTimeout(900);
-    ok('confirmar: o banner diz que o estoque voltou', /voltou \+1/.test(await texto('#banner')), await texto('#banner'));
-    eq('   +1 no saldo', saldo('BK140140BEGE'), s0 + 1);
-    const s1 = saldo('BK120120BEGE');
-    respostaDialogo = 'No ML a venda segue ativa';
-    await p.click('#cancL .row:has-text("Coleta Quatro Recusar") button:text-is("Recusar")'); await p.waitForTimeout(900);
-    respostaDialogo = null;
-    ok('recusar: a caixa volta para a lista de saída', /Coleta Quatro Recusar/.test(await texto('#confL')) && lote(co4.id).estagio === 'carregado', await texto('#confL'));
-    eq('   e o saldo não mexeu', saldo('BK120120BEGE'), s1);
-    ok('a lista das canceladas zera', /Nenhuma venda cancelada esperando/.test(await texto('#cancL')), await texto('#cancL'));
+    await bipar(co1.code);
+    ok('coleta: conferida no Carrinho A', /Conferida — no Carrinho A/.test(await texto('#banner')), await texto('#banner'));
+    eq('   o carrinho A tem 1', await destino('Carrinho A'), '1');
+    eq('   e baixou 1', saldo('BK140140BEGE'), s0 - 1);
+    await bipar(ag1.code);
+    ok('agência: vai sozinha para o Carro da agência', /Carro da agência/.test(await texto('#banner')) && lote(ag1.id).carrinho === 'AG', await texto('#banner'));
+    await bipar('CARRINHO-B');
+    ok('a etiqueta do carrinho troca o ativo para o B', /ATIVO/.test(await texto('.dc:has-text("Carrinho B")')), await texto('#painel'));
+    await filtro('Conferidas sem carrinho');
+    ok('as conferidas de antes aparecem sem carrinho', /Coleta Dois No Canto/.test(await texto('#lista')) && /Agencia Dois Conferida/.test(await texto('#lista')), await texto('#lista'));
+    const s1 = saldo('BK140140BEGE');
+    await bipar(co2.code);
+    ok('a conferida sem carrinho entra no B pelo bipe', /já estava conferida/.test(await texto('#banner')) && lote(co2.id).carrinho === 'B', await texto('#banner'));
+    eq('   sem baixar de novo', saldo('BK140140BEGE'), s1);
+    await bipar(co4.code);   // mais uma no B
 
-    /* ═════ 6 ═════ */
-    secao('6. no celular nada rola de lado');
-    await p.setViewportSize({ width:400, height:900 }); await abrir();
-    const m = await p.evaluate(() => ({ sw:document.documentElement.scrollWidth, cw:document.documentElement.clientWidth }));
-    ok('a 400 px a página não rola de lado', m.sw <= m.cw, m);
-    /* O cabecalho da lista nasceu ambar: a classe `conf` ja era de um botao
-       antigo (o "Conferir carga do carro"). So apareceu abrindo a tela. */
-    const fundo = await p.$eval('#confT', e => getComputedStyle(e).backgroundColor);
-    ok('o cabeçalho "Conferidas" não herda a cor de outra regra', fundo === 'rgb(250, 251, 253)', fundo);
+    secao('3. a recontagem cega');
+    await p.click('.dc:has-text("Carrinho B") button:has-text("Recontar")'); await p.waitForTimeout(300);
+    ok('a recontagem não mostra o número esperado', !/2 caixas|Na conferência/.test(await texto('#painel')), await texto('#painel'));
+    await bipar(co2.code);
+    await p.click('text=Terminei a recontagem'); await p.waitForTimeout(700);
+    ok('faltou uma: a lista aparece', /Faltam 1 no carrinho/.test(await texto('#painel')) && /Coleta Quatro Recusar/.test(await texto('#painel')), await texto('#painel'));
+    const s2 = saldo('BK120120BEGE');
+    await p.click('#painel .cx:has-text("Coleta Quatro Recusar") button:has-text("Não achei")'); await p.waitForTimeout(700);
+    ok('"não achei" tira do carrinho', lote(co4.id).carrinho === null && !!lote(co4.id).nao_achada_em);
+    eq('   sem mexer no estoque', saldo('BK120120BEGE'), s2);
+    await p.click('#painel button:has-text("Concluir")'); await p.waitForTimeout(500);
+
+    secao('4. a entrega');
+    await p.click('.dc:has-text("Carrinho A") button:has-text("Entregar")'); await p.waitForTimeout(800);
+    if(/Seguir sem elas/.test(await texto('#painel'))){ await p.click('text=Seguir sem elas →'); await p.waitForTimeout(300); }
+    ok('passo dos carrinhos, com o A marcado', /☑ Carrinho A/.test(await texto('#painel')), await texto('#painel'));
+    await p.click('#painel button:has-text("Continuar")'); await p.waitForTimeout(300);
+    await p.setInputFiles('#fotoIn', FOTO); await p.waitForTimeout(800);
+    await p.click('#painel button:has-text("Continuar")'); await p.waitForTimeout(300);
+    await p.fill('#numEnt', '2'); await p.click('text=Comparar e fechar'); await p.waitForTimeout(800);
+    ok('número diferente: não bateu, e o liberar aparece', /Não bateu/.test(await texto('#painel')) && !!(await p.$('#painel button:has-text("Liberar com divergência")')), await texto('#painel'));
+    eq('   nada saiu', lote(co1.id).saida_id, null);
+    await p.fill('#numEnt', '1'); await p.click('text=Comparar e fechar'); await p.waitForTimeout(900);
+    ok('número certo: entrega fechada', /Entrega fechada/.test(await texto('#banner')) && !!lote(co1.id).saida_id && lote(co1.id).saiu_por === 'coleta', await texto('#banner'));
+    await p.click('.dc:has-text("Carro da agência") button:has-text("Entregar")'); await p.waitForTimeout(800);
+    if(/Seguir sem elas/.test(await texto('#painel'))){ await p.click('text=Seguir sem elas →'); await p.waitForTimeout(300); }
+    await p.click('#painel button:has-text("Continuar")'); await p.waitForTimeout(300);
+    await p.setInputFiles('#fotoIn', FOTO); await p.waitForTimeout(800);
+    await p.click('#painel button:has-text("Continuar")'); await p.waitForTimeout(500);
+    ok('agência: pede quem levou', !!(await p.$('#quemLevou')));
+    await p.selectOption('#quemLevou', '2'); await p.fill('#numEnt', '1');
+    await p.click('text=Comparar e fechar'); await p.waitForTimeout(900);
+    ok('agência fechada com quem levou', /Entrega fechada/.test(await texto('#banner')) && lote(ag1.id).saiu_por === 'agencia', await texto('#banner'));
+    await p.click('text=Histórico do dia'); await p.waitForTimeout(400);
+    ok('o histórico do dia mostra as duas entregas', (await texto('#hist')).split('entregou').length - 1 === 2, await texto('#hist'));
+
+    secao('5. a venda cancelada');
+    const s3 = saldo('BK140140BEGE');
+    await p.click('text=✕ Venda cancelada'); await p.waitForTimeout(400);
+    await bipar(co3.code); await bipar('BK140140BEGE');
+    await p.click('#painel button:text-is("Venda cancelada")'); await p.waitForTimeout(300);
+    await p.click('text=Separar como venda cancelada'); await p.waitForTimeout(900);
+    ok('separada: a caixa sai das listas', lote(co3.id).estagio === 'cancelado', lote(co3.id).estagio);
+    eq('   e o saldo não mexeu', saldo('BK140140BEGE'), s3);
+
+    secao('6. nada rola de lado');
+    for(const w of [400, 768, 1024]){
+      await p.setViewportSize({ width:w, height:900 }); await abrir();
+      const m = await p.evaluate(() => ({ sw:document.documentElement.scrollWidth, cw:document.documentElement.clientWidth }));
+      ok('a ' + w + ' px a página não rola de lado', m.sw <= m.cw, m);
+    }
     await p.screenshot({ path:path.join(tmp, 'tela-400.png'), fullPage:true });
     if(process.env.SALVAR_TELA) fs.copyFileSync(path.join(tmp, 'tela-400.png'), process.env.SALVAR_TELA);
     eq('nenhum erro de script em tudo isso', erros, []);

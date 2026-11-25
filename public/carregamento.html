@@ -11,1075 +11,540 @@
 <link rel="stylesheet" href="/ipad.css">
 <title>Conferência</title>
 <style>
-  /* Operacao: fundo CLARO (DESIGN secao 2) — tela usada sob luz de fabrica, escuro vira espelho */
-  :root{--bg:#ffffff;--panel:#f4f6f8;--line:#d8dee6;--txt:#1a1d23;--muted:#5a6472;--amber:#b26a00;--green:#2e7d32;--red:#c62828;--blue:#1565c0;--violet:#6f42c1}
-  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif}
-  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  /* A 202 CONFERÊNCIA COM CARRINHOS (spec CONFERENCIA-CARRINHOS, 25/11/2026).
+     A tela segue o caminho da caixa: em cima as duas barras do dia; à
+     esquerda o bipe e os destinos (Carrinho A, B…, Carro da agência); à
+     direita a lista das caixas; embaixo as ações raras.
+     Operação: fundo CLARO (DESIGN §1) — luz de fábrica, tela escura vira espelho. */
+  :root{--bg:#ffffff;--panel:#f4f6f8;--line:#d8dee6;--txt:#1a1d23;--muted:#5a6472;--amber:#b26a00;--green:#2e7d32;--red:#c62828;--blue:#1565c0;--violet:#6f42c1;--gray:#9aa4b1;
+    --redbg:#fdecea;--greenbg:#e8f5e9;--amberbg:#fff4e0;--bluebg:#e8f0fb;--violetbg:#f1ebfb}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.4}
+  button{font:inherit;cursor:pointer}
+  header{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   .mark{width:34px;height:34px;border-radius:8px;background:var(--amber);display:grid;place-items:center;color:#1a1300;font-weight:800}
   h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
-  .link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px}
-  .links{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-  .wrap{max-width:1180px;margin:0 auto;padding:18px 18px 110px}
-  /* AS DUAS PORTAS LADO A LADO: carro (agência) à esquerda, coleta à direita.
-     São dois lugares físicos diferentes, e uma lista embaixo da outra fazia o
-     operador rolar a tela pra saber onde a caixa vai. Em tablet estreito
-     (abaixo de 900 px) empilha, o carro primeiro. */
-  .duas{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;align-items:start}
-  @media(max-width:900px){ .duas{grid-template-columns:1fr} }
-  /* COLETA tem cor propria (violeta) nas duas telas — Etiqueta de Venda e aqui.
-     E a segunda porta de saida da fabrica: uma cor que nao se confunde com
-     "conferida" (verde) nem "falta" (ambar). Os quatro quadros do topo (No
-     carro, Faltam no carro, Coleta esperando, Pecas adiantadas) SAIRAM em
-     03/11/2026 (CONFERENCIA-EXPEDICAO fase 1), junto com a linha da central
-     de pendencias: a conta esta no cabecalho de cada parte da lista unica. */
-  .tag.age{background:#e6f0fb;color:#1f4f8f;border:1px solid #b8cfee}
-  .lista1{margin-top:14px}
-  .fimdia{margin-top:14px}
-  .fimdia .fechbox{flex-wrap:wrap}
-  .tag.ontem{background:#fde8e6;color:#9b2c22;border:1px solid #efb1ad}
-  .cancPend .row{flex-wrap:wrap}
-  .cancPend .acoes{display:flex;gap:8px;flex-wrap:wrap}
-  #quemLevou{font-size:18px;padding:10px;border:2px solid #c9d8ee;border-radius:10px;max-width:100%}
-  .sub3{padding:10px 14px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--line);line-height:1.9}
-  .parte{padding:10px 14px;font-size:14px;border-top:1px solid var(--line);background:#fafbfd}
-  .parte.p-esp b{color:var(--amber)} .parte.p-conf b{color:var(--green)}
-  .parte .por{color:var(--muted);font-weight:400;margin-left:6px}
-  .adiant{margin-top:10px;font-size:18px;font-weight:800;color:var(--blue)}
-  .banner{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:26px;text-align:center;margin-bottom:14px}
-  .banner.ok{background:#e7f5eb;border-color:#a9d8b4}.banner.err{background:#fbe9e8;border-color:#efb1ad}.banner.warn{background:#fbf1db;border-color:#e7cb8c}
-  .banner.col{background:#efe9fb;border-color:#b9a3e6}
-  .bt{font-size:26px;font-weight:780}.bs{font-size:15px;color:var(--muted);margin-top:6px}.bs b{color:var(--txt)}
-  .indo{font-size:44px;font-weight:900;color:var(--violet);line-height:1.1;margin:8px 0 2px}
-  #scan{position:absolute;left:-9999px;opacity:0}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  .card h3{margin:0;padding:12px 14px;font-size:13px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--line)}
-  .card.col{border-color:#b9a3e6}.card.col h3{background:#efe9fb;color:#4b2a91}
-  .row{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:14px;align-items:center}
-  .row .c{font-family:ui-monospace,monospace;color:var(--muted);font-size:12px}
-  .row .who{flex:1}
-  .btn{border:0;border-radius:9px;font-weight:700;padding:11px 16px;cursor:pointer}
-  .fech{background:var(--violet);color:#fff}
-  .ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
-  .empty{padding:22px;text-align:center;color:var(--green)}
-  .sub2{padding:10px 14px;font-size:13px;color:#4b2a91;background:#f6f2fd;border-bottom:1px solid #e3d9f5}
-  .fechbox{padding:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line)}
-  .fechbox input[type=number]{font-size:24px;font-weight:800;width:110px;padding:10px;text-align:center;border:2px solid #b9a3e6;border-radius:10px}
-  /* A FOTO E OBRIGATORIA e por isso o botao dela e grande e vem ANTES do
-     "Fechar": a camera abre direto no tablet (capture=environment). O
-     <input type=file> fica dentro do <label>, visivel, porque o iOS ignora
-     campo escondido (§12). */
-  .fotobtn{display:inline-flex;align-items:center;gap:8px;background:#fff;border:2px dashed #6f42c1;color:#4b2a91;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer}
-  .fotobtn input{position:absolute;width:1px;height:1px;opacity:0.01}
-  .fotobtn.ok{border-style:solid;background:#efe9fb}
-  .fotoprev{height:64px;border-radius:8px;border:1px solid #b9a3e6;display:none}
-  .fotoprev.on{display:inline-block}
-  .hist{padding:8px 14px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
-  .hist b.ok{color:var(--green)}.hist b.div{color:var(--red)}
-  /* A SAIDA DO CAMINHAO (fase 3 da spec SAIDA-E-DUPLA-CONFERENCIA). Aberta, a
-     tela inteira muda de cor e o bipe passa a querer dizer SOBROU. A cor nao
-     e enfeite: e o que impede bipar meia hora achando que esta carregando o
-     carro (e o mesmo mecanismo dos tres modos da Revisao, §3). */
-  body.modo-saida header{background:#efe9fb;border-bottom:3px solid var(--violet)}
-  body.modo-saida .banner:not(.ok):not(.err):not(.warn){background:#efe9fb;border-color:#b9a3e6}
-  /* A VIAGEM A AGENCIA (fase 4) tem a cor do carro: azul. O bipe da tela vai
-     para UM lugar de cada vez — a area, o carro ou as sobras do caminhao — e
-     a faixa #modoBar diz qual, na cor dele. */
-  body.modo-viagem header{background:#e8f0fb;border-bottom:3px solid var(--blue)}
-  .viagemhead{background:var(--blue);color:#fff;font-weight:800;padding:12px 14px;font-size:15px}
-  .saidaconta.viagemconta .big{color:var(--blue)}
-  .modobar{border-radius:10px;padding:8px 14px;font-weight:800;font-size:14px;margin:-6px 0 14px;text-align:center}
-  .modobar.area{background:#f4f6f8;color:var(--muted);border:1px solid var(--line)}
-  .modobar.carro{background:#e8f0fb;color:var(--blue);border:2px solid var(--blue)}
-  .modobar.sobra{background:#efe9fb;color:#4b2a91;border:2px solid var(--violet)}
-  /* A RECUSA DO MOTORISTA (RECUSA-DO-MOTORISTA, 02/10/2026): vermelho, porque
-     o bipe para de querer dizer "conferir" e passa a tirar a caixa da venda. */
-  .modobar.recusa{background:#fbe9e8;color:var(--red);border:2px solid var(--red)}
-  .recusabox{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
-  .recusabox .btn{flex:1 1 200px}
-  .btn.recusar{background:#fff;color:var(--red);border:2px solid var(--red)}
-  .volta{margin-top:12px;font-size:22px;font-weight:800;color:var(--red);line-height:1.3}
-  /* O "SOBROU" (fase 2-B): a caixa volta para a prateleira. Os motivos sao
-     botoes grandes, o escolhido fica cheio; as persianas sao uma lista que se
-     marca a cada bipe do SKU. */
-  .motivos{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-  .motivos .btn{flex:1 1 160px;background:#fff;color:var(--txt);border:2px solid var(--line)}
-  .motivos .btn.esc{background:var(--blue);color:#fff;border-color:var(--blue)}
-  .sobrouPecas{margin-top:10px;font-size:18px;line-height:1.5}
-  .sobrouPecas .ok{color:#2e7d32}
-  #sobrouTexto{width:100%;margin-top:8px;font-size:18px;padding:10px;border:2px solid var(--line);border-radius:10px;box-sizing:border-box}
-  .cancPend .row .c{white-space:normal}
-  .saidahead{background:var(--violet);color:#fff;font-weight:800;padding:12px 14px;font-size:15px}
-  .saidaconta{padding:12px 14px;font-size:15px;border-bottom:1px solid #e3d9f5}
-  .saidaconta .big{font-size:34px;font-weight:900;color:var(--violet);line-height:1.1}
-  .mini{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer;margin-left:auto}
-  .tagtroca{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:4px;
-    background:#fbf1db;color:var(--amber);border:1px solid #e7cb8c;white-space:nowrap}
-  .divbox{padding:12px 14px;background:#fbe9e8;border-top:1px solid #efb1ad}
-  .divbox h4{margin:0 0 6px;color:var(--red);font-size:15px}
-  .divbox .row{background:#fff}
-  .motivo{width:100%;font-size:15px;padding:10px;border:2px solid #efb1ad;border-radius:10px;margin-top:8px}
-  /* A CONFERENCIA DA PILHA (fase 2 da spec SAIDA-E-DUPLA-CONFERENCIA): as
-     caixas com etiqueta impressa HOJE contra as que ja foram bipadas aqui.
-     A conta fecha caixa a caixa — impressas = conferidas + faltam — e o que
-     falta vem com nome. Fica acima das duas portas porque vale para as duas. */
-  .pilha{margin-top:14px}
-  .pconta{display:flex;gap:18px;flex-wrap:wrap;padding:12px 14px;font-size:15px;align-items:baseline}
-  .pconta b{font-size:24px;font-weight:800}
-  .pconta .pf b{color:var(--amber)}.pconta .pc b{color:var(--green)}
-  .pconta .zero b{color:var(--green)}
-  .tag{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:4px;white-space:nowrap}
-  .tag.adi{background:#eef3fb;color:var(--blue);border:1px solid #c9d8ee}
-  .tag.col{background:#efe9fb;color:#4b2a91;border:1px solid #b9a3e6}
-  .tag.ant{background:#fbf1db;color:var(--amber);border:1px solid #e7cb8c}
-  .pnota{padding:8px 14px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
-  /* QUEM IMPRIMIU (CARREGAMENTO-SEGUNDA-PESSOA, fase 1): o nome do login de
-     quem fez a etiqueta de venda, na recusa, no bipe aceito e na pilha. */
-  /* linha própria: em inline-block ele grudava no número de antes
-     ("prontas pro carro 1Etiqueta feita por …") — 05/10/2026 */
-  .quem{display:block;margin-top:6px;font-size:15px}
-  .tag.quem2{background:#eef1f6;color:#3a4250}
-  .btroca{margin-top:12px;background:#1a1d23;color:#fff;font-size:17px;padding:13px 20px}
-
-  /* As listas da pilha ficam RECOLHIDAS: com o bipe unico (opcao A) as caixas
-     que faltam conferir sao as mesmas das listas do carro e da coleta logo
-     abaixo, e aberta a tela diria a mesma coisa duas vezes — que foi o que o
-     dono leu como "duas vendas" na caixa de varias (opcao B, 25/09/2026).
-     O numero fica sempre a vista; a lista abre com um toque, e continua
-     aberta nos refreshes de 4 s (o <details> nao e redesenhado). */
-  .pilha details{border-top:1px solid var(--line)}
-  .pilha summary{padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;list-style:revert}
-  .pilha details.ant summary{background:#fbf1db;color:var(--amber)}
+  .links{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+  .link{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:8px;background:#fff}
+  .par{font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 10px}
+  .wrap{max-width:1360px;margin:0 auto;padding:14px 18px 60px;display:flex;flex-direction:column;gap:14px}
+  .btn{border-radius:10px;padding:10px 16px;font-weight:700;min-height:46px;background:var(--panel);color:var(--txt);border:1px solid var(--line)}
+  .btn.pri{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .btn.ok{background:var(--green);color:#fff;border-color:var(--green)}
+  .btn.red{background:var(--red);color:#fff;border-color:var(--red)}
+  .btn.big{font-size:17px;padding:13px 20px;min-height:54px}
+  .btn.sm{min-height:38px;padding:7px 12px;font-size:14px}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .acoes{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  /* as duas barras */
+  .barras{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  @media(max-width:860px){.barras{grid-template-columns:1fr}}
+  .bx{border:1px solid var(--line);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:7px}
+  .bx .cab{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .bx .tit{font-size:13px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .bx .falta{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+  .bx .falta small{font-size:15px;font-weight:600;color:var(--muted)}
+  .bx .de{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .trilho{display:flex;height:20px;border-radius:8px;overflow:hidden;background:var(--panel);border:1px solid var(--line)}
+  .trilho i{display:block;height:100%}
+  .leg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted)}
+  .leg span{display:inline-flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}.leg b{color:var(--txt)}
+  .sq{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .k-ent{background:var(--green)}.k-car{background:var(--blue)}.k-imp{background:var(--amber)}.k-sem{background:var(--gray)}
+  .faixa{background:var(--amberbg);border:2px solid var(--amber);color:#4a2c00;border-radius:10px;padding:9px 14px;font-weight:700}
+  /* o corpo */
+  .corpo{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;align-items:start}
+  @media(max-width:980px){.corpo{grid-template-columns:1fr}}
+  .card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;background:#fff;min-width:0}
+  .card h2{font-size:16px;margin:0}
+  .banner{border-radius:12px;padding:14px 18px;border:3px solid var(--line);background:var(--panel)}
+  .banner .bt{font-size:23px;font-weight:800;line-height:1.15}
+  .banner .bs{font-size:15px;margin-top:5px}
+  .banner.ok{background:var(--greenbg);border-color:var(--green);color:#173f1a}
+  .banner.err{background:var(--redbg);border-color:var(--red);color:#5a1010}
+  .banner.esp{background:var(--bluebg);border-color:var(--blue);color:#0c3266}
+  .banner.warn{background:var(--amberbg);border-color:var(--amber);color:#4a2c00}
+  #scan{width:100%;font-size:20px;padding:12px 14px;border:2px solid #c9d8ee;border-radius:10px;font-family:ui-monospace,Menlo,Consolas,monospace;min-height:52px}
+  .dest{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+  .dc{border:2px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;background:#fff;text-align:left}
+  .dc .n{font-weight:800;font-size:15px;display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap}
+  .dc .q{font-size:36px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+  .dc .l{font-size:12px;color:var(--muted)}
+  .dc.ativo{border-color:var(--blue);background:var(--bluebg);box-shadow:0 0 0 2px var(--blue) inset}
+  .dc.ativo .l{color:var(--blue);font-weight:700}
+  .dc.ag{border-color:#c6d8f1}
+  .chip{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;border:1px solid transparent;white-space:nowrap}
+  .c-col{background:var(--violetbg);color:var(--violet);border-color:#d9c9f3}
+  .c-ag{background:var(--bluebg);color:var(--blue);border-color:#c6d8f1}
+  .c-ok{background:var(--greenbg);color:var(--green);border-color:#bfe0c2}
+  .c-am{background:var(--amberbg);color:var(--amber);border-color:#f0d29a}
+  .c-red{background:var(--redbg);color:var(--red);border-color:#f3c3c0}
+  .c-mu{background:var(--panel);color:var(--muted);border-color:var(--line)}
+  .filtros{display:flex;gap:6px;flex-wrap:wrap}
+  .fl{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 12px;font-size:14px;font-weight:700;color:var(--muted);min-height:40px}
+  .fl.on{background:var(--txt);color:#fff;border-color:var(--txt)}
+  .lista{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden;max-height:620px;overflow-y:auto}
+  .cx{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);align-items:center}
+  .cx:last-child{border-bottom:0}
+  .cx .cli{font-weight:700}
+  .cx .det{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:3px 10px;align-items:center}
+  .cx .det .mono{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--txt)}
+  .cx .dir{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .vazio{padding:14px;color:var(--muted);font-size:14px}
+  .passos{display:flex;gap:6px;flex-wrap:wrap;font-size:13px}
+  .passos span{padding:6px 10px;border-radius:999px;background:var(--panel);color:var(--muted);border:1px solid var(--line)}
+  .passos span.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .passos span.feito{background:var(--greenbg);color:var(--green);border-color:#bfe0c2}
+  .num{font-size:30px;font-weight:800;width:140px;text-align:center;padding:8px;border:2px solid #c9d8ee;border-radius:10px;font-variant-numeric:tabular-nums}
+  .cmp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .cmp div{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel)}
+  .cmp b{display:block;font-size:30px;font-variant-numeric:tabular-nums}
+  .foto{width:150px;height:100px;border-radius:10px;border:2px dashed var(--line);display:grid;place-items:center;color:var(--muted);font-size:13px;background:var(--panel);overflow:hidden}
+  .foto img{width:100%;height:100%;object-fit:cover}
+  input.txt, select.txt{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:8px;width:100%;min-height:44px;background:#fff}
+  .pecas{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+  .pc{display:flex;gap:10px;align-items:center;font-size:16px;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--txt)}
+  .pc.ok{background:var(--greenbg);border-color:#bfe0c2}
+  .outras{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .outras .lbl{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-right:4px}
+  .ct{display:inline-block;min-width:22px;padding:0 6px;border-radius:11px;background:var(--red);color:#fff;font-size:12px;margin-left:4px;text-align:center}
+  .ct.z{background:var(--line);color:var(--muted)}
+  .hist{display:flex;flex-direction:column;gap:6px;font-size:14px}
+  .hist div{padding:7px 10px;border-left:3px solid var(--line);background:var(--panel);border-radius:0 6px 6px 0}
+  .nota{font-size:13px;color:var(--muted)}
 </style></head><body>
-<header><div class="mark">C</div><div><h1>Conferência da etiqueta de venda</h1><div class="sub">Bipe a etiqueta de venda ao conferir a caixa — antes do carro ou do caminhão</div></div>
-<div class="links"><button class="link" style="background:none;cursor:pointer" onclick="trocarPessoa()">👤 Trocar de pessoa</button><a class="link" href="/embalagem">Expedição</a><a class="link" href="/painel">Painel</a></div></header>
+<header><div class="mark">C</div><div><h1>202 Conferência</h1><div class="sub">Bipe as caixas com etiqueta, coloque nos carrinhos e entregue</div></div>
+<div class="links"><span class="par" id="parSegundo">Segundo bipe (SKU): …</span>
+  <button class="link" onclick="trocarPessoa()">👤 Trocar de pessoa</button><a class="link" href="/embalagem">Etiqueta de Venda</a></div></header>
 <div class="wrap">
-  <div class="banner" id="banner"><div class="bt">Pronto</div><div class="bs">Bipe o QR ou código de barras da etiqueta de venda.</div></div>
-  <div class="modobar area" id="modoBar">O bipe agora: CONFERIR NA ÁREA</div>
-  <input id="scan" autocomplete="off">
-  <div class="card pilha" id="pilhaCard"><h3>📋 Conferência da pilha — etiquetas impressas hoje</h3>
-    <div class="pconta" id="pConta"></div>
-    <details id="pAntD"><summary id="pAntS"></summary><div id="pAnt"></div></details>
-    <div id="pVazio"></div><div id="pSeg"></div></div>
-  <!-- A LISTA UNICA (CONFERENCIA-EXPEDICAO fase 1, 03/11/2026): agencia e
-       coleta juntas, cada caixa com a marcacao. A modalidade vem do servidor
-       (carga.js); a tela so junta o que a rota ja manda (listaUnica). -->
-  <div class="card lista1" id="listaCard"><h3>📦 Caixas com etiqueta de venda</h3>
-    <div class="sub3">Bipe cada caixa para conferir. <span class="tag col">🟣 Coleta</span> o caminhão do Mercado Livre vem buscar — a caixa vai pro canto reservado. <span class="tag age">🚗 Agência</span> a gente leva no carro.</div>
-    <div class="parte p-esp" id="espT"></div><div id="espL"></div>
-    <div class="parte p-conf" id="confT"></div><div id="confL"></div>
-    <div id="depois"></div>
+  <div class="barras" id="barras"></div>
+  <div class="faixa" id="faixa" hidden></div>
+  <div class="corpo">
+    <div class="card">
+      <h2 id="titEsq">Bipar caixas</h2>
+      <div class="banner" id="banner"><div class="bt">Pronto</div><div class="bs">Bipe a etiqueta de venda da caixa.</div></div>
+      <input id="scan" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Bipe aqui">
+      <div id="painel"></div>
+    </div>
+    <div class="card"><h2>Caixas de hoje</h2><div class="filtros" id="filtros"></div><div id="lista"></div></div>
   </div>
-  <!-- O FIM DO DIA (CONFERENCIA-EXPEDICAO fases 3 e 4, 03/11/2026): a caixa
-       que ficou tem dois destinos, e so dois. Sem marcacao ela continua na
-       lista, como "nao saiu" — nunca como cancelada. -->
-  <div class="card fimdia" id="fimCard"><h3>🌙 Fim do dia — a caixa que ficou na fábrica</h3>
-    <div class="sub3">A caixa da lista acima que não saiu hoje tem <b>dois destinos</b>. Sem marcação ela continua na lista — o sistema entende "não saiu", nunca "cancelada".</div>
-    <div class="fechbox">
-      <button class="btn fech" id="btnNaoPassou" onclick="coletaNaoPassou()">🚚 A coleta não passou hoje</button>
-      <span style="font-size:13px;color:var(--muted)" id="fimInfo">As caixas da lista ficam esperando e amanhã aparecem <b>em cima</b>, com o selo <b>de ontem</b>. Nada muda no estoque.</span>
-    </div>
-    <div class="fechbox">
-      <button class="btn recusar" id="btnSobrou" onclick="modoSobrou()">✕ Venda cancelada — separar a caixa</button>
-      <span style="font-size:13px;color:var(--muted)">Bipe a etiqueta e o SKU de cada persiana. A caixa fica separada, e o estoque <b>só volta</b> quando outra pessoa confirmar o cancelamento no Mercado Livre.</span>
-    </div>
-    <div class="cancPend" id="cancCard"><div class="parte" id="cancT"></div><div id="cancL"></div></div>
-  </div>
-  <div class="duas">
-  <div class="card"><h3>🚗 Agência — a viagem até a agência</h3>
-    <!-- A VIAGEM A AGENCIA (fase 4): fechada, so o botao; aberta, o bipe poe no carro. -->
-    <div class="fechbox" id="viagemBtnBox" style="border-top:0;border-bottom:1px solid var(--line)">
-      <button class="btn" style="background:var(--blue);color:#fff" onclick="abrirViagem()">🚗 Viagem à agência</button>
-      <span style="font-size:13px;color:var(--muted)">Na hora de sair, abra a viagem: <b>todas as conferidas de agência</b> entram no carro. Depois bipe só o que <b>ficou</b>.</span>
-    </div>
-    <div id="viagemBox" style="display:none">
-      <div class="viagemhead" id="viagemHead">🚗 VIAGEM À AGÊNCIA ABERTA — BIPE O QUE FICOU NA FÁBRICA</div>
-      <div class="saidaconta viagemconta" id="viagemConta"></div>
-      <div id="viagemLista"></div>
-      <div class="fechbox">
-        <button class="btn ghost" id="btnModoFicou" onclick="escolherModo('ficou')">Bipar o que ficou</button>
-        <button class="btn ghost" id="btnModoCarro" onclick="escolherModo('carro')">Pôr mais uma no carro</button>
-        <button class="btn ghost" id="btnModoArea" onclick="escolherModo('area')">Conferir na área</button>
-        <button class="btn ghost" onclick="cancelarViagem()">Cancelar viagem</button>
-      </div>
-      <!-- A foto vem da CAMERA OU DA GALERIA (decisao D3): o motorista tira no
-           balcao da agencia e fecha quando volta, pelo celular dele. Por isso
-           este campo NAO tem capture — com ele o celular so abriria a camera. -->
-      <div class="fechbox">
-        <label class="fotobtn" id="fotoBtnV" style="border-color:var(--blue);color:var(--blue)">📷 <span id="fotoTxtV">Foto da tela do atendente</span>
-          <input type="file" id="fotoInV" accept="image/*"></label>
-        <img class="fotoprev" id="fotoPrevV" alt="">
-        <label style="font-weight:700">Quem levou
-          <select id="quemLevou"><option value="">— escolha —</option></select></label>
-        <span style="font-weight:700">Atendente bipou</span>
-        <input id="atQtd" type="number" min="0" inputmode="numeric" placeholder="0" style="font-size:24px;font-weight:800;width:110px;padding:10px;text-align:center;border:2px solid #c9d8ee;border-radius:10px">
-        <span style="font-weight:700">caixas</span>
-        <button class="btn" style="background:var(--blue);color:#fff" onclick="fecharViagem(false)">Fechar viagem</button>
-      </div>
-      <div id="viagemDiv"></div>
-    </div>
-    <div id="viagemHist"></div></div>
-
-  <!-- A COLETA: a segunda porta de saida. O caminhao do Mercado Livre vem
-       buscar; a caixa vai pro lugar reservado, nunca pro carro. Bipa-se igual —
-       o bipe e o que poe a caixa na conta que o motorista tem que bater. -->
-  <div class="card col" id="colCard">
-    <h3>🚚 Coleta — a saída do caminhão do Mercado Livre</h3>
-    <!-- A SAIDA DO CAMINHAO: fechada, so o botao; aberta, o bipe vira SOBRA. -->
-    <div class="fechbox" id="saidaBtnBox">
-      <button class="btn fech" onclick="abrirSaida()">🚚 Saída do caminhão</button>
-      <span style="font-size:13px;color:#4b2a91">Quando o caminhão chegar: bipe o que <b>ficou</b>, foto e número do motorista.</span>
-    </div>
-    <div id="saidaBox" style="display:none">
-      <div class="saidahead">🚚 SAÍDA DO CAMINHÃO ABERTA — BIPE O QUE FICOU NO CANTO</div>
-      <div class="saidaconta" id="saidaConta"></div>
-      <div id="saidaSobras"></div>
-      <div class="fechbox" id="saidaPasso">
-        <button class="btn ghost" id="btnNada" onclick="naoFicouNada()">Não ficou nada</button>
-        <button class="btn ghost" onclick="cancelarSaida()">Cancelar saída</button>
-      </div>
-      <div class="fechbox" id="fechBox">
-        <label class="fotobtn" id="fotoBtn">📷 <span id="fotoTxt">Foto da tela do motorista</span>
-          <input type="file" id="fotoIn" accept="image/*" capture="environment"></label>
-        <img class="fotoprev" id="fotoPrev" alt="">
-        <span style="font-weight:700">Motorista bipou</span>
-        <input id="motQtd" type="number" min="0" inputmode="numeric" placeholder="0">
-        <span style="font-weight:700">caixas</span>
-        <button class="btn fech" onclick="fecharSaida(false)">Fechar saída</button>
-      </div>
-      <div id="saidaDiv"></div>
-    </div>
-    <div id="colHist"></div>
-  </div>
-  </div>
+  <div class="card"><div class="outras"><span class="lbl">Outras ações</span>
+    <button class="btn" onclick="abrirCancelada()">✕ Venda cancelada <span class="ct z" id="ctCanc">0</span></button>
+    <button class="btn" onclick="abrirNaoPassou()">🚚 A coleta não passou</button>
+    <button class="btn" onclick="verHist=!verHist;desenharHist()">Histórico do dia</button></div>
+    <div id="hist"></div></div>
 </div>
-<script src="/sku.js"></script>
 <script>
-const $=s=>document.querySelector(s);
-let last={c:null,t:0};
-/* "⏩ ADIANTADO — despacha qui 02/10": a caixa esta saindo antes do dia que a
-   etiqueta manda. Nao e erro nem recusa (adiantar e permitido); e informacao
-   pra quem esta com ela na mao. */
-const DSEM=['dom','seg','ter','qua','qui','sex','sáb'];
-function diaSemBR(s){ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m) return '';
-  return DSEM[new Date(+m[1],+m[2]-1,+m[3]).getDay()]+' '+m[3]+'/'+m[2]; }
-function linhaAdiant(r){ return r&&r.adiantado ? '<div class="adiant">⏩ ADIANTADO — despacha '+diaSemBR(r.pedido&&r.pedido.despachar_em)+'</div>' : ''; }
-function linhaQuem(r){ return r&&r.impresso_por ? '<div class="quem">Etiqueta feita por <b>'+esc0(r.impresso_por)+'</b></div>' : ''; }
-/* TROCAR DE PESSOA: sai e volta pela MESMA tela de login (grade de nomes +
-   PIN), que ja traz de volta para o Carregamento. Uma segunda tela de login
-   aqui dentro seria a segunda porta de entrada. */
-function trocarPessoa(){
-  fetch('/api/auth/logout',{method:'POST'}).then(function(){ location.href='/login?r=/carregamento'; });
+/* ===================== ESTADO ===================== */
+var D=null;                   // a última leitura de /api/conferencia/dia
+var estado='bipar';           // bipar | entrega | recontar | cancelada | naopassou
+var ativo=null;               // o carrinho ativo deste aparelho
+var aguardando=null;          // segundo bipe: a etiqueta esperando o SKU
+var caixaPecas=null;          // a caixa de várias sendo conferida peça a peça
+var filtro='faltam', verHist=false;
+var ENT=null, REC=null, CANC=null, pessoas=null;
+function $(s){ return document.querySelector(s); }
+function esc0(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function nomeDest(c){ return c==='AG'?'Carro da agência':'Carrinho '+c; }
+function trocarPessoa(){ fetch('/api/auth/logout',{method:'POST'}).then(function(){ location.href='/login?r=/carregamento'; }); }
+/* O carrinho ativo é deste aparelho (só conveniência; o servidor confere). */
+try{ ativo=localStorage.getItem('conf_carrinho')||null; }catch(e){}
+function setAtivo(c){ ativo=c; try{ localStorage.setItem('conf_carrinho',c); }catch(e){} }
+async function postJ(url,corpo){
+  var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo||{})});
+  /* Resposta que não é JSON (servidor fora, página de erro) é falha de
+     conexão, e o bipe tem que avisar — nunca virar um "não deu" calado. */
+  var j=await r.json();
+  j.__status=r.status; return j;
 }
-function banner(kind,title,sub){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'; }
-/* AS PEÇAS DA CAIXA DE VÁRIAS PERSIANAS (05/10/2026, decisão do dono). Até
-   aqui a linha da caixa mostrava só o `lote.codigo`, que é o PRIMEIRO item, e
-   a tela do bipe peça a peça não dizia quais eram (a conferência era cega,
-   02/10). O dono decidiu mostrar: quem confere tem a caixa na mão e precisa
-   saber o que procurar nas etiquetas coladas por fora. A trava continua sendo
-   o BIPE de cada peça. Conta persiana (soma das `qtd`), nunca linha. */
-function pecasDeC(itens){ return (itens||[]).reduce(function(s,i){ return s+Math.max(1,(i&&i.qtd)||1); },0); }
-function ehVarias(f){ return pecasDeC(f&&f.itens)>1; }
-/* O código ao lado da NF: na caixa de várias ele sai, porque sozinho fazia dois
-   SKUs parecerem um; a lista vem embaixo, por `pecasLinhas`. */
-function skuDaLinha(f){ return ehVarias(f) ? '' : ' · '+esc0(f.codigo||''); }
-function pecasLinhas(itens, grande){
-  if(pecasDeC(itens)<2) return '';
-  return '<div style="margin-top:3px">'
-    +(grande?'':'<span class="tagtroca" style="background:#fff4e5;border-color:#e0a63f;color:#8a5a00">📦 '+pecasDeC(itens)+' persianas</span>')
-    +(itens||[]).map(function(i){
-      var q=Math.max(1,i.qtd||1), b=(i.bipadas==null?null:i.bipadas), ok=(b!=null && b>=q);
-      var peca=(typeof pecaTexto==='function') ? pecaTexto({
-        medida:(i.exige_medida&&i.largura_cm&&i.altura_cm)?(i.largura_cm+' × '+i.altura_cm):null,
-        cor:i.cor_nome||null, tecido:i.tecido_nome||null, modelo:i.modelo_nome||null}) : '';
-      return '<div style="font-size:'+(grande?'16px':'12px')+';margin-top:2px'+(ok?';color:#2e7d32':'')+'">'
-        +(b!=null?(ok?'✓ ':'○ '):'')+'<b>'+q+' ×</b> <span style="font-family:ui-monospace,monospace">'+esc0(i.codigo||'')+'</span>'
-        +(peca?' <span style="color:var(--muted)">· '+esc0(peca)+'</span>':'')
-        +(b!=null && q>1?' <b>'+b+' de '+q+'</b>':'')+'</div>';
-    }).join('')+'</div>';
-}
-function esc0(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
-  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-/* Quando a conferencia dupla esta ligada, o bipe da etiqueta nao carrega
-   sozinho: o volume fica ESPERANDO o bipe do SKU da propria caixa. Guardamos
-   qual etiqueta esta pendurada pra casar o segundo bipe com ela. */
-let aguardando=null;   // {code, buyer, nf}
-async function bip(code){
-  code=(code||'').trim(); if(!code) return;
-  const now=Date.now(); if(last.c===code && now-last.t<600) return; last={c:code,t:now};
-  /* Com a saida do caminhao aberta, o bipe quer dizer UMA coisa so: esta
-     caixa FICOU no canto. Nunca "foi no caminhao" — essa e por botao. */
-  /* O bipe vai para UM lugar de cada vez (modoAtual): a area (conferir), o
-     carro (viagem aberta) ou as sobras do caminhao (saida aberta). A faixa
-     #modoBar diz qual, na cor dele. */
-  if(sobrou){ await bipSobrou(code); return; }
-  var m=modoAtual();
-  if(m==='sobra'){ await bipSobra(code); return; }
-  if(m==='carro'){ await bipCarro(code); return; }
-  if(m==='ficou'){ await bipFicou(code); return; }
-  if(caixaPecas){ await bipPeca(code); return; }
-  const corpo = aguardando ? {code:aguardando.code, sku:code} : {code:code};
-  const r=await (await fetch('/api/carregar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)})).json();
-  mostrar(r,code);
+function banner(kind,t,s){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+t+'</div>'+(s?'<div class="bs">'+s+'</div>':''); }
+function beep(ok){ try{ var a=new (window.AudioContext||window.webkitAudioContext)(), o=a.createOscillator(), g=a.createGain();
+  o.connect(g); g.connect(a.destination); o.frequency.value=ok?820:240; g.gain.value=.05; o.start();
+  setTimeout(function(){ o.stop(); a.close(); }, ok?100:220); }catch(e){} }
+function pecasDe(itens){ return (itens||[]).reduce(function(s,i){ return s+Math.max(1,(i&&i.qtd)||1); },0); }
+function dataBR(s){ var m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]):''; }
+function horaDe(s){ var p=String(s||'').split(' '); return (p[1]||'').slice(0,5); }
+function linha(c,dir){
+  var n=pecasDe(c.itens);
+  var sku=n>1?'<span class="chip c-am">📦 '+n+' persianas</span>':'<span class="mono">'+esc0(c.codigo||'')+'</span>';
+  var mod=c.coleta?'<span class="chip c-col">🟣 Coleta</span>':'<span class="chip c-ag">🚗 Agência</span>';
+  return '<div class="cx"><div><div class="cli">'+esc0(c.buyer||'(sem nome)')
+    +(c.antiga&&!c.conferido_por?' <span class="chip c-am">de antes</span>':'')
+    +(c.adiantada?' <span class="chip c-mu">despacha '+dataBR(c.despachar_em)+'</span>':'')+'</div>'
+    +'<div class="det">'+sku+'<span>NF '+esc0(c.nf||'—')+'</span>'+mod
+    +(c.impresso_por?'<span>impressa por '+esc0(c.impresso_por)+'</span>':'')+'</div></div><div class="dir">'+(dir||'')+'</div></div>';
 }
 
-/* ── A CAIXA DE VÁRIAS PERSIANAS, PEÇA A PEÇA (CARREGAMENTO-SEGUNDA-PESSOA,
-   fase 2, 02/10/2026) ───────────────────────────────────────────────────────
-   O bipe da etiqueta de venda NÃO confere a caixa de várias: ela fica em
-   âmbar, e cada persiana é bipada pela etiqueta de SKU colada por fora da
-   caixa (a do saco, P6). Desde 05/10/2026 (decisão do dono) a tela MOSTRA
-   quais SKUs a caixa leva, com o que cada um é e quantos já foram bipados; a
-   trava é o bipe de cada peça, e o SKU fora da caixa continua parando. */
-let caixaPecas=null;   // {lote_id, buyer, nf, total, bipadas, pecas}
-let ultimaPeca={c:'',t:0};
-function bannerPecas(){
-  var c=caixaPecas;
-  banner('warn','📦 ESTA CAIXA LEVA '+c.total+' PERSIANAS',
-    '<b>'+esc0(c.buyer)+'</b> · NF <b>'+esc0(c.nf||'—')+'</b><br>'
-    +'Bipe a etiqueta de SKU de <b>cada</b> persiana (coladas por fora da caixa).'
-    +pecasLinhas(c.pecas,true)
-    +'<div class="indo" style="color:#8a5a00">'+c.bipadas+' de '+c.total+'</div>'
-    +'<button class="btn" onclick="recomecarCaixa()">↺ Recomeçar esta caixa</button> '
-    +'<button class="mini" style="margin-left:6px" onclick="sairDaCaixa()">deixar esta caixa</button>');
+/* ===================== LEITURA ===================== */
+async function carregar(){
+  var d; try{ d=await (await fetch('/api/conferencia/dia')).json(); }catch(e){ return; }
+  if(!d || !d.barras) return;
+  D=d;
+  var cods=(d.destinos||[]).filter(function(x){ return x.codigo!=='AG'; }).map(function(x){ return x.codigo; });
+  if(!ativo || cods.indexOf(ativo)<0) setAtivo(cods[0]||null);
+  $('#parSegundo').innerHTML='Segundo bipe (SKU): <b>'+(d.segundo_bipe?'ligado':'desligado')+'</b> · muda na 906 Parâmetros';
+  desenharBarras(); desenharFaixa(); desenharLista(); desenharHist();
+  if(estado==='bipar') desenharPainel();
+  if(estado==='entrega' && ENT && ENT.passo===0) desenharPainel();
+  try{ var s=await (await fetch('/api/carregamento/sobras')).json(); CANC_LISTA=s; var n=(s.caixas||[]).length+(s.aguardando||[]).length;
+    $('#ctCanc').textContent=n; $('#ctCanc').className='ct'+(n?'':' z'); if(estado==='cancelada' && !digitando()) desenharCancelada(); }catch(e){}
+}
+var CANC_LISTA={caixas:[],aguardando:[]};
+function seg(v,t,cl){ return v&&t?'<i class="'+cl+'" style="width:'+(v/t*100)+'%"></i>':''; }
+function desenharBarras(){
+  var e=D.barras.entrega, b=D.barras.bipe;
+  $('#barras').innerHTML=
+    '<div class="bx"><div class="cab"><span class="tit">Entrega do dia</span><span class="de">'+e.entregues+' de '+e.total+' entregues</span></div>'
+   +'<div class="falta">'+e.faltam+' <small>faltam entregar</small></div>'
+   +'<div class="trilho">'+seg(e.entregues,e.total,'k-ent')+seg(e.nos_carrinhos,e.total,'k-car')+seg(e.sem_bipe,e.total,'k-imp')+seg(e.sem_etiqueta,e.total,'k-sem')+'</div>'
+   +'<div class="leg"><span><i class="sq k-ent"></i>entregues <b>'+e.entregues+'</b></span><span><i class="sq k-car"></i>nos carrinhos <b>'+e.nos_carrinhos+'</b></span>'
+   +'<span><i class="sq k-imp"></i>impressas sem bipe <b>'+e.sem_bipe+'</b></span><span><i class="sq k-sem"></i>sem etiqueta ainda <b>'+e.sem_etiqueta+'</b></span></div></div>'
+   +'<div class="bx"><div class="cab"><span class="tit">Bipar o que foi impresso hoje</span><span class="de">'+b.bipadas+' de '+b.impressas+' bipadas</span></div>'
+   +'<div class="falta">'+b.faltam+' <small>faltam bipar</small></div>'
+   +'<div class="trilho">'+seg(b.bipadas,b.impressas,'k-car')+seg(b.faltam,b.impressas,'k-imp')+'</div>'
+   +'<div class="leg"><span><i class="sq k-car"></i>bipadas <b>'+b.bipadas+'</b></span><span><i class="sq k-imp"></i>faltam <b>'+b.faltam+'</b></span>'
+   +(b.antes_sem_bipe?'<span><b>+ '+b.antes_sem_bipe+'</b> impressas antes de hoje sem bipe</span>':'')+'</div></div>';
+}
+function desenharFaixa(){
+  var l=(D.destinos||[]).filter(function(x){ return x.n; });
+  var f=$('#faixa');
+  if(!l.length || estado==='entrega'){ f.hidden=true; return; }
+  f.hidden=false; f.textContent='⚠ '+l.map(function(x){ return x.nome+' com '+x.n; }).join(' · ')+' — falta entregar';
+}
+function desenharLista(){
+  var n={faltam:(D.faltam||[]).length, nos:(D.nos||[]).length, sem:(D.sem_carrinho||[]).length, entregues:(D.entregues||[]).length, etq:(D.sem_etiqueta||[]).length};
+  var F=[['faltam','Faltam bipar'],['nos','Nos carrinhos'],['sem','Conferidas sem carrinho'],['entregues','Entregues hoje'],['etq','Sem etiqueta ainda']]
+    .filter(function(x){ return x[0]!=='sem' || n.sem; });
+  if(filtro==='sem' && !n.sem) filtro='faltam';
+  $('#filtros').innerHTML=F.map(function(x){ return '<button class="fl'+(filtro===x[0]?' on':'')+'" onclick="filtro=\''+x[0]+'\';desenharLista()">'+x[1]+' '+n[x[0]]+'</button>'; }).join('');
+  var l=filtro==='faltam'?D.faltam: filtro==='nos'?D.nos: filtro==='sem'?D.sem_carrinho: filtro==='entregues'?D.entregues: D.sem_etiqueta;
+  var vazio={faltam:'Nada faltando: tudo o que foi impresso está bipado.',nos:'Nenhuma caixa nos carrinhos.',sem:'Nenhuma.',entregues:'Nada entregue hoje ainda.',etq:'Nenhuma venda do dia esperando etiqueta.'}[filtro];
+  $('#lista').innerHTML='<div class="lista">'+((l||[]).length?l.map(function(c){
+    var dir= filtro==='nos'?'<span class="chip c-ok">'+esc0(nomeDest(c.carrinho))+'</span>'
+      : filtro==='sem'?(c.nao_achada?'<span class="chip c-red">não achada na recontagem</span>':'<span class="chip c-am">bipe num carrinho</span>')
+      : filtro==='entregues'?'<span class="chip c-ok">entregue</span>'
+      : filtro==='etq'?'<span class="chip c-mu">esperando a 201</span>':'';
+    return linha(c,dir); }).join(''):'<div class="vazio">'+vazio+'</div>')+'</div>'
+    +(filtro==='sem'?'<div class="nota">Caixas já conferidas (o estoque já baixou) que não estão em carrinho nenhum. Bipe cada uma: ela entra no carrinho ativo sem baixar de novo.</div>':'')
+    +(filtro==='etq'?'<div class="nota">Vendas do dia que ainda não tiveram a etiqueta impressa na 201. Contam na entrega do dia, mas ainda não se bipam.</div>':'');
+}
+function desenharHist(){
+  if(!verHist || !D){ $('#hist').innerHTML=''; return; }
+  var l=D.saidas_hoje||[];
+  $('#hist').innerHTML='<div class="hist">'+(l.length?l.map(function(s){
+    var dest=(s.carrinhos||[]).length?s.carrinhos.map(nomeDest).join(' + '):(s.tipo==='agencia'?'viagem à agência':'saída do caminhão');
+    return '<div>'+horaDe(s.fechada_em)+' — '+esc0(s.fechado_por||'?')+' entregou '+esc0(dest)+' '+(s.tipo==='agencia'?'à agência':'ao motorista')
+      +': sistema '+s.sistema+', '+(s.tipo==='agencia'?'atendente ':'motorista ')+s.externa+(s.divergente?' · <b>liberado com divergência</b>: '+esc0(s.motivo||''):' ✓')
+      +(s.quem_levou?' · levou: '+esc0(s.quem_levou):'')+(s.foto?' · <a href="'+s.foto+'" target="_blank" rel="noopener">foto</a>':'')+'</div>'; }).join('')
+    :'<div>Nenhuma entrega fechada hoje.</div>')+'</div>';
+}
+
+/* ===================== O PAINEL DA ESQUERDA ===================== */
+function desenharPainel(){
+  $('#titEsq').textContent={bipar:'Bipar caixas',entrega:'Entregar',recontar:'Recontar carrinho',cancelada:'✕ Venda cancelada',naopassou:'🚚 A coleta não passou'}[estado];
+  if(estado==='entrega') return desenharEntrega();
+  if(estado==='recontar') return desenharRecontar();
+  if(estado==='cancelada') return desenharCancelada();
+  if(estado==='naopassou') return desenharNaoPassou();
+  if(!D) return;
+  $('#painel').innerHTML='<div class="dest">'+(D.destinos||[]).map(function(d){
+    var ag=d.codigo==='AG', at=!ag && ativo===d.codigo;
+    return '<div class="dc'+(at?' ativo':'')+(ag?' ag':'')+'"><div class="n"><span>'+(ag?'🚗 ':'🛒 ')+esc0(d.nome)+'</span>'
+      +(d.recontado?'<span class="chip c-ok">recontado</span>':'')+'</div><div class="q">'+d.n+'</div>'
+      +'<div class="l">'+(ag?'caixas de agência entram aqui':at?'ATIVO — o bipe da coleta vem para cá':'bipe a etiqueta do carrinho para usar')+'</div>'
+      +'<div class="acoes">'+(!ag&&!at?'<button class="btn sm" onclick="usar(\''+d.codigo+'\')">Usar este</button>':'')
+      +(d.n?'<button class="btn sm" onclick="abrirRecontar(\''+d.codigo+'\')">🔁 Recontar</button><button class="btn sm ok" onclick="abrirEntrega(\''+d.codigo+'\')">Entregar →</button>':'')+'</div></div>';
+  }).join('')+'</div><div class="nota">Os carrinhos vêm do cadastro "Carrinhos da expedição" (902 Cadastros). Bipar a etiqueta do carrinho troca o ativo.</div>';
+}
+function usar(c){ setAtivo(c); banner('ok','Agora a coleta vai para o '+nomeDest(c),''); beep(true); desenharPainel(); $('#scan').focus(); }
+function voltarBipar(){ estado='bipar'; ENT=null; REC=null; CANC=null; banner('','Pronto','Bipe a etiqueta de venda da caixa.'); desenharPainel(); desenharFaixa(); $('#scan').focus(); }
+
+/* ===================== O BIPE ===================== */
+function semConexao(){
+  banner('err','⚠ SEM CONEXÃO — O BIPE NÃO CHEGOU', caixaPecas
+    ? 'Não sei se a última persiana contou. Toque em <b>↺ Recomeçar esta caixa</b> e bipe todas de novo.<div class="acoes" style="margin-top:8px"><button class="btn" onclick="recomecarCaixa()">↺ Recomeçar esta caixa</button></div>'
+    : 'Confira o Wi-Fi e <b>bipe a mesma caixa de novo</b>. Se ela já tiver entrado, o sistema avisa.');
+  beep(false);
+}
+async function bip(code){
+  code=String(code||'').trim(); if(!code) return;
+  if(estado==='recontar') return bipRecontar(code);
+  if(estado==='cancelada') return bipCancelada(code);
+  if(caixaPecas) return bipPeca(code);
+  var corpo=aguardando?{code:aguardando.code, sku:code, carrinho:ativo||''}:{code:code, carrinho:ativo||''};
+  var r=await postJ('/api/carregar',corpo);
+  aguardando=null;
+  mostrar(r, corpo.code);
+  carregar();
+  if(estado==='entrega' && ENT) atualizarPrevia();
+}
+function quem(r){ var p=r.pedido||{}; return esc0(p.buyer||'')+(p.nf?' · NF '+esc0(p.nf):''); }
+function mostrar(r, enviado){
+  if(r.__status===401){ banner('err','Sessão encerrada','Entre de novo com o seu PIN.'); beep(false); return; }
+  if(r.trocar_carrinho){ setAtivo(r.trocar_carrinho); banner('ok','Agora a coleta vai para o '+esc0(r.nome),''); beep(true); desenharPainel(); return; }
+  if(r.ok && r.recolocada){ banner('ok','✓ No '+esc0(nomeDest(r.carrinho))+' (já estava conferida)',quem(r)+' · o estoque não baixou de novo'); beep(true); return; }
+  if(r.ok){ banner('ok','✓ Conferida — no '+esc0(nomeDest(r.carrinho||'?')),quem(r)+(r.adiantado?' · <b>⏩ adiantada</b>':'')); beep(true); return; }
+  var m=r.motivo;
+  if(m==='falta_sku'){ aguardando={code:enviado}; banner('esp','Agora bipe a persiana desta caixa',quem(r)+' — a etiqueta do SKU colada por fora.'); beep(true); return; }
+  if(m==='sku_divergente'){ banner('err','Persiana errada nesta caixa','A venda é <b>'+esc0(r.esperado)+'</b>, você bipou <b>'+esc0(r.lido)+'</b>. <b>Não coloque no carrinho.</b> Separe a caixa e avise.'); beep(false); return; }
+  if(m==='conferir_pecas'){ caixaPecas={id:r.pedido.id, r:r}; desenharPecas(r,''); beep(true); return; }
+  if(m==='mesma_pessoa'){ banner('err','Você imprimiu esta etiqueta','Outra pessoa confere esta caixa, com o login dela. Ela continua em "Faltam bipar".'
+    +'<div class="acoes" style="margin-top:8px"><button class="btn" onclick="trocarPessoa()">👤 Trocar de pessoa</button></div>'); beep(false); return; }
+  if(m==='ja_no_carrinho'){ banner('warn','Já está no '+esc0(nomeDest(r.carrinho)),quem(r)); beep(false); return; }
+  if(m==='duplicado'){ banner('warn','Esta caixa já saiu ou já foi conferida',quem(r)); beep(false); return; }
+  if(m==='nao_encontrado'){ banner('err','Etiqueta não reconhecida','O código '+esc0(r.lido||enviado||'')+' não é de nenhuma caixa com etiqueta de venda. Bipe a etiqueta de VENDA da caixa.'); beep(false); return; }
+  banner(m==='sem_carrinho'?'warn':'err', {sem_carrinho:'Escolha o carrinho primeiro',carrinho_invalido:'Carrinho fora do cadastro',cancelada:'Venda cancelada: não carregar',
+    bloqueado:'BLOQUEADO — SKU fora do cadastro',nao_embalado:'Esta caixa não tem etiqueta de venda'}[m]||'Não deu para conferir',
+    (r.pedido?quem(r)+'<br>':'')+esc0(r.aviso||''));
+  beep(false);
+}
+function desenharPecas(r, erro){
+  var p=r.pecas||[];
+  banner('esp','📦 Esta caixa leva '+(r.pecas_total||pecasDe(p))+' persianas: bipe cada uma ('+(r.bipadas||0)+' de '+(r.pecas_total||'?')+')',
+    quem(r)+' — as etiquetas coladas por fora da caixa.'
+    +'<div class="pecas">'+p.map(function(x){ var ok=(x.bipadas||0)>=Math.max(1,x.qtd||1);
+      return '<div class="pc'+(ok?' ok':'')+'"><span>'+(ok?'✓':'○')+'</span><b>'+Math.max(1,x.qtd||1)+' ×</b> '+esc0(x.codigo)+(x.qtd>1?' — '+(x.bipadas||0)+' de '+x.qtd:'')+'</div>'; }).join('')+'</div>'
+    +(erro?'<div style="margin-top:8px;font-weight:700;color:var(--red)">'+esc0(erro)+'</div>':'')
+    +'<div class="acoes" style="margin-top:8px"><button class="btn" onclick="recomecarCaixa()">↺ Recomeçar esta caixa</button><button class="btn" onclick="sairDaCaixa()">Deixar esta caixa para depois</button></div>');
 }
 async function bipPeca(code){
-  /* ⚠️ O GUARD DE 700 ms (§5, #23 e §12): o leitor às vezes manda o mesmo
-     código duas vezes numa leitura só, e aqui isso contaria uma persiana a
-     mais. Duas persianas de verdade exigem largar uma e pegar a outra, o que
-     nunca leva menos de 0,7 s. */
-  var agora=Date.now();
-  if(ultimaPeca.c===code && agora-ultimaPeca.t<700) return;
-  ultimaPeca={c:code,t:agora};
-  var r=await (await fetch('/api/carregar/peca',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({lote_id:caixaPecas.lote_id, sku:code})})).json();
-  if(r.ok && r.bipadas<r.pecas_total){
-    caixaPecas.bipadas=r.bipadas; if(r.pecas) caixaPecas.pecas=r.pecas; bannerPecas(); beep(true); return;
-  }
-  if(r.motivo==='peca_divergente'){
-    banner('err','⛔ PARE — A CAIXA NÃO BATE',
-      '<b>'+esc0(caixaPecas.buyer)+'</b> · NF <b>'+esc0(caixaPecas.nf||'—')+'</b><br>'
-      +'A caixa devia ter <span class="c">'+esc0(r.esperado)+'</span>;<br>foi bipado <span class="c">'+esc0(r.bipado)+'</span>.<br>'
-      +'<b>Não carregue.</b> Confira as persianas e bipe de novo.'
-      +'<br><button class="btn" onclick="recomecarCaixa()">↺ Recomeçar esta caixa</button>');
-    beep(false); return;
-  }
-  caixaPecas=null;
-  mostrar(r,code);
+  var r=await postJ('/api/carregar/peca',{lote_id:caixaPecas.id, sku:code, carrinho:ativo||''});
+  if(r.ok && r.bipadas<r.pecas_total){ caixaPecas.r=r; desenharPecas(r,''); beep(true); return; }
+  if(r.ok){ caixaPecas=null; banner('ok','✓ Caixa de '+r.pecas_total+' persianas no '+esc0(nomeDest(r.carrinho||'?')),quem(r)); beep(true); carregar(); return; }
+  if(r.motivo==='peca_divergente'){ caixaPecas.r=Object.assign({},caixaPecas.r,{pecas:r.pecas,bipadas:r.bipadas}); desenharPecas(caixaPecas.r,r.aviso); beep(false); return; }
+  caixaPecas=null; mostrar(r);
 }
-async function recomecarCaixa(){
-  if(!caixaPecas) return;
-  var r=await (await fetch('/api/carregar/recomecar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({lote_id:caixaPecas.lote_id})})).json();
-  caixaPecas.bipadas=r.bipadas||0; if(r.pecas) caixaPecas.pecas=r.pecas; ultimaPeca={c:'',t:0}; bannerPecas();
-}
-/* Largar a caixa no meio não apaga o que já foi bipado: voltar a ela (bipando
-   a etiqueta de venda) continua de onde parou. */
-function sairDaCaixa(){ caixaPecas=null; banner('','Pronto para bipar',''); }
+async function recomecarCaixa(){ if(!caixaPecas) return;
+  var r=await postJ('/api/carregar/recomecar',{lote_id:caixaPecas.id});
+  caixaPecas.r=Object.assign({},caixaPecas.r,{pecas:r.pecas,bipadas:r.bipadas}); desenharPecas(caixaPecas.r,''); $('#scan').focus(); }
+function sairDaCaixa(){ caixaPecas=null; banner('','Pronto','Bipe a etiqueta de venda da caixa.'); $('#scan').focus(); }
 
-/* ── O "SOBROU" (CONFERENCIA-E-BAIXA, fase 2-B, 22/10/2026) ──────────────────
-   A caixa que ficou na fabrica (venda cancelada, motorista recusou, outro)
-   volta para a prateleira AQUI, sem passar pela Mesa: bipa a etiqueta, bipa o
-   SKU de cada persiana, escolhe o motivo e confirma. Se a caixa ja tinha
-   baixado do estoque, o saldo volta +1 por peca; se nao, so solta a reserva.
-   O bipe do SKU e o que prova que a persiana esta na mao. Quem conferiu a
-   caixa nao marca a sobra dela (D8). O servidor confere tudo de novo no fim. */
-let sobrou=false, sobrouPend=null, sobrouSkus=[], sobrouMotivo=null, sobrouFaltam=0, sobrouErro='';
-function modoSobrou(){
-  sobrou=!sobrou; sobrouLimpar(); aguardando=null; caixaPecas=null; pintarModo();
-  if(sobrou) banner('err','✕ Venda cancelada','Bipe a etiqueta de VENDA da caixa cancelada.');
-  else banner('','Pronto para bipar','');
-  $('#scan').focus();
+/* ===================== RECONTAGEM (cega) ===================== */
+function abrirRecontar(c, daEntrega){ estado='recontar'; REC={c:c, codes:[], fim:null, daEntrega:!!daEntrega};
+  banner('esp','Bipe cada caixa do '+nomeDest(c),'Contagem cega: a tela não mostra quantas deveria ter. Conte o que está no carrinho.'); desenharPainel(); $('#scan').focus(); }
+function bipRecontar(code){
+  if(REC.fim) return;
+  var k=code.toUpperCase();
+  if(REC.codes.indexOf(k)>=0){ banner('warn','Já bipada nesta recontagem',''); beep(false); return; }
+  REC.codes.push(k); banner('ok','✓ Contada','Bipadas: '+REC.codes.length); beep(true); desenharRecontar();
 }
-function sobrouLimpar(){ sobrouPend=null; sobrouSkus=[]; sobrouMotivo=null; sobrouFaltam=0; sobrouErro=''; }
-function linhasPecas(l){
-  return (l||[]).map(function(p){ return '<span class="c">'+(p.qtd>1?p.qtd+' × ':'')+esc0(p.codigo)+'</span>'; }).join(' · ');
-}
-function soCodigo0(c){ return String(c||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase(); }
-async function bipSobrou(code){
-  if(!sobrouPend){
-    var r=await postJ('/api/carregamento/sobra',{code:code});
-    if(!r.ok){
-      var quem=r.motivo==='mesma_pessoa'
-        ? '<br><b>Conferida por '+esc0(r.conferido_por||'')+'.</b><div class="recusabox"><button class="btn" onclick="trocarPessoa()">👤 Trocar de pessoa</button></div>'
-        : '';
-      banner('err','Não dá para marcar esta caixa como sobra',(r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')+quem);
-      beep(false); return;
-    }
-    sobrouLimpar(); sobrouPend=r; sobrouFaltam=r.faltam||0;
-    pintarModo(); desenharSobrou(); beep(true); return;
-  }
-  var lista=sobrouSkus.concat([code]);
-  var r2=await postJ('/api/carregamento/sobra',{id:sobrouPend.pedido.id,skus:lista});
-  if(!r2.ok){ sobrouErro=r2.aviso||'Este bipe não vale para esta caixa.'; desenharSobrou(); beep(false); return; }
-  sobrouSkus=lista; sobrouFaltam=r2.faltam||0; sobrouErro=''; desenharSobrou(); beep(true);
-}
-function desenharSobrou(){
-  var r=sobrouPend; if(!r) return;
-  var bip={}; sobrouSkus.forEach(function(c){ var k=soCodigo0(c); bip[k]=(bip[k]||0)+1; });
-  var pecas=(r.pecas||[]).map(function(p){
-    if(p.sob_medida) return '<div>'+esc0(p.codigo)+' — <b>sob medida</b>, não tem SKU a bipar</div>';
-    var q=Math.max(1,p.qtd||1), b=Math.min(q,bip[soCodigo0(p.codigo)]||0);
-    return '<div class="'+(b>=q?'ok':'')+'">'+(b>=q?'✓ ':'○ ')+'<b>'+q+' ×</b> '+esc0(p.codigo)+(q>1?' — <b>'+b+' de '+q+'</b>':'')+'</div>';
-  }).join('');
-  var motivo=function(id,rot){ return '<button class="btn'+(sobrouMotivo===id?' esc':'')+'" onclick="escolherMotivo(\''+id+'\')">'+rot+'</button>'; };
-  var pronto=sobrouFaltam===0 && !!sobrouMotivo;
-  banner('warn','✕ Venda cancelada — '+esc0(r.pedido.buyer),
-    'NF <b>'+esc0(r.pedido.nf||'—')+'</b>'
-    +(r.cancelada_motivo?' · <span class="c">'+esc0(r.cancelada_motivo)+'</span>':'')
-    +'<div class="sobrouPecas">'+(sobrouFaltam?'<b>Bipe o SKU de cada persiana</b> (falta'+(sobrouFaltam===1?' 1':'m '+sobrouFaltam)+'):':'<b>Todas as persianas bipadas.</b>')+pecas+'</div>'
-    +(sobrouErro?'<div class="volta" style="font-size:18px">'+esc0(sobrouErro)+'</div>':'')
-    +'<div class="motivos">'+motivo('cancelada','Venda cancelada')+motivo('motorista','Motorista recusou')+motivo('outro','Outro')+'</div>'
-    +(sobrouMotivo==='outro'?'<input id="sobrouTexto" maxlength="160" placeholder="Escreva o motivo" value="'+esc0(sobrouTextoAtual())+'">':'')
-    +'<div style="margin-top:8px;font-size:14px;color:var(--muted)">Separar <b>não mexe no estoque</b>. '+(r.sob_medida?'Sob medida não tem estoque.':
-      (r.baixou?'Quando outra pessoa confirmar no Mercado Livre, o estoque volta +1 por persiana.':'Esta caixa ainda não foi conferida: a peça nunca saiu do saldo.'))+'</div>'
-    +'<div class="recusabox"><button class="btn" style="background:var(--red);color:#fff"'+(pronto?'':' disabled')+' onclick="confirmarSobrou()">Separar como venda cancelada</button>'
-    +'<button class="btn ghost" onclick="desistirSobrou()">Cancelar — bipei a caixa errada</button></div>');
-  var t=document.getElementById('sobrouTexto');
-  if(t){ t.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); confirmarSobrou(); } }); }
-}
-var sobrouTextoGuardado='';
-function sobrouTextoAtual(){ var t=document.getElementById('sobrouTexto'); return t?t.value:sobrouTextoGuardado; }
-function escolherMotivo(id){
-  sobrouTextoGuardado=sobrouTextoAtual(); sobrouMotivo=id; desenharSobrou();
-  var t=document.getElementById('sobrouTexto'); if(t) t.focus(); else $('#scan').focus();
-}
-function desistirSobrou(){ sobrouLimpar(); sobrouTextoGuardado=''; pintarModo(); banner('err','✕ Venda cancelada','Bipe a etiqueta de VENDA da caixa cancelada.'); $('#scan').focus(); }
-async function confirmarSobrou(){
-  if(!sobrouPend) return;
-  var texto=sobrouTextoAtual();
-  var r=await postJ('/api/carregamento/sobra',{id:sobrouPend.pedido.id,skus:sobrouSkus,motivo:sobrouMotivo,texto:texto,confirmar:true});
-  if(!r.ok){ sobrouErro=r.aviso||'Não marquei. Tente de novo.'; sobrouTextoGuardado=texto; desenharSobrou(); beep(false); return; }
-  sobrouLimpar(); sobrouTextoGuardado=''; sobrou=false; pintarModo();
-  banner('warn','✕ Separada como venda cancelada — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · '+linhasPecas(r.pecas)
-    +'<div class="volta">'+esc0(r.aviso||'')+'</div>');
-  beep(true); carregar(); $('#scan').focus();
-}
-/* AS CANCELADAS (CONFERENCIA-EXPEDICAO fase 4). Duas partes:
-   - a separar: a venda que o ML ja cancelou e cuja caixa ainda esta na fabrica
-     (falta bipar no "✕ Venda cancelada");
-   - aguardando confirmacao: separada pelo operador; quem tem a permissao
-     confirma (o estoque volta) ou recusa (a caixa volta para a lista).
-   Os botoes so aparecem a quem pode (pode_confirmar); o servidor confere de
-   novo. A recusa pede o motivo num prompt, e nao num campo do card: o card e
-   redesenhado a cada 4 s, e o campo apagaria no meio da frase (§12). */
-var canceladas={caixas:[],aguardando:[]};
-async function desenharSobras(){
-  var d={caixas:[],aguardando:[]}; try{ d=await (await fetch('/api/carregamento/sobras')).json(); }catch(e){ return; }
-  canceladas=d;
-  var sep=d.caixas||[], ag=d.aguardando||[];
-  $('#cancT').innerHTML='<b>Canceladas: '+(sep.length+ag.length)+'</b><span class="por">a separar '+sep.length+' · aguardando confirmação '+ag.length+'</span>';
-  var h='';
-  if(sep.length) h+='<div style="font-size:13px;color:var(--muted);padding:6px 14px">O Mercado Livre cancelou — a caixa ainda está na fábrica. Toque em <b>✕ Venda cancelada</b> e bipe a etiqueta:</div>'
-    +sep.map(function(v){ return '<div class="row"><span class="who">'+esc0(v.buyer)+' <span class="c">NF '+esc0(v.nf||'—')
-      +' · '+esc0(v.codigo||'')+(v.pecas>1?' · '+v.pecas+' persianas':'')+' · '+esc0(v.cancelada_motivo||'venda cancelada')+'</span></span></div>'; }).join('');
-  if(ag.length) h+='<div style="font-size:13px;color:var(--muted);padding:6px 14px">Separadas, <b>aguardando confirmação no Mercado Livre</b>'
-      +(d.pode_confirmar?'':' — quem confirma é quem tem a permissão "Confirmar venda cancelada"')+':</div>'
-    +ag.map(function(p){ var n=(p.pecas||[]).reduce(function(s,x){ return s+Math.max(1,x.qtd||1); },0);
-      return '<div class="row"><span class="who">'+esc0(p.buyer||'')+' <span class="c">NF '+esc0(p.nf||'—')
-        +' · '+(n>1?n+' persianas':esc0(((p.pecas||[])[0]||{}).codigo||p.codigo||''))+' · '+esc0(p.motivo||'')
-        +' · separada por '+esc0(p.marcado_por||'?')+' em '+dataBR(String(p.marcado_em||'').slice(0,10))+' '+horaDe(p.marcado_em)
-        +' · '+(p.baixou?'ao confirmar, o estoque volta':'o estoque não muda')+'</span></span>'
-        +(d.pode_confirmar?'<span class="acoes"><button class="btn" style="background:var(--green);color:#fff" onclick="decidirCancelada('+p.id+',\'confirmar\')">Confirmar no ML</button>'
-          +'<button class="btn ghost" onclick="decidirCancelada('+p.id+',\'recusar\')">Recusar</button></span>':'')+'</div>'; }).join('');
-  $('#cancL').innerHTML=h||'<div class="empty" style="color:var(--muted)">Nenhuma venda cancelada esperando.</div>';
-}
-async function decidirCancelada(id, acao){
-  var corpo={id:id};
-  if(acao==='confirmar'){
-    if(!confirm('Confirmar que a venda está CANCELADA no Mercado Livre? Se a caixa já tinha baixado, as peças voltam ao estoque.')) return;
+function desenharRecontar(){
+  var R=REC, h='';
+  if(!R.fim){
+    h='<div style="font-size:26px;font-weight:800">Bipadas: '+R.codes.length+'</div>'
+     +'<div class="acoes"><button class="btn" onclick="voltarBipar()">Desistir</button><button class="btn ok big" onclick="terminarRecontar()">Terminei a recontagem</button></div>';
   } else {
-    var m=prompt('Por que o cancelamento foi recusado? A caixa volta para a lista de saída.');
-    if(m===null) return;
-    if(!String(m).trim()){ banner('warn','Escreva o motivo da recusa',''); beep(false); return; }
-    corpo.motivo=m;
+    var f=R.fim;
+    h='<div class="cmp"><div>Recontagem<b>'+f.contadas+'</b></div><div>Na conferência<b>'+f.esperadas+'</b></div></div>';
+    if(f.bateu) h+='<div class="banner ok"><div class="bt">Bateu ✓</div><div class="bs">Fica registrado quem recontou.</div></div>';
+    if(f.faltam.length) h+='<div class="banner err"><div class="bt">Faltam '+f.faltam.length+' no carrinho</div><div class="bs">A conferência pôs estas no '+nomeDest(R.c)+' e a recontagem não achou. "Não achei" tira a caixa do carrinho e cria uma pendência; o estoque não mexe.</div></div>'
+      +'<div class="lista">'+f.faltam.map(function(c){ return linha(c,'<button class="btn sm ok" onclick="recAchei('+c.id+')">Achei</button><button class="btn sm red" onclick="recNao('+c.id+')">Não achei</button>'); }).join('')+'</div>';
+    if(f.sobraram.length) h+='<div class="banner warn"><div class="bt">'+f.sobraram.length+' caixa de outro carrinho</div><div class="bs">Estava aqui, mas a conferência pôs em outro lugar.</div></div>'
+      +'<div class="lista">'+f.sobraram.map(function(c){ return linha(c,'<button class="btn sm pri" onclick="recPassar('+c.id+')">Passar para o '+esc0(nomeDest(R.c))+'</button>'); }).join('')+'</div>';
+    if(f.desconhecidos && f.desconhecidos.length) h+='<div class="nota">Códigos que não são caixa conferida: '+f.desconhecidos.map(esc0).join(', ')+'. Tire do carrinho e deixe separado.</div>';
+    var pend=f.faltam.length||f.sobraram.length;
+    h+='<div class="acoes"><button class="btn ok big"'+(pend?' disabled':'')+' onclick="fimRecontar()">'+(R.daEntrega?'Voltar para a entrega':'Concluir')+'</button></div>';
   }
-  const r=await postJ('/api/carregamento/cancelada/'+acao,corpo);
-  if(r.__status===403){ banner('err','Sem permissão','Confirmar ou recusar venda cancelada é de quem tem a permissão "Confirmar venda cancelada".'); beep(false); return; }
-  if(r.ok){ banner(acao==='confirmar'?'ok':'warn',acao==='confirmar'?'✓ Cancelamento confirmado':'Cancelamento recusado', esc0(r.aviso||'')); beep(true); }
-  else { banner('err','Não deu', esc0(r.aviso||r.erro||'')); beep(false); }
-  carregar();
+  $('#painel').innerHTML=h;
 }
+async function terminarRecontar(){
+  var r=await postJ('/api/carrinho/recontar',{carrinho:REC.c, codes:REC.codes});
+  if(!r.ok){ banner('err','Não deu para recontar',esc0(r.aviso||'')); beep(false); return; }
+  REC.fim=r; banner(r.bateu?'ok':'warn', r.bateu?'Recontagem bateu':'Recontagem não bateu',''); desenharRecontar(); carregar();
+}
+async function recAchei(id){
+  /* "Achei": a caixa estava no carrinho. A recontagem refaz no servidor, com
+     ela junto, e a linha nova fica gravada. */
+  REC.ids=(REC.ids||[]).concat([id]);
+  var r=await postJ('/api/carrinho/recontar',{carrinho:REC.c, codes:REC.codes, ids:REC.ids});
+  if(r.ok){ REC.fim=r; desenharRecontar(); carregar(); } else { banner('err','Não deu',esc0(r.aviso||'')); beep(false); } }
+async function recNao(id){ var r=await postJ('/api/carrinho/nao-achou',{lote_id:id});
+  if(!r.ok){ banner('err','Não deu',esc0(r.aviso||'')); beep(false); return; }
+  REC.fim.faltam=REC.fim.faltam.filter(function(x){ return x.id!==id; }); REC.fim.esperadas--;
+  banner('warn','Caixa fora do carrinho','Ela virou pendência para procurar. Achando, bipe num carrinho: ela entra sem baixar o estoque de novo.');
+  desenharRecontar(); carregar(); }
+async function recPassar(id){ var r=await postJ('/api/carrinho/passar',{lote_id:id, carrinho:REC.c});
+  if(!r.ok){ banner('err','Não deu',esc0(r.aviso||'')); beep(false); return; }
+  REC.fim.sobraram=REC.fim.sobraram.filter(function(x){ return x.id!==id; }); REC.fim.esperadas++;
+  if(!REC.fim.faltam.length && !REC.fim.sobraram.length) REC.fim.bateu=true;
+  desenharRecontar(); carregar(); }
+function fimRecontar(){ var volta=REC.daEntrega; REC=null;
+  if(volta && ENT){ estado='entrega'; ENT.passo=3; ENT.res=null; banner('','Entrega','Digite de novo o número do '+(ENT.para==='agencia'?'atendente':'motorista')+'.'); desenharPainel(); }
+  else voltarBipar(); }
 
-function mostrar(r,code){
-  if(r.motivo==='conferir_pecas'){
-    aguardando=null;
-    caixaPecas={lote_id:r.pedido.id, buyer:r.pedido.buyer, nf:r.pedido.nf, total:r.pecas_total, bipadas:r.bipadas||0, pecas:r.pecas||[]};
-    bannerPecas(); beep(true);
+/* ===================== ENTREGA ===================== */
+function abrirEntrega(c){
+  estado='entrega'; ENT={sel:[c], passo:0, para:c==='AG'?'agencia':'motorista', foto:null, numero:'', levou:'', motivo:'', res:null, previa:null};
+  banner('','Entregar','Quem entrega é quem está logado.'); desenharFaixa(); atualizarPrevia();
+}
+async function atualizarPrevia(){
+  try{ ENT.previa=await (await fetch('/api/entrega/previa?destinos='+encodeURIComponent(ENT.sel.join(',')))).json(); }catch(e){ ENT.previa=null; }
+  if(ENT.passo===0 && ENT.previa && !(ENT.previa.faltam_bipar||[]).length) ENT.passo=1;
+  if(!digitando()) desenharEntrega();
+}
+function desenharEntrega(){
+  var E=ENT; if(!E) return;
+  var quemRecebe=E.para==='agencia'?'atendente da agência':'motorista';
+  var h='<div class="passos">'+['Antes de entregar','Carrinhos','Foto','Número'].map(function(n,i){ return '<span class="'+(E.passo===i?'on':E.passo>i?'feito':'')+'">'+n+'</span>'; }).join('')+'</div>';
+  if(E.passo===0){
+    var pend=(E.previa&&E.previa.faltam_bipar)||[];
+    h+='<div class="banner warn"><div class="bt">Ainda faltam '+pend.length+' caixa'+(pend.length===1?'':'s')+' impressas sem bipar</div><div class="bs">Bipe agora se estiverem aí. Elas não entram nesta entrega sem o bipe.</div></div>'
+      +'<div class="lista">'+pend.map(function(c){ return linha(Object.assign({coleta:c.modalidade==='coleta'},c)); }).join('')+'</div>'
+      +'<div class="acoes"><button class="btn" onclick="voltarBipar()">Voltar</button><button class="btn" onclick="ENT.passo=1;desenharEntrega()">Seguir sem elas →</button></div>';
+  } else if(E.passo===1){
+    var temAG=(D.destinos||[]).some(function(d){ return d.codigo==='AG' && d.n; });
+    var disp=(D.destinos||[]).filter(function(d){ return d.n && (E.para==='motorista' || d.codigo==='AG'); });
+    h+='<div class="banner"><div class="bt">O que vai ser entregue?</div><div class="bs">Pode entregar um carrinho agora e o outro depois, ou vários juntos com uma foto só.</div></div>';
+    if(temAG) h+='<div class="acoes"><span class="nota">Para quem:</span><button class="btn sm'+(E.para==='motorista'?' pri':'')+'" onclick="setPara(\'motorista\')">🚚 Motorista da coleta</button>'
+      +'<button class="btn sm'+(E.para==='agencia'?' pri':'')+'" onclick="setPara(\'agencia\')">🚗 Agência</button></div>';
+    h+='<div class="dest">'+disp.map(function(d){ var on=E.sel.indexOf(d.codigo)>=0;
+      return '<button class="dc'+(on?' ativo':'')+'" onclick="selDest(\''+d.codigo+'\')"><span class="n">'+(on?'☑ ':'☐ ')+esc0(d.nome)+'</span><span class="q">'+d.n+'</span><span class="l">caixas'+(d.recontado?' · recontado ✓':'')+'</span></button>'; }).join('')+'</div>'
+      +'<div class="acoes"><button class="btn" onclick="voltarBipar()">Voltar</button><button class="btn ok big"'+(E.sel.length?'':' disabled')+' onclick="ENT.passo=2;desenharEntrega()">Continuar →</button></div>';
+  } else if(E.passo===2){
+    h+='<div class="banner"><div class="bt">Foto da tela do '+quemRecebe+'</div><div class="bs">A tela do celular dele com a quantidade que ele bipou. Sem a foto não fecha.</div></div>'
+      +'<div class="acoes"><div class="foto">'+(E.foto?'<img alt="Foto da tela" src="'+E.foto+'">':'sem foto')+'</div>'
+      +'<label class="btn pri" style="display:inline-flex;align-items:center">📷 '+(E.foto?'Tirar outra':'Tirar ou escolher a foto')+'<input id="fotoIn" type="file" accept="image/*" hidden></label></div>'
+      +'<div class="acoes"><button class="btn" onclick="ENT.passo=1;desenharEntrega()">← Voltar</button><button class="btn ok big"'+(E.foto?'':' disabled')+' onclick="ENT.passo=3;desenharEntrega()">Continuar →</button></div>';
+  } else {
+    var sis=(D.destinos||[]).filter(function(d){ return E.sel.indexOf(d.codigo)>=0; }).reduce(function(s,d){ return s+d.n; },0);
+    h+='<div class="nota">Entregando: '+E.sel.map(nomeDest).join(' + ')+' ao '+quemRecebe+'.</div>';
+    if(E.para==='agencia') h+='<label><b>Quem levou à agência</b><select class="txt" id="quemLevou" onchange="ENT.levou=this.value"><option value="">— escolha —</option>'
+      +(pessoas||[]).map(function(p){ return '<option value="'+p.id+'"'+(String(E.levou)===String(p.id)?' selected':'')+'>'+esc0(p.nome)+'</option>'; }).join('')+'</select></label>';
+    h+='<div class="acoes"><b>Quantas o '+quemRecebe+' bipou?</b><input id="numEnt" class="num" type="number" min="0" inputmode="numeric" value="'+esc0(E.numero)+'" oninput="ENT.numero=this.value">'
+      +'<button class="btn ok big" onclick="fecharEntrega(false)">Comparar e fechar</button></div>';
+    if(E.res && E.res.motivo==='divergente'){
+      h+='<div class="cmp"><div>Sistema<b>'+E.res.sistema+'</b></div><div>'+(E.para==='agencia'?'Atendente':'Motorista')+'<b>'+E.res.numero+'</b></div></div>'
+        +'<div class="banner err"><div class="bt">Não bateu</div><div class="bs">'+(E.res.numero>E.res.sistema
+          ?'O '+quemRecebe+' bipou a mais: uma caixa foi sem o bipe. <b>Ache a caixa e bipe-a agora</b> — ela entra no carrinho e na conta.'
+          :'Pode ter ficado caixa no carrinho. Reconte antes de liberar.')+'</div></div>'
+        +'<div class="acoes">'+E.sel.map(function(c){ return '<button class="btn" onclick="abrirRecontar(\''+c+'\',true)">🔁 Recontar '+esc0(nomeDest(c))+'</button>'; }).join('')+'</div>'
+        +'<div class="card" style="background:var(--panel)"><b>Liberar com divergência</b><div class="nota">Só quem tem a permissão de liberar, com o motivo.</div>'
+        +'<input class="txt" id="motivoLib" placeholder="Por que está liberando com número diferente?" maxlength="300" value="'+esc0(E.motivo)+'" oninput="ENT.motivo=this.value">'
+        +'<div class="acoes"><button class="btn red" data-perm="saida.liberar" onclick="fecharEntrega(true)">Liberar com divergência</button></div></div>';
+    } else if(E.res && E.res.aviso){
+      h+='<div class="banner err"><div class="bt">Não fechou</div><div class="bs">'+esc0(E.res.aviso)+'</div></div>';
+    }
+    h+='<div class="acoes"><button class="btn" onclick="ENT.passo=2;desenharEntrega()">← Voltar</button><button class="btn" onclick="voltarBipar()">Cancelar a entrega</button></div>';
   }
-  else if(r.ok && r.coleta){
-    /* ESTA INDO N. Depois de cada bipe de coleta a tela diz quantas caixas
-       estao no canto — e o numero que o motorista tem que bater. Sai em letra
-       grande porque e o que a pessoa vai falar em voz alta pra ele. */
-    aguardando=null;
-    var n=r.coleta_aguardando||0;
-    banner('col','COLETA ✓ — '+esc0(r.pedido.buyer),
-      'NF <b>'+esc0(r.pedido.nf||'—')+'</b>'+(ehVarias(r)?'':' · <span class="c">'+esc0(r.pedido.codigo||'')+'</span>')+' · <b>não vai no carro</b>: deixe no lugar reservado.'
-      +pecasLinhas(r.itens)+linhaQuem(r)+linhaAdiant(r)
-      +'<div class="indo">'+(n===1?'Está indo 1 caixa':'Estão indo '+n+' caixas')+'</div>'
-      +'<div style="color:#4b2a91;font-weight:700">Peça ao motorista o número de caixas que ele bipou antes de sair.</div>');
-    beep(true);
-  }
-  else if(r.ok && r.conferida){
-    /* AGENCIA: o bipe da area so CONFERE (fase 4, D1). A caixa fica na area
-       esperando a viagem; quem a poe no carro e o bipe da viagem. */
-    aguardando=null;
-    banner('ok','Conferida ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b>'+(ehVarias(r)?'':' · <span class="c">'+esc0(r.pedido.codigo||'')+'</span>')+' · <b>fica na área</b>: prontas pro carro <b>'+r.prontas+'</b>'+linhaQuem(r)+linhaAdiant(r)+pecasLinhas(r.itens)); beep(true);
-  }
-  /* QUEM IMPRIMIU NAO CONFERE (CARREGAMENTO-SEGUNDA-PESSOA, fase 1). A tarja
-     diz o nome do login que fez a etiqueta e o caminho: outra pessoa entra
-     com o login dela. */
-  else if(r.motivo==='mesma_pessoa'){ aguardando=null;
-    banner('err','✋ OUTRA PESSOA TEM QUE CONFERIR',
-      (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+' · <span class="c">'+esc0(r.pedido.codigo||'')+'</span><br>':'')
-      +'Etiqueta feita por <b>'+esc0(r.impresso_por||'')+'</b> — o mesmo login que está nesta tela.<br>'
-      +esc0(r.aviso||'')
-      +'<br><button class="btn btroca" onclick="trocarPessoa()">👤 Trocar de pessoa</button>'); beep(false); }
-  else if(r.motivo==='ja_conferida'){ aguardando=null;
-    banner('warn','Essa já foi conferida',(r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
-  else if(r.ok){
-    aguardando=null;
-    banner('ok','Carregado ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b>'+(ehVarias(r)?'':' · <span class="c">'+esc0(r.pedido.codigo||'')+'</span>')+' · No carro <b>'+r.carregados+'</b> de '+r.total+linhaAdiant(r)+pecasLinhas(r.itens)); beep(true);
-  }
-  else if(r.motivo==='falta_sku'){
-    // 1o bipe aceito. NAO mostramos qual SKU esperar — a conferencia e cega.
-    aguardando={code:code, buyer:r.pedido.buyer, nf:r.pedido.nf};
-    banner('warn','Agora bipe o SKU da caixa','<b>'+esc0(r.pedido.buyer)+'</b> · NF <b>'+esc0(r.pedido.nf||'—')+'</b><br>Bipe o código de barras do produto <b>nesta mesma caixa</b> para conferir.');
-    beep(true);
-  }
-  else if(r.motivo==='sku_divergente'){
-    aguardando=null;
-    banner('err','⛔ PARE — CAIXA ERRADA',
-      'A etiqueta de <b>'+esc0(r.pedido.buyer)+'</b> (NF '+esc0(r.pedido.nf||'—')+') é do produto <span class="c">'+esc0(r.esperado)+'</span>,<br>'+
-      'mas a caixa que ela está colada é <span class="c">'+esc0(r.lido)+'</span>.<br><b>Não carregue.</b> Separe e confira antes de despachar.');
-    beep(false);
-  }
-  /* VOLUME BLOQUEADO (SKU fora do cadastro, §6). O servidor sempre mandou o
-     motivo, mas a tela nao tinha este caso e caia no "Etiqueta nao
-     reconhecida — bipe a etiqueta de VENDA": a pessoa, com a etiqueta certa na
-     mao, era mandada procurar outra. */
-  else if(r.motivo==='bloqueado'){ aguardando=null;
-    banner('err','⛔ VOLUME BLOQUEADO — NÃO CARREGAR',
-      (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')
-      +'<br>Separe a caixa e avise o admin: o SKU precisa ser cadastrado.'); beep(false); }
-  else if(r.motivo==='volume_sem_sku'){ aguardando=null; banner('err','Volume sem SKU', r.aviso||''); beep(false); }
-  /* A caixa que nunca passou pela Etiqueta de Venda (dívida 13). A recusa tem
-     que dizer o CAMINHO: a pessoa está com a caixa na mão, na frente do carro,
-     e "não pode" sem saída é o que ensina a empurrar do jeito que der. */
-  /* Venda cancelada no Mercado Livre (VENDAS-E-MEDIA fase 2, D2): a caixa
-     esta na mao da pessoa, e a recusa diz o que fazer com ela. */
-  else if(r.motivo==='cancelada'){ aguardando=null;
-    banner('err',r.origem==='motorista'?'🚫 RECUSADA PELO MOTORISTA — NÃO CARREGAR':'⛔ VENDA CANCELADA — NÃO CARREGAR',
-      (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
-  /* MODO TESTE LIGADO E CAIXA DE VERDADE (22/10/2026): conferir aqui a deixaria
-     baixada, e o "apagar tudo" do modo teste devolveria o saldo pela foto — o
-     estoque ficaria 1 acima para sempre. A tela diz o porque, e o que fazer. */
-  else if(r.motivo==='modo_teste'){ aguardando=null;
-    banner('err','🧪 MODO TESTE LIGADO — ESTA CAIXA É DE VERDADE',
-      (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
-  else if(r.motivo==='nao_embalado'){ aguardando=null;
-    banner('err','⚠ FALTA A ETIQUETA DE VENDA',
-      (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
-  else if(r.motivo==='duplicado'){ aguardando=null;
-    banner('err','⚠ JÁ '+(r.coleta?'SEPARADO PRA COLETA':'CARREGADO'),'Esse pacote ('+esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+') já foi bipado'+(r.coleta?' pra coleta':'')+'. Cuidado com duplicidade.'); beep(false); }
-  else {
-    // Enquanto espera o SKU, um codigo nao reconhecido pode ser outra etiqueta:
-    // solta a pendencia pra pessoa nao ficar presa num volume.
-    var era=aguardando; aguardando=null;
-    banner('err','Etiqueta não reconhecida', era
-      ? 'Lido: '+esc0(code)+'. Esperava o SKU da caixa de '+esc0(era.buyer)+'. Bipe a etiqueta de venda de novo pra recomeçar.'
-      : 'Lido: '+esc0(code)+'. Bipe a etiqueta de VENDA (não o SKU do produto).');
-    beep(false);
-  }
-  carregar();
+  $('#painel').innerHTML=h;
+  var fi=document.getElementById('fotoIn');
+  if(fi) fi.onchange=async function(){ var f=fi.files&&fi.files[0]; if(!f) return;
+    try{ ENT.foto=await reduzirFoto(f); }catch(e){ ENT.foto=null; banner('err','Não deu para ler a foto','Tente de novo.'); }
+    desenharEntrega(); };
+  if(E.passo===3 && E.para==='agencia' && !pessoas) carregarPessoas();
 }
-/* O ATRASADO SAI MARCADO E EM CIMA (carga.js).
-   Ele ja vem primeiro do servidor. Aqui so ganha a tarja: diluido no meio do
-   trabalho de hoje, sem nada que o distinga, ele viraria uma linha a mais numa
-   lista que nunca zera — e lista que nunca zera ninguem le ate o fim. */
-function dataBR(s){ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?(m[3]+'/'+m[2]):''; }
-function horaDe(s){ var p=String(s||'').split(' '); return (p[1]||'').slice(0,5); }
-/* A LISTA UNICA (CONFERENCIA-EXPEDICAO fase 1, 03/11/2026). Agencia e coleta
-   numa lista so, cada caixa com a marcacao. A tela NAO decide o que e coleta:
-   junta as tres listas que a rota ja manda, e a modalidade de cada uma vem do
-   carga.js (dono unico de "isto e coleta?").
-     esperando  = agencia ainda nao conferida (`faltam`, conferida=0)
-                + coleta com etiqueta ainda fora do canto (`coleta.faltam`)
-     conferidas = agencia conferida na area, esperando o carro (conferida=1)
-                + coleta no canto, esperando o caminhao (`coleta.aguardando`)
-   A de dia anterior vem em cima (armadilha #9: atraso tem que gritar). A
-   venda futura continua fora da conta, na linha "so despacham depois". */
-function listaUnica(d){
-  var col=(d&&d.coleta)||{}, age=((d&&d.faltam)||[]);
-  function marca(m){ return function(f){ return Object.assign({},f,{modal:m}); }; }
-  /* A caixa que FICOU num dia anterior (o "a coleta nao passou", fase 3) vem
-     em cima de tudo, com o selo; depois o atraso. */
-  function ordem(a,b){ return ((b.ficou_de?1:0)-(a.ficou_de?1:0)) || ((b.atrasado||0)-(a.atrasado||0))
-    || String(a.data||'').localeCompare(String(b.data||'')) || ((a.id||0)-(b.id||0)); }
-  var esperando=age.filter(function(f){ return f.conferida!==1; }).map(marca('agencia'))
-    .concat((col.faltam||[]).map(marca('coleta'))).sort(ordem);
-  var conferidas=age.filter(function(f){ return f.conferida===1; }).map(marca('agencia'))
-    .concat((col.aguardando||[]).map(marca('coleta'))).sort(function(a,b){ return (b.ficou_de?1:0)-(a.ficou_de?1:0); });
-  return {esperando:esperando, conferidas:conferidas};
+function setPara(p){ ENT.para=p; ENT.sel=p==='agencia'?ENT.sel.filter(function(c){ return c==='AG'; }):ENT.sel; desenharEntrega(); }
+function selDest(c){ var i=ENT.sel.indexOf(c); if(i>=0) ENT.sel.splice(i,1); else ENT.sel.push(c); desenharEntrega(); }
+/* Quem levou: as pessoas ativas do cadastro. Chegam depois do passo aberto, e
+   por isso preenchem SÓ a lista — redesenhar o passo apagaria o número e o
+   motivo que a pessoa já está digitando (§12). */
+async function carregarPessoas(){
+  try{ pessoas=await (await fetch('/api/auth/pessoas')).json(); }catch(e){ pessoas=null; return; }
+  var sel=document.getElementById('quemLevou'); if(!sel) return;
+  sel.innerHTML='<option value="">— escolha —</option>'+(pessoas||[]).map(function(p){ return '<option value="'+p.id+'"'+(ENT&&String(ENT.levou)===String(p.id)?' selected':'')+'>'+esc0(p.nome)+'</option>'; }).join('');
 }
-function tagModal(f){ return f.modal==='coleta' ? '<span class="tag col">🟣 Coleta</span>' : '<span class="tag age">🚗 Agência</span>'; }
-/* O selo do fim do dia: "de ontem" quando ficou ontem; senao, o dia. */
-var hojeSrv='';
-function ontemDe(h){ var m=String(h||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m) return '';
-  var d=new Date(+m[1],+m[2]-1,+m[3]-1); var z=function(n){ return (n<10?'0':'')+n; };
-  return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); }
-function seloFicou(f){ if(!f.ficou_de) return '';
-  return '<span class="tag ontem">🌙 '+(f.ficou_de===ontemDe(hojeSrv)?'de ontem':'ficou '+dataBR(f.ficou_de))+' — a coleta não passou</span>'; }
-function linha(f){
-  return '<div class="row"><span class="who">'+seloFicou(f)
-    +(f.atrasado?'<span class="tag ant">⏳ de '+dataBR(f.data)+'</span>':'')
-    +tagModal(f)+esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)
-    +(f.modal==='coleta'&&f.carregado_em?' · no canto desde '+horaDe(f.carregado_em):'')
-    +'</span>'+pecasLinhas(f.itens)+'</span></div>';
-}
-/* A COLETA NAO PASSOU (fase 3): registra quem, quando e quais caixas — as da
-   lista de agora. Nao mexe em estagio nem em estoque. */
-async function coletaNaoPassou(){
-  if(!confirm('Registrar que a coleta não passou hoje? As caixas da lista continuam esperando e amanhã aparecem em cima. Nada muda no estoque.')) return;
-  const r=await postJ('/api/carregamento/fimdia',{});
-  if(r.ok){ banner('ok','🚚 Registrado: a coleta não passou hoje', '<b>'+r.caixas+'</b> caixa'+(r.caixas===1?'':'s')+' ficam esperando. Amanhã elas aparecem no topo da lista, com o selo <b>de ontem</b>.'); beep(true); }
-  else { banner('err','Não registrei', esc0(r.aviso||r.erro||'')); beep(false); }
-  carregar();
-}
-function porModal(l){ var c=l.filter(function(f){ return f.modal==='coleta'; }).length, a=l.length-c;
-  return l.length ? '<span class="por">🟣 coleta '+c+' · 🚗 agência '+a+'</span>' : ''; }
-function desenharLista(d){
-  hojeSrv=d.hoje||hojeSrv;
-  var u=listaUnica(d), col=d.coleta||{};
-  var fh=d.fim_dia&&d.fim_dia.hoje;
-  $('#fimInfo').innerHTML = fh
-    ? '✓ Registrado hoje por <b>'+esc0(fh.por||'?')+'</b> às '+horaDe(fh.em)+' ('+fh.n+' caixa'+(fh.n===1?'':'s')+'). Amanhã elas aparecem em cima, com o selo <b>de ontem</b>. Pode registrar de novo.'
-    : 'As caixas da lista ficam esperando e amanhã aparecem <b>em cima</b>, com o selo <b>de ontem</b>. Nada muda no estoque.';
-  $('#espT').innerHTML='<b>Esperando conferência: '+u.esperando.length+'</b>'+porModal(u.esperando);
-  $('#espL').innerHTML=u.esperando.length ? u.esperando.map(linha).join('')
-    : '<div class="empty">✅ Nenhuma caixa esperando conferência.</div>';
-  $('#confT').innerHTML='<b>Conferidas, esperando sair: '+u.conferidas.length+'</b>'+porModal(u.conferidas);
-  $('#confL').innerHTML=u.conferidas.length ? u.conferidas.map(linha).join('')
-    : '<div class="empty" style="color:var(--muted)">Nenhuma caixa conferida esperando sair'
-      +(col.retiradas_hoje?' — '+col.retiradas_hoje+' já retirada'+(col.retiradas_hoje===1?'':'s')+' pelo caminhão hoje':'')+'.</div>';
-}
-/* A PILHA (carga.js → pilhaDaArea). A caixa conferida e a que foi bipada aqui
-   — no carro ou no canto da coleta. "Sem segunda pessoa" e HISTORIA: a caixa
-   que a propria pessoa conferiu antes de 01/10/2026, quando o bipe passou a
-   recusar o mesmo login, sem liberacao (CARREGAMENTO-SEGUNDA-PESSOA). A caixa impressa em dia anterior e nao conferida vem em cima: ela
-   esta na fabrica e nao pode sumir (armadilha #9). Tablet com a pagina antiga
-   nao chama isto; servidor antigo nao manda `pilha`, e o card some. */
-function tagsPilha(f){
-  return (f.coleta?'<span class="tag col">coleta</span>':'')
-    +(f.adiantada?'<span class="tag adi">adiantada · despacha '+dataBR(f.despachar_em)+'</span>':'');
-}
-function linhaPilha(f, ant){
-  return '<div class="row"><span class="who">'
-    +(ant?'<span class="tag ant">⏳ impressa '+dataBR(String(f.embalado_em||'').slice(0,10))+'</span>':'')
-    +tagsPilha(f)+esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)+'</span>'
-    +(f.impresso_por?' <span class="tag quem2">feita por '+esc0(f.impresso_por)+'</span>':'')+pecasLinhas(f.itens)+'</span></div>';
-}
-function desenharPilha(p){
-  var card=$('#pilhaCard'); if(!p||!p.hoje){ card.style.display='none'; return; }
-  card.style.display='';
-  var h=p.hoje, na=p.anteriores.length;
-  $('#pConta').innerHTML='<span>impressas <b>'+h.impressas+'</b></span>'
-    +'<span class="pc">conferidas <b>'+h.conferidas+'</b></span>'
-    +'<span class="pf'+(h.faltam?'':' zero')+'">faltam <b>'+h.faltam+'</b></span>';
-  var ad=$('#pAntD'); ad.style.display=na?'':'none'; ad.className=na?'ant':'';
-  $('#pAntS').textContent='⏳ '+na+(na===1?' caixa impressa em dia anterior e ainda não conferida'
-                                        :' caixas impressas em dias anteriores e ainda não conferidas');
-  $('#pAnt').innerHTML=p.anteriores.map(function(f){ return linhaPilha(f,true); }).join('');
-  /* "Ver as que faltam" SAIU (03/11/2026, decisao do dono): as mesmas caixas
-     estao na lista unica, em "Esperando conferencia". */
-  $('#pVazio').innerHTML = h.faltam ? '<div class="pnota">As que faltam estão na lista <b>Esperando conferência</b>, logo abaixo.</div>'
-    : (h.impressas ? '<div class="empty">✅ Todas as impressas hoje foram conferidas.</div>'
-                   : '<div class="empty" style="color:var(--muted)">Nenhuma etiqueta impressa hoje ainda.</div>');
-  var notas=[];
-  if(h.sem_segunda) notas.push('<b>'+h.sem_segunda+'</b> conferidas por quem imprimiu, antes da trava de 01/10: '
-    +p.sem_segunda.slice(0,8).map(function(f){ return esc0(f.buyer)+' ('+esc0(f.quem)+')'; }).join(', ')
-    +(p.sem_segunda.length>8?'…':''));
-  /* FOI NO CAMINHAO SEM CONFERENCIA (02/10/2026): linha propria, separada de
-     "sem registro" — aqui se sabe que ninguem conferiu. Servidor antigo nao
-     manda o campo, e a linha simplesmente nao aparece. */
-  var sc=p.sem_conferencia||[];
-  if(h.sem_conferencia) notas.push('<b>'+h.sem_conferencia+'</b> '+(h.sem_conferencia===1?'foi':'foram')
-    +' no caminhão sem conferência: '
-    +sc.slice(0,8).map(function(f){ return esc0(f.buyer)+(f.nf?' (NF '+esc0(f.nf)+')':''); }).join(', ')
-    +(sc.length>8?'…':''));
-  if(h.sem_registro) notas.push('<b>'+h.sem_registro+'</b> sem registro de quem imprimiu ou de quem conferiu');
-  $('#pSeg').innerHTML = notas.map(function(n){ return '<div class="pnota">'+n+'</div>'; }).join('');
-}
-async function carregar(){
-  const d=await (await fetch('/api/carregamento')).json();
-  desenharPilha(d.pilha);
-  desenharSobras();
-  const col=d.coleta||{faltam:[],aguardando:[],fechamentos:[],retiradas_hoje:0};
-  /* Os quadros do topo e as duas colunas (carro e canto) sairam em 03/11/2026:
-     tudo o que se confere esta na lista unica. `saiu_adiantado` e `carregados`
-     continuam na rota, para quem ler; a tela nao os mostra mais. */
-  desenharLista(d);
-  /* A venda futura aparece, mas fora da cobranca: ela existe e esta na
-     fabrica (nao pode sumir, foi esse o buraco), so nao e carga de hoje. */
-  var dp=document.getElementById('depois');
-  if(dp) dp.innerHTML = d.adiantadas
-    ? '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#eef3fb;'
-      +'border:1px solid #c9d8ee;font-size:14px">📅 <b>'+d.adiantadas+'</b> com etiqueta impressa '
-      +'que <b>só despacham depois</b> — não vão hoje: '
-      +d.depois.slice(0,6).map(function(f){ return esc0(f.buyer)+' ('+dataBR(f.despachar_em)+')'; }).join(', ')
-      +(d.depois.length>6?'…':'')+'</div>'
-    : '';
-  $('#colCard').style.display = '';
-  /* A saida do caminhao: aberta no banco, a tela entra no modo e busca o
-     retrato (a conta, as sobras e o que pode ter ido fora da conta). */
-  if(col.saida_aberta){
-    try{ saidaAtual=await (await fetch('/api/saida/aberta')).json(); }catch(e){}
-  } else { saidaAtual=null; divergPend=null; }
-  var car=d.carro||{prontas:0,viagem_aberta:null,viagens_hoje:[]};
-  if(car.viagem_aberta){
-    try{ viagemAtual=await (await fetch('/api/viagem/aberta')).json(); }catch(e){}
-  } else { viagemAtual=null; divergV=null; }
-  desenharSaida(); desenharViagem();
-  $('#viagemHist').innerHTML=(car.viagens_hoje||[]).map(function(f){
-    return '<div class="hist">🚗 '+horaDe(f.fechada_em)+' — '
-      +(f.divergente ? '<b class="div">⛔ LIBERADA COM DIVERGÊNCIA</b>: carro '+f.qtd_sistema+', atendente '+f.qtd_externa
-                     : '<b class="ok">✓ bateu</b>: '+f.qtd_sistema+' caixa'+(f.qtd_sistema===1?'':'s'))
-      +(f.quem_levou?' · levou: <b>'+esc0(f.quem_levou)+'</b>':'')+(f.fechado_por?' · fechou: '+esc0(f.fechado_por):'')+(f.motivo?' · '+esc0(f.motivo):'')
-      +(f.tem_foto?' · <a href="/api/saida/foto/'+f.id+'" target="_blank" style="color:var(--blue);font-weight:700">📷 ver a foto</a>':'')+'</div>';
-  }).join('');
-  $('#colHist').innerHTML = (col.saidas_hoje||[]).map(function(f){
-    return '<div class="hist">🚚 '+horaDe(f.fechada_em)+' — '
-      +(f.divergente ? '<b class="div">⛔ LIBERADO COM DIVERGÊNCIA</b>: sistema '+f.qtd_sistema+', motorista '+f.qtd_externa
-                     : '<b class="ok">✓ bateu</b>: '+f.qtd_sistema+' caixa'+(f.qtd_sistema===1?'':'s'))
-      +(f.fechado_por?' · '+esc0(f.fechado_por):'')+(f.motivo?' · '+esc0(f.motivo):'')
-      +(f.tem_foto?' · <a href="/api/saida/foto/'+f.id+'" target="_blank" style="color:#4b2a91;font-weight:700">📷 ver a foto</a>':'')+'</div>';
-  }).join('') + col.fechamentos.map(function(f){
-    return '<div class="hist">'+horaDe(f.fechado_em)+' — '
-      +(f.divergente ? '<b class="div">⛔ DIVERGENTE</b>: sistema '+f.qtd_sistema+', motorista '+f.qtd_motorista
-                     : '<b class="ok">✓ bateu</b>: '+f.qtd_sistema+' caixas')
-      +(f.fechado_por?' · '+esc0(f.fechado_por):'')+(f.obs?' · '+esc0(f.obs):'')
-      +(f.tem_foto?' · <a href="/api/coleta/foto/'+f.id+'" target="_blank" style="color:#4b2a91;font-weight:700">📷 ver a foto</a>':'')+'</div>';
-  }).join('');
-}
-/* FECHAR A COLETA: o motorista diz quantas bipou, o sistema compara com as
-   que estao no canto. Bateu, as caixas saem do canto e fica registrado. Nao
-   bateu, NADA anda: a tela lista as caixas pra conferir uma a uma com o
-   motorista ali na frente — e o unico momento em que a caixa que sumiu ainda
-   pode ser achada. Liberar assim mesmo existe (o caminhao nao pode ficar
-   preso), mas fica gravado como divergente, com quem fechou. */
-/* A FOTO DA TELA DO MOTORISTA E A PROVA DO NUMERO. Regra do dono: "nao adianta
-   apenas o motorista falar a quantidade". O tablet fotografa o celular dele
-   com a contagem do sistema do ML, a foto e reduzida aqui (1600 px, JPEG) pra
-   nao pesar no fio, e vai junto do fechamento. Sem foto o servidor recusa. */
-let fotoDataUrl=null;
 function reduzirFoto(file){
   return new Promise(function(res,rej){
     var fr=new FileReader();
-    fr.onload=function(){
-      var img=new Image();
-      img.onload=function(){
-        var max=1600, w=img.width, h=img.height, k=Math.min(1, max/Math.max(w,h));
+    fr.onload=function(){ var img=new Image();
+      img.onload=function(){ var max=1600, w=img.width, h=img.height, k=Math.min(1,max/Math.max(w,h));
         var c=document.createElement('canvas'); c.width=Math.round(w*k); c.height=Math.round(h*k);
-        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-        res(c.toDataURL('image/jpeg',0.85));
-      };
-      img.onerror=rej; img.src=fr.result;
-    };
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height); res(c.toDataURL('image/jpeg',0.85)); };
+      img.onerror=rej; img.src=fr.result; };
     fr.onerror=rej; fr.readAsDataURL(file);
   });
 }
-$('#fotoIn').addEventListener('change',async function(){
-  var f=this.files&&this.files[0]; if(!f) return;
-  try{ fotoDataUrl=await reduzirFoto(f); }
-  catch(e){ fotoDataUrl=null; banner('err','Não deu pra ler a foto','Tente tirar de novo.'); return; }
-  $('#fotoPrev').src=fotoDataUrl; $('#fotoPrev').className='fotoprev on';
-  $('#fotoBtn').className='fotobtn ok'; $('#fotoTxt').textContent='Foto tirada ✓ — tirar outra';
-  $('#motQtd').focus();
-});
-function limparFoto(){
-  fotoDataUrl=null; $('#fotoIn').value=''; $('#fotoPrev').className='fotoprev'; $('#fotoPrev').src='';
-  $('#fotoBtn').className='fotobtn'; $('#fotoTxt').textContent='Foto da tela do motorista';
-}
-let divergPend=null, saidaAtual=null, viagemAtual=null, divergV=null, modoEscolhido=null, fotoV=null;
-/* PARA ONDE VAI O BIPE. Sem nada aberto, e a area. Com a saida do caminhao
-   aberta, as sobras; com a viagem aberta, o carro. Quando as duas estao
-   abertas vale a ultima escolhida, e a faixa diz qual. */
-function modoAtual(){
-  var sa=!!(saidaAtual&&saidaAtual.saida), vi=!!(viagemAtual&&viagemAtual.viagem);
-  if(modoEscolhido==='sobra'&&sa) return 'sobra';
-  if(modoEscolhido==='carro'&&vi) return 'carro';
-  if(modoEscolhido==='ficou'&&vi) return 'ficou';
-  if(modoEscolhido==='area') return 'area';
-  /* Viagem aberta: o bipe diz o que FICOU (CONFERENCIA-EXPEDICAO fase 2) —
-     abrir ja pos no carro todas as conferidas de agencia de hoje. */
-  return sa?'sobra':(vi?'ficou':'area');
-}
-function escolherModo(m){ modoEscolhido=m; pintarModo(); desenharViagem();
-  banner('',({area:'Bipe para CONFERIR na área',carro:'Bipe para PÔR NO CARRO',ficou:'Bipe a caixa de agência que FICOU na fábrica',sobra:'Bipe o que FICOU no canto'})[m],''); }
-function pintarModo(){
-  var m=modoAtual();
-  document.body.classList.toggle('modo-saida',m==='sobra');
-  document.body.classList.toggle('modo-viagem',m==='carro'||m==='ficou');
-  var bar=$('#modoBar');
-  bar.className='modobar '+(sobrou?'recusa':(m==='ficou'?'carro':m));
-  bar.textContent='O bipe agora: '+(sobrou?(sobrouPend?'VENDA CANCELADA — BIPE O SKU DE CADA PERSIANA':'VENDA CANCELADA — BIPE A ETIQUETA DA CAIXA'):
-    ({area:'CONFERIR NA ÁREA',carro:'PÔR NO CARRO DA AGÊNCIA',ficou:'FICOU NA FÁBRICA (tira do carro da agência)',sobra:'SOBRA DO CAMINHÃO (o que ficou no canto)'})[m]);
-  var bt=$('#btnSobrou'); if(bt) bt.textContent=sobrou?'✕ Sair — voltar a conferir':'✕ Venda cancelada — separar a caixa';
-}
-const postJ=async function(url,corpo){
-  const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo||{})});
-  let j={}; try{ j=await resp.json(); }catch(e){}
-  j.__status=resp.status; return j;
-};
-function linhaSaida(f, extra){
-  return '<div class="row"><span class="who">'
-    +(f.antiga?'<span class="tagtroca">⏳ bipada '+dataBR(String(f.carregado_em||'').slice(0,10))+'</span>':'')
-    +(f.troca_de_porta?'<span class="tagtroca">troca de porta · era agência</span>':'')
-    +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)+'</span>'+pecasLinhas(f.itens)+'</span>'+(extra||'')+'</div>';
-}
-/* ⚠️ O MOTIVO SOBREVIVE AO REDESENHO (20/10/2026, teste_carregamento_tela.js).
-   O card da divergencia e redesenhado a cada atualizacao, e o campo do motivo
-   mora dentro dele: trocar o innerHTML recria o campo vazio. O texto que a
-   pessoa estava escrevendo sumia, e no iPad o teclado fechava no meio da
-   frase. Quem redesenha guarda o que estava escrito e devolve, com o foco. */
-function digitado(id){ var e=document.getElementById(id);
-  return e ? {valor:e.value, foco:document.activeElement===e} : null; }
-function devolverDigitado(id,antes){ var e=document.getElementById(id); if(!e||!antes) return;
-  e.value=antes.valor; if(antes.foco) e.focus({preventScroll:true}); }
-/* O QUE A TELA MOSTRA DA SAIDA ABERTA: quantas vao no caminhao (a conta que
-   o motorista tem que bater), as sobras bipadas e, se a conta nao bateu, as
-   caixas desta saida e as impressas FORA da conta que podem ter ido. */
-function desenharSaida(){
-  var ab=!!(saidaAtual&&saidaAtual.saida);
-  pintarModo();
-  $('#saidaBtnBox').style.display=ab?'none':'';
-  /* Aberta, a lista unica some: ela repetia as mesmas caixas da conta e
-     empurrava o painel da saida para fora da tela (1440 x 900). A conta e as
-     sobras sao o que importa agora; a lista volta quando a saida fecha. */
-  $('#listaCard').style.display=ab?'none':'';
-  $('#saidaBox').style.display=ab?'':'none';
-  if(!ab){ $('#saidaDiv').innerHTML=''; return; }
-  var sa=saidaAtual, nS=(sa.sobras||[]).length;
-  $('#saidaConta').innerHTML='Vão no caminhão:<div class="big">'+sa.sistema+' caixa'+(sa.sistema===1?'':'s')+'</div>'
-    +(nS?'<b>'+nS+'</b> sobra'+(nS===1?'':'s')+' bipada'+(nS===1?'':'s')
-        :(sa.saida.nada_ficou?'<b style="color:var(--green)">✓ não ficou nada no canto</b>'
-                             :'<b style="color:var(--amber)">Bipe as caixas que FICARAM — ou toque em "Não ficou nada".</b>'))
-    +((sa.levou||[]).length?' · <b>'+sa.levou.length+'</b> fora da conta foi no caminhão':'');
-  $('#saidaSobras').innerHTML=(nS?'<div class="hist" style="border-top:0"><b>Ficaram no canto:</b></div>'
-      +sa.sobras.map(function(f){ return linhaSaida(f,'<button class="mini" onclick="tirarSobra('+f.id+')">tirar</button>'); }).join(''):'')
-    +((sa.levou||[]).length?'<div class="hist"><b>Fora da conta, foram no caminhão:</b></div>'
-      +sa.levou.map(function(f){ return linhaSaida(f,'<button class="mini" onclick="tirarLevou('+f.id+')">tirar</button>'); }).join(''):'');
-  $('#btnNada').style.display=nS?'none':'';
-  if(!divergPend){ $('#saidaDiv').innerHTML=''; return; }
-  var mot=divergPend.motorista, dif=sa.sistema-mot, motivoAntes=digitado('motivoLib');
-  $('#saidaDiv').innerHTML='<div class="divbox"><h4>⛔ NÃO BATEU — sistema '+sa.sistema+', motorista '+mot+'</h4>'
-    +(dif>0?'O sistema tem <b>'+dif+'</b> a mais. Alguma destas <b>ficou no canto</b> (bipe como sobra) ou o motorista deixou passar:'
-           :(dif<0?'O motorista levou <b>'+(-dif)+'</b> a mais. Veja na lista de baixo se alguma caixa <b>fora da conta</b> foi no caminhão:'
-                  :'Agora bate. Toque em <b>Fechar saída</b> de novo.'))
-    +'<div style="margin-top:8px"><b>Nesta saída ('+sa.lista.length+'):</b></div>'+sa.lista.map(function(f){ return linhaSaida(f); }).join('')
-    +((sa.candidatos||[]).length?'<div style="margin-top:10px"><b>Impressas fora da conta, que podem ter ido no caminhão:</b></div>'
-      +sa.candidatos.map(function(f){ return linhaSaida(Object.assign({},f,{troca_de_porta:!f.coleta}),
-          '<button class="mini" onclick="foiNoCaminhao('+f.id+')">foi no caminhão</button>'); }).join(''):'')
-    +'<div style="margin-top:12px"><b>Liberar o caminhão assim mesmo</b> — só supervisor ou admin, e fica registrado com o seu nome:'
-    +'<input class="motivo" id="motivoLib" placeholder="Por que está liberando com número diferente?" maxlength="300">'
-    +'<button class="btn ghost" data-perm="saida.liberar" style="margin-top:8px" onclick="fecharSaida(true)">Liberar com divergência</button></div></div>';
-  devolverDigitado('motivoLib',motivoAntes);
-}
-async function abrirSaida(){
-  const r=await postJ('/api/saida/abrir',{});
-  if(r.ok){ divergPend=null; limparFoto(); modoEscolhido='sobra';
-    banner('col','🚚 SAÍDA DO CAMINHÃO ABERTA','Vão no caminhão <b>'+r.sistema+'</b>. Agora <b>bipe as caixas que FICARAM</b> no canto — ou toque em "Não ficou nada". Depois, foto e número do motorista.');
-    beep(true); }
-  else banner('err','Não deu pra abrir a saída', esc0(r.erro||r.aviso||''));
-  carregar();
-}
-async function bipSobra(code){
-  const r=await postJ('/api/saida/sobra',{code:code});
-  if(r.ok){ banner('col','Ficou no canto ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · agora vão no caminhão <b>'+r.sistema+'</b>'); beep(true); }
-  else if(r.motivo==='ja_sobra'){ banner('warn','Essa já estava nas sobras', esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'. Não contou de novo.'); beep(false); }
-  else if(r.motivo==='fora_da_conta'){ banner('warn','Fora da conta deste caminhão', (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
-  else if(r.motivo==='cancelada'){ banner('warn','Venda cancelada — deixe separada', (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
-  else if(r.motivo==='nao_encontrado'){ banner('err','Etiqueta não reconhecida','Lido: '+esc0(code)+'. Bipe a etiqueta de VENDA da caixa que ficou.'); beep(false); }
-  else { banner('err','Não deu', esc0(r.aviso||r.erro||'')); beep(false); }
-  carregar();
-}
-async function naoFicouNada(){ const r=await postJ('/api/saida/nada',{}); if(!r.ok) banner('warn','Há sobras bipadas', esc0(r.aviso||'')); carregar(); }
-async function tirarSobra(id){ await postJ('/api/saida/sobra/tirar',{id:id}); carregar(); }
-async function tirarLevou(id){ await postJ('/api/saida/levou/tirar',{id:id}); carregar(); }
-async function foiNoCaminhao(id){
-  const r=await postJ('/api/saida/levou',{id:id});
-  if(!r.ok) banner('err','Não entrou na saída', esc0(r.aviso||''));
-  carregar();
-}
-async function cancelarSaida(){
-  if(!confirm('Cancelar esta saída? As sobras bipadas se perdem, e nenhuma caixa é mexida.')) return;
-  await postJ('/api/saida/cancelar',{}); divergPend=null; limparFoto();
-  banner('','Saída cancelada','Nada foi gravado nas caixas.'); carregar();
+async function fecharEntrega(liberar){
+  var E=ENT;
+  var r=await postJ(liberar?'/api/entrega/liberar':'/api/entrega/fechar',{destinos:E.sel, para:E.para, numero:E.numero, foto:E.foto,
+    quem_levou_id:E.levou, motivo:E.motivo});
+  if(r.__status===403){ banner('err','Sem permissão','Liberar com número diferente é de quem tem a permissão de liberar a saída.'); beep(false); return; }
+  if(r.ok){ banner('ok','✓ Entrega fechada','Sistema '+r.sistema+' · '+(E.para==='agencia'?'atendente':'motorista')+' '+r.numero+(r.divergente?' · liberado com divergência':'')+'. As caixas saíram da fábrica.');
+    beep(true); ENT=null; estado='bipar'; carregar(); desenharPainel(); desenharFaixa(); $('#scan').focus(); return; }
+  E.res=r; beep(false); desenharEntrega();
 }
 
-/* ── A VIAGEM À AGÊNCIA (fase 4) ── */
-function desenharViagem(){
-  var ab=!!(viagemAtual&&viagemAtual.viagem);
-  $('#viagemBtnBox').style.display=ab?'none':'';
-  $('#viagemBox').style.display=ab?'':'none';
-  pintarModo();
-  if(!ab){ $('#viagemDiv').innerHTML=''; return; }
-  var vi=viagemAtual, m=modoAtual();
-  $('#btnModoFicou').style.display=m==='ficou'?'none':'';
-  $('#btnModoCarro').style.display=m==='carro'?'none':'';
-  $('#btnModoArea').style.display=m==='area'?'none':'';
-  $('#viagemHead').textContent=({ficou:'🚗 VIAGEM À AGÊNCIA ABERTA — BIPE O QUE FICOU NA FÁBRICA',
-    carro:'🚗 VIAGEM À AGÊNCIA ABERTA — BIPE O QUE ENTRA NO CARRO'})[m]||'🚗 VIAGEM À AGÊNCIA ABERTA — o bipe agora está conferindo na área';
-  carregarPessoas();
-  $('#viagemConta').innerHTML='No carro:<div class="big">'+vi.sistema+' caixa'+(vi.sistema===1?'':'s')+'</div>'
-    +'<b>'+vi.prontas.length+'</b> conferida'+(vi.prontas.length===1?'':'s')+' na área, fora do carro'+(vi.prontas.length?' (foi? toque em "Pôr mais uma no carro" e bipe)':'')
-    +(vi.viagem.antiga?' · <b style="color:var(--red)">⚠ viagem aberta desde '+dataBR(String(vi.viagem.aberta_em).slice(0,10))+' — feche com a foto do atendente</b>':'');
-  $('#viagemLista').innerHTML=vi.lista.map(function(f){
-    return '<div class="row"><span class="who">'+(f.troca_de_porta?'<span class="tagtroca">troca de porta · era coleta</span>':'')
-      +esc0(f.buyer)+' <span class="c">NF '+esc0(f.nf||'—')+skuDaLinha(f)+'</span>'+pecasLinhas(f.itens)+'</span>'
-      +'<button class="mini" onclick="tirarDoCarro('+f.id+')">tirar do carro</button></div>'; }).join('');
-  if(!divergV){ $('#viagemDiv').innerHTML=''; return; }
-  var at=divergV.atendente, motivoAntes=digitado('motivoLibV');
-  $('#viagemDiv').innerHTML='<div class="divbox"><h4>⛔ NÃO BATEU — carro '+vi.sistema+', atendente '+at+'</h4>'
-    +(vi.sistema>at?'O carro tem <b>'+(vi.sistema-at)+'</b> a mais: alguma ficou no carro ou o atendente deixou passar.'
-                    :(vi.sistema<at?'O atendente bipou <b>'+(at-vi.sistema)+'</b> a mais: alguma caixa foi no carro sem bipe.'
-                                   :'Agora bate. Toque em <b>Fechar viagem</b> de novo.'))
-    +'<div style="margin-top:12px"><b>Liberar a viagem assim mesmo</b> — só supervisor ou admin, e fica registrado com o seu nome:'
-    +'<input class="motivo" id="motivoLibV" placeholder="Por que está liberando com número diferente?" maxlength="300">'
-    +'<button class="btn ghost" data-perm="saida.liberar" style="margin-top:8px" onclick="fecharViagem(true)">Liberar com divergência</button></div></div>';
-  devolverDigitado('motivoLibV',motivoAntes);
-}
-async function abrirViagem(){
-  const r=await postJ('/api/viagem/abrir',{});
-  if(r.ok){ divergV=null; limparFotoV(); modoEscolhido='ficou';
-    banner('ok','🚗 VIAGEM À AGÊNCIA ABERTA — '+r.sistema+' no carro','Todas as conferidas de agência entraram no carro. Se alguma <b>ficou</b>, bipe ela agora. Na agência, peça a foto da tela do atendente; feche na volta, com quem levou.');
-    beep(true); }
-  else banner('err','Não deu pra abrir a viagem', esc0(r.erro||r.aviso||''));
-  carregar();
-}
-async function bipCarro(code){
-  const r=await postJ('/api/viagem/carro',{code:code});
-  if(r.ok){ banner('ok','No carro ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> · no carro agora <b>'+r.sistema+'</b>'
-      +(r.troca_de_porta?'<br><b>Troca de porta:</b> esta era de coleta e vai pela agência.':'')); beep(true); }
-  else if(r.motivo==='nao_conferida'){ banner('warn','⚠ FALTA CONFERIR NA ÁREA',(r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
-  else if(r.motivo==='ja_no_carro'){ banner('warn','Essa já está no carro', esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'. Não contou de novo.'); beep(false); }
-  else if(r.motivo==='nao_encontrado'){ banner('err','Etiqueta não reconhecida','Lido: '+esc0(code)+'. Bipe a etiqueta de VENDA.'); beep(false); }
-  else { banner('err',({nao_embalado:'⚠ FALTA A ETIQUETA DE VENDA',bloqueado:'Volume bloqueado',duplicado:'⚠ Essa caixa já saiu',cancelada:'⛔ VENDA CANCELADA — NÃO CARREGAR'})[r.motivo]||'Não entrou no carro',
-    (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
-  carregar();
-}
-/* O BIPE "FICOU" (fase 2): tira do carro da viagem a caixa que nao foi. */
-async function bipFicou(code){
-  const r=await postJ('/api/viagem/ficou',{code:code});
-  if(r.ok){ banner('ok','Ficou na fábrica ✓ — '+esc0(r.pedido.buyer),'NF <b>'+esc0(r.pedido.nf||'—')+'</b> saiu do carro · no carro agora <b>'+r.sistema+'</b>'); beep(true); }
-  else if(r.motivo==='fora_do_carro'){ banner('warn','Essa não está no carro', (r.pedido?esc0(r.pedido.buyer)+' · NF '+esc0(r.pedido.nf||'—')+'<br>':'')+esc0(r.aviso||'')); beep(false); }
-  else if(r.motivo==='nao_encontrado'){ banner('err','Etiqueta não reconhecida','Lido: '+esc0(code)+'. Bipe a etiqueta de VENDA.'); beep(false); }
-  else { banner('err','Não deu', esc0(r.aviso||r.erro||'')); beep(false); }
-  carregar();
-}
-async function tirarDoCarro(id){ await postJ('/api/viagem/tirar',{id:id}); carregar(); }
-async function cancelarViagem(){
-  if(!confirm('Cancelar esta viagem?')) return;
-  const r=await postJ('/api/viagem/cancelar',{});
-  if(!r.ok){ banner('warn','Há caixas no carro', esc0(r.aviso||'')); return; }
-  divergV=null; limparFotoV(); modoEscolhido=null; banner('','Viagem cancelada','Nada foi gravado.'); carregar();
-}
-async function fecharViagem(liberar){
-  if(!fotoV){ banner('warn','Falta a foto da tela do atendente','Toque em <b>📷 Foto da tela do atendente</b> e escolha a foto (da câmera ou da galeria). Sem a foto a viagem não fecha.'); beep(false); return; }
-  var q=$('#atQtd').value;
-  if(q==='' || !(parseInt(q,10)>=0)){ banner('warn','Quantas caixas o atendente bipou?','Digite o número que está na foto antes de fechar.'); return; }
-  var ql=$('#quemLevou').value;
-  if(!ql){ banner('warn','Quem levou as caixas à agência?','Escolha a pessoa em <b>Quem levou</b> antes de fechar.'); beep(false); return; }
-  var corpo={atendente:parseInt(q,10),foto:fotoV,quem_levou_id:parseInt(ql,10)};
-  if(liberar){ var m=document.getElementById('motivoLibV'); corpo.motivo=m?m.value:''; }
-  const r=await postJ(liberar?'/api/viagem/liberar':'/api/viagem/fechar',corpo);
-  if(r.__status===403){ banner('err','Só supervisor ou admin libera com divergência','Chame quem pode liberar — ou confira as caixas até o número bater.'); beep(false); return; }
-  if(r.ok){ divergV=null; $('#atQtd').value=''; $('#quemLevou').value=''; limparFotoV(); modoEscolhido=null;
-    if(r.divergente){ banner('err','Viagem liberada COM DIVERGÊNCIA','Carro <b>'+r.sistema+'</b> · atendente <b>'+r.atendente+'</b>. Ficou registrado com o seu nome, o motivo e a foto.'); beep(false); }
-    else { banner('ok','Viagem conferida ✓ — '+r.sistema+' = '+r.atendente,'O número do atendente bateu e a foto ficou guardada.'
-      +(r.troca_de_porta?' <b>'+r.troca_de_porta+'</b> caixa'+(r.troca_de_porta===1?'':'s')+' de coleta foi pela agência.':'')); beep(true); } }
-  else if(r.motivo==='divergente'){ divergV=r;
-    banner('err','⛔ NÃO BATEU — carro '+r.sistema+', atendente '+r.atendente,'Confira as caixas logo abaixo, no card do carro.'); beep(false); }
-  else { banner('warn',({sem_foto:'Falta a foto',sem_motivo:'Escreva o motivo',vazia:'Viagem vazia',sem_viagem:'Nenhuma viagem aberta',sem_quem_levou:'Falta quem levou'})[r.motivo]||'Não deu pra fechar',
-    esc0(r.aviso||r.erro||'')); beep(false); }
-  carregar();
-}
-/* QUEM LEVOU: as pessoas ativas do cadastro (a mesma lista da tela de login).
-   Busca uma vez, e so com a viagem aberta. */
-var pessoasCarregadas=false;
-async function carregarPessoas(){
-  if(pessoasCarregadas) return; pessoasCarregadas=true;
-  var l=[]; try{ l=await (await fetch('/api/auth/pessoas')).json(); }catch(e){ pessoasCarregadas=false; return; }
-  var sel=$('#quemLevou'); if(!sel) return;
-  sel.innerHTML='<option value="">— escolha —</option>'+(l||[]).map(function(p){ return '<option value="'+p.id+'">'+esc0(p.nome)+'</option>'; }).join('');
-}
-function limparFotoV(){
-  fotoV=null; $('#fotoInV').value=''; $('#fotoPrevV').className='fotoprev'; $('#fotoPrevV').src='';
-  $('#fotoTxtV').textContent='Foto da tela do atendente';
-}
-$('#fotoInV').addEventListener('change',async function(){
-  var f=this.files&&this.files[0]; if(!f) return;
-  try{ fotoV=await reduzirFoto(f); }
-  catch(e){ fotoV=null; banner('err','Não deu pra ler a foto','Escolha de novo.'); return; }
-  $('#fotoPrevV').src=fotoV; $('#fotoPrevV').className='fotoprev on';
-  $('#fotoTxtV').textContent='Foto escolhida ✓ — trocar'; $('#atQtd').focus();
-});
-/* FECHAR A SAIDA. A foto da tela do motorista e a prova do numero (regra do
-   dono, 09/09/2026); sem ela o servidor recusa. Nao bateu, NADA anda: a tela
-   mostra as caixas desta saida e as de fora que podem ter ido. Liberar com
-   numero diferente e so de supervisor ou admin, com motivo. */
-async function fecharSaida(liberar){
-  if(!fotoDataUrl){ banner('warn','Falta a foto da tela do motorista','Toque em <b>📷 Foto da tela do motorista</b> e fotografe o celular dele mostrando quantas caixas ele bipou. Sem a foto a saída não fecha.'); beep(false); return; }
-  var q=$('#motQtd').value;
-  if(q==='' || !(parseInt(q,10)>=0)){ banner('warn','Quantas caixas o motorista bipou?','Digite o número que está na foto antes de fechar.'); return; }
-  var corpo={motorista:parseInt(q,10),foto:fotoDataUrl};
-  if(liberar){ var m=document.getElementById('motivoLib'); corpo.motivo=m?m.value:''; }
-  const r=await postJ(liberar?'/api/saida/liberar':'/api/saida/fechar',corpo);
-  if(r.__status===403){ banner('err','Só supervisor ou admin libera com divergência','Chame quem pode liberar — ou confira as caixas com o motorista até o número bater.'); beep(false); return; }
-  if(r.ok){
-    divergPend=null; $('#motQtd').value=''; limparFoto();
-    if(r.divergente){ banner('err','Caminhão liberado COM DIVERGÊNCIA','Sistema <b>'+r.sistema+'</b> · motorista <b>'+r.motorista+'</b>. Ficou registrado com o seu nome, o motivo e a foto.'); beep(false); }
-    else { banner('ok','Saída conferida ✓ — '+r.sistema+' = '+r.motorista,'O número do motorista bateu e a foto ficou guardada.'
-      +(r.troca_de_porta?' <b>'+r.troca_de_porta+'</b> caixa'+(r.troca_de_porta===1?'':'s')+' de agência foi pela coleta.':'')+' Pode liberar o caminhão.'); beep(true); }
+/* ===================== VENDA CANCELADA ===================== */
+function abrirCancelada(){ estado=estado==='cancelada'?'bipar':'cancelada'; CANC={pend:null, skus:[], motivo:null, texto:'', erro:''};
+  if(estado==='bipar') return voltarBipar();
+  banner('err','✕ Venda cancelada','Bipe a etiqueta de VENDA da caixa cancelada. Separar não mexe no estoque.'); desenharPainel(); $('#scan').focus(); }
+function soCod(c){ return String(c||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase(); }
+async function bipCancelada(code){
+  if(!CANC.pend){
+    var r=await postJ('/api/carregamento/sobra',{code:code});
+    if(!r.ok){ banner('err','Não dá para separar esta caixa',(r.pedido?quem(r)+'<br>':'')+esc0(r.aviso||'')); beep(false); return; }
+    CANC.pend=r; CANC.faltam=r.faltam||0; beep(true); desenharCancelada(); return;
   }
-  else if(r.motivo==='divergente'){ divergPend=r;
-    banner('err','⛔ NÃO BATEU — sistema '+r.sistema+', motorista '+r.motorista,'<b>Não libere o caminhão.</b> Confira as caixas logo abaixo, no card da coleta, com o motorista na frente.'); beep(false); }
-  else if(r.motivo==='sobras'||r.motivo==='sem_foto'||r.motivo==='sem_motivo'||r.motivo==='vazia'||r.motivo==='sem_saida'){
-    banner('warn',({sobras:'Falta o passo das sobras',sem_foto:'Falta a foto',sem_motivo:'Escreva o motivo',vazia:'Saída vazia',sem_saida:'Nenhuma saída aberta'})[r.motivo], esc0(r.aviso||'')); beep(false); }
-  else { banner('err','Não deu pra fechar', esc0(r.erro||r.aviso||JSON.stringify(r))); beep(false); }
+  var lista=CANC.skus.concat([code]);
+  var r2=await postJ('/api/carregamento/sobra',{id:CANC.pend.pedido.id, skus:lista});
+  if(!r2.ok){ CANC.erro=r2.aviso||'Este bipe não vale para esta caixa.'; beep(false); desenharCancelada(); return; }
+  CANC.skus=lista; CANC.faltam=r2.faltam||0; CANC.erro=''; beep(true); desenharCancelada();
+}
+function desenharCancelada(){
+  var C=CANC, h='';
+  if(C && C.pend){
+    var r=C.pend, bip={}; C.skus.forEach(function(c){ var k=soCod(c); bip[k]=(bip[k]||0)+1; });
+    h+=linha(Object.assign({itens:r.pecas},r.pedido,{coleta:r.pedido.modalidade==='coleta'}))
+      +'<div class="pecas">'+(r.pecas||[]).map(function(p){ if(p.sob_medida) return '<div class="pc">'+esc0(p.codigo)+' — sob medida, não tem SKU a bipar</div>';
+        var q=Math.max(1,p.qtd||1), b=Math.min(q,bip[soCod(p.codigo)]||0);
+        return '<div class="pc'+(b>=q?' ok':'')+'"><span>'+(b>=q?'✓':'○')+'</span><b>'+q+' ×</b> '+esc0(p.codigo)+(q>1?' — '+b+' de '+q:'')+'</div>'; }).join('')+'</div>'
+      +(C.faltam?'<div class="nota"><b>Bipe o SKU de cada persiana</b> (falta'+(C.faltam===1?' 1':'m '+C.faltam)+').</div>':'')
+      +(C.erro?'<div style="font-weight:700;color:var(--red)">'+esc0(C.erro)+'</div>':'')
+      +'<b>Motivo</b><div class="acoes">'+[['cancelada','Venda cancelada'],['motorista','Motorista recusou'],['outro','Outro']].map(function(m){
+        return '<button class="btn sm'+(C.motivo===m[0]?' pri':'')+'" onclick="CANC.motivo=\''+m[0]+'\';desenharCancelada()">'+m[1]+'</button>'; }).join('')+'</div>'
+      +(C.motivo==='outro'?'<input class="txt" id="cancTexto" maxlength="160" placeholder="Escreva o motivo" value="'+esc0(C.texto)+'" oninput="CANC.texto=this.value">':'')
+      +'<div class="acoes"><button class="btn red"'+(!C.faltam&&C.motivo?'':' disabled')+' onclick="separar()">Separar como venda cancelada</button>'
+      +'<button class="btn" onclick="CANC={pend:null,skus:[],motivo:null,texto:\'\',erro:\'\'};desenharCancelada();$(\'#scan\').focus()">Bipei a caixa errada</button></div>';
+  }
+  var sep=CANC_LISTA.caixas||[], ag=CANC_LISTA.aguardando||[];
+  h+='<h2 style="margin-top:6px">Canceladas no ML ainda na fábrica ('+sep.length+')</h2><div class="lista">'+(sep.length?sep.map(function(v){
+      return linha({buyer:v.buyer,nf:v.nf,codigo:v.codigo,coleta:v.modalidade==='coleta'},'<span class="nota">'+esc0(v.cancelada_motivo||'venda cancelada')+' — bipe a etiqueta</span>'); }).join(''):'<div class="vazio">Nenhuma.</div>')+'</div>'
+    +'<h2>Aguardando confirmação no ML ('+ag.length+')</h2><div class="lista">'+(ag.length?ag.map(function(p){
+      return linha({buyer:p.buyer,nf:p.nf,codigo:((p.pecas||[])[0]||{}).codigo||p.codigo,itens:p.pecas,coleta:p.modalidade==='coleta'},
+        '<span class="nota">separada por '+esc0(p.marcado_por||'?')+' · '+esc0(p.motivo||'')+'</span>'
+        +(CANC_LISTA.pode_confirmar?'<button class="btn sm ok" onclick="decidir('+p.id+',\'confirmar\')">Confirmar no ML</button><button class="btn sm" onclick="decidir('+p.id+',\'recusar\')">Recusar</button>':'')); }).join(''):'<div class="vazio">Nenhuma.</div>')+'</div>'
+    +(ag.length&&!CANC_LISTA.pode_confirmar?'<div class="nota">Confirma outra pessoa, com a permissão "Confirmar venda cancelada".</div>':'')
+    +'<div class="acoes"><button class="btn" onclick="voltarBipar()">Fechar</button></div>';
+  $('#painel').innerHTML=h;
+}
+async function separar(){
+  var r=await postJ('/api/carregamento/sobra',{id:CANC.pend.pedido.id, skus:CANC.skus, motivo:CANC.motivo, texto:CANC.texto, confirmar:true});
+  if(!r.ok){ CANC.erro=r.aviso||'Não separei. Tente de novo.'; beep(false); desenharCancelada(); return; }
+  banner('warn','✕ Separada como venda cancelada',quem(r)+'<br>'+esc0(r.aviso||'')); beep(true);
+  CANC={pend:null, skus:[], motivo:null, texto:'', erro:''}; carregar();
+}
+async function decidir(id, acao){
+  var corpo={id:id};
+  if(acao==='confirmar'){ if(!confirm('Confirmar que a venda está CANCELADA no Mercado Livre? Se a caixa já tinha baixado, as peças voltam ao estoque.')) return; }
+  else { var m=prompt('Por que o cancelamento foi recusado? A caixa volta para a lista.'); if(m===null) return;
+    if(!String(m).trim()){ banner('warn','Escreva o motivo da recusa',''); beep(false); return; } corpo.motivo=m; }
+  var r=await postJ('/api/carregamento/cancelada/'+acao,corpo);
+  if(r.__status===403){ banner('err','Sem permissão','Confirmar ou recusar é de quem tem a permissão "Confirmar venda cancelada".'); beep(false); return; }
+  banner(r.ok?(acao==='confirmar'?'ok':'warn'):'err', r.ok?(acao==='confirmar'?'✓ Cancelamento confirmado':'Cancelamento recusado'):'Não deu', esc0(r.aviso||r.erro||'')); beep(!!r.ok);
   carregar();
 }
-const scan=$('#scan');
-/* preventScroll: devolver o foco nao pode arrastar a tela. O #scan mora no
-   alto; sem isto, focar de volta rolava a pagina ate ele e jogava pro topo
-   quem tivesse descido pra usar qualquer coisa no fim. O keep existe pro
-   BIPE cair no lugar certo, nao pra mexer no que a pessoa esta olhando.
-   O campo do motorista e a excecao: enquanto a pessoa digita ali, o foco
-   fica ali. */
-const keep=()=>{ const a=document.activeElement; if(a===scan) return; if(a && (a.id==='motQtd'||a.id==='fotoIn'||a.id==='motivoLib'||a.id==='atQtd'||a.id==='fotoInV'||a.id==='motivoLibV'||a.id==='sobrouTexto')) return; scan.focus({preventScroll:true}); };
-scan.addEventListener('blur',()=>setTimeout(keep,50));
-document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,label')) keep(); });
-/* ⚠️ O BIPE QUE NAO CHEGA AVISA (20/10/2026). Sem rede, ou com o servidor
-   devolvendo pagina de erro, o bipe morria calado: nada na tela, nenhum som,
-   e a pessoa concluia que o leitor tinha falhado. Nao da para saber se o
-   servidor gravou antes de a resposta se perder — por isso a frase manda
-   bipar de novo (a caixa que ja entrou e avisada como repetida) e, na caixa
-   de varias, recomecar a caixa, porque ali o bipe repetido contaria uma
-   persiana a mais. */
-function semConexao(){
-  banner('err','⚠ SEM CONEXÃO — O BIPE NÃO CHEGOU',
-    caixaPecas
-      ? 'Não sei se a última persiana contou. Toque em <b>↺ Recomeçar esta caixa</b> e bipe todas de novo.'
-        +'<br><button class="btn" onclick="recomecarCaixa()">↺ Recomeçar esta caixa</button>'
-      : 'Confira o Wi-Fi e <b>bipe a mesma caixa de novo</b>. Se ela já tiver entrado, o sistema avisa que é repetida.');
-  beep(false);
+
+/* ===================== A COLETA NÃO PASSOU ===================== */
+function abrirNaoPassou(){ estado=estado==='naopassou'?'bipar':'naopassou'; if(estado==='bipar') return voltarBipar(); desenharPainel(); }
+function desenharNaoPassou(){
+  var n=((D&&D.nos)||[]).filter(function(c){ return c.coleta; }).length + ((D&&D.faltam)||[]).filter(function(c){ return c.coleta; }).length;
+  $('#painel').innerHTML='<div class="banner warn"><div class="bt">'+n+' caixas de coleta ficam na fábrica</div><div class="bs">Fica registrado quem marcou e quais caixas. Amanhã elas aparecem em cima, com o selo "de ontem". Nada muda no estoque, e as caixas continuam nos carrinhos.</div></div>'
+    +'<div class="acoes"><button class="btn" onclick="voltarBipar()">Voltar</button><button class="btn pri big" onclick="naoPassou()">Confirmar: a coleta não passou</button></div>';
 }
-scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; bip(v).catch(semConexao); } });
-$('#motQtd').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); fecharSaida(false); } });
+async function naoPassou(){
+  var r=await postJ('/api/carregamento/fimdia',{});
+  if(r.ok){ banner('ok','🚚 Registrado: a coleta não passou hoje','<b>'+r.caixas+'</b> caixa'+(r.caixas===1?'':'s')+' ficam esperando.'); beep(true); voltarBiparSemBanner(); }
+  else { banner('err','Não registrei',esc0(r.aviso||r.erro||'')); beep(false); }
+  carregar();
+}
+function voltarBiparSemBanner(){ estado='bipar'; desenharPainel(); desenharFaixa(); $('#scan').focus(); }
+
+/* ===================== O CAMPO DO BIPE ===================== */
+var scan=$('#scan');
+scan.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); var v=scan.value.trim(); scan.value=''; if(v) bip(v).catch(semConexao); } });
 scan.focus();
-function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=ok?820:240;g.gain.value=.05;o.start();setTimeout(()=>{o.stop();a.close();},ok?100:220);}catch(e){} }
-/* A atualizacao de 4 s espera quem esta digitando: redesenhar por baixo de um
-   campo com foco fecha o teclado do iPad. O campo do bipe nao conta — ele
-   esta sempre com o foco, e a tela tem que andar com ele. */
-const DIGITACAO=['motQtd','motivoLib','atQtd','motivoLibV','sobrouTexto'];
+/* A atualização de 4 s espera quem está digitando: redesenhar por baixo de um
+   campo com foco fecha o teclado do iPad (§12). O campo do bipe não conta. */
+var DIGITACAO=['numEnt','motivoLib','cancTexto','quemLevou'];
 function digitando(){ var a=document.activeElement; return !!(a && DIGITACAO.indexOf(a.id)>=0); }
 carregar(); setInterval(function(){ if(!digitando()) carregar(); },4000);
 </script><script src="/nav.js"></script>
