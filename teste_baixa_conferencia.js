@@ -137,6 +137,12 @@ const app = {
 };
 require('./exp_route')(app, db);
 require('./etq_route')(app, db);
+/* A TRAVA DA 201 (CONFERENCIA-CARRINHOS fase 3): a caixa da virada e de ONTEM e
+   nao foi conferida — com ela, a 201 nao imprime etiqueta nova. Este teste e
+   sobre a baixa, nao sobre a trava (teste_trava_dia.js): ela sai da trava como
+   o Supervisor a soltaria ("caixa nao encontrada"), e a conferencia dela, mais
+   abaixo, continua valendo. */
+db.prepare("UPDATE lote SET nao_encontrada_em=datetime('now','localtime'), nao_encontrada_motivo='teste' WHERE id=?").run(vAntigo);
 require('./carreg_route')(app, db);
 require('./saida_route')(app, db);
 require('./correcao_route')(app, db);

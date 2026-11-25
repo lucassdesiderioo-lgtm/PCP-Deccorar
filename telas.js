@@ -85,7 +85,7 @@ const TELAS = [
   { n:105, nome:'Painel da TV',          rota:'/painel',        nivel:'operacao',   onde:'TV',         perms:['painel.ver'],            area:'painel',
     modulo:'producao', bloco:'medida_padrao', liga:[101, 102, 201, 401] },
   // ── 200 · Expedição ──
-  { n:201, nome:'Etiqueta de Venda',     rota:'/embalagem',     nivel:'operacao',   onde:'tablet',     perms:['etiqueta.emitir'],       area:'embalagem',
+  { n:201, nome:'Etiqueta de Venda',     rota:'/embalagem',     nivel:'operacao',   onde:'tablet',     perms:['etiqueta.emitir','expedicao.caixa_nao_encontrada'],       area:'embalagem',
     modulo:'expedicao', bloco:'comum', liga:[103, 102, 202, 'lote'] },
   { n:202, nome:'Conferência',           rota:'/carregamento',  nivel:'operacao',   onde:'tablet',     perms:['carregamento.executar'], area:'carregamento',
     modulo:'expedicao', bloco:'comum', liga:[201, 'estoque de peça', 'saida'] },

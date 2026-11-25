@@ -454,6 +454,33 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 - **Teste que trava:** `teste_carrinhos.js`.
 - **Status:** construído em 25/11/2026, falta subir.
 
+## A trava do dia seguinte (a 201)
+
+### R-TRV-01 · A 201 não imprime etiqueta NOVA com caixa de dia anterior sem conferência
+- **Regra:** enquanto houver caixa impressa num dia anterior e ainda sem o bipe da Conferência (fora de qualquer saída), o `POST /api/embalar` recusa (409 `trava_dia`, com a lista) e a 201 mostra o quadro vermelho: cliente, NF, SKU, quem imprimiu e o dia. **Vale a adiantada também** (D18: as 15 adiantadas de hoje para a coleta de amanhã, se amanhã cedo não tiverem bipe, travam), e o sob medida igual (D19). Para todo mundo (D11). A régua é do `trava_dominio.js` (dono único). A caixa impressa hoje não trava.
+- **Por quê:** o dono (25/11/2026): *"a tela de etiqueta de venda não pode deixar avançar se tiver peças que não foram conferidas"* — a caixa esquecida no carrinho sem bipe é a que vai embora sem baixa.
+- **Exceções:** a conta que falhar (banco sem as colunas) não derruba a bancada: vai ao log e a tela diz *"não consegui conferir a trava"*.
+- **Teste que trava:** `teste_trava_dia.js`.
+- **Status:** construído em 25/11/2026, falta subir.
+
+### R-TRV-02 · A reimpressão nunca trava
+- **Regra:** o `POST /api/reimprimir` passa com a trava ligada, sem motivo (D16), e não baixa (R-EST-04). É a saída prática da caixa que sumiu: pegar outra persiana, reimprimir e bipar.
+- **Por quê:** sem isso a fábrica ficaria presa.
+- **Teste que trava:** `teste_trava_dia.js`.
+- **Status:** construído em 25/11/2026, falta subir.
+
+### R-TRV-03 · O que solta a trava
+- **Regra:** o bipe na 202; separar como venda cancelada; ou, sem persiana para repor, quem tem `expedicao.caixa_nao_encontrada` (Supervisor, sensível) marca **"caixa não encontrada"** com motivo — a caixa não muda de estágio nem de saldo, e vira a pendência "Etiqueta de Venda — caixa não encontrada" na 204 até alguém resolver com o que foi decidido com o ML (ou até a caixa aparecer e ser bipada).
+- **Por quê:** a venda está parada; decidir com o Mercado Livre (spec §6).
+- **Teste que trava:** `teste_trava_dia.js`.
+- **Status:** construído em 25/11/2026, falta subir.
+
+### R-TRV-04 · Fica fora da trava, e a caixa reimpressa no dia seguinte vira pendência
+- **Regra:** fora da trava: a conferida (no carrinho ou não), a cancelada e a separada, a que já saiu, a de teste, e **a caixa de várias com item cancelado pelo ML** (`cancelada_varias=1`, decisão do dono de 25/11/2026: ela espera decisão no card "Canceladas depois da etiqueta"). **Reimprimir uma caixa que está travando** abre a pendência "caixa reimpressa no dia seguinte" (§7, D6), uma por caixa; quem tem a chave decide: *achei a caixa velha* (nada), *foi só a etiqueta* (nada) ou *persiana perdida* — que abre o **pedido** de ajuste −1 por peça (por SKU, a caixa de várias pelo `lote_item`; o sob medida não pede), e outra pessoa aprova (R-EST-20). Com pedido de ajuste do SKU já aberto, a decisão é recusada e nada grava. **"Persiana perdida" só depois de a caixa reimpressa baixar** (pelo bipe da 202 ou pelo passivo das nunca conferidas): antes, a reposição pode nem acontecer, e o passivo baixaria a mesma peça que o ajuste. **A caixa marcada "não encontrada" e depois reimpressa também abre a pendência** — ela saiu da trava, mas é a mais provável de ser reposta.
+- **Por quê:** a reimpressão não pede motivo, e é assim que o sistema reconhece sozinho a persiana que pode ter sumido (saíram duas da prateleira e baixou uma).
+- **Teste que trava:** `teste_trava_dia.js`.
+- **Status:** construído em 25/11/2026, falta subir.
+
 ## A saída do caminhão (coleta)
 
 ### R-SAI-01 · Uma saída por caminhão, e ela só olha o que saiu nela

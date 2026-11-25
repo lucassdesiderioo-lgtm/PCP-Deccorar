@@ -63,6 +63,16 @@ module.exports = [
      no Mercado Livre e confirma — so a confirmacao devolve a peca ao estoque.
      SENSIVEL pela mesma razao do `estoque.editar`: e saldo voltando sem venda
      na frente. Nivel `supervisor`, como o `saida.liberar` (§19, #34). */
+  /* A TRAVA DA 201 (CONFERENCIA-CARRINHOS fase 3, 25/11/2026): sem persiana
+     para repor a caixa perdida, quem tem esta chave solta a trava com motivo,
+     e decide a caixa reimpressa no dia seguinte ("perdida" abre o PEDIDO de
+     ajuste −1, que outra pessoa aprova). SENSIVEL: solta uma venda parada e
+     pode levar a ajuste de saldo. Nivel `supervisor` (§19, #34). Nasce so para o
+     Admin Geral (R-ALC-06). */
+  { chave:'expedicao.caixa_nao_encontrada', grupo:'Expedição', tela:201, nivel:'supervisor',
+    rotulo:'Caixa não encontrada',
+    desc:'Soltar a trava da Etiqueta de Venda marcando a caixa impressa que não foi achada, e decidir a caixa reimpressa no dia seguinte',
+    sensivel:true },
   { chave:'cancelamento.confirmar', grupo:'Expedição', tela:202, nivel:'supervisor',
     rotulo:'Confirmar venda cancelada',
     desc:'Confirmar no Mercado Livre a venda cancelada que a Conferência separou — devolve as peças ao estoque — ou recusar',

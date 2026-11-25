@@ -139,6 +139,17 @@ const LINHAS = [
       return { n:l.length, desde:maisAntiga(l.map(x => x.cancelada_em)),
                canceladas:l.filter(x => x.de === 'cancelada').map(x => x.id) };
     } },
+  /* A TRAVA DA 201 (CONFERENCIA-CARRINHOS fase 3): a caixa marcada "não
+     encontrada" solta a trava e deixa a venda parada (decidir com o ML); a
+     reimpressa no dia seguinte pode ser uma persiana perdida (§7). */
+  { chave:'trava_nao_encontrada', tela:201, frase:['caixa impressa não foi encontrada e a venda está parada','caixas impressas não foram encontradas e as vendas estão paradas'],
+    nome:'Etiqueta de Venda — caixa não encontrada', perm:['expedicao.caixa_nao_encontrada'], onde:{ url:'/embalagem' },
+    ajuda:'caixa impressa num dia anterior que ninguém achou: decidir com o Mercado Livre',
+    contar(db){ return require('./trava_dominio').contarNaoEncontradas(db); } },
+  { chave:'caixa_reimpressa', tela:201, frase:['caixa foi reimpressa no dia seguinte e pode haver persiana perdida','caixas foram reimpressas no dia seguinte e pode haver persiana perdida'],
+    nome:'Etiqueta de Venda — caixa reimpressa no dia seguinte', perm:['expedicao.caixa_nao_encontrada'], onde:{ url:'/embalagem' },
+    ajuda:'achei a caixa velha · persiana perdida (pedido de ajuste −1) · foi só a etiqueta',
+    contar(db){ return require('./trava_dominio').contarReimpressas(db); } },
   /* CONFERENCIA-CARRINHOS (25/11/2026): a caixa conferida que a recontagem não
      achou no carrinho. O estoque não mexeu (ela foi bipada); resolve-se
      achando a caixa e bipando-a num carrinho na 202. */
