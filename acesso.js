@@ -944,6 +944,17 @@ module.exports = function(app, db){
     if(eq('/api/revisao/cancelar') || eq('/api/revisao/desfazer') || eq('/api/revisao/ultima')) return 'revisao.executar';
     if(M !== 'GET' && eq('/api/rejeicao')) return 'revisao.rejeitar';
     if(pre('/api/material-extra')) return 'material.extra';   // a 106 (FICHAS-NO-CADASTRO-UNICO)
+    /* A PRODUCAO DA MEDIDA PADRAO (PRODUCAO-MAPA-E-MOTOR v7, §14): a aba de
+       etiquetas da 401 e do Supervisor; cancelar etiqueta e corrigir. A bolinha
+       do ☰ Menu pergunta so o numero. As bancadas, cada uma a sua chave. O
+       tradutor e quem fez a persiana sao leitura de quem bipa. */
+    if(eq('/api/producao/etiquetas/cancelar')) return 'producao.corrigir';
+    if(pre('/api/producao/etiquetas')) return 'producao.etiqueta';
+    if(pre('/api/producao/corte/tecido')) return 'producao.cortar_tecido';
+    if(pre('/api/producao/corte/tubo')) return 'producao.cortar_tubo';
+    if(pre('/api/producao/montagem')) return 'producao.montar';
+    if(pre('/api/producao/traduzir')) return '@logado';
+    if(pre('/api/producao/persiana')) return ['revisao.executar','producao.montar','embalagem.executar','relatorios.ver','@admin'];
     if(M !== 'GET' && eq('/api/montagem')) return 'embalagem.executar';
     /* Cancelar a embalagem em andamento (21/11/2026): a mesma bancada. */
     if(eq('/api/montagem/cancelar')) return 'embalagem.executar';
