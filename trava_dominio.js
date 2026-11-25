@@ -137,7 +137,7 @@ function registrarReimpressa(db, { lote_id, quem }){
 function reimpressas(db){
   try{
     return db.prepare(`SELECT c.id, c.lote_id, c.reimpressa_em, c.reimpresso_por, l.codigo, l.buyer, l.nf, l.envio,
-        CASE WHEN l.conferido_em IS NOT NULL THEN 1 ELSE 0 END conferida
+        CASE WHEN l.conferido_em IS NOT NULL OR l.baixado_em IS NOT NULL THEN 1 ELSE 0 END conferida
       FROM caixa_reimpressa c JOIN lote l ON l.id=c.lote_id
       WHERE c.status='pendente' AND COALESCE(c.teste,0)=0 ORDER BY c.reimpressa_em`).all();
   }catch(e){ return []; }
@@ -158,14 +158,18 @@ function pecasPorSku(db, lote_id){
 
 function decidirReimpressa(db, { id, decisao, quem }){
   if(!DECISOES[decisao]) throw erro(400, 'escolha: achei a caixa velha, persiana perdida ou foi só a etiqueta');
-  const c = db.prepare('SELECT c.*, l.nf, l.conferido_em FROM caixa_reimpressa c JOIN lote l ON l.id=c.lote_id WHERE c.id=?').get(Number(id));
+  const c = db.prepare('SELECT c.*, l.nf, l.conferido_em, l.baixado_em FROM caixa_reimpressa c JOIN lote l ON l.id=c.lote_id WHERE c.id=?').get(Number(id));
   if(!c) throw erro(404, 'pendência não encontrada');
   if(c.status !== 'pendente') throw erro(409, 'esta caixa já foi decidida (' + (DECISOES[c.status] || c.status) + ')');
   /* ⚠️ "PERDIDA" SÓ DEPOIS DO BIPE (③ REVISÃO, 25/11/2026): a perda é a SEGUNDA
      persiana — a reposição, que baixou ao ser bipada. Com a caixa ainda sem bipe
      a reposição pode nem acontecer, e mais tarde o passivo das nunca conferidas
      daria a baixa dela: o −1 do ajuste baixaria a mesma peça de novo. */
-  if(decisao === 'perdida' && !c.conferido_em)
+  /* A régua é "a caixa reimpressa já BAIXOU?" (③ REVISÃO, rodada 2): o bipe da
+     Conferência baixa, e o passivo das nunca conferidas também (com
+     `conferido_em` vazio, R-PAS-02) — pelo `conferido_em` só, a pendência da
+     caixa que saiu pelo passivo nunca aceitaria "perdida". */
+  if(decisao === 'perdida' && !c.conferido_em && !c.baixado_em)
     throw erro(409, 'bipe a caixa reimpressa na Conferência antes: a persiana só está perdida depois que a reposta saiu');
   return db.transaction(() => {
     const feitos = [];

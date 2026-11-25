@@ -254,6 +254,14 @@ const limpar = () => db.prepare("UPDATE lote SET estagio='carregado', conferido_
   r = await chamar('POST /api/etiqueta/reimpressa/decidir', {id:crb, decisao:'perdida'}, SUP);
   ok('...e depois de bipada, aceita', r.ok === true, JSON.stringify(r));
   db.prepare("DELETE FROM ajuste_pedido WHERE codigo='BK120160CINZA'").run();
+  // ── ③ REVISÃO rodada 2: a que saiu pelo passivo (baixou sem bipe) aceita "perdida" ──
+  const pp = impressa(1, null, 'BK120160CINZA');
+  await chamar('POST /api/reimprimir', {id:pp}, ANA);
+  const crp = db.prepare('SELECT id FROM caixa_reimpressa WHERE lote_id=?').get(pp).id;
+  db.prepare("UPDATE lote SET baixado_em=datetime('now','localtime'), saiu_em=datetime('now','localtime') WHERE id=?").run(pp);
+  r = await chamar('POST /api/etiqueta/reimpressa/decidir', {id:crp, decisao:'perdida'}, SUP);
+  ok('a caixa reimpressa que saiu pelo passivo (baixou sem bipe) aceita "persiana perdida" (③ REVISÃO)', r.ok === true, JSON.stringify(r));
+  db.prepare("DELETE FROM ajuste_pedido WHERE codigo='BK120160CINZA'").run();
   // ── ③ REVISÃO 4: quem tem só a chave abre a 201 ──
   const tela201 = require('./telas').TELAS.find(t => t.n === 201);
   ok('a 201 abre também com expedicao.caixa_nao_encontrada (o Supervisor decide lá)',

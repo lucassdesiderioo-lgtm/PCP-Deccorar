@@ -24,3 +24,4 @@ parametros:
 - 19/11/2026 — A etiqueta continua só reservando a peça. A caixa que saiu da fábrica sem passar pela Conferência passa a ter o estoque baixado quando o acerto das caixas não conferidas é feito, uma vez só.
 - 25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU
 - 25/11/2026 — trava: com caixa impressa num dia anterior e sem conferência, a etiqueta nova não sai até a caixa ser bipada na Conferência; a reimpressão continua liberada, e quem tem a permissão "Caixa não encontrada" solta a caixa perdida e decide a caixa reimpressa no dia seguinte
+- 25/11/2026 — "Persiana perdida" só aparece depois que a caixa reimpressa for bipada na Conferência; quem só decide a trava abre a tela e vê só o quadro

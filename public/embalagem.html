@@ -204,6 +204,7 @@ function banner(kind,title,sub,acts){ emIdle=false; $('#banner').className='bann
 // prendeu na etiqueta que acabou de sair e ninguém quer procurar na lista.
 function idle(){
   confirmar=null;
+  if(SEM_EMITIR) return;   // quem só decide a trava: o aviso dele fica (③ REVISÃO)
   var u=(impCache||[])[0];   // var hoisted: no primeiro idle() a lista ainda nem carregou
   if(!u){ banner('','Bipe o SKU da caixa','A próxima venda desse SKU aparece aqui pra você conferir.'); emIdle=true; return; }
   banner('','Bipe o SKU da caixa','A próxima venda desse SKU aparece aqui pra você conferir.'
@@ -313,7 +314,7 @@ function telaPacote(r,extras){
    Conferencia. O numero e o placar da bancada (`embalado_em` de hoje). */
 async function stats(){
   var d=null;
-  try{ d=await (await fetch('/api/fila/resumo')).json(); }catch(e){ return; }
+  try{ var rq=await fetch('/api/fila/resumo'); if(!rq.ok) return; d=await rq.json(); }catch(e){ return; }
   var el=$('#resumo'); if(!el) return;
   var h='';
   if(d.hoje>0){
@@ -373,12 +374,13 @@ async function scanSku(sku){
   // 2º bip do mesmo SKU = confirma
   if(confirmar && confirmar.codigo && confirmar.codigo.toUpperCase()===sku){ imprimir(); return; }
   // O filtro vai junto: em Agência ou Coleta o bipe só pega venda daquela lista.
-  const r=await (await fetch('/api/proximo/'+encodeURIComponent(sku)+(MODO!=='todas'?'?modo='+MODO:''))).json();
+  const rp=await fetch('/api/proximo/'+encodeURIComponent(sku)+(MODO!=='todas'?'?modo='+MODO:''));
+  if(rp.status===403){ semEmitir(); return; }
+  const r=await rp.json();
   /* A TRAVA (R-TRV-01): o servidor recusa a impressão nova; a tela diz no
      bipe, antes de oferecer o "Imprimir". */
-  if(r.trava && r.trava.n>0){ banner('err','🔒 Etiqueta de Venda travada',
-      r.trava.n+(r.trava.n===1?' caixa impressa num dia anterior ainda não foi conferida.':' caixas impressas em dias anteriores ainda não foram conferidas.')
-      +'<br>Bipe essas caixas na <b>Conferência</b> para liberar. A lista está no quadro vermelho, em cima.');
+  if(r.trava && r.trava.n>0){ banner('err','🔒 Não dá para imprimir agora',
+      'Há caixa de um dia anterior sem conferência: veja o quadro vermelho logo abaixo.');
     beep(false); confirmar=null; carregarTrava(); return; }
   if(!r.cadastrado){ banner('err','SKU não cadastrado', '<span class="sku">'+sku+'</span> — cadastre no Admin.'); beep(false); confirmar=null; return; }
   // Sob medida nao tem estoque por definicao: a peca e feita contra o pedido.
@@ -689,6 +691,7 @@ async function listaPend(){
   var l=[], cx=[];
   try{
     var rs=await Promise.all([fetch("/api/pendentes"), fetch("/api/pendentes/varias")]);
+    if(rs[0].status===403){ semEmitir(); return; }
     l=await rs[0].json(); cx=await rs[1].json();
     if(!Array.isArray(l)) l=[]; if(!Array.isArray(cx)) cx=[];
   }catch(e){}
@@ -1006,7 +1009,7 @@ listaImp();
 
 async function relogioDesp(){
   var d=null;
-  try{ d=await (await fetch("/api/expedicao/status")).json(); }catch(e){ return; }
+  try{ var rq=await fetch("/api/expedicao/status"); if(!rq.ok) return; d=await rq.json(); }catch(e){ return; }
   var el=document.getElementById("despBox");
   if(!el){
     el=document.createElement("div");
@@ -1077,7 +1080,7 @@ function desenharTrava(){
   if(t.erro) h+='<div class="dec"><b>Não consegui conferir a trava</b> — se a etiqueta for recusada, avise o admin.</div>';
   if(t.travada){
     h+='<div class="tv"><h2>🔒 Etiqueta de Venda travada</h2>'
-      +'<div style="font-size:16px;margin-bottom:6px">'+esc(t.frase||'')+' <b>A reimpressão continua liberada.</b></div>';
+      +'<div style="font-size:16px;margin-bottom:6px">'+esc(t.frase||'')+(SEM_EMITIR?'':' <b>A reimpressão continua liberada.</b>')+'</div>';
     (t.caixas||[]).forEach(function(c){
       h+='<div class="cx"><div class="q"><b style="font-size:17px">'+esc(c.buyer||'—')+'</b> · NF <b>'+esc(c.nf||'—')+'</b>'
         +(c.envio?' · envio <span data-copiar style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace">'+esc(c.envio)+'</span>':'')
@@ -1105,7 +1108,9 @@ function desenharTrava(){
         +(c.conferida?' · <b>já conferida</b>':'')
         +'<div style="font-size:13px;color:var(--muted);margin:4px 0">Pode haver uma persiana perdida. "Persiana perdida" abre o pedido de ajuste −1, que outra pessoa aprova.</div>'
         +'<button class="ghost" onclick="decidirReimpressa('+c.id+',\'achei\',this)">Achei a caixa velha</button> '
-        +'<button class="ghost" onclick="decidirReimpressa('+c.id+',\'perdida\',this)">Persiana perdida</button> '
+        /* "Persiana perdida" só depois de a caixa reposta baixar (③ REVISÃO): antes, o servidor recusa — não se oferece o botão. */
+        +(c.conferida?'<button class="ghost" onclick="decidirReimpressa('+c.id+',\'perdida\',this)">Persiana perdida</button> '
+          :'<span style="font-size:13px;color:var(--muted)">"Persiana perdida" aparece depois que a caixa reposta for bipada na Conferência.</span> ')
         +'<button class="ghost" onclick="decidirReimpressa('+c.id+',\'so_etiqueta\',this)">Foi só a etiqueta</button></div>';
     });
     (t.nao_encontradas||[]).forEach(function(c){
@@ -1120,20 +1125,36 @@ function desenharTrava(){
   el.innerHTML=h;
   Object.keys(guardado).forEach(function(k){ var i=document.getElementById(k); if(i) i.value=guardado[k]; });
 }
+/* QUEM ABRE A 201 SÓ PARA DECIDIR A TRAVA (③ REVISÃO, rodada 2): com a chave
+   "Caixa não encontrada" e sem a de emitir etiqueta, as listas e o bipe dão 403 —
+   e a tela dizia "Nada faltando" e "SKU não cadastrado", falso. Ela some com o
+   que a pessoa não usa e diz por quê; fica o quadro da trava. */
+var SEM_EMITIR=false;
+function semEmitir(){
+  if(SEM_EMITIR) return; SEM_EMITIR=true;
+  ['#modoBar','#resumo','.direita','#despBox','#pendAviso'].forEach(function(q){ var e=$(q); if(e) e.style.display='none'; });
+  scan.style.display='none';
+  var c=$('#impLista'); if(c && c.closest('.card')) c.closest('.card').style.display='none';
+  banner('warn','Você abre esta tela para decidir a trava',
+    'Imprimir etiqueta de venda pede a permissão <b>Emitir etiqueta de venda</b>. Aqui embaixo ficam as caixas que travam a tela e as que esperam decisão.');
+}
 /* ⚠️ O FOCO VOLTA AO BIPE depois de cada ação do quadro (③ REVISÃO): o
    redesenho tira o botão tocado, o foco cai no body, e o #scan — que já tinha
    perdido o foco para o motivo — não recebia o bipe seguinte, calado (§12). */
 function voltaBipe(){ setTimeout(function(){ var a=document.activeElement;
   if(a && a.closest && a.closest('#trava') && /^(INPUT|TEXTAREA)$/.test(a.tagName)) return;
-  scan.focus({preventScroll:true}); }, 0); }
+  scan.focus({preventScroll:true});
+  /* o quadro é comprido: depois de decidir, a página pode ter rolado e o campo
+     sair da vista — no iPad o campo fora da tela perde o foco (§12) */
+  var rc=scan.getBoundingClientRect(); if(rc.top<70 || rc.bottom>window.innerHeight) window.scrollTo({top:0}); }, 0); }
 async function travaPost(url,body,btn){
   if(btn){ btn.disabled=true; }
   try{
     var resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     var r=null; try{ r=await resp.json(); }catch(e){ throw new Error('sem resposta'); }
-    if(!r.ok){ banner('err','Não deu', esc(r.erro||'não deu para gravar')); beep(false); if(btn) btn.disabled=false; return null; }
+    if(!r.ok){ banner('err','Não deu', esc(r.erro||'não deu para gravar')); beep(false); if(btn) btn.disabled=false; voltaBipe(); return null; }
     return r;
-  }catch(e){ banner('err','SEM CONEXÃO','A decisão pode não ter chegado ao servidor. Confira o quadro antes de repetir.'); beep(false); if(btn) btn.disabled=false; return null; }
+  }catch(e){ banner('err','SEM CONEXÃO','A decisão pode não ter chegado ao servidor. Confira o quadro antes de repetir.'); beep(false); if(btn) btn.disabled=false; voltaBipe(); return null; }
 }
 async function naoEncontrada(id){
   var i=document.getElementById('tvMot'+id), m=i?i.value.trim():'';
