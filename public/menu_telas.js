@@ -94,7 +94,10 @@
     });
     if(botao){
       var vb = botao.querySelector('.mnPend'); if(vb) vb.remove();
-      if(p.total) botao.insertAdjacentHTML('beforeend', bolinha(String(p.total), p.total + ' ' + pl(p.total, 'pendência esperando você', 'pendências esperando você') + (p.erro ? ' (e uma linha não deu para contar)' : '')));
+      var etq = (por['401'] && por['401'].etiquetas) || 0, pen = p.total - etq;
+      var tit = [pen > 0 ? pen + ' ' + pl(pen, 'pendência esperando você', 'pendências esperando você') : '',
+        etq > 0 ? etq + ' ' + pl(etq, 'etiqueta de hoje a imprimir', 'etiquetas de hoje a imprimir') : ''].filter(Boolean).join(' e ');
+      if(p.total) botao.insertAdjacentHTML('beforeend', bolinha(String(p.total), tit + (p.erro ? ' (e uma linha não deu para contar)' : '')));
       else if(p.erro) botao.insertAdjacentHTML('beforeend', bolinha('?', 'Não deu para contar as pendências'));
     }
   }

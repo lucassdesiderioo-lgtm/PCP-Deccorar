@@ -105,7 +105,7 @@
       '<button type="button" class="btn" data-acao="voltar">Cancelar</button>';
   }
   function cortando(ab){
-    var x = (DADOS.lista.itens.find(function(i){ return i.chave === ab.item; })) || SEL || { titulo:ab.descricao || ab.item, cor:'', sub:'' };
+    var x = (DADOS.lista.itens.find(function(i){ return i.chave === ab.item; })) || ((DADOS.itens_entrada || []).find(function(i){ return i.chave === ab.item; })) || SEL || { titulo:ab.descricao || ab.item, cor:'', sub:'' };
     var boas = ab.quantidade - ab.perdidas;
     var h = '<div class="banner rev">' + cab(x) + (ab.entrada_inicial ? '<div class="bs" style="color:var(--amber);font-weight:700">Entrada inicial</div>' : '') +
       '<div class="bs">' + esc(como(x, boas)) + '</div>' +
@@ -203,6 +203,8 @@
     if(!b){ manter(); return; }
     if(b.id === 'entrada'){ ENTRADA = b.checked; SEL = null; desenhar(); return; }
     var item = b.getAttribute('data-item'), dig = b.getAttribute('data-dig'), acao = b.getAttribute('data-acao');
+    /* a confirmação do cancelar só vale com o aviso à vista: qualquer outro toque a desarma */
+    if(acao !== 'cancelar') CONF_CANC = false;
     if(item){
       if(DADOS && DADOS.aberto){ MSG = { t:'Termine ou cancele ' + (MONT ? 'esta montagem' : 'este corte') + ' antes.' }; beep(false); desenhar(); return; }
       var x = achar(item); if(!x) return;
@@ -233,7 +235,7 @@
     if(acao === 'cancelar' && !MONT && DADOS && DADOS.aberto && DADOS.aberto.pecas.length >= 1 && !CONF_CANC){
       /* ③ REVISAO: cancelar solta as etiquetas bipadas — so se as pecas NAO foram cortadas. */
       CONF_CANC = true; MSG = { t:(DADOS.aberto.pecas.length > 1 ? 'As ' + DADOS.aberto.pecas.length + ' etiquetas bipadas voltam' : 'A etiqueta bipada volta') + ' para o maço, e as peças saem do sistema. Só cancele se elas NÃO foram cortadas. Toque em Cancelar corte de novo para confirmar.' }; beep(false); desenhar(); return; }
-    if(acao === 'cancelar'){ CONF_CANC = false; var rc = await post('cancelar', {}); if(rc.erro){ MSG = { t:rc.erro }; beep(false); } SEL = null; FIM = null; await carregar(); return; }
+    if(acao === 'cancelar'){ CONF_CANC = false; var rc = await post('cancelar', {}); if(rc.erro){ MSG = { t:rc.erro }; beep(false); } else MSG = { t:(MONT ? 'Montagem' : 'Corte') + ' cancelad' + (MONT ? 'a' : 'o') + '.' }; SEL = null; FIM = null; await carregar(); return; }
   });
 
   /* O bipe: o campo visivel (iPad), Enter ou Tab, e o leitor em rajada fora

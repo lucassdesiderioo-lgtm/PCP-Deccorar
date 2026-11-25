@@ -839,7 +839,7 @@ document.getElementById('epCorpo').addEventListener('click',function(e){
   if(semEtq){ delete ABAS.etiquetas; const b=document.querySelector('#tabs [data-t="etiquetas"]'); if(b) b.remove(); }
   if(soEtq){
     Object.keys(ABAS).forEach(function(k){ if(k!=='etiquetas'){ delete ABAS[k]; const b=document.querySelector('#tabs [data-t="'+k+'"]'); if(b) b.remove(); } });
-    document.querySelectorAll('.topo,#recorte,section.aba').forEach(function(x){ if(x.id!=='secEtiquetas') x.style.display='none'; });
+    document.querySelectorAll('.topo,#recorte,section.aba,header .links').forEach(function(x){ if(x.id!=='secEtiquetas') x.style.display='none'; });
     if(ABAS.etiquetas) abrirAba('etiquetas', true);
     return;
   }
