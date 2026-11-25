@@ -6240,7 +6240,7 @@ O que parece bug e não é:
   **não é pega** (o dono aceita, §14.4).
 
 **Rode `node teste_etiqueta_producao.js` (63), `node teste_producao_motor.js` (112) e
-`node teste_producao_revisao.js` (41) ao mexer em qualquer um desses donos, nas
+`node teste_producao_revisao.js` (47) ao mexer em qualquer um desses donos, nas
 telas 107, 108, 110, na aba da 401 ou nas rotas que o tradutor cobre.** E abra as
 telas: a lista e os bipes são texto montado.
 
