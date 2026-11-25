@@ -3,7 +3,7 @@
 > **STATUS — 25/11/2026: APROVADA PELO DONO** (*"p1 sim, p2 sim, p3 sim,
 > aprovado"*) · **fases 1 e 2 construídas juntas (decisão do dono), falta
 > subir** · fase 3 (a trava da 201) não começou. Testes: `teste_carrinhos.js`
-> (37), `teste_entrega.js` (25), `teste_conferencia_tela.js` (30, num
+> (37), `teste_entrega.js` (28), `teste_conferencia_tela.js` (38, num
 > Chromium), `teste_carregamento_tela.js` (10).
 >
 > **O que mudou na construção** (vale o que está aqui):
