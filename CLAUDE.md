@@ -939,7 +939,9 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 > embalagem. ⚠️ **O alerta da embalagem demorada**
 > (acima de 600 s, avisando quem supervisiona a pessoa) **não existe**: o dono
 > pediu, e é NOVIDADE que espera spec — o sistema não tem "quem supervisiona esta
-> pessoa". `node teste_tempos_minimos.js` (35). Construído, falta subir.
+> pessoa". `node teste_tempos_minimos.js` (35). ✅ **No ar desde 24/11/2026** (PR #371):
+> o dono fez o deploy e disse *"deu certo o deploy"*. ⚠️ **Ainda não provado com
+> dado real:** a primeira troca do mínimo pela 906 valendo no bipe da bancada.
 >
 > ⚠️ **A PERSIANA SÓ EMBALA SE VEIO DA REVISÃO (21/11/2026)** — spec
 > `EMBALAGEM-SO-DA-REVISAO`, cartão R-EMB-02 (mudou), linha em
@@ -5490,6 +5492,15 @@ só (§14 dela), cartões R-SMN-01 a R-SMN-18.
 > saiu. As abreviações das escolhas moram só no `ABREV` do
 > `etiqueta_producao.js`.
 >
+> ✅ **NO AR EM 28/10/2026** (PR #244): o dono fez o deploy, as migrações 32 a
+> 38 estão no banco, a segurança passou, e as três conferências da §4.5 no
+> simulador de produção deram o Rolô **igual à conta, número por número**.
+>
+> ⚠️ **O QUE NÃO ESTÁ PROVADO EM PRODUÇÃO:** a Romana e o Painel (não existem
+> ainda — a prova é conferi-los no simulador, inativos, quando cadastrados) e
+> o pedido real com o leitor na mão, que vem **antes** de vender para a
+> revenda. Prova que não foi feita se escreve como não feita (§4).
+>
 > ⚠️ **A CONFERÊNCIA ACHOU DOIS DEFEITOS DE TELA QUE JÁ ESTAVAM NO AR**, e os
 > dois só apareciam abrindo a tela: o Catálogo e o simulador liam a recusa em
 > `e.mensagem` (o `ui.js` a põe em `e.message`), e toda recusa virava "Não deu
@@ -6040,7 +6051,8 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 > pessoa abre vira link; a que ela não abre fica só escrita; sem tela conhecida,
 > nada. **Parâmetro novo na 906 entra no `ONDE` do `parametros_onde.js`** — o
 > `teste_parametros_onde.js` (62) reprova o do sob medida (lido do banco novo de
-> lá) e os da medida padrão sem a tela. Construído, falta subir.
+> lá) e os da medida padrão sem a tela. ✅ **No ar desde 24/11/2026** (PR #372): o dono
+> fez o deploy e disse *"deu certo o deploy"*.
 >
 > **Rode `node teste_parametros.js` (113) ao mexer na 906, no horário padrão da
 > 206, no `POST /api/config/horarios`, no card do segundo bipe, na aba Parâmetros
@@ -6508,7 +6520,7 @@ dia de corte, montagem e revisão pela etiqueta em série na fábrica.
 ## 26. O manual do sistema — a ficha de cada tela, dentro da tela (21/11/2026)
 
 Spec `docs/specs/MANUAL-DO-SISTEMA.md`, fase 1 (a fundação) construída em
-21/11/2026, falta subir; duas linhas em `docs/DECISOES.md` (D7 e D8). O dono:
+21/11/2026 e **no ar desde 22/11/2026** (PR #362); duas linhas em `docs/DECISOES.md` (D7 e D8). O dono:
 *"estar a regra de cada tela … dentro de cada tela eu também consigo ler como
 funciona … tudo que for novo, esse manual vai se atualizando"*.
 
@@ -6629,7 +6641,11 @@ depois de escrever a linha de "Mudanças".** Também `teste_mapa`, `teste_lugar`
 `teste_cobertura`, `teste_acesso`, `teste_menu`, `teste_linguagem` e `cd tecido
 && npm test` ganharam a 907.
 
-⚠️ **Construído, falta subir.** Ainda não provado com dado real: a 907 aberta
-pelo dono no servidor com as 53 em rascunho e o mapa; `/manual` dando 302 sem
-login no servidor; o "?" aparecendo para o Admin Geral e para ninguém mais.
-Prova que não foi feita se escreve como não feita.
+✅ **NO AR DESDE 22/11/2026** (PR #362, mesclado depois do #363 — o retrato
+recusou o merge até as fichas 101, 102 e 104 ganharem a linha do R-EMB-11 e do
+R-TEM-01 no ar, a primeira vez que a régua pegou um merge de verdade): o dono
+fez o deploy e disse *"feito"*. ⚠️ **Ainda não provado com dado real:** a 907
+aberta pelo dono no servidor com as 53 em rascunho e o mapa; `/manual` dando
+302 e `/api/manual/minhas` 401 sem login no servidor; o "?" aparecendo para o
+Admin Geral e para ninguém mais. Prova que não foi feita se escreve como não
+feita.
