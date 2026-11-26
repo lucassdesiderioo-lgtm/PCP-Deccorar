@@ -63,7 +63,10 @@
 var alvo=null, pin='', etapa='pin', atual='', novoPin='';
 var q=new URLSearchParams(location.search);
 var voluntaria=false;
-var destino=q.get('r')||'';
+/* O `r` so vale como caminho DESTE sistema (comeca com uma barra so): sem a
+   guarda, /login?r=https://outro-site levaria a pessoa para fora depois do PIN. */
+var destino=(function(r){ return /^\/(?!\/)/.test(r)?r:''; })(q.get('r')||'');
+var feito=false;
 var MAX=6;
 function $(s){return document.querySelector(s);}
 var TEXTO={
@@ -101,14 +104,14 @@ document.addEventListener('click',function(e){
     fetch('/api/auth/logout',{method:'POST'}).finally(function(){ location.href='/login'; });
     return;
   }
-  var k=e.target.closest('.k'); if(!k) return;
+  var k=e.target.closest('.k'); if(!k||feito) return;
   var a=k.dataset.a;
   if(a==='del'){ pin=pin.slice(0,-1); pontos(); return; }
   if(a==='ok'){ enviar(); return; }
   digito(k.textContent.trim());
 });
 document.addEventListener('keydown',function(e){
-  if(!alvo) return;
+  if(!alvo||feito) return;
   if(/^[0-9]$/.test(e.key)) digito(e.key);
   if(e.key==='Backspace'){ pin=pin.slice(0,-1); pontos(); }
   if(e.key==='Enter') enviar();
@@ -155,6 +158,7 @@ function enviar(){
      .then(function(r){
        if(r.ok){
          if(!voluntaria) return seguir(r.j.destino);
+         feito=true;
          $('#pede').textContent='PIN trocado. Os outros aparelhos que estavam com o seu login foram desconectados.';
          return setTimeout(function(){ location.href=destino||'/setor'; },2500);
        }

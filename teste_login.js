@@ -330,7 +330,16 @@ async function main(){
 
     /* O banco e o modo teste. */
     const cS = db.prepare("SELECT name FROM pragma_table_info('sessao')").all().map(c => c.name).join(',');
-    eq('a tabela sessao', cS, 'id,usuario_id,usuario_nome,entrou_em,saiu_em,como_saiu,ip,aparelho');
+    eq('a tabela sessao (com a marca da troca de PIN no fim, LOGIN-PESSOAL)', cS, 'id,usuario_id,usuario_nome,entrou_em,saiu_em,como_saiu,ip,aparelho,derrubada');
+    {
+      /* O banco que ja tinha a tabela sem a coluna ganha ela no fim, na mesma ordem (§17). */
+      const dbS = new Database(path.join(tmp, 'sessao_velha.db'));
+      dbS.exec("CREATE TABLE sessao (id INTEGER PRIMARY KEY AUTOINCREMENT, usuario_id INTEGER NOT NULL, usuario_nome TEXT, entrou_em TEXT, saiu_em TEXT, como_saiu TEXT, ip TEXT, aparelho TEXT)");
+      require('./auth')(express(), dbS);
+      eq('o banco antigo termina com as mesmas colunas, na mesma ordem', dbS.prepare("SELECT name FROM pragma_table_info('sessao')").all().map(c => c.name).join(','), cS);
+      eq('e a tabela usuarios tambem', dbS.prepare("SELECT name FROM pragma_table_info('usuarios')").all().map(c => c.name).pop(), 'pin_trocado_em');
+      dbS.close();
+    }
     const cE = db.prepare("SELECT name FROM pragma_table_info('sessao_evento')").all().map(c => c.name).join(',');
     eq('a tabela sessao_evento', cE, 'id,sessao_id,usuario_id,usuario_nome,tipo,detalhe,em,ip');
     const tr = fs.readFileSync(path.join(__dirname, 'teste_route.js'), 'utf8');
@@ -415,6 +424,24 @@ async function main(){
     const cLiaLogout = sess((await login(LIZA, '999000')).cookie);
     await fetch(base + '/api/auth/logout', { method:'POST', headers:{ cookie: cLiaLogout } });
 
+    /* ③ REVISAO: a sessao que ja estava FECHADA por outro motivo (o bloqueio,
+       o "Sair") tambem nao volta a valer depois da troca. Sem isso, o tablet
+       da pessoa bloqueada voltava a funcionar no nome dela quando o
+       administrador a reativava e zerava o PIN. */
+    const NEI = pessoa('Nei', '676767', 'painel'); db.prepare('UPDATE usuarios SET pin_curto=0 WHERE id=?').run(NEI);
+    const cNeiX = sess((await login(NEI, '676767')).cookie);
+    const cNeiY = sess((await login(NEI, '676767')).cookie);
+    db.prepare('UPDATE usuarios SET ativo=0 WHERE id=?').run(NEI);
+    eq('bloqueado, o tablet X cai (e a sessao dele fecha como bloqueado)', (await eu(cNeiX)).logado, false);
+    db.prepare('UPDATE usuarios SET ativo=1 WHERE id=?').run(NEI);
+    eq('reativado, o tablet X volta (como sempre foi)', (await eu(cNeiX)).logado, true);
+    await fetch(base + '/api/auth/logout', { method:'POST', headers:{ cookie: cNeiY } });
+    const cNeiZ = sess((await login(NEI, '676767')).cookie);
+    eq('o Nei troca o PIN no tablet Z', (await trocar2(cNeiZ, '676767', '898989')).status, 200);
+    eq('o tablet X, que tinha caido pelo bloqueio, nao volta depois da troca', (await eu(cNeiX)).logado, false);
+    eq('nem o cookie da sessao fechada pelo "Sair"', (await eu(cNeiY)).logado, false);
+    eq('e o tablet Z, de onde ele trocou, continua', (await eu(cNeiZ)).logado, true);
+
     /* Trocar a partir do cookie de antes: a pessoa ganha uma sessao com numero,
        e nao cai do proprio tablet. */
     const MIA = pessoa('Mia', '121212', 'painel'); db.prepare('UPDATE usuarios SET pin_curto=0 WHERE id=?').run(MIA);
@@ -448,6 +475,8 @@ async function main(){
     ok('a barra do sob medida tambem', /Trocar meu PIN/.test(navSm) && /\/login\?trocar=1/.test(navSm));
     ok('a tela de PIN abre a troca para quem pediu (trocar=1), e nao so para o PIN de 4', /voluntaria/.test(telaLogin) && /q\.get\('trocar'\)/.test(telaLogin));
     ok('e a tela recusa o PIN novo igual ao de hoje antes de mandar', /diferente do de hoje/.test(telaLogin));
+    ok('e o "r" so leva a um caminho deste sistema (sem redirecionar para outro site)', /\^\\\/\(\?!\\\/\)/.test(telaLogin));
+    ok('e depois de trocar o teclado para (um OK a mais nao conta erro na trava)', /feito=true/.test(telaLogin) && /\|\|feito\) return/.test(telaLogin));
   } finally {
     srv.close();
   }
