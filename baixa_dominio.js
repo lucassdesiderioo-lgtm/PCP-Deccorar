@@ -13,7 +13,9 @@
  *
  * QUEM CHAMA `baixar`: o bipe da conferencia (area e canto, carreg_route.js) e
  * o "foi no caminhao" da saida (saida_route.js), que e a caixa que saiu sem
- * ninguem conferir. Mais ninguem. A Mesa de correcoes NAO baixa (D7).
+ * ninguem conferir, e o passivo das caixas que sairam sem conferencia
+ * (fechar_saida_passivo.js --nao-bipadas, 19/11/2026). Mais ninguem. A Mesa
+ * de correcoes NAO baixa (D7).
  *
  * QUEM CHAMA `devolver` (fase 2-B): so o "Sobrou" da Conferencia, depois de
  * bipado o SKU de cada persiana. E o caminho de volta do mesmo −1, e por isso
@@ -71,18 +73,25 @@ function pecas(db, v){
 
 /* A BAIXA. Uma vez por volume: com `baixado_em` cheio, nao faz nada. Sob medida
    nao baixa (§7) — mas o volume fica marcado, senao ele seria uma caixa
-   "esperando baixa" para sempre. Devolve as linhas que moveram. */
-function baixar(db, v, usuario){
+   "esperando baixa" para sempre. Devolve as linhas que moveram.
+   `opcoes` (19/11/2026, spec LIMPEZA-SAIU-SEM-CONFERENCIA) e so do passivo
+   das caixas que sairam sem conferencia: `em` e o carimbo de saida da caixa,
+   que vai em `baixado_em` (o grafico conta a baixa por esse dia, e a hora da
+   rodada faria um pico falso); `motivo` vai na linha do livro, que fica com
+   a hora real. Sem `opcoes`, a conferencia e o "foi no caminhao" de sempre. */
+function baixar(db, v, usuario, opcoes){
+  const o = opcoes || {};
   const atual = db.prepare('SELECT * FROM lote WHERE id=?').get(v.id);
   if(!atual || atual.baixado_em) return [];
   const moveu = [];
   for(const l of pecas(db, atual)){
     if(l.sob_medida) continue;
     ESTOQUE.movimentar(db, { codigo:l.codigo, delta:-l.qtd, tipo:'conferencia',
-      referencia:'lote:' + atual.id, usuario:usuario || null });
+      referencia:'lote:' + atual.id, motivo:o.motivo || undefined, usuario:usuario || null });
     moveu.push({ codigo:l.codigo, delta:-l.qtd });
   }
-  db.prepare("UPDATE lote SET baixado_em=datetime('now','localtime') WHERE id=?").run(atual.id);
+  if(o.em) db.prepare('UPDATE lote SET baixado_em=? WHERE id=?').run(o.em, atual.id);
+  else db.prepare("UPDATE lote SET baixado_em=datetime('now','localtime') WHERE id=?").run(atual.id);
   return moveu;
 }
 

@@ -6,8 +6,9 @@
  * A REGRA, do dono da operacao: "ela so pode passar a ser estoque depois da
  * montagem/embalagem". A peca revisada ainda nao esta pronta — falta embalar e
  * conferir o kit. Revisar so:
- *   - grava o tempo em `revisao`, com o modo da tela (vermelho = 'hoje',
- *     azul = 'estoque');
+ *   - grava o tempo em `revisao`, com o modo que o servidor decide (desde
+ *     23/11/2026, tela única): 'hoje' se a peça cobre a ordem de hoje, senão
+ *     'estoque';
  *   - poe a peca na `fila` como 'aguardando', no mesmo modo.
  * O saldo (`skus.estoque`) e o livro (`movimento_estoque`) nao andam. Quem soma
  * +1 e a embalagem (mont_route.js, teste_montagem.js).
@@ -101,18 +102,24 @@ eq('SKU zerado revisado continua zerado (nao vira +1)',
 eq('a ordem do dia nao anda na revisao (quem abate e a embalagem)',
    db.prepare("SELECT produzido FROM producao WHERE codigo='BK140140BEGE'").get().produzido, 1);
 
-console.log('\n── 2. a peca vai para a fila, aguardando, no modo da tela ──');
+console.log('\n── 2. a peca vai para a fila, aguardando, no modo que o SERVIDOR decide ──');
+/* TELA ÚNICA (REVISAO-TELA-UNICA, 23/11/2026): o `modo` do corpo é ignorado.
+   BK140140BEGE tem ordem de hoje de 3: as três primeiras revisões cobrem a
+   ordem ('hoje'), e as de depois vão para o estoque. BK160140CINZA não tem
+   ordem: 'estoque'. */
 const fila = db.prepare("SELECT codigo,modo,situacao FROM fila ORDER BY id").all();
 eq('uma linha de fila por revisao', fila.length, 6);
 ok('toda linha nasce aguardando', fila.every(f => f.situacao === 'aguardando'), JSON.stringify(fila));
-eq('a revisao da tela vermelha vai como hoje', fila[0].modo, 'hoje');
-eq('a revisao da tela azul vai como estoque', fila[1].modo, 'estoque');
-eq('sem modo no corpo, vale hoje', fila[5].modo, 'hoje');
-eq('modo desconhecido vira hoje, nunca outra coisa',
-   (revisar({ codigo:'BK140140BEGE', modo:'qualquer' }), db.prepare('SELECT modo FROM fila ORDER BY id DESC').get().modo), 'hoje');
+eq('a primeira revisao cobre a ordem de hoje', fila[0].modo, 'hoje');
+eq('o corpo dizendo estoque nao manda: a ordem de hoje ainda falta', fila[1].modo, 'hoje');
+eq('a terceira ainda cobre a ordem', fila[2].modo, 'hoje');
+eq('coberta a ordem, a peca vai para estoque', fila[3].modo, 'estoque');
+eq('SKU sem ordem de hoje vai para estoque', fila[5].modo, 'estoque');
+eq('o corpo dizendo hoje tambem nao manda',
+   (revisar({ codigo:'BK140140BEGE', modo:'hoje' }), db.prepare('SELECT modo FROM fila ORDER BY id DESC').get().modo), 'estoque');
 const rev = db.prepare('SELECT codigo,segundos,modo FROM revisao ORDER BY id').all();
 eq('a revisao grava o tempo arredondado', rev[0].segundos, 42);
-eq('a revisao e a fila tem o mesmo modo', rev[1].modo, 'estoque');
+eq('a revisao e a fila tem o mesmo modo', rev[3].modo, fila[3].modo);
 
 console.log('\n── 3. o codigo bipado e normalizado ──');
 r = revisar({ codigo:'  bk140140bege ' });

@@ -59,7 +59,7 @@ function carregarMenu(){
   }
   fetch('/api/telas/minhas',{credentials:'same-origin'})
     .then(function(r){ return r.json(); })
-    .then(function(d){ MENU.telas=d||{}; desenharMenu(); })
+    .then(function(d){ MENU.telas=d||{}; window.TELAS_MINHAS=d||{}; desenharMenu(); })   // o MENU daqui vive no IIFE; o "?" do manual lê o global nomeado
     .catch(function(){ if(MENU.painel) MENU.painel.innerHTML='<div class="mnVazio">Não deu para carregar as telas.</div>'; });
 }
 
@@ -151,4 +151,11 @@ fetch(BASE+'/api/eu',{credentials:'same-origin'})
 (function(){
   if(typeof window!=='undefined' && window.__pendCaixa) return;
   var sc=document.createElement('script'); sc.src='/pendencias_aviso.js'; document.head.appendChild(sc);
+})();
+/* O "?" DE TODA TELA (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026): o mesmo
+   manual_ajuda.js da medida padrão. Ele acha a barra daqui (`.sessao .menuBt`)
+   e pergunta a ficha pela rota /sobmedida/...; sem `manual.ler`, nada nasce. */
+(function(){
+  if(typeof window!=='undefined' && window.__manualAjuda) return;
+  var sc=document.createElement('script'); sc.src='/manual_ajuda.js'; document.head.appendChild(sc);
 })();

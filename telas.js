@@ -66,6 +66,15 @@ const TELAS = [
      a tela (tirá-la mudaria quem abre — #13), sem lista nenhuma. */
   { n:103, nome:'Subir PDF de vendas',   rota:'/admin/producao', nivel:'operacao',  onde:'computador', perms:['producao.lancar','pdf.subir'], area:'expedicao', aba:'prod',
     modulo:'comercial', bloco:'mercado_livre', liga:[201, 401, 'lote (vendas do PDF)'] },
+  /* A PRODUCAO DA MEDIDA PADRAO (PRODUCAO-MAPA-E-MOTOR v7, §14.4, 25/11/2026):
+     as bancadas no formato da 101 (a lista hoje → proximos dias → alvo). A rota
+     /montagem e da Embalagem (102); a montagem da persiana e /montagem-persiana. */
+  { n:107, nome:'Montagem',              rota:'/montagem-persiana', nivel:'operacao', onde:'tablet',   perms:['producao.montar'],   area:'montagem_persiana',
+    modulo:'producao', bloco:'medida_padrao', liga:[108, 110, 101, 404, 401] },
+  { n:108, nome:'Corte de tecido',       rota:'/corte-tecido',  nivel:'operacao',   onde:'tablet',     perms:['producao.cortar_tecido'], area:'corte_tecido',
+    modulo:'producao', bloco:'medida_padrao', liga:[401, 404, 107] },
+  { n:110, nome:'Serralheria',           rota:'/serralheria',   nivel:'operacao',   onde:'tablet',     perms:['producao.cortar_tubo'], area:'serralheria',
+    modulo:'producao', bloco:'medida_padrao', liga:[401, 404, 107] },
   { n:104, nome:'Problemas',             rota:'/admin/problemas', nivel:'admin',    onde:'computador', perms:['@admin'],                aba:'pb',
     modulo:'producao', bloco:'medida_padrao', liga:[101] },
   /* A 106 (FICHAS-NO-CADASTRO-UNICO §3-G, 11/11/2026): o Supervisor decide se a
@@ -76,7 +85,7 @@ const TELAS = [
   { n:105, nome:'Painel da TV',          rota:'/painel',        nivel:'operacao',   onde:'TV',         perms:['painel.ver'],            area:'painel',
     modulo:'producao', bloco:'medida_padrao', liga:[101, 102, 201, 401] },
   // ── 200 · Expedição ──
-  { n:201, nome:'Etiqueta de Venda',     rota:'/embalagem',     nivel:'operacao',   onde:'tablet',     perms:['etiqueta.emitir'],       area:'embalagem',
+  { n:201, nome:'Etiqueta de Venda',     rota:'/embalagem',     nivel:'operacao',   onde:'tablet',     perms:['etiqueta.emitir','expedicao.caixa_nao_encontrada'],       area:'embalagem',
     modulo:'expedicao', bloco:'comum', liga:[103, 102, 202, 'lote'] },
   { n:202, nome:'Conferência',           rota:'/carregamento',  nivel:'operacao',   onde:'tablet',     perms:['carregamento.executar'], area:'carregamento',
     modulo:'expedicao', bloco:'comum', liga:[201, 'estoque de peça', 'saida'] },
@@ -116,8 +125,11 @@ const TELAS = [
   { n:303, nome:'Inventário',            rota:'/inventario',    nivel:'operacao',   onde:'tablet',     perms:['contagem.contar','contagem.desempatar'], area:'inventario',
     modulo:'estoque', bloco:'medida_padrao', liga:[302, 301] },
   // ── 400 · Planejamento ──
-  { n:401, nome:'Planejamento',          rota:'/planejamento',  nivel:'admin',      onde:'computador', perms:['planilha.importar'],     area:'necessidade', aba:'plan',
-    modulo:'planejamento', bloco:'medida_padrao', liga:[101, 404, 'venda_futura (planilha do ML)'] },
+  /* A 401 abre tambem para o Supervisor com `producao.etiqueta`, que ve SO a aba
+     "Etiquetas da producao" (PRODUCAO-MAPA-E-MOTOR v7, §14.3, 25/11/2026). As
+     outras abas continuam de nivel Admin: as rotas delas recusam. */
+  { n:401, nome:'Planejamento',          rota:'/planejamento',  nivel:'supervisor', onde:'computador', perms:['planilha.importar','producao.etiqueta'], area:'necessidade', aba:'plan',
+    modulo:'planejamento', bloco:'medida_padrao', liga:[101, 404, 107, 108, 110, 'venda_futura (planilha do ML)'] },
   { n:402, nome:'Cadastro de SKU',       rota:'/admin/skus',    nivel:'admin',      onde:'computador', perms:['sku.cadastrar','sku.excluir','modelo.cadastrar'], aba:'cad',
     modulo:'cadastros', bloco:'medida_padrao', liga:[403, 404, 'skus'] },
   { n:403, nome:'SKU incompleto',        rota:'/admin/sku-incompleto', nivel:'admin', onde:'computador', perms:['sku.cadastrar'],      aba:'pend',
@@ -167,8 +179,16 @@ const TELAS = [
      aparece para quem tem a chave dela; o segundo bipe muda quem é nível Admin.
      Os horários de corte e despacho saíram daqui em 11/11/2026 (AJUSTE): moram
      na 206, que é o assunto deles. */
-  { n:906, nome:'Parâmetros',            rota:'/parametros',    nivel:'supervisor', onde:'computador', perms:['sobmedida.parametro.ler','sobmedida.parametro.editar','@admin'],
-    modulo:'administracao', bloco:'comum', liga:[202, 602, 609, 610, 611] },
+  { n:906, nome:'Parâmetros',            rota:'/parametros',    nivel:'supervisor', onde:'computador', perms:['sobmedida.parametro.ler','sobmedida.parametro.editar','producao.corrigir','@admin'],
+    modulo:'administracao', bloco:'comum', liga:[202, 401, 602, 609, 610, 611] },
+  /* A 907 MANUAL (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026): a ficha de cada
+     tela, em língua de fábrica, lida pelo "?" de toda tela e por esta. Cada
+     pessoa vê só as telas que opera (D7); "ver todas" é a chave
+     `manual.ver_todas` (D8). Nível Operação: é da bancada. Nasce só para o
+     Admin Geral (R-ALC-06): o dono marca `manual.ler` nos setores na fase 2. A
+     ficha mora em docs/manual/, e o `teste_manual.js` reprova tela sem ficha. */
+  { n:907, nome:'Manual',                rota:'/manual',        nivel:'operacao',   onde:'computador', perms:['manual.ler'],
+    modulo:'administracao', bloco:'comum', liga:['todas as telas, pelo "?" de cada uma', 'docs/manual (as fichas)', 'config (o valor de hoje dos parâmetros)'] },
   // 903 Modo teste SAIU em 11/11/2026 (aposentado, decisao do dono): o numero
   // fica vago para sempre (R-TEL-02).
   { n:904, nome:'Relatórios',            rota:'/relatorios',    nivel:'supervisor', onde:'computador', perms:['relatorios.ver'],        area:'relatorios', aba:'rel',
@@ -199,7 +219,7 @@ const TELAS = [
    alcança decide. É a ordem que existia no `PADRAO`, e mudá-la mudaria para
    onde cada pessoa vai de manhã — por isso ela é uma lista própria, e não a
    ordem do mapa. O Admin (a porta '/admin') vem primeiro, como sempre. */
-const CHEGADA = [105, 101, 102, 201, 202, 103, 904, 401, 502, 303, 251, 252, 503];   // a 503 no fim: quem só tem volume.movimentar (revisão do PR #305)   // a 103 no lugar da 203 (05/11/2026)
+const CHEGADA = [105, 101, 102, 201, 202, 103, 904, 401, 502, 303, 251, 252, 503, 107, 108, 110];   // as bancadas da producao no fim (PRODUCAO-MAPA-E-MOTOR v7, ③): quem so tem a chave delas chega nelas   // a 503 no fim: quem só tem volume.movimentar (revisão do PR #305)   // a 103 no lugar da 203 (05/11/2026)
 
 const NIVEIS = ['operacao', 'supervisor', 'admin', 'admin_geral'];
 const NOME_NIVEL = { operacao:'Operação', supervisor:'Supervisor', admin:'Admin', admin_geral:'Admin Geral' };

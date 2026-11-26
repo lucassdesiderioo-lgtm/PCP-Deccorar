@@ -25,6 +25,21 @@ module.exports = [
   { chave:'material.extra',       grupo:'Produção',   tela:106, nivel:'supervisor',
     rotulo:'Decidir material extra', desc:'Dizer se a peça refeita usou material, e baixar',
     sensivel:true },
+  /* A PRODUCAO DA MEDIDA PADRAO (PRODUCAO-MAPA-E-MOTOR v7, §14, 25/11/2026).
+     As bancadas, cada uma a sua chave; a aba de etiquetas da 401 e do
+     Supervisor; corrigir (cancelar etiqueta, a entrada inicial da virada) e
+     sensivel. Tudo nasce so para o Admin Geral (R-ALC-06). */
+  { chave:'producao.cortar_tecido', grupo:'Produção', tela:108, nivel:'operacao',
+    rotulo:'Cortar tecido',       desc:'Cortar o tecido pela lista, bipando a etiqueta de cada peça' },
+  { chave:'producao.cortar_tubo', grupo:'Produção',   tela:110, nivel:'operacao',
+    rotulo:'Cortar tubo e base',  desc:'Cortar o tubo e a base pela lista, bipando a etiqueta de cada tubo' },
+  { chave:'producao.montar',      grupo:'Produção',   tela:107, nivel:'operacao',
+    rotulo:'Montar persianas',    desc:'Montar a persiana bipando o SKU em série, o tecido e o tubo' },
+  { chave:'producao.etiqueta',    grupo:'Produção',   tela:401, nivel:'supervisor',
+    rotulo:'Imprimir etiquetas da produção', desc:'Imprimir o SKU em série e os maços de tecido e de tubo; reimprimir' },
+  { chave:'producao.corrigir',    grupo:'Produção',   tela:401, nivel:'supervisor',
+    rotulo:'Corrigir a produção', desc:'Cancelar etiqueta impressa e lançar a entrada inicial do corte',
+    sensivel:true },
 
   // ─── EXPEDIÇÃO ──────────────────────────────────────────────
   { chave:'pdf.subir',            grupo:'Expedição',  tela:103, nivel:'operacao',
@@ -48,6 +63,16 @@ module.exports = [
      no Mercado Livre e confirma — so a confirmacao devolve a peca ao estoque.
      SENSIVEL pela mesma razao do `estoque.editar`: e saldo voltando sem venda
      na frente. Nivel `supervisor`, como o `saida.liberar` (§19, #34). */
+  /* A TRAVA DA 201 (CONFERENCIA-CARRINHOS fase 3, 25/11/2026): sem persiana
+     para repor a caixa perdida, quem tem esta chave solta a trava com motivo,
+     e decide a caixa reimpressa no dia seguinte ("perdida" abre o PEDIDO de
+     ajuste −1, que outra pessoa aprova). SENSIVEL: solta uma venda parada e
+     pode levar a ajuste de saldo. Nivel `supervisor` (§19, #34). Nasce so para o
+     Admin Geral (R-ALC-06). */
+  { chave:'expedicao.caixa_nao_encontrada', grupo:'Expedição', tela:201, nivel:'supervisor',
+    rotulo:'Caixa não encontrada',
+    desc:'Soltar a trava da Etiqueta de Venda marcando a caixa impressa que não foi achada, e decidir a caixa reimpressa no dia seguinte',
+    sensivel:true },
   { chave:'cancelamento.confirmar', grupo:'Expedição', tela:202, nivel:'supervisor',
     rotulo:'Confirmar venda cancelada',
     desc:'Confirmar no Mercado Livre a venda cancelada que a Conferência separou — devolve as peças ao estoque — ou recusar',
@@ -366,4 +391,14 @@ module.exports = [
   { chave:'auditoria.ver',        grupo:'Sistema',    tela:901, nivel:'admin_geral',
     rotulo:'Ver auditoria',       desc:'Histórico de ações e cobertura',
     sensivel:true, intransferivel:true },
+  // ─── MANUAL (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026) ─────────────
+  /* A ficha de cada tela, lida pelo "?" e pela 907. `manual.ler` abre a 907 e
+     o "?" com as fichas das telas que a pessoa opera (D7); `manual.ver_todas`
+     mostra o manual inteiro (D8), e e de nivel Supervisor por decisao do dono:
+     a bancada "nao deve ter acesso a tudo, para nao se perder". As duas nascem
+     so para o Admin Geral (R-ALC-06); o dono marca na tela de Acessos. */
+  { chave:'manual.ler',           grupo:'Sistema',    tela:907, nivel:'operacao',
+    rotulo:'Ler o manual',        desc:'Abrir a ficha das telas que a pessoa opera, pelo ? e pela 907' },
+  { chave:'manual.ver_todas',     grupo:'Sistema',    tela:907, nivel:'supervisor',
+    rotulo:'Ver o manual de todas as telas', desc:'Ler a ficha das telas que a pessoa não opera' }
 ];

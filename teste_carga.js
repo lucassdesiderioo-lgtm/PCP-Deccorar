@@ -372,37 +372,26 @@ async function noCarro(code){
     }
     /* Nenhuma linha escreve o codigo solto por conta propria: so o `skuDaLinha`. */
     ok('nenhuma lista escreve o codigo do volume por fora do `skuDaLinha`',
-       (html.match(/esc0\(f\.codigo/g)||[]).length===1 && (html.match(/skuDaLinha\(f\)/g)||[]).length===5);
-    /* 5, e nao mais 6, desde 03/11/2026: as duas listas do canto da coleta e a
-       do carro viraram a lista unica (CONFERENCIA-EXPEDICAO fase 1). */
+       (html.match(/esc0\(f\.codigo/g)||[]).length===1 && (html.match(/skuDaLinha\(f\)/g)||[]).length===2);
+    /* 2 desde 25/11/2026 (CONFERENCIA-CARRINHOS): a definicao e a `linha()`, a
+       unica que desenha caixa — todas as listas da tela nova passam por ela.
+       Era 5 (03/11/2026) e 6 antes disso. */
   }
 
-  /* A LISTA UNICA (CONFERENCIA-EXPEDICAO fase 1, 03/11/2026): agencia e coleta
-     misturadas numa lista so, com a marcacao. A tela so junta o que a rota ja
-     manda — a modalidade vem do servidor. Executada, nao procurada no texto. */
+  /* A LISTA UNICA (CONFERENCIA-EXPEDICAO fase 1, 03/11/2026; R-COL-03): agencia
+     e coleta numa lista so, com a marcacao. Desde 25/11/2026 (CONFERENCIA-
+     CARRINHOS) quem junta e o servidor (`/api/conferencia/dia`, conferido no
+     teste_carrinhos.js) e a tela marca cada caixa pela modalidade que vem dele.
+     Executada, nao procurada no texto. */
   {
     const html=fs.readFileSync(path.join(__dirname,'public','carregamento.html'),'utf8');
-    const m=html.match(/function listaUnica\([\s\S]*?\n\}/), t=html.match(/function tagModal\([\s\S]*?\}/);
-    ok('a tela tem a lista unica (`listaUnica`)', !!(m&&t));
-    if(m&&t){
-      const f=new Function(m[0]+t[0]+'; return {listaUnica,tagModal};')();
-      const d={
-        faltam:[{id:10,buyer:'Ana',data:'2026-11-03',conferida:0,atrasado:0},
-                {id:11,buyer:'Bia',data:'2026-11-03',conferida:1,atrasado:0},
-                {id:12,buyer:'Caio',data:'2026-11-01',conferida:0,atrasado:1}],
-        coleta:{faltam:[{id:20,buyer:'Davi',data:'2026-11-03',conferida:0,atrasado:0},
-                        {id:21,buyer:'Edu',data:'2026-11-02',conferida:0,atrasado:1}],
-                aguardando:[{id:30,buyer:'Fabi',carregado_em:'2026-11-03 09:10'}]}};
-      const eq=(n,veio,esp)=>ok(n, veio===esp, 'veio '+JSON.stringify(veio)+', esperado '+JSON.stringify(esp));
-      const u=f.listaUnica(d);
-      eq('esperando: agencia nao conferida + coleta fora do canto, as de dia anterior em cima',
-         u.esperando.map(v=>v.buyer+':'+v.modal).join(','), 'Caio:agencia,Edu:coleta,Ana:agencia,Davi:coleta');
-      eq('conferidas: agencia na area + coleta no canto',
-         u.conferidas.map(v=>v.buyer+':'+v.modal).join(','), 'Bia:agencia,Fabi:coleta');
+    const fs1=['pecasDeC','ehVarias','skuDaLinha','pecasLinhas','dataBR','ontem','seloFicou','linha']
+      .map(n=>(html.match(new RegExp('function '+n+'\\([\\s\\S]*?\\n\\}'))||[])[0]);
+    ok('a tela tem a linha da caixa com a marcacao (`linha`)', fs1.every(Boolean));
+    if(fs1.every(Boolean)){
+      const f=new Function('esc0', fs1.join('\n')+'; return linha;')(x=>String(x==null?'':x));
       ok('cada caixa sai com a marcacao certa',
-         /Coleta/.test(f.tagModal({modal:'coleta'})) && /Agência/.test(f.tagModal({modal:'agencia'})));
-      eq('nenhuma caixa some nem se repete', u.esperando.length+u.conferidas.length, 6);
-      eq('sem dado nenhum, as duas partes vem vazias', JSON.stringify(f.listaUnica({})), JSON.stringify({esperando:[],conferidas:[]}));
+         /Coleta/.test(f({coleta:true,buyer:'A'})) && /Agência/.test(f({coleta:false,buyer:'B'})));
     }
     ok('saem da tela o carro, as pecas adiantadas e o "Conferir carga do carro"',
        !/id="nCar"|id="nFal"|id="nAdi"|conferir\(\)/.test(html));

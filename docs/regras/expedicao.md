@@ -80,16 +80,17 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Status:** no código desde 27/10/2026, aguardando deploy. ⚠ Não foi provado com um PDF real do ML: o teste troca o `parsePdf`.
 
 ### R-PDF-08 · A busca do "Já impressos" olha o histórico inteiro, e a lista não corta calada
-- **Regra:** `GET /api/impressos?q=` busca no **banco**, em todas as datas, por cliente, NF, SKU (inclusive os da caixa de várias), cidade, pack e venda — até 60 resultados. Sem `q`, a lista é a do período (até 30 dias), com teto de 400. Quando qualquer das duas bate no teto, o cabeçalho `X-Cortado` diz, e a tela avisa. Só aparece o que foi impresso (`embalado`/`carregado`). `tem_pdf` diz antes do clique se o PDF ainda está no servidor; o caminho do arquivo não viaja.
+- **Regra:** `GET /api/impressos?q=` busca no **banco**, em todas as datas, por cliente, NF, SKU (inclusive os da caixa de várias), cidade, pack, venda e — desde 16/11/2026 — o **número do envio** (`lote.envio`, com ou sem o espaço da etiqueta) — até 60 resultados. Sem `q`, a lista é a do período (até 30 dias), com teto de 400. Quando qualquer das duas bate no teto, o cabeçalho `X-Cortado` diz, e a tela avisa. Só aparece o que foi impresso (`embalado`/`carregado`). `tem_pdf` diz antes do clique se o PDF ainda está no servidor; o caminho do arquivo não viaja.
 - **Por quê:** até 27/10/2026 a busca filtrava **no navegador** só as 400 da lista, e saindo ~57 caixas por dia as 400 eram uns 7 dias. O "30 dias" não trazia 30 dias, e a NF de uma semana e meia atrás dava "Nada com esse termo", calado.
 - **Exceções:** nenhuma. A permissão é a mesma de antes (`etiqueta.emitir`).
-- **Teste que trava:** `teste_impressos.js` (33).
+- **Teste que trava:** `teste_impressos.js` (42: o envio, seção 7).
 - **Status:** no código desde 27/10/2026, aguardando deploy. Aberta a 1440 e a 400 px num banco semeado.
 
 ### R-PDF-11 · A etiqueta só com "Envio:" é etiqueta, e o número do envio é a chave dela
 - **Regra:** a página que traz `Envio: 485023 18254` — e não traz `Pack ID:` nem `Venda:` — é etiqueta (`folha.js → tipoDaPagina`). Na folha, o item traz `Envio: 48502318254` no lugar dos dois; é por esse número (o do código de barras) que a etiqueta acha o item, e ele é a identidade do item (`envioLinha`): abre a sua venda na folha inteira (R-VOL-09) e não é irmão de pacote. O item **sem** envio, sem comprador, logo abaixo, continua sendo irmão (R-VOL-03). O upload grava o número em `lote.envio` e o usa como chave de duplicidade de **toda** etiqueta, nos dois sentidos, inclusive contra o volume de antes do deploy, cujo número só está nos `codes` (R-PDF-06). A modalidade não muda: vem da linha "Despachar:" (R-MOD-01).
 - **Por quê:** em 12/11/2026 um PDF com 46 etiquetas trouxe 27 neste formato. Elas não viraram volume (NFs 9718 a 9744, todas vencendo no dia), e a folha inteira contou os itens delas dentro da caixa de cima: NF 9700 gravou 7 persianas, 9717 e 9665 gravaram 3, e 9683 gravou 2 — todas retidas no card do pacote. Conta do card: folha 48, sistema 32.
 - **Exceções:** a venda deste formato não tem venda nem pack em lugar nenhum do PDF (a nota também não traz). Por isso o relatório do ML não a cancela (`cancelada_dominio` procura venda e pack), o planejamento não a tira do comprometido depois da etiqueta (R-PLN-06: a falta sai a mais, que é o lado seguro), e a devolução a acha pela NF, mas não pela venda. Item `Envio:` que fica sem etiqueta no PDF cai na conta aberta (R-PDF-10), e não em "venda sem etiqueta" (R-PDF-09). A etiqueta de rota JADLOG não traz "NF:": a nota dela é a página seguinte, conferida pela R-CONF-07, e a NF do volume vem dessa nota.
+- **Na tela (16/11/2026):** os três cards de Pendências (dúvida na leitura, caixa de várias, modalidade), o "Confira esta venda" da Etiqueta de Venda e o "Já impressos" mostram **"envio 48462356937"**, sem espaço, num pedaço que um toque seleciona inteiro (`idVenda` no `index.html`), e a busca do "Já impressos" acha pelo envio (R-PDF-08). É o único número que a pessoa tem para achar o pedido no ML quando a etiqueta não traz pack nem venda. Só aparece no volume gravado depois de 12/11/2026: o de antes tem o número só nos `codes`, e a tela não o deduz. **Construído em 16/11/2026, falta subir.**
 - **Teste que trava:** `teste_casos_reais.js` (`casos/2026-11-12-nf-9738.json`: 46 volumes, conta 48 = 48, a 9658 como única caixa de várias, as quatro caixas com 1 peça e o segundo upload sem gravar nada — reprova em 9 pontos sem o conserto, e em 1 com a leitura nova e o upload antigo) · `teste_parse.js` (a etiqueta só com "Envio:": o envio que sobe, os dois envios livres, o irmão do pacote neste formato) · `teste_upload.js` (o envio nos dois sentidos) · `teste_quem.js` (a coluna nova no fim do `lote`, §17).
 - **Status:** no ar desde 12/11/2026 (PRs #342 e #343) · ✅ provado com dado real no mesmo dia: o PDF de 12/11 subido de novo deu "0 novas, 85 repetidas", e as 27 vendas estão no banco. ⚠ Ainda não provado: o próximo PDF neste formato fechando a conta sozinho, no primeiro upload.
 - **História:** `docs/historia/expedicao.md`, "A etiqueta só com Envio:".
@@ -133,7 +134,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Regra:** tela âmbar com a lista das peças; **um bipe por persiana** (`lote_item.conferidos` é contador). Sem todas, não imprime. Baixa uma por peça, e a recusa de estoque diz qual SKU faltou. O guard de 700 ms da tela não pode ser afrouxado.
 - **Por quê:** a lista diz o que buscar na prateleira; o bipe prova o que entrou. A repetição do leitor contaria uma persiana a mais.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_etiqueta.js` (68) · ⚠ **sem teste** do guard de 700 ms nesta tela (o do Carregamento tem, em `teste_pecas_carga.js`).
+- **Teste que trava:** `teste_etiqueta.js` (86) · ⚠ **sem teste** do guard de 700 ms nesta tela (o do Carregamento tem, em `teste_pecas_carga.js`).
 - **Status:** no ar.
 
 ### R-VOL-06 · A caixa de várias aparece antes do bipe, e uma vez só
@@ -282,16 +283,11 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **História:** armadilha #27.
 
 ### R-CAR-03 · O segundo bipe do carregamento, quando ligado, é cego
-- **Regra:** com `config.conf_carregamento='1'`, carregar pede a etiqueta de venda e o SKU da mesma caixa; o SKU esperado não aparece antes. Nasce desligada.
-- **Por quê:** quem sabe a resposta bipa o que for para fechar a linha.
+- **Regra:** com `config.conf_carregamento='1'`, carregar pede a etiqueta de venda e o SKU da mesma caixa; o SKU esperado não aparece antes. Liga e desliga na **906 Parâmetros** (nunca na 202, que só mostra se está ligado). Nasceu desligada; ⚠️ **o dono decidiu ligá-la em 24/11/2026** (DECISOES): o passo é ligar na 906 depois do deploy da CONFERENCIA-CARRINHOS, e ainda não foi feito.
+- **Por quê:** quem sabe a resposta bipa o que for para fechar a linha. O ganho é pegar a etiqueta colada na caixa errada.
 - **Exceções:** a caixa de várias substitui este bipe pelo bipe de cada peça (§8-B).
-- **Teste que trava:** ⚠ **sem teste**.
-- **Status:** no ar, desligada.
-
----
-
-## A Mesa de correções e o passivo
-
+- **Teste que trava:** `teste_carrinhos.js` (pede o SKU sem dizer qual, recusa o errado, aceita o certo).
+- **Status:** no ar, desligada até o dono ligar na 906.
 ### R-COR-01 · A Mesa corrige pela ação, nunca pela linha
 - **Regra:** cada objeto mostra só as ações que valem para ele; a que não vale aparece desabilitada com o motivo. A prévia não grava. Executar exige motivo e grava em `correcao`. Desfazer compara os sete campos de "andou" e recusa nomeando o campo; bloco é tudo ou nada.
 - **Por quê:** apagar linha à mão quebra saldo e fila em silêncio.

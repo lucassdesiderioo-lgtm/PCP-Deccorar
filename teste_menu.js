@@ -123,8 +123,9 @@ const MINHAS_OP = { telas:[ { n:101, nome:'Revisão', rota:'/operador', modulo:'
   const MARCAS = [
     ['public/operador.html',  "b.id='rjBt'",                                   'revisao.rejeitar'],
     /* a caixa "Subir PDF" da 201 saiu em 05/11/2026: o upload é só na 103 (D2) */
-    ['public/carregamento.html', 'onclick="fecharSaida(true)"',                'saida.liberar'],
-    ['public/carregamento.html', 'onclick="fecharViagem(true)"',               'saida.liberar'],
+    /* Desde 25/11/2026 (CONFERENCIA-CARRINHOS) a saída do caminhão e a viagem
+       viraram a ENTREGA por carrinho: um botão "Liberar com divergência" só. */
+    ['public/carregamento.html', 'onclick="fecharEntrega(true)"',              'saida.liberar'],
     ['public/index.html', "data-resolvediv=\"'+r.id+'\" data-sku=\"'+esc(sug.codigo)", 'sku.cadastrar'],
     ['public/index.html', "data-resolvediv=\"'+r.id+'\" data-sku=\"'+esc(outras[k2].codigo)", 'sku.cadastrar'],
     ['public/index.html', "data-resolveoutro=\"'+r.id+'\">Confirmar",       'sku.cadastrar'],
@@ -142,7 +143,10 @@ const MINHAS_OP = { telas:[ { n:101, nome:'Revisão', rota:'/operador', modulo:'
     ['public/index.html', 'id="edExcluir"',                                    'modelo.cadastrar'],
     ['public/index.html', 'cdAdd" data-perm',                                    'listas.editar'],
     ['public/index.html', 'cdDel" data-perm',                                   'listas.editar'],
-    ['public/index.html', 'id="cdKitBt"',                                      'kit.editar']
+    ['public/index.html', 'id="cdKitBt"',                                      'kit.editar'],
+    /* O "?" de toda tela (spec MANUAL-DO-SISTEMA, fase 1): nasce no
+       manual_ajuda.js, carregado pelas duas barras, com a chave de ler o manual. */
+    ['public/manual_ajuda.js', "b.id = 'manualAjuda'",                           'manual.ler']
   ];
   for(const [arq, pedaco, chave] of MARCAS){
     const txt = fs.readFileSync(path.join(__dirname, arq), 'utf8');

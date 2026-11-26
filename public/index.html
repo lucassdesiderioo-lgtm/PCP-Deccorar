@@ -2541,6 +2541,19 @@ function opcoesCatalogo(){
   }
   return h;
 }
+/* OS NÚMEROS DA VENDA NUM CARD DE PENDÊNCIAS (16/11/2026, NF 9927). A
+   etiqueta nova do ML só traz "Envio: 484623 56937", sem Pack ID e sem Venda, e
+   o card dizia "pack — · venda —": a pessoa não tinha número nenhum para achar
+   o pedido no Mercado Livre. O envio (lote.envio, gravado desde 12/11/2026,
+   R-PDF-11) sai junto, sem espaço no meio, num pedaço que um toque seleciona
+   inteiro. Os três cards escrevem a linha por aqui. */
+function idVenda(r){
+  var p=[];
+  if(r.packId) p.push('pack '+esc(r.packId));
+  if(r.venda) p.push('venda '+esc(r.venda));
+  if(r.envio) p.push('envio <span style="user-select:all;-webkit-user-select:all;font-family:ui-monospace,monospace;color:var(--txt);font-weight:700">'+esc(String(r.envio).replace(/\s+/g,''))+'</span>');
+  return p.length ? p.join(' · ') : 'pack — · venda —';
+}
 async function carregarDiv(){
   var l=[]; try{ l=await (await fetch("/api/divergencias")).json(); }catch(e){}
   var card=document.getElementById("divCard"), lis=document.getElementById("divLista");
@@ -2555,7 +2568,7 @@ async function carregarDiv(){
     var r=l[i];
     h+='<div style="border-top:1px solid #d8dee6;padding:14px 0">'
       +'<div style="font-weight:700">'+esc(r.buyer||"—")+' · NF '+esc(r.nf||"—")+' · '+esc(r.data||"")+'</div>'
-      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">pack '+esc(r.packId||"—")+' · venda '+esc(r.venda||"—")+'</div>';
+      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">'+idVenda(r)+'</div>';
 
     /* POR QUE ESTE VOLUME PAROU. Sem isso a pessoa escolhe no chute: as cinco
        conferencias do §5 param o volume por motivos bem diferentes, e a que
@@ -2575,7 +2588,7 @@ async function carregarDiv(){
 
     h+='<div style="font-size:13px;font-weight:700;margin-bottom:2px">Qual peça o cliente comprou?</div>'
       +'<div style="font-size:12px;color:#5a6472;margin-bottom:10px">'
-      +'Abra a venda '+esc(r.venda||r.packId||"")+' no Mercado Livre e confira antes de escolher.</div>';
+      +'Abra a venda '+esc(r.venda||r.packId||(r.envio?'do envio '+r.envio:''))+' no Mercado Livre e confira antes de escolher.</div>';
 
     /* SAO DUAS DECISOES DIFERENTES, E A TELA SEPARA AS DUAS.
        "O sistema leu certo" e "o sistema leu errado, a peca e esta outra" nao
@@ -2734,7 +2747,7 @@ async function carregarPac(){
     var pecas=(r.itens||[]).reduce(function(s,x){ return s+(x.qtd||1); },0);
     h+='<div style="border-top:1px solid #d8dee6;padding:12px 0" data-pacvol="'+r.id+'">'
       +'<div style="font-weight:700">'+esc(r.buyer||"—")+' · NF '+esc(r.nf||"—")+' · '+esc(r.data||"")+'</div>'
-      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">pack '+esc(r.packId||"—")+' · venda '+esc(r.venda||"—")
+      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">'+idVenda(r)
       +(r.despachar_em?' · despacha '+esc(r.despachar_em):'')+'</div>'
       +'<div style="margin:8px 0;padding:8px 10px;border-radius:6px;background:#fff4e5;border:1px solid #e0c08a;font-size:12px;color:#8a5a00">'
       +'⚠ '+esc(r.motivo||"")+'</div>'
@@ -2808,7 +2821,7 @@ async function carregarMod(){
     h+='<div style="border-top:1px solid #d8dee6;padding:12px 0">'
       +'<div style="font-weight:700">'+esc(r.buyer||"—")+' · NF '+esc(r.nf||"—")+' · '+esc(r.data||"")
       +(r.codigo?' · <span style="font-family:ui-monospace,monospace">'+esc(r.codigo)+'</span>':'')+'</div>'
-      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">pack '+esc(r.packId||"—")+' · venda '+esc(r.venda||"—")
+      +'<div style="font-size:12px;color:#5a6472;margin:4px 0 0">'+idVenda(r)
       +(r.despachar_em?' · despacha '+esc(r.despachar_em):'')+'</div>'
       +'<div style="margin:8px 0;padding:8px 10px;border-radius:6px;background:#f6f2fd;border:1px solid #d3c5ef;font-size:12px;color:#4b2a91">⚠ '+esc(r.motivo||"")+'</div>'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
@@ -3227,11 +3240,19 @@ async function carregarProb(){
     h+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)"><span style="font-family:ui-monospace,monospace;font-size:13px">'+d.porSku[j].codigo+'</span><b>'+d.porSku[j].qtd+'</b></div>';
   }
   h+='</div></div>';
+  /* ONDE FOI ACHADA (EMBALAGEM-DEFEITO-VOLTA): revisao e embalagem, separadas, e o setor */
+  var NOMEO={revisao:'Achado na revisão',embalagem:'Achado na embalagem'};
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:16px"><div><div class="sub" style="margin-bottom:8px">ONDE FOI ACHADA</div>';
+  (d.porOrigem||[]).forEach(function(o){ h+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)"><span>'+(NOMEO[o.origem]||o.origem)+'</span><b>'+o.qtd+'</b></div>'; });
+  h+='</div><div><div class="sub" style="margin-bottom:8px">SETOR RESPONSÁVEL</div>';
+  if(!(d.porSetor||[]).length) h+='<div style="color:var(--muted);padding:7px 0">Nenhum setor informado no período.</div>';
+  (d.porSetor||[]).forEach(function(o){ h+='<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)"><span>'+o.setor+'</span><b>'+o.qtd+'</b></div>'; });
+  h+='</div></div>';
   el.innerHTML=h;
-  var t='<table><thead><tr><th>Quando</th><th>SKU</th><th>Motivo</th><th>Quem</th><th>Obs</th></tr></thead><tbody>';
+  var t='<table><thead><tr><th>Quando</th><th>SKU</th><th>Motivo</th><th>Onde</th><th>Setor</th><th>Quem</th><th>Obs</th></tr></thead><tbody>';
   for(var k=0;k<d.lista.length;k++){
     var r=d.lista[k];
-    t+='<tr><td style="font-size:13px;color:var(--muted)">'+(r.criado_em||'').slice(5,16)+'</td><td><b>'+r.codigo+'</b></td><td>'+r.motivo+'</td><td style="color:var(--muted)">'+(r.usuario||'-')+'</td><td style="color:var(--muted);font-size:13px">'+(r.obs||'')+'</td></tr>';
+    t+='<tr><td style="font-size:13px;color:var(--muted)">'+(r.criado_em||'').slice(5,16)+'</td><td><b>'+r.codigo+'</b></td><td>'+r.motivo+'</td><td style="font-size:13px">'+(r.origem==='embalagem'?'embalagem':'revisão')+'</td><td style="font-size:13px">'+(r.setor||'—')+'</td><td style="color:var(--muted)">'+(r.achou_por?'achou: '+r.achou_por+' · conferiu: ':'')+(r.usuario||'-')+'</td><td style="color:var(--muted);font-size:13px">'+(r.obs||'')+'</td></tr>';
   }
   document.getElementById('pbLista').innerHTML=t+'</tbody></table>';
 }
@@ -3338,7 +3359,11 @@ var CDTIPOS=[
   /* AS CATEGORIAS DE MATERIAL (AJUSTE de 11/11/2026, o dono: "deveríamos ter um
      campo para cadastrar novas categorias"). A lista já existia (R-CMP-04) e não
      tinha tela. Ela só filtra e agrupa a compra programada — não decide regra. */
-  {t:'categoria_material',n:'Categorias de material (a 501 Compras → Materiais usa ao cadastrar)'}
+  {t:'categoria_material',n:'Categorias de material (a 501 Compras → Materiais usa ao cadastrar)'},
+  /* OS CARRINHOS DA EXPEDIÇÃO (spec CONFERENCIA-CARRINHOS): a 202 põe cada caixa
+     conferida num carrinho desta lista. Cada um tem a etiqueta de código de
+     barras que se cola nele (CARRINHO-A); bipar a etiqueta troca o carrinho. */
+  {t:'carrinho_expedicao',n:'Carrinhos da expedição (a 202 Conferência põe as caixas conferidas neles) — só letras ou números, ex.: C',etiqueta:true}
 ];
 async function carregarCad(){
   var el=document.getElementById('cdBox');
@@ -3349,7 +3374,9 @@ async function carregarCad(){
     var l=[]; try{ l=await (await fetch('/api/listas/'+tp.t)).json(); }catch(e){}
     h+='<div class="card"><div style="font-weight:700;font-size:15px;margin-bottom:12px">'+tp.n+'</div>';
     for(var j=0;j<l.length;j++){
-      h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span>'+l[j].valor+'</span><button class="ghost small cdDel" data-perm="listas.editar" data-id="'+l[j].id+'">remover</button></div>';
+      h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span>'+(tp.etiqueta?'Carrinho ':'')+l[j].valor+'</span><span style="display:flex;gap:8px">'
+        +(tp.etiqueta?'<a class="ghost small" style="text-decoration:none;padding:6px 10px;border:1px solid var(--line);border-radius:8px" target="_blank" rel="noopener" href="/api/carrinho/etiqueta/'+encodeURIComponent(l[j].valor)+'">etiqueta</a>':'')
+        +'<button class="ghost small cdDel" data-perm="listas.editar" data-id="'+l[j].id+'">remover</button></span></div>';
     }
     h+='<div style="display:flex;gap:8px;margin-top:14px"><input id="cdIn_'+tp.t+'" placeholder="novo item" style="flex:1"><button class="primary cdAdd" data-perm="listas.editar" data-t="'+tp.t+'">Adicionar</button></div>';
     h+='</div>';
@@ -3591,13 +3618,15 @@ document.addEventListener('click',async function(e){
     var inp=document.getElementById('cdIn_'+tp);
     var v=(inp.value||'').trim();
     if(!v) return;
-    await fetch('/api/listas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:tp,valor:v})});
+    var ra=await fetch('/api/listas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:tp,valor:v})});
+    if(!ra.ok){ var ja={}; try{ ja=await ra.json(); }catch(err){} alert(ja.erro||'Não deu para adicionar.'); return; }
     carregarCad(); return;
   }
   var d=e.target.closest('.cdDel');
   if(d){
     if(!confirm('Remover este item? Registros antigos que já usaram ele continuam intactos.')) return;
-    await fetch('/api/listas/'+d.getAttribute('data-id'),{method:'DELETE'});
+    var rd=await fetch('/api/listas/'+d.getAttribute('data-id'),{method:'DELETE'});
+    if(!rd.ok){ var jd={}; try{ jd=await rd.json(); }catch(err){} alert(jd.erro||'Não deu para remover.'); return; }
     carregarCad(); return;
   }
   if(e.target.closest('#cdKitBt')){
@@ -3967,6 +3996,32 @@ function corIrMesa(){
   var t=document.querySelector('.tab[data-t="cor"]');
   if(t && !t.classList.contains('active')) t.click();
 }
+/* ⚠️ O CLIQUE DA 204 QUE LEVA À 205 LEVA O PEDIDO NO ENDEREÇO (CONSERTO de
+   25/11/2026). Desde que o Admin virou telas, "ir para a aba Correções" TROCA
+   DE PÁGINA, e o segundo passo do clique (abrir o quadro do bloco, abrir o
+   volume) rodava na página que estava sendo deixada e se perdia: a 205 abria
+   vazia, e o "Fechar vencidos em bloco" não fazia nada. Agora o pedido vai em
+   `#abrir=...` e a 205 o executa ao abrir (`corPedidoDoEndereco`). Na página
+   com as abas (sem TELA), segue abrindo na mesma página. */
+function corIr(pedido){
+  if(TELA && TELA.aba!=='cor' && ROTA_DA_ABA.cor){
+    location.href=ROTA_DA_ABA.cor+'#abrir='+encodeURIComponent(pedido); return;
+  }
+  corIrMesa(); corFazerPedido(pedido);
+}
+function corFazerPedido(pedido){
+  var m=/^(lote|fila)-(\d+)$/.exec(String(pedido||''));
+  if(pedido==='vencidos') corVencidos();
+  else if(pedido==='conferencias') corConferencias();
+  else if(m) corAbrir(m[1], +m[2]);
+}
+function corPedidoDoEndereco(){
+  var m=/^#abrir=([a-z]+(?:-\d+)?)$/.exec(location.hash||'');
+  if(!m) return;
+  /* limpa o endereço: recarregar a 205 não reabre um pedido velho */
+  try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+  corFazerPedido(decodeURIComponent(m[1]));
+}
 
 async function corPassivo(){
   var box=$('#corPassivo'); if(!box) return;
@@ -3987,14 +4042,14 @@ async function corPassivo(){
        +(x.cancelada_varias?' <span class="sub">(caixa de várias — só um item cancelado)</span>':''); }},
     {k:'vencidos', um:'pendente vencido', muitos:'pendentes vencidos', lista:'os vencidos',
      ajuda:'despacho já passou e a etiqueta nunca saiu — ou saiu por fora, ou é venda atrasada',
-     extra:'<div style="margin:8px 0"><button class="btn" onclick="corIrMesa();corVencidos()">Fechar vencidos em bloco…</button> '
+     extra:'<div style="margin:8px 0"><button class="btn" onclick="corIr(\'vencidos\')">Fechar vencidos em bloco…</button> '
        +'<span class="sub">ou abra um volume para dar saída só nele</span></div>',
      linha:function(x){ return corFrase(x)+(x.despachar_em?' <span class="sub">despachava '+esc(x.despachar_em)+'</span>'
        :' <span class="sub">sem despacho lido</span>'); }},
     {k:'conferencias', um:'caixa impressa sem conferência', muitos:'caixas impressas sem conferência',
      lista:'as caixas sem conferência',
      ajuda:'etiqueta impressa num dia anterior e nunca conferida — a linha âmbar da Conferência',
-     extra:'<div style="margin:8px 0"><button class="btn" onclick="corIrMesa();corConferencias()">Fechar conferências antigas em bloco…</button> '
+     extra:'<div style="margin:8px 0"><button class="btn" onclick="corIr(\'conferencias\')">Fechar conferências antigas em bloco…</button> '
        +'<span class="sub">ou abra uma caixa para dar saída só nela</span></div>',
      linha:function(x){ return corFrase(x)+' <span class="sub">impressa '+esc(String(x.embalado_em||x.data||'').slice(0,10))+'</span>'
        +(String(x.modalidade||'').toLowerCase()==='coleta'?' <span class="sub">(coleta)</span>':''); }},
@@ -4027,7 +4082,7 @@ async function corPassivo(){
       +esc(b.lista)+'</summary>'+(b.extra||'')
       +'<div style="margin-top:8px">'+it.map(function(x){
           return '<div style="padding:5px 0;border-bottom:1px solid var(--bd)">'
-            +'<a href="#" class="corLink" onclick="corIrMesa();corAbrir(\''+(b.tipo||'lote')+'\','+x.id+');return false">'+b.linha(x)+'</a></div>'; }).join('')
+            +'<a href="#" class="corLink" onclick="corIr(\''+(b.tipo||'lote')+'-'+x.id+'\');return false">'+b.linha(x)+'</a></div>'; }).join('')
       +'</div></details>';
   });
   if(!blocos.some(function(b){ return ((d[b.k]||{}).n||0)>0; }))
@@ -4305,6 +4360,7 @@ async function corHistorico(){
    mesma carga que o clique da pessoa fazia. No fim do script, para todas as
    funções já existirem. */
 if(TELA){ var tt=document.querySelector('.tab[data-t="'+TELA.aba+'"]'); if(tt) tt.click(); }
+if(naTela('cor')) setTimeout(corPedidoDoEndereco,0);
 </script>
 <script src="/nav.js"></script>
 </body></html>

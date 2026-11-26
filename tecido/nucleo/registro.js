@@ -51,7 +51,18 @@ function montar(app, db, modulos, prefixo){
           const dados=await r.manipulador({
             corpo:req.body||{}, params:req.params, query:req.query, usuario:u, db
           });
-          if(!leitura||r.tipo) audita(u,r.permissao,req.method,req.path,r.detalhe?r.detalhe(req,dados):null,1);
+          /* ⚠️ O DETALHE RODA DEPOIS DA ESCRITA (CONSERTO de 12/11/2026). Se
+             ele estourar, a escrita ja aconteceu: responder 500 faria a tela
+             dizer "nao salvou" sobre o que salvou, e a auditoria perderia quem
+             fez. O erro vai para o log; a linha grava, sem o texto. */
+          if(!leitura||r.tipo){
+            let det=null;
+            if(r.detalhe){
+              try{ det=r.detalhe(req,dados); }
+              catch(e){ console.error('[registro] detalhe falhou em '+req.method+' '+req.path+':',e); det='(detalhe falhou)'; }
+            }
+            audita(u,r.permissao,req.method,req.path,det,1);
+          }
 
           /* ARQUIVO, nao envelope. A etiqueta vai para a impressora como PDF, e
              PDF dentro de {ok,dados} teria que passar por base64 e ser

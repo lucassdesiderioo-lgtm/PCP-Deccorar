@@ -333,6 +333,11 @@ ou agência, pela modalidade).
 > saída e o modo teste. `retirado_em` só na coleta, como a viagem e o caminhão
 > fazem. `conferido_em` **fica vazio**: ninguém conferiu, e o campo diz isso.
 > Estoque e modalidade não se mexem, porque a baixa aconteceu na impressão.
+>
+> ⚠️ **DESDE 19/11/2026 ESTE MODO DÁ A BAIXA** (R-PAS-02, spec
+> `LIMPEZA-SAIU-SEM-CONFERENCIA`): desde 22/10/2026 a baixa é na conferência, e
+> a caixa impressa e nunca conferida nunca tinha baixado. As 187 caixas de 10/11
+> a 18/11 saíram assim. O texto acima é como era em 01/10/2026.
 
 **Rode `node teste_saida.js` (47 casos; os 21 últimos são este grupo)** ao
 mexer no script. Oito defeitos foram reintroduzidos um a um: carimbo em `now`

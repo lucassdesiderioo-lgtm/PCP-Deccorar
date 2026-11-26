@@ -59,5 +59,15 @@ module.exports=[
   const s=fs.readFileSync(path.join(PUB,'nav.js'),'utf8');
   if(/var NOMES=|var ORDEM=|function rodape\(/.test(s)) throw new Error('o rodape voltou ao nav.js');
 }},
-
+/* O MANUAL (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026): toda tela do sob
+   medida tem a sua ficha em docs/manual/ (NNN-nome.md), a mesma pasta da medida
+   padrao. Quem le a pasta e o manual.js da raiz (dono unico); aqui so se confere
+   que a tela daqui nao nasce sem ficha — o teste_manual.js cobra o formato. */
+{nome:'TODA TELA DECLARADA TEM FICHA em docs/manual/ (a tela nova do sob medida nao nasce sem a sua)',
+ executar(){
+  const pasta=path.join(__dirname,'..','..','docs','manual');
+  const arquivos=fs.readdirSync(pasta);
+  const semFicha=Object.entries(TELAS).filter(([c,t])=>!t.apelido).filter(([c,t])=>!arquivos.some(a=>a.indexOf(t.numero+'-')===0)).map(([c,t])=>t.numero+' '+c);
+  if(semFicha.length) throw new Error('sem ficha em docs/manual/: '+semFicha.join(', '));
+}},
 ];

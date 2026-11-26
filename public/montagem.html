@@ -39,14 +39,54 @@
   .fi:last-child{border-bottom:0}
   .fc{font-family:ui-monospace,monospace;font-weight:700;font-size:15px}
   .fq{font-size:19px;font-weight:800;color:var(--amber)}
+  /* OS QUATRO BLOCOS (EMBALAGEM-PRIORIDADE, 23/11/2026): a cor é a ordem. */
+  .bloco{border-radius:14px;padding:12px 14px;margin-top:12px;border:1px solid var(--line)}
+  .bloco .bh{display:flex;align-items:baseline;gap:10px;font-size:14px;font-weight:800;letter-spacing:.5px}
+  .bloco .bh .bd{margin-left:auto;font-size:13px;font-weight:400;letter-spacing:0;color:#3b4552}
+  .b1{border:2px solid var(--red);background:#fff6f5}.b1 .bh{color:var(--red)}
+  .b2{border-color:#e7cb8c;background:#fdf4e3}.b2 .bh{color:#8a5200}
+  .b3{border-color:#a9c9ee;background:#e8f0fb}.b3 .bh{color:var(--blue)}
+  .b4{border-color:#cfb2dc;background:#f3e9f7}.b4 .bh{color:#6a1b9a}
+  .b5 .bh{color:var(--muted)}
+  .barra{height:10px;border-radius:5px;background:#f2d4d1;overflow:hidden;margin:8px 0}.barra i{display:block;height:10px;background:var(--green)}
+  .ln{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,.8fr) minmax(0,2fr);gap:10px;align-items:center;background:#fff;border:1px solid #efb1ad;border-radius:10px;padding:9px 12px;margin-top:6px}
+  .ln.vazia{opacity:.7}.ln.agora{border:2px solid var(--red)}
+  .ln .cod{font-family:ui-monospace,monospace;font-weight:800;font-size:17px;overflow-wrap:anywhere}
+  .ln .md{font-size:12px;color:var(--muted)}
+  .ln .nb{text-align:center}.ln .nb b{display:block;font-size:24px;color:var(--red)}.ln .nb span{font-size:11px;color:var(--muted)}
+  .qd{display:flex;gap:4px}.qd span{flex:1 1 0;height:20px;border-radius:5px;background:#e1e5ea}
+  .qd .v{background:var(--green)}.qd .a{background:#f6c343}.qd .l{background:repeating-linear-gradient(45deg,#f6c343 0 5px,#fff 5px 9px);border:1px solid #f6c343}
+  .ql{font-size:12px;color:var(--muted);margin-top:3px}
+  .lb{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-top:6px;font-size:14px}
+  .lb .cod{font-family:ui-monospace,monospace;font-weight:700;font-size:15px;overflow-wrap:anywhere}
+  .lb b{font-size:18px}
+  .selo{font-size:11px;font-weight:800;color:#fff;background:var(--red);border-radius:10px;padding:2px 8px;margin-left:6px;vertical-align:middle}
+  .selo.dev{background:#6a1b9a}
+  .faixa{border-radius:14px;padding:14px 18px;margin-bottom:12px;border:1px solid var(--line)}
+  .faixa .ft1{font-size:20px;font-weight:780}.faixa .ft2{font-size:14px;color:#3b4552;margin-top:3px}
+  .faixa.nova{border:2px solid var(--red);background:#fbe9e8}.faixa.esp{border-color:#e7cb8c;background:#fdf4e3}.faixa.feito{border-color:#a9d8b4;background:#e7f5eb}.faixa.feito .ft1{color:var(--green)}
+  /* O aviso do bipe fora da prioridade (§4): o próximo bipe decide. */
+  .fora{border:2px solid var(--red);background:#fff;border-radius:14px;padding:16px 18px;margin:14px 0;text-align:left}
+  .fora .ft{color:var(--red);font-weight:800;font-size:14px;letter-spacing:.5px;text-transform:none;margin:0}
+  .fora .fq1{font-size:19px;font-weight:750;margin-top:6px}.fora .fq2{font-size:16px;color:#3b4552;margin-top:6px;line-height:1.5}
+  .fora button{min-height:52px;border-radius:12px;font-size:16px;font-weight:800;padding:0 16px;cursor:pointer}
+  .fora .bd1{border:0;background:var(--red);color:#fff}.fora .bd2{border:1px solid #c9d1db;background:#fff;color:#3b4552;font-weight:700}
 </style></head><body>
 <header><div class="mark">M</div><div><h1>Embalagem</h1><div class="sub">Bipa SKU · bipa kit · bipa SKU pra finalizar</div></div>
 <div class="links"><a class="link" href="/embalagem">Etiqueta de Venda</a><a class="link" href="/painel">Painel</a></div></header>
 <div class="wrap">
   <div class="banner" id="banner"></div>
+  <!-- CANCELAR A EMBALAGEM (21/11/2026): aparece so com uma embalagem aberta.
+       O espelho do "Cancelar revisao": nada grava, a peca continua na fila. -->
+  <div id="cancLin" style="display:none;text-align:center;margin:-4px 0 14px"><button type="button" id="cancEmb" style="padding:11px 20px;border-radius:9px;border:1px solid #c9d1db;background:transparent;color:#3b4552;font-size:14px;cursor:pointer">Cancelar embalagem</button><button type="button" id="defBt" style="display:none;margin-left:10px;padding:11px 20px;border-radius:9px;border:1px solid #c62828;background:#fff;color:#c62828;font-size:14px;font-weight:700;cursor:pointer">Peça com defeito</button></div>
+  <!-- PECA COM DEFEITO (EMBALAGEM-DEFEITO-VOLTA, R-EMB-11, 21/11/2026): so persiana.
+       Quem embala decide sozinho, com motivo; a peca volta para a Revisao. -->
+  <div id="defPainel" style="display:none;border:1px solid #efb1ad;background:#fbe9e8;border-radius:14px;padding:18px;margin:0 0 14px"></div>
   <input id="scan" autocomplete="off">
   <div class="stats" id="stats"></div>
-  <div class="fila"><div class="ft">Aguardando embalagem</div><div id="filaLista"></div></div>
+  <div id="foraPainel" class="fora" style="display:none"></div>
+  <div id="faixa"></div>
+  <div id="filaLista"></div>
 </div>
 <!-- antes do bloco de baixo: e dele que vem pecaDeSku/pecaTexto -->
 <script src="/sku.js"></script>
@@ -54,16 +94,102 @@
      pergunta "isto e o kit?" tem uma regua so, senao a tela aceitaria um bipe
      que o servidor recusa no dia em que uma das duas mudasse. -->
 <script src="/kit_bipe.js"></script>
+<script src="/tempo_bancada.js"></script>
+<script src="/codigo_serie.js"></script>
 <script>
 const $=s=>document.querySelector(s);
-let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[];
+let SKUS=[], KIT=null, emb=null, tick=null, last={c:null,t:0}, FILA=[], avisoFixo=false;
+/* A PRIORIDADE (EMBALAGEM-PRIORIDADE, 23/11/2026): os quatro blocos vêm
+   prontos do servidor (embalagem_prioridade.js). A tela só desenha. FILA
+   continua sendo a lista "SKU → quantas esperam", para a trava da Revisão. */
+let PRIO=null, VISTOS=null, NOVA=null;
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function doDia(c){ c=String(c||'').toUpperCase(); return !!(PRIO&&PRIO.dia.linhas.some(d=>d.codigo===c)); }
+function linhaDia(c){ c=String(c||'').toUpperCase(); return PRIO?PRIO.dia.linhas.find(d=>d.codigo===c):null; }
+/* A peça do dia que está aqui e livre, a primeira da ordem (o aviso da §4). */
+function primeiraDoDia(){ return PRIO?PRIO.dia.linhas.find(d=>d.aqui>(d.minha?1:0))||null:null; }
+function plural(n,a,b){ return n+' '+(n===1?a:b); }
 async function carregarFila(){
   try{
-    FILA=await (await fetch('/api/fila')).json();
-    document.getElementById('filaLista').innerHTML = FILA.length
-      ? FILA.map(function(f){ return '<div class="fi"><div><div class="fc">'+f.codigo+'</div><div style="font-size:12px;color:var(--muted)">'+(f.cor||'')+'</div></div><div class="fq">'+f.qtd+'</div></div>'; }).join('')
-      : '<div style="color:var(--muted);font-size:14px">Nada aguardando. A revis&atilde;o ainda n&atilde;o liberou pe&ccedil;as.</div>';
-  }catch(e){}
+    let p=null;
+    try{ p=await (await fetch('/api/montagem/prioridade')).json(); }catch(e){ p=null; }
+    /* ⚠️ SEM A PRIORIDADE, A LISTA SIMPLES DE SEMPRE (③ REVISAO): a conta da
+       prioridade e pesada, e um erro nela nao pode parar a bancada — a trava da
+       Revisao (FILA) continua pelo GET /api/fila. */
+    if(!p || !p.dia){
+      const lista=await (await fetch('/api/fila')).json();
+      if(!Array.isArray(lista)) return false;
+      FILA=lista; PRIO=null;
+      document.getElementById('faixa').innerHTML='';
+      document.getElementById('filaLista').innerHTML='<div class="bloco"><div class="bh" style="color:var(--muted)">AGUARDANDO EMBALAGEM — a prioridade do dia não carregou</div>'
+        +(lista.length?lista.map(f=>'<div class="lb"><span class="cod">'+esc(f.codigo)+'</span><span><b>'+f.qtd+'</b> aqui</span></div>').join(''):'<div style="color:var(--muted);font-size:14px">Nada aguardando.</div>')+'</div>';
+      return true;
+    }
+    PRIO=p;
+    const mapa={};
+    [].concat(p.dia.linhas,p.hoje,p.reposicao,p.devolucao,p.outros,p.so_reservadas||[]).forEach(function(x){ mapa[x.codigo]=(mapa[x.codigo]||0)+(x.aqui||0)+((x.sendo&&x.sendo.length)||0); });
+    FILA=Object.keys(mapa).map(k=>({codigo:k,qtd:mapa[k]}));
+    /* A peça do dia que acabou de sair da Revisão (F6): o SKU que não tinha
+       peça aqui e agora tem. Fica marcada até o próximo bipe. */
+    /* ⚠️ PELA LINHA DA FILA, E NAO PELO NUMERO "aqui" (③ REVISAO): o "aqui"
+       sobe tambem quando a reserva de outra pessoa solta, ou quando um SKU com
+       peca esperando entra no vermelho — e nenhuma peca saiu da Revisao. */
+    const todos=[].concat(p.dia.linhas,p.hoje,p.reposicao,p.devolucao,p.so_reservadas||[]);
+    if(VISTOS){ const d=p.dia.linhas.find(x=>(x.ids||[]).some(id=>!VISTOS.has(id))); if(d) NOVA=d.codigo; }
+    else VISTOS=new Set();
+    todos.forEach(x=>(x.ids||[]).forEach(id=>VISTOS.add(id)));
+    desenhar();
+    return true;
+  }catch(e){ return false; }
+}
+function sendoTxt(x){ return x.sendo&&x.sendo.length ? ' · '+plural(x.sendo.length,'sendo embalada','sendo embaladas')+' por '+esc(x.sendo.join(', ')) : ''; }
+function desenhar(){
+  const p=PRIO; if(!p) return;
+  const cur=emb?String(emb.codigo).toUpperCase():null;
+  let h='', fx='';
+  const L=p.dia.linhas;
+  if(L.length){
+    /* SÓ O TRABALHO DA EMBALAGEM (decisão do dono, 24/11/2026): o número
+       grande é quanto embalar agora; nada de estoque nem de produção. */
+    const fe=p.dia.faltam_embalar||0;
+    h+='<div class="bloco b1"><div class="bh">1 · DO DIA — EMBALAR PRIMEIRO<span class="bd">faltam embalar <b>'+fe+'</b> '+(fe===1?'peça':'peças')+' do dia</span></div>';
+    L.forEach(function(d){
+      const q=d.quadros, sq=[];
+      for(let i=0;i<q.amarelo;i++) sq.push('<span class="a"></span>');
+      for(let i=0;i<q.listrado;i++) sq.push('<span class="l"></span>');
+      const partes=[plural(d.paradas,'venda de hoje esperando esta peça','vendas de hoje esperando esta peça')];
+      if(d.sendo.length) partes.push(plural(d.sendo.length,'sendo embalada','sendo embaladas')+' por '+esc(d.sendo.join(', ')));
+      h+='<div class="ln'+(cur===d.codigo?' agora':'')+'"><div><div class="cod">'+esc(d.codigo)
+        +(NOVA===d.codigo&&d.aqui?'<span class="selo">NOVA</span>':'')+(cur===d.codigo?'<span class="selo">EMBALANDO AGORA</span>':'')+'</div>'
+        +'<div class="md">'+esc([d.medida,d.cor].filter(Boolean).join(' · '))+'</div></div>'
+        +'<div class="nb"><b>'+d.para_embalar+'</b><span>para embalar</span></div>'
+        +'<div><div class="qd">'+sq.join('')+'</div><div class="ql">'+partes.join(' · ')+'</div></div></div>';
+    });
+    h+='</div>';
+  }
+  function bloco(cls,titulo,lista,motivo){
+    if(!lista.length) return '';
+    return '<div class="bloco '+cls+'"><div class="bh">'+titulo+'</div>'+lista.map(function(x){
+      return '<div class="lb"><div><span class="cod">'+esc(x.codigo)+'</span>'+(cls==='b4'?'<span class="selo dev">DEVOLUÇÃO</span>':'')
+        +(cur===x.codigo?'<span class="selo">EMBALANDO AGORA</span>':'')
+        +'<div style="font-size:12px;color:var(--muted)">'+esc([x.medida,x.cor].filter(Boolean).join(' · '))+'</div></div>'
+        +'<div style="text-align:right">'+[motivo(x),sendoTxt(x).replace(/^ · /,''),'<b>'+x.aqui+'</b> aqui'].filter(Boolean).join(' · ')+'</div></div>';
+    }).join('')+'</div>';
+  }
+  /* Há venda do dia sem peça, mas nenhuma peça do dia aqui para embalar. */
+  const semDiaAqui=!L.length && p.dia.m>0 && !p.dia.todas;
+  h+=bloco('b2','2 · PEDIDO DE HOJE'+(!L.length||semDiaAqui?' — EMBALAR AGORA':''),p.hoje,x=>x.ordem_pede?'ordem pede '+x.ordem_pede+' · falta '+x.falta:'revisada na tela vermelha');
+  h+=bloco('b3','3 · REPOSIÇÃO — pela falta do estoque',p.reposicao,x=>x.falta==null?'reposição':(x.falta>0?'abaixo do alvo em '+x.falta:'estoque no alvo'));
+  h+=bloco('b4','4 · DEVOLUÇÃO',p.devolucao,()=>'reembalar');
+  h+=bloco('b5','Kit e acessório',p.outros,()=>'');
+  if(!h) h='<div class="bloco"><div style="color:var(--muted);font-size:14px">Nada aguardando. A revis&atilde;o ainda n&atilde;o liberou pe&ccedil;as.</div></div>';
+  /* As faixas do topo da lista (F6, F7, F8). */
+  const ln=NOVA&&linhaDia(NOVA);
+  if(ln && ln.aqui) fx='<div class="faixa nova"><span class="selo" style="margin:0 8px 0 0">NOVA</span><span class="ft1">Chegou da Revisão uma peça do dia</span><div class="ft2"><b style="font-family:ui-monospace,monospace">'+esc(ln.codigo)+'</b> — '+plural(ln.paradas,'venda de hoje esperando','vendas de hoje esperando')+'. Ela está no bloco vermelho.</div></div>';
+  else if(semDiaAqui) fx='<div class="faixa esp"><div class="ft1">Nenhuma peça do dia para embalar agora</div><div class="ft2">Embale o bloco 2. Quando uma peça do dia sair da Revisão, ela aparece em cima.</div></div>';
+  else if(p.dia.todas) fx='<div class="faixa feito"><div class="ft1">Todas as '+p.dia.m+' vendas de hoje têm peça ✓</div><div class="ft2">A prioridade agora é o bloco 2. Se entrar venda nova de hoje sem peça, o vermelho volta aqui em cima.</div></div>';
+  document.getElementById('faixa').innerHTML=fx;
+  document.getElementById('filaLista').innerHTML=h;
 }
 setInterval(function(){ if(!emb) carregarFila(); },4000);
 async function load(){
@@ -71,7 +197,9 @@ async function load(){
   SKUS=await (await fetch('/api/skus')).json();
   KIT=(await (await fetch('/api/config/kit')).json()).kit;
   stats();
-  if(!emb) idle();
+  /* A recusa "Não passou pela Revisão" e o "Sem conexão" ficam ate o proximo
+     bipe (③ REVISAO): este redesenho de 4 s os apagava em menos de 4 s. */
+  if(!emb && !avisoFixo && !conferindo) idle();
 }
 async function stats(){
   const st=await (await fetch('/api/montagem/hoje')).json();
@@ -81,7 +209,50 @@ async function stats(){
 function fmt(s){ s=+s||0; const m=Math.floor(s/60); return (m?m+'m':'')+(s%60)+'s'; }
 function mmss(ms){ const t=Math.floor(ms/1000),m=Math.floor(t/60); return String(m).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); }
 function steps(){ return '<div class="steps"><span class="chip done">1 · SKU ✓</span><span class="chip '+(emb&&emb.kitOk?'done':'')+'">2 · Kit '+(emb&&emb.kitOk?'✓':'…')+'</span><span class="chip">3 · SKU final</span></div>'; }
-function banner(kind,title,sub,extra){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(extra||''); }
+function banner(kind,title,sub,extra){ $('#banner').className='banner '+(kind||''); $('#banner').innerHTML='<div class="bt">'+title+'</div><div class="bs">'+(sub||'')+'</div>'+(extra||''); mostrarCancelar(); }
+/* O botao acompanha o banner: so com uma embalagem aberta e fora do envio. */
+function mostrarCancelar(){ var l=document.getElementById('cancLin'); if(l) l.style.display=(emb && !emb.enviando && !emb.trocando)?'':'none';
+  var d=document.getElementById('defBt'); if(d) d.style.display=(emb && !emb.enviando && !emb.trocando && emb.persiana)?'':'none';
+  if(!(emb && emb.persiana)) fecharDefeito(); }
+/* ── PECA COM DEFEITO: volta para a Revisao (R-EMB-11) ── */
+let MOTIVOS=null;
+function fecharDefeito(){ var p=document.getElementById('defPainel'); if(p){ p.style.display='none'; p.innerHTML=''; } }
+async function abrirDefeito(){
+  if(!emb || emb.enviando || emb.trocando || !emb.persiana) return;
+  if(!MOTIVOS){ try{ MOTIVOS=(await (await fetch('/api/listas/rejeicao')).json()).map(x=>x.valor||x).filter(Boolean); }catch(e){ MOTIVOS=null; } }
+  var p=document.getElementById('defPainel');
+  if(!MOTIVOS || !MOTIVOS.length){ p.style.display=''; p.innerHTML='<b>Não deu para carregar os motivos.</b> Confira o Wi-Fi e toque de novo em "Peça com defeito".'; return; }
+  p.style.display='';
+  p.innerHTML='<div style="font-size:19px;font-weight:800;margin-bottom:4px">Peça com defeito — <span style="font-family:ui-monospace,monospace">'+emb.codigo+'</span></div>'
+    +'<div style="font-size:14px;color:#5a6472;margin-bottom:10px">Escolha o motivo. A peça <b>não é embalada</b> e volta para a Revisão.</div>'
+    +'<div id="defMot" style="display:flex;flex-wrap:wrap;gap:8px">'+MOTIVOS.map(function(m,i){ return '<button type="button" data-mot="'+i+'" style="padding:12px 16px;border-radius:9px;border:1px solid #c9d1db;background:#fff;font-size:15px;cursor:pointer">'+m.replace(/</g,'&lt;')+'</button>'; }).join('')+'</div>'
+    +'<input id="defObs" maxlength="500" placeholder="Observação (opcional)" style="width:100%;margin-top:10px;padding:12px;border-radius:9px;border:1px solid #c9d1db;font-size:15px;box-sizing:border-box">'
+    +'<div id="defErr" style="color:#c62828;font-weight:700;margin-top:8px"></div>'
+    +'<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap"><button type="button" id="defOk" disabled style="padding:13px 20px;border-radius:9px;border:0;background:#c62828;color:#fff;font-size:15px;font-weight:800;cursor:pointer;opacity:.5">Devolver à Revisão</button>'
+    +'<button type="button" id="defVolta" style="padding:13px 20px;border-radius:9px;border:1px solid #c9d1db;background:transparent;font-size:15px;cursor:pointer">Voltar à embalagem</button></div>';
+  var escolhido=null;
+  p.querySelectorAll('[data-mot]').forEach(function(b){ b.addEventListener('click',function(){
+    escolhido=MOTIVOS[+b.dataset.mot];
+    p.querySelectorAll('[data-mot]').forEach(function(x){ x.style.background='#fff'; x.style.borderColor='#c9d1db'; x.style.fontWeight=''; });
+    b.style.background='#fde2e0'; b.style.borderColor='#c62828'; b.style.fontWeight='800';
+    var ok=document.getElementById('defOk'); ok.disabled=false; ok.style.opacity='1'; keep(); }); });
+  document.getElementById('defVolta').addEventListener('click', function(){ fecharDefeito(); keep(); });
+  document.getElementById('defOk').addEventListener('click', function(){ if(escolhido) enviarDefeito(escolhido, document.getElementById('defObs').value); });
+}
+async function enviarDefeito(motivo, obs){
+  const cur=emb; if(!cur || cur.enviando || cur.trocando) return;
+  const seg=Math.round((Date.now()-cur.inicio)/1000);
+  cur.enviando=true; mostrarCancelar();
+  var err=document.getElementById('defErr');
+  try{
+    const resp=await fetch('/api/montagem/defeito',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo:cur.codigo,motivo:motivo,obs:obs,segundos:seg})});
+    const r=await resp.json();
+    if(r && r.erro){ cur.enviando=false; mostrarCancelar(); if(err) err.textContent=r.erro; beep(false); return; }
+    clearInterval(tick); tick=null; emb=null; bipePerdido=null; fecharDefeito(); mostrarFora(); keep();
+    avisoFixo=true; banner('err','Peça devolvida à Revisão por defeito','<b>'+cur.codigo+'</b> · '+motivo.replace(/</g,'&lt;')+' · nada foi embalado nem entrou no estoque. Leve a peça para a Revisão.');
+    beep(true); stats(); carregarFila();
+  }catch(e){ cur.enviando=false; mostrarCancelar(); if(err) err.textContent='Sem conexão: a peça não foi devolvida. Confira o Wi-Fi e toque de novo.'; beep(false); }
+}
 /* Descricao da peca em letra grande. Sai do formatador unico do /sku.js — a
    mesma frase da tela de Etiqueta de Venda, pra ninguem achar que sao medidas
    diferentes. SKU sem medida/cor no cadastro avisa em vermelho em vez de ficar
@@ -93,9 +264,176 @@ function pecaHtml(info){
 }
 function idle(){ emb=null; if(!KIT){ banner('err','Código do kit não cadastrado','Peça ao responsável para cadastrar o código do kit no <b>Admin → Cadastros</b>. Sem isso não dá pra conferir o kit na embalagem.'); return; } banner('','Pronto','Bipe o <b>SKU</b> da persiana pra começar a embalagem.'); }
 function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const t=$('#tm'); if(emb&&t) t.textContent=mmss(Date.now()-emb.inicio); },250); }
+/* CANCELAR A EMBALAGEM EM ANDAMENTO (21/11/2026), o espelho do "Cancelar
+   revisao" (R-REV-08): zera num toque, sem motivo. NADA foi gravado; o servidor
+   so guarda quem cancelou. A peca continua em "Aguardando embalagem". */
+async function cancelarEmb(){
+  const cur=emb; if(!cur || cur.enviando || cur.trocando) return;
+  const seg=Math.round((Date.now()-cur.inicio)/1000);
+  clearInterval(tick); tick=null; emb=null; bipePerdido=null; mostrarFora();
+  avisoFixo=true;
+  /* Kit, acessorio e sob medida nao passam pela fila (R-EMB-02): para eles nao
+     se fala da lista "Aguardando embalagem" (③ REVISAO). */
+  const resto=cur.persiana ? ' · nada foi gravado, e a peça continua esperando embalagem na lista.' : ' · nada foi gravado.';
+  banner('','Embalagem cancelada', '<b>'+cur.codigo+'</b>'+resto+' Bipe o SKU para começar de novo.');
+  beep(true);
+  try{
+    const r=await (await fetch('/api/montagem/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({codigo:cur.codigo,segundos:seg,inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
+    /* sem a chave crua na tela (§20): "nao_logado" nao diz nada a quem embala */
+    if(r && r.erro && !emb){ avisoFixo=true; banner('err','Embalagem cancelada, sem registro', '<b>'+cur.codigo+'</b> · nada foi gravado, mas o cancelamento não ficou registrado. Se a tela pedir o PIN, entre de novo. Bipe o SKU para começar de novo.'); }
+  }catch(e){ /* sem conexao: a embalagem ja foi zerada na tela e nada foi gravado */ }
+  carregarFila();
+}
+document.getElementById('cancEmb').addEventListener('click', cancelarEmb);
+document.getElementById('defBt').addEventListener('click', abrirDefeito);
+/* O 1o BIPE RESERVA A PECA (EMBALAGEM-PRIORIDADE §5): se todas as que esperam
+   estao com outras pessoas, a recusa vem aqui e nada abre. Sem conexao, abre
+   assim mesmo: o bipe final cai na regra de sempre. */
+/* O /reservar tem prazo (③ REVISAO): com o Wi-Fi pendurado, todo bipe viraria
+   "Bipe nao valeu". Em 8 s ele desiste, e a embalagem abre sem reserva. */
+async function reservarPeca(codigo){
+  const ctl=(typeof AbortController==='function')?new AbortController():null;
+  const prazo=ctl?setTimeout(()=>ctl.abort(),8000):null;
+  try{ return await (await fetch('/api/montagem/reservar',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl?ctl.signal:undefined,body:JSON.stringify({codigo})})).json(); }
+  finally{ if(prazo) clearTimeout(prazo); }
+}
+async function iniciar(info, notaAntes){
+  if(info.exige_medida===0){ abrir(info); if(notaAntes) $('#banner').insertAdjacentHTML('beforeend', notaAntes); return; }
+  conferindo=true; bipePerdido=null;
+  let r=null;
+  try{ r=await reservarPeca(info.codigo); }
+  catch(e){ r=null; }
+  finally{ conferindo=false; }
+  if(emb) return;
+  if(r && r.erro){ avisoFixo=true; banner('err', r.motivo==='reservada'?'Esta peça já está com outra pessoa':'Não deu para começar', esc(r.erro)+(notaAntes||'')+perdido()); beep(false); carregarFila(); return; }
+  const nota=(notaAntes||'')+perdido(); abrir(info); if(nota) $('#banner').insertAdjacentHTML('beforeend', nota);
+}
+/* O AVISO DO BIPE FORA DA PRIORIDADE (§4): o proximo bipe decide — o kit
+   segue com esta (fica registrado), o SKU do dia troca. Os botoes valem o mesmo. */
+function mostrarFora(){
+  const p=document.getElementById('foraPainel');
+  if(!emb || !emb.foraDe || emb.kitOk || emb.enviando){ p.style.display='none'; p.innerHTML=''; return; }
+  const d=linhaDia(emb.foraDe)||{codigo:emb.foraDe,paradas:0,aqui:0,para_embalar:0};
+  p.style.display='';
+  p.innerHTML='<div class="ft">TEM PEÇA DO DIA ESPERANDO</div>'
+    +'<div class="fq1">Você bipou a <span style="font-family:ui-monospace,monospace">'+esc(emb.codigo)+'</span>, que não é do dia.</div>'
+    +'<div class="fq2">A <b>'+esc(d.codigo)+'</b> tem '+plural(d.para_embalar||d.aqui,'peça do dia para embalar','peças do dia para embalar')+' e <b>'+plural(d.paradas,'venda de hoje parada','vendas de hoje paradas')+'</b> na Etiqueta de Venda.<br>'
+    +(emb.foraRecusada===d.codigo?'Siga com esta: <b>bipe o kit</b>.':'Para trocar, <b>bipe a '+esc(d.codigo)+'</b>. Para seguir com esta, <b>bipe o kit</b>.')+'</div>'
+    +(emb.foraErro?'<div style="color:var(--red);font-weight:700;margin-top:8px">'+emb.foraErro+'</div>':'')
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+(emb.foraRecusada===d.codigo?'':'<button type="button" class="bd1" id="foraTroca">Vou embalar a '+esc(d.codigo)+'</button>')
+    +'<button type="button" class="bd2" id="foraSegue">Embalar esta mesmo assim</button></div>';
+  var bt=document.getElementById('foraTroca');
+  /* o botao reserva a do dia antes de cancelar esta, como o bipe (③ r3) */
+  if(bt) bt.addEventListener('click', function(){ var i=SKUS.find(function(x){ return String(x.codigo).toUpperCase()===String(d.codigo).toUpperCase(); }); trocar(i||null, true); keep(); });
+  document.getElementById('foraSegue').addEventListener('click', function(){ seguirFora(); keep(); });
+}
+function renovar(cur, dia){
+  fetch('/api/montagem/renovar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({codigo:cur.codigo,codigo_dia:dia||'',segundos:Math.round((Date.now()-cur.inicio)/1000)})}).catch(function(){});
+}
+/* "Mesmo assim": registra quem escolheu, e o aviso nao volta nesta embalagem. */
+function seguirFora(){ if(!emb || !emb.foraDe || emb.trocando) return; renovar(emb, emb.foraDe); emb.foraDe=null; emb.foraVisto=true; mostrarFora(); }
+/* Troca para a peca do dia: a embalagem de agora e cancelada (a reserva solta)
+   e, se veio o bipe do SKU do dia, a dele comeca do zero. */
+async function trocar(info, peloBotao){
+  const cur=emb; if(!cur || cur.enviando || cur.trocando) return;
+  let dia=cur.foraDe;
+  /* ⚠️ A PECA DO DIA E RESERVADA ANTES de cancelar a de agora (③ REVISAO): se
+     ela nao estiver aqui, ou estiver com outra pessoa, a embalagem de agora
+     continua, e o aviso diz por que. */
+  /* Quem decide se a peca do dia esta aqui e o servidor (③ REVISAO r3): a
+     lista da tela fica parada com a embalagem aberta. Enquanto ele responde,
+     os bipes nao valem (cur.trocando), para o kit ou o SKU final nao andarem
+     no meio de uma troca. */
+  if(info){
+    cur.trocando=true; cur.foraErro='Trocando para a '+esc(info.codigo)+'… aguarde: o bipe neste meio não vale.'; mostrarFora(); mostrarCancelar(); fecharDefeito();
+    let r=null; try{ r=await reservarPeca(info.codigo); }catch(e){ r=null; }
+    cur.trocando=false; mostrarCancelar();
+    if(emb!==cur) return;
+    let erro=null;
+    /* SEM RESPOSTA, A TROCA PODE TER ACONTECIDO NO SERVIDOR (§12, ③ r3): a tela
+       segue com esta e pede de volta a reserva dela. */
+    if(!r){ erro='Sem conexão: não deu para confirmar a troca. Siga com esta, ou bipe a do dia de novo.'; reservarPeca(cur.codigo).catch(function(){}); }
+    else if(r.erro){ erro=esc(r.erro); if(r.motivo==='reservada' && info.codigo.toUpperCase()===String(cur.foraDe||'').toUpperCase()) cur.foraRecusada=cur.foraDe; }
+    else if(r.fila_id==null) erro='Não há nenhuma '+esc(info.codigo)+' esperando embalagem: ela ainda está na produção. Siga com esta ou bipe outra do dia.';
+    if(erro){ cur.foraErro=erro; mostrarFora(); beep(false); return; }
+  }
+  clearInterval(tick); tick=null; emb=null; bipePerdido=null; mostrarFora();
+  try{ await fetch('/api/montagem/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({codigo:cur.codigo,trocou:1,manter:info?1:0,codigo_dia:(info?info.codigo:dia)||'',segundos:Math.round((Date.now()-cur.inicio)/1000)})}); }catch(e){}
+  if(info && !peloBotao){ abrir(info); return; }
+  if(info) dia=info.codigo;
+  avisoFixo=true; banner('go','Pegue a peça do dia','A embalagem de <b>'+esc(cur.codigo)+'</b> foi cancelada e a peça continua esperando. Bipe a <b>'+esc(dia)+'</b> para começar'+(info?' — ela já está reservada para você.':'.'));
+  beep(true); carregarFila();
+}
+function abrir(info){
+  emb={codigo:info.codigo,cor:info.cor||'',peca:pecaHtml(info),inicio:Date.now(),kitOk:false,persiana:info.exige_medida!==0}; startTimer();
+  NOVA=null;
+  const ld=emb.persiana?linhaDia(info.codigo):null;
+  emb.dia=!!ld;
+  const pd=(emb.persiana && !ld)?primeiraDoDia():null;
+  emb.foraDe=pd?pd.codigo:null;
+  /* A CONFERENCIA DA PECA ACONTECE AQUI, e so aqui.
+     Depois de ensacada a persiana some dentro do saco preto e o unico jeito
+     de saber o que tem dentro passa a ser a etiqueta colada por fora. Este
+     e o ultimo momento em que alguem VE a peca — se a conferencia nao for
+     neste bipe, nao ha outro. */
+  banner('go','Embalando '+info.codigo, emb.peca
+    +'<div class="confira">Confira com a peça na bancada. Não bateu, <b>não embale</b>.</div>'
+    +(ld?'<div style="font-size:15px;font-weight:800;color:var(--red);margin-top:6px">DO DIA · destrava 1 das '+plural(ld.paradas,'venda parada','vendas paradas')+'</div>':'')
+    +'Prepare e depois <b>bipe o KIT</b>.<div class="timer" id="tm">00:00</div>'+steps());
+  if(emb.foraDe){ beep(false); setTimeout(function(){ beep(false); },260); } else beep(true);
+  mostrarFora(); desenhar();
+}
+/* "E persiana?" — a mesma regua do servidor (`exige_medida` do /api/skus):
+   kit, acessorio e sob medida nao passam pela Revisao. */
+function naoNaFila(info){
+  if(info.exige_medida===0) return false;
+  const c=String(info.codigo).toUpperCase();
+  return !FILA.some(f=>String(f.codigo||'').toUpperCase()===c && (+f.qtd||0)>0);
+}
+/* A lista "Aguardando embalagem" se atualiza a cada 4 s: antes de recusar, a
+   tela pergunta de novo — a peca pode ter saido da Revisao agora. O bipe
+   nesse meio e ignorado. */
+let conferindo=false, bipePerdido=null;
+async function conferirRevisao(info){
+  conferindo=true; bipePerdido=null;
+  banner('','Conferindo a fila da Revisão…','Aguarde: <b>'+info.codigo+'</b> não está na lista de peças esperando embalagem, e a tela está perguntando de novo.');
+  let leu=false;
+  try{ leu=await carregarFila(); }finally{ conferindo=false; }
+  if(emb) return;
+  /* SEM CONEXAO NAO E "SEM REVISAO" (③ REVISAO, §12): mandar a peca a Revisao
+     por falta de rede criaria uma segunda linha na fila para a mesma peca. */
+  if(!leu){ avisoFixo=true; banner('err','Sem conexão','Não deu para conferir a fila da Revisão. <b>Bipe o SKU de novo</b>; se repetir, confira o Wi-Fi.'+perdido()); beep(false); return; }
+  /* achou a peca: abre, e o bipe que nao valeu no meio aparece embaixo (③ r3) */
+  if(!naoNaFila(info)){ const nota=perdido(); iniciar(info, nota); return; }
+  semRevisao(info.codigo);
+}
+function semRevisao(cod){
+  avisoFixo=true;
+  banner('err','Não passou pela Revisão','Não há nenhuma <b>'+cod+'</b> esperando embalagem.'
+    +'<div class="confira">Leve a persiana para a <b>Revisão</b> e embale depois.</div>'+perdido()); beep(false);
+}
+/* O bipe que chegou durante a conferencia da fila nao valeu: o aviso final diz qual. */
+function perdido(){
+  const c=bipePerdido; bipePerdido=null;
+  return c ? '<div class="confira">O bipe de <b>'+c+'</b> chegou enquanto a tela conferia e <b>não valeu</b>: bipe de novo.</div>' : '';
+}
 function handle(code){
   code=(code||'').trim().toUpperCase(); if(!code) return;
   const now=Date.now(); if(last.c===code && now-last.t<700) return; last={c:code,t:now};
+  /* solta o aviso fixo so o bipe que passou do filtro de 700 ms (③ r3) */
+  avisoFixo=false;
+  /* COM O ENVIO NO AR, O BIPE E IGNORADO (③ REVISAO, EMBALAGEM-TEMPO-MINIMO):
+     a embalagem fica de pe ate o servidor responder. Antes ela era zerada
+     antes do envio, e um bipe nesse meio abria uma embalagem nova escondida —
+     e a recusa do tempo apagava o desenho dela. */
+  if(emb && emb.enviando){ beep(false); return; }
+  if(emb && emb.trocando){ emb.foraErro='O bipe de <b>'+esc(code)+'</b> chegou durante a troca e <b>não valeu</b>: bipe de novo.'; mostrarFora(); beep(false); return; }
+  /* O BIPE DURANTE A CONFERENCIA DA FILA DIZ QUE NAO VALEU (③ REVISAO): com
+     rede lenta ele se perdia so com o bipe grave. */
+  if(conferindo){ bipePerdido=code; banner('err','Bipe não valeu','A tela ainda está conferindo a fila da Revisão. <b>Bipe de novo</b> em instantes.'); beep(false); return; }
   // Kit: compara so letras/numeros. O leitor + teclado ABNT2 embaralha os
   // simbolos do link do Drive (: -> Ç, / -> ;), mas o miolo alfanumerico e o
   // mesmo. Assim bate tanto bipando o QR quanto digitando a URL limpa.
@@ -106,21 +444,19 @@ function handle(code){
     /* Guarda O QUE FOI BIPADO para mandar no POST: desde 17/09/2026 o servidor
        confere o kit também (dívida 14). O "⚠ FALTOU O KIT" deixou de existir só
        aqui — quem chama a rota por fora esbarra na mesma trava. */
-    emb.kitOk=true; emb.kitCod=code; banner('kit','Kit confirmado ✓', (emb.peca||'')
+    /* o kit renova a reserva; com o aviso aberto, e a escolha de seguir (§4) */
+    renovar(emb, emb.foraDe); emb.foraDe=null; emb.kitOk=true; emb.kitCod=code; mostrarFora(); banner('kit','Kit confirmado ✓', (emb.peca||'')
       +'Cole a etiqueta de <b>'+emb.codigo+'</b> por fora e <b>bipe o SKU de novo</b> pra finalizar.'
       +'<div class="timer" id="tm">'+mmss(Date.now()-emb.inicio)+'</div>'+steps()); beep(true); return;
   }
   const info=SKUS.find(s=>s.codigo.toUpperCase()===code);
   if(info){
-    if(!emb){ emb={codigo:info.codigo,cor:info.cor||'',peca:pecaHtml(info),inicio:Date.now(),kitOk:false}; startTimer();
-      /* A CONFERENCIA DA PECA ACONTECE AQUI, e so aqui.
-         Depois de ensacada a persiana some dentro do saco preto e o unico jeito
-         de saber o que tem dentro passa a ser a etiqueta colada por fora. Este
-         e o ultimo momento em que alguem VE a peca — se a conferencia nao for
-         neste bipe, nao ha outro. */
-      banner('go','Embalando '+info.codigo, emb.peca
-        +'<div class="confira">Confira com a peça na bancada. Não bateu, <b>não embale</b>.</div>'
-        +'Prepare e depois <b>bipe o KIT</b>.<div class="timer" id="tm">00:00</div>'+steps()); beep(true); return; }
+    /* A PERSIANA SO EMBALA SE VEIO DA REVISAO (R-EMB-02, 21/11/2026). A tela
+       avisa ja no 1o bipe, para ninguem embalar a peca a toa; quem decide e o
+       servidor, no bipe final. */
+    if(!emb){ if(naoNaFila(info)) conferirRevisao(info); else iniciar(info); return; }
+    /* Com o aviso aberto, bipar a peca do dia troca (§4). */
+    if(emb.foraDe && !emb.kitOk && emb.codigo.toUpperCase()!==code && doDia(code)){ trocar(info); return; }
     if(emb.codigo.toUpperCase()===code){
       if(!emb.kitOk){ banner('err','⚠ FALTOU O KIT','Bipe o <b>kit</b> antes de finalizar '+emb.codigo+'.<div class="timer" id="tm">'+mmss(Date.now()-emb.inicio)+'</div>'+steps()); beep(false); return; }
       finish(); return;
@@ -132,29 +468,73 @@ function handle(code){
     : '<div style="font-size:12px;color:#8b97a5;margin-top:10px">Nenhum código de kit cadastrado — cadastre em <b>Admin → Cadastros</b>.</div>';
   banner('err','Código não reconhecido',code+' não é um SKU cadastrado nem o kit.'+dg); beep(false);
 }
+function rapidoDemais(cur, r){
+  var seg=(r&&typeof r.segundos==='number')?r.segundos:Math.round((Date.now()-cur.inicio)/1000);
+  var min=(r&&typeof r.minimo==='number')?r.minimo:45;
+  banner('err','Rápido demais ('+seg+' s, o mínimo é '+min+' s)', (cur.peca||'')
+    +'A embalagem <b>continua</b>, com o kit já conferido. Termine de embalar e <b>bipe o SKU de novo</b>.'
+    +'<div class="timer" id="tm">'+mmss(Date.now()-cur.inicio)+'</div>'+steps());
+  beep(false);
+}
 async function finish(){
-  const cur=emb; clearInterval(tick); tick=null; emb=null;
+  const cur=emb; if(!cur || cur.enviando) return;
+  bipePerdido=null;
+  cur.enviando=true; mostrarCancelar();
   const seg=Math.round((Date.now()-cur.inicio)/1000);
   try{
-    const r=await (await fetch('/api/montagem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo:cur.codigo,segundos:seg,kit_ok:cur.kitOk?1:0,kit_codigo:cur.kitCod||'',inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})})).json();
+    /* O ENVIO TEM LIMITE DE TEMPO (③ REVISAO r2): com a embalagem de pe
+       durante o envio, um pedido pendurado no Wi-Fi da bancada ignoraria todo
+       bipe sem explicar. Em 20 s ele desiste e cai no "Falha de conexao". */
+    const ctl=(typeof AbortController==='function')?new AbortController():null;
+    const prazo=ctl?setTimeout(()=>ctl.abort(),20000):null;
+    let resp, r;
+    try{ resp=await fetch('/api/montagem',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl?ctl.signal:undefined,body:JSON.stringify({codigo:cur.codigo,segundos:seg,kit_ok:cur.kitOk?1:0,kit_codigo:cur.kitCod||'',inicio:new Date(cur.inicio).toISOString(),fim:new Date().toISOString()})});
+         r=await resp.json(); }
+    finally{ if(prazo) clearTimeout(prazo); }
+    /* RAPIDO DEMAIS (EMBALAGEM-TEMPO-MINIMO, 21/11/2026): o servidor recusou
+       o bipe de fim abaixo do minimo (45 s). NADA foi gravado, e a MESMA
+       embalagem segue, com o kit ja conferido e o cronometro do mesmo inicio.
+       Quem decide e so o servidor: se a tela recusasse sozinha com um numero
+       dela, o dia em que o config baixasse o minimo a tela diria "continua"
+       de uma embalagem que o servidor gravou — e o segundo bipe somaria +2. */
+    if(r && r.motivo==='rapido_demais'){ cur.enviando=false; rapidoDemais(cur, r); return; }
+    clearInterval(tick); tick=null; emb=null;
     /* A RECUSA DO SERVIDOR APARECE NA BANCADA. Antes a resposta era ignorada:
        um 404 de SKU ou uma falha de gravação saíam como "Embalada ✓", e a peça
        ia pra caixa sem existir no sistema. */
-    if(r && r.erro){ banner('err','Não deu pra embalar', r.erro); beep(false); stats(); return; }
-    banner('ok','Embalada ✓ ('+fmt(seg)+')', cur.codigo+' · kit conferido · foi pro estoque.'); beep(true); stats();
-  }catch(e){ banner('err','Falha de conexão',String(e)); beep(false); }
+    /* SEM REVISAO (R-EMB-02, 21/11/2026): a peca saiu da fila entre o 1o bipe
+       e o final (outra bancada embalou a ultima, alguem tirou da fila). */
+    if(r && r.motivo==='sem_revisao'){ semRevisao(cur.codigo); stats(); carregarFila(); return; }
+    if(r && r.erro){ avisoFixo=true; banner('err','Não deu pra embalar', r.erro); beep(false); stats(); return; }
+    /* o resultado fica até o próximo bipe: o redesenho de 4 s o apagava em menos de 1 s */
+    /* a peca do dia destrava uma venda na Etiqueta de Venda (F4) */
+    const destrava=cur.dia?'<div style="font-size:15px;color:var(--green);font-weight:700;margin-top:6px">1 venda de hoje destravada — a Etiqueta de Venda já pode imprimir</div>':'';
+    avisoFixo=true; banner('ok','Embalada ✓ ('+fmt(seg)+')', cur.codigo+' · kit conferido · foi pro estoque.'+destrava, (window.tempoBancada?tempoBancada(r&&r.tempo):'')); beep(true); stats(); carregarFila();
+  }catch(e){
+    /* A RESPOSTA PODE SE PERDER DEPOIS DA GRAVACAO (§12, ③ REVISAO r3): aqui
+       rebipar soma +1 de novo. A frase diz isso, e o contador de hoje e
+       atualizado para a pessoa conferir antes de embalar outra vez. */
+    clearInterval(tick); tick=null; emb=null;
+    avisoFixo=true; banner('err','Falha de conexão', 'A embalagem de <b>'+cur.codigo+'</b> pode ter sido gravada: confira o contador de hoje antes de embalar de novo.'
+      +'<div style="font-size:12px;color:#8b97a5;margin-top:8px">'+String(e&&e.name==='AbortError'?'o servidor não respondeu em 20 s':e)+'</div>');
+    beep(false); stats();
+  }
 }
 const scan=$('#scan');
 /* preventScroll: devolver o foco nao pode arrastar a tela. O #scan mora no
    alto; sem isto, focar de volta rolava a pagina ate ele e jogava pro topo
    quem tivesse descido pra usar qualquer coisa no fim. O keep existe pro
    BIPE cair no lugar certo, nao pra mexer no que a pessoa esta olhando. */
-const keep=()=>{ if(document.activeElement!==scan) scan.focus({preventScroll:true}); };
+/* o painel da peca com defeito tem campo proprio: o foco nao volta ao bipe enquanto se escreve nele */
+const keep=()=>{ var a=document.activeElement; if(a && a.id==='defObs') return; if(a!==scan) scan.focus({preventScroll:true}); };
 scan.addEventListener('blur',()=>setTimeout(keep,50));
 document.addEventListener('click',e=>{ if(!e.target.closest('button,a,input')) keep(); });
 scan.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=scan.value.trim(); scan.value=''; handle(v); } });
 scan.focus();
 function beep(ok){ try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=ok?820:240;g.gain.value=.05;o.start();setTimeout(()=>{o.stop();a.close();},ok?100:220);}catch(e){} }
 load(); setInterval(()=>{ if(!emb) load(); },4000);
+/* A ETIQUETA DE SKU EM SERIE (PRODUCAO-MAPA-E-MOTOR v7, §14.2): o bipe da
+   etiqueta por fora da persiana nova vira o SKU dela antes do resto. */
+(function(){ var h0=handle; handle=async function(c){ return h0(window.codigoSerie ? await window.codigoSerie.sku(c) : c); }; })();
 </script><script src="/nav.js"></script>
 </body></html>

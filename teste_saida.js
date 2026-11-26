@@ -281,11 +281,36 @@ function montar(db, modulos){
   const xCarro = nb('X No Carro',  'agencia', dia(3)+' 08:00:00', dia(3), "conferido_em='"+dia(3)+" 09:00:00', no_carro_em='"+dia(3)+" 10:00:00'");
   const xTeste = nb('X Teste',     'coleta',  dia(3)+' 08:00:00', dia(3), 'teste=1');
   const xPend  = vol.run('BK140140BEGE','X Pendente','399','QP','WP','[]','pendente',dia(3),dia(3),pdf,'coleta').lastInsertRowid;
-  const fechadas = [nCol,nColAt,nTarde,nAg,nNull];
-  const fora = [xHoje,xFut,xConf,xCarro,xTeste,xPend];
+  /* A BAIXA DO PASSIVO (19/11/2026, spec LIMPEZA-SAIU-SEM-CONFERENCIA, R-PAS-02).
+     Desde 22/10/2026 a baixa é na conferência: a caixa impressa e nunca
+     conferida NUNCA baixou, e fechar a saída sem baixar deixava o saldo alto
+     para sempre. Agora o passivo dá a baixa — só na que nunca baixou. */
+  db.exec(`INSERT INTO modelo (id,codigo,nome,exige_medida,sob_medida) VALUES (2,'SOBMEDIDA','Sob medida',0,1);
+    INSERT INTO skus (codigo,estoque,modelo_id) VALUES ('SOBMEDIDA',0,2);
+    INSERT INTO skus (codigo,estoque,modelo_id,largura_cm,altura_cm) VALUES ('BK160140CINZA',1,1,160,140);`);
+  const nJaBaix = nb('NB JaBaixou', 'coleta',  dia(4)+' 08:10:00', dia(4));
+  db.prepare('UPDATE lote SET baixado_em=embalado_em WHERE id=?').run(nJaBaix);   // a de antes de 22/10
+  const nVarias = nb('NB Varias',   'coleta',  dia(4)+' 08:20:00', dia(4));
+  db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd) VALUES (?,'BK140140BEGE',1),(?,'BK160140CINZA',2)").run(nVarias, nVarias);
+  const nSob    = nb('NB SobMedida','coleta',  dia(4)+' 08:30:00', dia(4));
+  db.prepare("UPDATE lote SET codigo='SOBMEDIDA' WHERE id=?").run(nSob);
+  const xCanc   = nb('X Cancelada', 'coleta',  dia(3)+' 08:00:00', dia(3), "estagio='cancelado'");
+  /* A caixa de várias com um item cancelado pelo ML continua `embalado`, com
+     `cancelada_varias=1`, esperando uma pessoa no card (§3): não entra. */
+  const xCancV  = nb('X CancVarias','coleta',  dia(3)+' 08:00:00', dia(3), "cancelada_varias=1, cancelada_em='"+dia(2)+" 09:00:00'");
+  db.prepare("INSERT INTO lote_item (lote_id,codigo,qtd) VALUES (?,'BK140140BEGE',1),(?,'BK160140CINZA',1)").run(xCancV, xCancV);
+  const fechadas = [nCol,nColAt,nTarde,nAg,nNull,nJaBaix,nVarias,nSob];
+  const baixam   = [nCol,nColAt,nTarde,nAg,nNull,nVarias,nSob];   // a sob medida ganha a marca, sem mexer em saldo
+  const fora = [xHoje,xFut,xConf,xCarro,xTeste,xPend,xCanc,xCancV];
   const foraAntes = fora.map(foto);
   const modAntes2 = db.prepare('SELECT id,modalidade FROM lote ORDER BY id').all();
-  const estoqueAntes = db.prepare("SELECT estoque FROM skus WHERE codigo='BK140140BEGE'").get().estoque;
+  const BAIXA = require('./baixa_dominio');
+  const saldo = c => db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(c).estoque;
+  const SKUS = ['BK140140BEGE','BK160140CINZA','SOBMEDIDA'];
+  const saldoAntes = {}, livreAntes = {};
+  SKUS.forEach(c => { saldoAntes[c] = saldo(c); livreAntes[c] = BAIXA.disponivel(db, c); });
+  const movAntes = db.prepare('SELECT COALESCE(MAX(id),0) m FROM movimento_estoque').get().m;
+  const baixadoJa = l(nJaBaix).baixado_em;
   const saidasAntes = db.prepare('SELECT COUNT(*) n FROM saida').get().n;
 
   let erroAte = null;
@@ -298,18 +323,41 @@ function montar(db, modulos){
   erroAte = null;
   try{ fecharNaoBipadas(db, {aplicar:false, ate:dia(-1)}); }catch(e){ erroAte = e.message; }
   ok('corte no futuro é recusado: ninguém viu sair o que ainda nem foi impresso', !!erroAte, 'aceitou amanhã');
+  erroAte = null;
+  try{ fecharNaoBipadas(db, {aplicar:false, ate:dia(0)}); }catch(e){ erroAte = e.message; }
+  ok('corte HOJE é recusado: a caixa impressa hoje é trabalho da conferência (L2)',
+     !!erroAte && /ontem/.test(erroAte), erroAte || 'aceitou hoje');
 
   let sn = fecharNaoBipadas(db, {aplicar:false, ate:ATE});
   const achou = sn.caixas.map(c => c.id).sort((a,b)=>a-b);
-  ok('simulação acha exatamente as 5 nunca bipadas até o corte',
+  ok('simulação acha exatamente as ' + fechadas.length + ' nunca bipadas até o corte (a cancelada fica fora)',
      achou.join() === fechadas.slice().sort((a,b)=>a-b).join(), JSON.stringify(achou));
   ok('simulação não grava nada',
      !sn.saida_id && db.prepare('SELECT COUNT(*) n FROM saida').get().n === saidasAntes && l(nCol).estagio === 'embalado');
+  ok('simulação não baixa nada: nem saldo, nem baixado_em, nem linha no livro',
+     SKUS.every(c => saldo(c) === saldoAntes[c]) && !l(nCol).baixado_em &&
+     db.prepare('SELECT COALESCE(MAX(id),0) m FROM movimento_estoque').get().m === movAntes);
+  ok('simulação diz quais já tinham baixado e quais baixam agora',
+     sn.caixas.filter(c => c.ja_baixou).map(c => c.id).join() === String(nJaBaix) &&
+     sn.caixas.filter(c => !c.ja_baixou).length === fechadas.length - 1,
+     JSON.stringify(sn.caixas.map(c => [c.id, c.ja_baixou])));
+  const q = {}; (sn.quadro || []).forEach(x => { q[x.codigo] = x; });
+  ok('o quadro por SKU conta PEÇA: 1+1+1+1+1 da BEGE e 1 dela na caixa de várias = 6; 2 da CINZA',
+     q.BK140140BEGE && q.BK140140BEGE.pecas === 6 && q.BK160140CINZA && q.BK160140CINZA.pecas === 2,
+     JSON.stringify(sn.quadro));
+  ok('o quadro diz saldo antes, saldo depois e o livre (que não muda)',
+     q.BK140140BEGE && q.BK140140BEGE.saldo_antes === saldoAntes.BK140140BEGE &&
+     q.BK140140BEGE.saldo_depois === saldoAntes.BK140140BEGE - 6 &&
+     q.BK140140BEGE.livre === livreAntes.BK140140BEGE, JSON.stringify(q.BK140140BEGE));
+  ok('o quadro marca o SKU que fica negativo (L8)',
+     q.BK160140CINZA && q.BK160140CINZA.saldo_depois === -1 && q.BK160140CINZA.negativo === true,
+     JSON.stringify(q.BK160140CINZA));
+  ok('sob medida não entra no quadro: não baixa (§7)', !q.SOBMEDIDA, JSON.stringify(q.SOBMEDIDA));
 
   sn = fecharNaoBipadas(db, {aplicar:true, ate:ATE});
   const sdn = db.prepare('SELECT * FROM saida WHERE id=?').get(sn.saida_id);
-  ok('aplicar cria UMA saída passivo com as 5 caixas',
-     !!sdn && sdn.tipo === 'passivo' && sdn.qtd_sistema === 5 &&
+  ok('aplicar cria UMA saída passivo com as ' + fechadas.length + ' caixas',
+     !!sdn && sdn.tipo === 'passivo' && sdn.qtd_sistema === fechadas.length &&
      JSON.parse(sdn.ids).sort((a,b)=>a-b).join() === fechadas.slice().sort((a,b)=>a-b).join(),
      JSON.stringify(sdn));
   ok('cada caixa vira carregada e aponta para a saída',
@@ -341,16 +389,98 @@ function montar(db, modulos){
        AND despachar_em > date(${require('./carga').SAIDA()})`).get().n === 0);
   ok('não toca em quem fica: depois do corte, despacho futuro, conferida, no carro, teste, pendente',
      fora.map(foto).join() === foraAntes.join());
-  ok('não mexe em modalidade nem em estoque (a baixa foi na impressão)',
-     JSON.stringify(db.prepare('SELECT id,modalidade FROM lote ORDER BY id').all()) === JSON.stringify(modAntes2) &&
-     db.prepare("SELECT estoque FROM skus WHERE codigo='BK140140BEGE'").get().estoque === estoqueAntes);
+  ok('não mexe em modalidade',
+     JSON.stringify(db.prepare('SELECT id,modalidade FROM lote ORDER BY id').all()) === JSON.stringify(modAntes2));
+  const novos = db.prepare('SELECT * FROM movimento_estoque WHERE id>? ORDER BY id').all(movAntes);
+  const porRef = r => novos.filter(m => m.referencia === 'lote:' + r);
+  ok('a caixa nunca baixada BAIXA: −1 por persiana, uma linha no livro (L3)',
+     [nCol,nColAt,nTarde,nAg,nNull].every(i => porRef(i).length === 1 && porRef(i)[0].delta === -1 &&
+       porRef(i)[0].tipo === 'conferencia' && porRef(i)[0].codigo === 'BK140140BEGE'),
+     JSON.stringify(novos));
+  ok('a caixa de várias persianas baixa N, uma linha por SKU',
+     porRef(nVarias).length === 2 &&
+     porRef(nVarias).some(m => m.codigo === 'BK140140BEGE' && m.delta === -1) &&
+     porRef(nVarias).some(m => m.codigo === 'BK160140CINZA' && m.delta === -2), JSON.stringify(porRef(nVarias)));
+  ok('a que já tinha baixado NÃO baixa de novo, e o baixado_em dela não muda',
+     porRef(nJaBaix).length === 0 && l(nJaBaix).baixado_em === baixadoJa);
+  ok('sob medida não move saldo, mas fica marcada (senão esperaria baixa para sempre)',
+     porRef(nSob).length === 0 && !!l(nSob).baixado_em && saldo('SOBMEDIDA') === saldoAntes.SOBMEDIDA);
+  ok('baixado_em é o CARIMBO DE SAÍDA da caixa, nunca a hora da rodada (L4)',
+     baixam.every(i => l(i).baixado_em === l(i).carregado_em) &&
+     l(nCol).baixado_em === dia(7)+' 15:00:00', baixam.map(i => l(i).baixado_em).join(' | '));
+  ok('a linha do livro tem o motivo do passivo, e não fica sem dizer por quê',
+     novos.length > 0 && novos.every(m => /passivo|sem confer/i.test(m.motivo || '')),
+     JSON.stringify(novos.map(m => m.motivo)));
+  ok('o saldo anda exatamente o que o livro diz (SUM(delta) das linhas novas)',
+     SKUS.every(c => saldo(c) - saldoAntes[c] === novos.filter(m => m.codigo === c).reduce((a, m) => a + m.delta, 0)) &&
+     saldo('BK140140BEGE') === saldoAntes.BK140140BEGE - 6 && saldo('BK160140CINZA') === -1,
+     SKUS.map(c => c + ' ' + saldoAntes[c] + '→' + saldo(c)).join(', '));
+  ok('o LIVRE de cada SKU é o mesmo antes e depois: a peça já não estava na prateleira',
+     SKUS.every(c => BAIXA.disponivel(db, c) === livreAntes[c]),
+     SKUS.map(c => c + ' ' + livreAntes[c] + '→' + BAIXA.disponivel(db, c)).join(', '));
+  ok('a caixa de várias com item cancelado não baixa nem fecha: espera a pessoa no card (L6, §3)',
+     porRef(xCancV).length === 0 && l(xCancV).estagio === 'embalado' && !l(xCancV).saida_id && !l(xCancV).baixado_em);
+  ok('a cancelada não baixa nem fecha (L6)',
+     porRef(xCanc).length === 0 && l(xCanc).estagio === 'cancelado' && !l(xCanc).baixado_em);
   const sn2 = fecharNaoBipadas(db, {aplicar:true, ate:ATE});
+  ok('o resultado conta o que FECHOU e o que BAIXOU de fato, não a previsão',
+     sn.fechadas === fechadas.length && sn.baixadas === baixam.length && sn.pecas_baixadas === 8,
+     JSON.stringify({f:sn.fechadas, b:sn.baixadas, p:sn.pecas_baixadas}));
   ok('rodar de novo não acha nada e não cria outra saída',
      sn2.caixas.length === 0 && !sn2.saida_id &&
      db.prepare('SELECT COUNT(*) n FROM saida').get().n === saidasAntes + 1);
+  ok('e não baixa nada de novo',
+     db.prepare('SELECT COUNT(*) n FROM movimento_estoque WHERE id>?').get(movAntes).n === novos.length);
+  ok('o script não diz mais que a baixa foi na impressão',
+     !/baixa (foi|aconteceu) na impress/i.test(texto), 'ainda diz');
   ok('o script tem o modo --nao-bipadas, exige --ate e faz backup antes de gravar',
      /--nao-bipadas/.test(texto) && /--ate/.test(texto) &&
      texto.indexOf('await db.backup(') < texto.lastIndexOf('fecharNaoBipadas(db,{aplicar:true'));
+
+  /* SKU FORA DO CADASTRO: a simulação diz, e o aplicar recusa ANTES de gravar
+     qualquer coisa — o movimentar estouraria no meio e derrubaria a rodada. */
+  const xSemCad = nb('X SemCadastro', 'coleta', dia(3)+' 08:00:00', dia(3));
+  db.prepare("UPDATE lote SET codigo='ZZZ-SEM-CADASTRO' WHERE id=?").run(xSemCad);
+  const s3 = fecharNaoBipadas(db, {aplicar:false, ate:ATE});
+  const qz = (s3.quadro || []).find(x => x.codigo === 'ZZZ-SEM-CADASTRO');
+  ok('simulação: SKU fora do cadastro aparece como tal, e não com saldo 0',
+     !!qz && qz.sem_cadastro === true && qz.saldo_antes === null, JSON.stringify(qz));
+  let erroCad = null;
+  const saidas3 = db.prepare('SELECT COUNT(*) n FROM saida').get().n;
+  try{ fecharNaoBipadas(db, {aplicar:true, ate:ATE}); }catch(e){ erroCad = e.message; }
+  ok('aplicar com SKU fora do cadastro é recusado dizendo qual, e nada grava',
+     !!erroCad && /ZZZ-SEM-CADASTRO/.test(erroCad) && /cadastre/.test(erroCad) && l(xSemCad).estagio === 'embalado' &&
+     db.prepare('SELECT COUNT(*) n FROM saida').get().n === saidas3, erroCad || 'não recusou');
+  db.prepare("UPDATE lote SET estagio='cancelado' WHERE id=?").run(xSemCad);
+
+  /* A CAIXA CONFERIDA ENTRE A LEITURA E A GRAVAÇÃO: não fecha, não baixa, não
+     entra nos ids da saída e não é contada no resultado. */
+  const xCorrida = nb('X Corrida', 'coleta', dia(3)+' 08:00:00', dia(3));
+  const nOk      = nb('NB Ok',     'coleta', dia(3)+' 08:10:00', dia(3));
+  const resOrig = BAIXA.reservados;
+  BAIXA.reservados = function(){ db.prepare("UPDATE lote SET conferido_em=datetime('now','localtime') WHERE id=?").run(xCorrida);
+    return resOrig.apply(this, arguments); };
+  let s4;
+  try{ s4 = fecharNaoBipadas(db, {aplicar:true, ate:ATE}); } finally { BAIXA.reservados = resOrig; }
+  const sd4 = db.prepare('SELECT * FROM saida WHERE id=?').get(s4.saida_id);
+  ok('a caixa conferida no meio não fecha nem baixa, e fica fora da saída e da conta',
+     l(xCorrida).estagio === 'embalado' && !l(xCorrida).baixado_em && l(nOk).estagio === 'carregado' &&
+     s4.fechadas === 1 && s4.baixadas === 1 && s4.pecas_baixadas === 1 &&
+     sd4.qtd_sistema === 1 && JSON.parse(sd4.ids).join() === String(nOk),
+     JSON.stringify({f:s4.fechadas, b:s4.baixadas, p:s4.pecas_baixadas, sd:sd4 && [sd4.qtd_sistema, sd4.ids]}));
+
+  /* TODAS CONFERIDAS NO MEIO: a saída passivo não nasce vazia. */
+  const xSo = nb('X SoEla', 'coleta', dia(3)+' 08:00:00', dia(3));
+  const saidas5 = db.prepare('SELECT COUNT(*) n FROM saida').get().n;
+  BAIXA.reservados = function(){ db.prepare("UPDATE lote SET conferido_em=datetime('now','localtime') WHERE id=?").run(xSo);
+    return resOrig.apply(this, arguments); };
+  let s5;
+  try{ s5 = fecharNaoBipadas(db, {aplicar:true, ate:ATE}); } finally { BAIXA.reservados = resOrig; }
+  ok('se nenhuma caixa fechou, não fica saída passivo vazia',
+     !s5.saida_id && s5.fechadas === 0 && db.prepare('SELECT COUNT(*) n FROM saida').get().n === saidas5,
+     JSON.stringify({id:s5.saida_id, f:s5.fechadas}));
+  ok('o aviso separa a caixa de várias que espera decisão no card da que já foi decidida',
+     /cancelada_resolvida_em IS NULL/.test(texto) && /cancelada_resolvida_em IS NOT NULL/.test(texto));
 
   // ── 6. O MODO TESTE COBRE A REIMPRESSÃO (fase 3 da QUEM-FEZ-E-REVISAO) ────
   require('./teste_route')({ get(){}, post(){}, locals:{} }, db);

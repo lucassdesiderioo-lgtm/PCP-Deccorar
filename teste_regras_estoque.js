@@ -81,6 +81,10 @@ async function entrar(nome, id, pin){
   const db = new Database(path.join(tmp, 'dados.db'));
   db.pragma('busy_timeout = 5000');
   const ESTOQUE = require('./estoque_dominio');
+  /* Desde 21/11/2026 a persiana so embala vindo da revisao (R-EMB-02): a
+     peca entra na fila antes de cada embalagem. */
+  const naFila = c => db.prepare("INSERT INTO fila (codigo,modo,teste) VALUES (?,'estoque',?)")
+    .run(c, (db.prepare("SELECT valor FROM config WHERE chave='modo_teste'").get()||{}).valor==='1' ? 1 : 0);
 
   /* ── a fábrica de mentira: pessoas, setores, SKUs, saldo pelo livro ── */
   const setor = nome => db.prepare('SELECT id FROM setores WHERE nome=?').get(nome).id;
@@ -234,7 +238,7 @@ async function entrar(nome, id, pin){
   console.log('\n── 5. embalagem e etiqueta ENTRE A e B não geram furo falso ──');
   const ve = caixa([[SK.E, 1]]);
   await contar('Ana', SK.E, 3); await terminar('Ana', SK.E);
-  const m5 = await post('Fabi', '/api/montagem', { codigo:SK.E, kit_ok:1 });
+  naFila(SK.E); const m5 = await post('Fabi', '/api/montagem', { codigo:SK.E, kit_ok:1, segundos:60 });
   ok('embalar no meio funciona (+1)', m5.ok, JSON.stringify(m5));
   const tAtiva = await tarja('Bia');
   const e5 = await post('Edu', '/api/embalar', { id: ve.id });
@@ -244,7 +248,7 @@ async function entrar(nome, id, pin){
 
   console.log('\n── 6. embalagem ou etiqueta DURANTE a contagem: conta de novo ──');
   await contar('Ana', SK.F, 2);
-  await post('Fabi', '/api/montagem', { codigo:SK.F, kit_ok:1 });
+  naFila(SK.F); await post('Fabi', '/api/montagem', { codigo:SK.F, kit_ok:1, segundos:60 });
   const r6 = await terminar('Ana', SK.F);
   ok('a embalagem no meio invalida a contagem: 409, "conte de novo"', r6.__st === 409 && r6.invalidada && /conte de novo/.test(r6.erro), JSON.stringify(r6));
   eq('não virou divergência nem 2ª contagem', [item(SK.F).status, item(SK.F).contado1], ['a_contar', null]);
@@ -291,14 +295,14 @@ async function entrar(nome, id, pin){
   ok('(a peça a peça respondeu)', pc.ok !== false, JSON.stringify(pc));
   const vsm = caixa([['SOBMEDTESTE', 1]]);
   const movSm = () => db.prepare("SELECT COUNT(*) n FROM movimento_estoque WHERE codigo='SOBMEDTESTE'").get().n;
-  await post('Fabi', '/api/montagem', { codigo:'SOBMEDTESTE', kit_ok:1 });
+  naFila('SOBMEDTESTE'); await post('Fabi', '/api/montagem', { codigo:'SOBMEDTESTE', kit_ok:1, segundos:60 });
   await post('Edu', '/api/embalar', { id: vsm.id });
   await post('Gil', '/api/carregar', { code: vsm.pack, sku:'SOBMEDTESTE' });
   eq('sob medida não gera movimento (embalar, imprimir, conferir)', movSm(), 0);
   const sK = saldo(SK.K);
   ok('LIGAR o modo teste e recusado (410): ele foi aposentado', (await post('Lucas', '/api/teste/ligar')).__st === 410);
   require('./util_modo_teste_antigo')(db);   // simula o banco que chegou LIGADO ao deploy
-  await post('Fabi', '/api/montagem', { codigo:SK.K, kit_ok:1 });
+  naFila(SK.K); await post('Fabi', '/api/montagem', { codigo:SK.K, kit_ok:1, segundos:60 });
   eq('(em modo teste a embalagem soma)', saldo(SK.K), sK + 1);
   const ap = await post('Lucas', '/api/teste/limpar', { confirmar:true });
   eq('modo teste "apagar" restaura o saldo', saldo(SK.K), sK);

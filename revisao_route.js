@@ -67,7 +67,6 @@ const emTeste = db => {
   try{ const r = db.prepare("SELECT valor FROM config WHERE chave='modo_teste'").get(); return r && r.valor === '1' ? 1 : 0; }
   catch(e){ return 0; }
 };
-const modoDe = b => (b && b.modo) === 'estoque' ? 'estoque' : 'hoje';
 const texto = v => v == null || v === '' ? null : String(v).slice(0, 40);
 
 function evento(db, tipo, q, d){
@@ -94,16 +93,38 @@ function candidata(db, usuarioId){
   if(!r) return null;
   const jaDesfez = db.prepare(`SELECT 1 FROM revisao_evento WHERE tipo='desfeita' AND usuario_id=? AND revisao_id>?`).get(usuarioId, r.id);
   if(jaDesfez) return null;
+  /* A revisão mais nova desta pessoa voltou da embalagem por defeito e foi
+     apagada (22/11/2026): a de antes NÃO vira a "última" — seria a pilha de
+     desfazer por outra porta. */
+  try{
+    const dev = db.prepare(`SELECT 1 FROM embalagem_defeito WHERE revisado_por_id=? AND revisao_id>?`).get(usuarioId, r.id);
+    if(dev) return null;
+  }catch(e){}
   return r;
+}
+/* A ÚLTIMA coisa desta pessoa hoje foi ter a revisão apagada por defeito? Só
+   então o desfazer diz "voltou por defeito": a revisão dela de depois, ou um
+   desfazer de depois, já é outra história (③ REVISÃO). */
+function devolvidaHoje(db, usuarioId){
+  try{
+    const dev = db.prepare(`SELECT MAX(revisao_id) m FROM embalagem_defeito WHERE revisado_por_id=?
+      AND date(achou_em)=date('now','localtime')`).get(usuarioId).m;
+    if(dev == null) return false;
+    const rev = db.prepare(`SELECT MAX(id) m FROM revisao WHERE usuario_id=? AND data=date('now','localtime')`).get(usuarioId).m;
+    const desf = db.prepare(`SELECT MAX(revisao_id) m FROM revisao_evento WHERE tipo='desfeita' AND usuario_id=?`).get(usuarioId).m;
+    return dev > (rev || 0) && dev > (desf || 0);
+  }catch(e){ return false; }
 }
 function situacaoFila(db, revisaoId){
   const f = db.prepare('SELECT id, situacao FROM fila WHERE revisao_id=? ORDER BY id LIMIT 1').get(revisaoId);
   if(!f) return { fila:null, motivo:'fora_da_fila' };
+  if(f.situacao === 'defeito') return { fila:f, motivo:'defeito' };
   if(f.situacao !== 'aguardando') return { fila:f, motivo:'embalada' };
   return { fila:f, motivo:null };
 }
 const MSG = {
   embalada:       'Essa peça já foi embalada — a revisão não se desfaz mais pela bancada.',
+  defeito:        'Essa peça voltou da embalagem por defeito — confira no bloco "Voltaram da embalagem".',
   fora_da_fila:   'Essa peça já saiu da fila da embalagem — a revisão não se desfaz mais pela bancada.',
   nao_e_sua:      'Essa revisão é de outra pessoa. Cada um desfaz só a própria.',
   outro_dia:      'Só se desfaz a revisão de hoje.',
@@ -112,7 +133,12 @@ const MSG = {
   nada:           'Não há revisão para desfazer agora.'
 };
 
+const TEMPO = require('./tempo_operador');
+const DEFEITO = require('./defeito_dominio');
 const QUEM = require('./quem');
+const LISTA = require('./revisao_lista');
+const MONTP=require('./montagem_persiana');
+const ETQP=require('./etiqueta_producao');
 module.exports=function(app,db){
   /* SEM LOGIN NADA GRAVA (QUEM-FEZ-E-REVISAO fase 7, 05/11/2026): toda escrita
      registrada neste modulo passa pelo quem.js antes do handler — a de amanha
@@ -125,9 +151,25 @@ module.exports=function(app,db){
     const q=exigir(req,res); if(!q) return;
     const {codigo,segundos=0,inicio=null,fim=null}=req.body||{};
     if(!codigo) return res.status(400).json({erro:'codigo'});
-    const cod=String(codigo).trim().toUpperCase();
+    /* A ETIQUETA DE SKU EM SERIE (PRODUCAO-MAPA-E-MOTOR v7, §14.5): a peca
+       que veio da montagem (107) se revisa pela etiqueta dela, e a revisao
+       fica ligada a persiana. A peca antiga, pelo SKU, como sempre (§14.7). */
+    let pers=null, cod=String(codigo).trim().toUpperCase();
+    try{ pers=MONTP.paraRevisar(db,cod); }
+    catch(e){ if(e instanceof MONTP.Recusa) return res.status(e.status).json({erro:e.message,motivo:'persiana'}); throw e; }
+    if(pers) cod=pers.etiqueta.sku;
+    else if(ETQP.traduzir(db,cod) && !db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(cod)){
+      /* o SKU antigo com a forma de etiqueta continua revisando pelo SKU (③) */
+      const t=ETQP.traduzir(db,cod);
+      return res.status(409).json({erro:t.desconhecida?'Etiqueta não reconhecida: '+cod+'.':'Esta etiqueta é de '+(t.tipo==='TC'?'tecido':'tubo')+': bipe a etiqueta de SKU da persiana.',motivo:'persiana'});
+    }
     if(!db.prepare('SELECT 1 FROM skus WHERE codigo=?').get(cod)) return res.status(404).json({erro:'SKU não cadastrado: '+cod});
-    const seg=Math.round(+segundos||0), modo=modoDe(req.body);
+    /* TELA ÚNICA (REVISAO-TELA-UNICA, 23/11/2026): quem decide para que a peça
+       serve é o servidor, no bipe que fecha — 'hoje' se ela cobre uma venda
+       de hoje sem peça (o a_produzir do ordem_dia), 'estoque' nos outros
+       casos. O `modo` que a tela antiga manda é ignorado: o tablet com a
+       página velha em cache segue a mesma regra. */
+    const seg=Math.round(+segundos||0), modo=LISTA.modoPara(db,cod);
     /* A BARREIRA vale aqui tambem, e nao so na tela: o tablet com a tela
        velha nao pode furar a regra. A revisao continua aberta na tela; o
        operador termina e bipa de novo. */
@@ -137,14 +179,19 @@ module.exports=function(app,db){
       return res.status(409).json({erro:'Rápido demais ('+seg+' s) — a revisão continua. Termine de revisar e bipe de novo.',
         motivo:'rapido_demais',minimo:min,segundos:seg});
     }
+    let novo=null;
     db.transaction(()=>{
       const id=db.prepare('INSERT INTO revisao (codigo,inicio,fim,segundos,usuario_id,usuario_nome,modo) VALUES (?,?,?,?,?,?,?)')
         .run(cod,inicio,fim,seg,q.usuario_id,q.usuario_nome,modo).lastInsertRowid;
       db.prepare('INSERT INTO fila (codigo,modo,revisao_id) VALUES (?,?,?)').run(cod,modo,id);
+      if(pers) MONTP.revisada(db,pers.persiana.id,id,pers.troca);
+      novo=id;
     })();
     const est=db.prepare('SELECT estoque FROM skus WHERE codigo=?').get(cod);
     const prog=db.prepare(`SELECT COALESCE(SUM(qtd),0) pedido, COALESCE(SUM(produzido),0) feito FROM producao WHERE codigo=? AND data=date('now','localtime')`).get(cod);
-    res.json({ok:true,codigo:cod,estoque:est?est.estoque:null,pedido:prog.pedido,feito:prog.feito});
+    /* TEMPO-NA-BANCADA (R-TEM-01): o tempo desta peça ao lado da mediana de quem a fez. */
+    const tempo=TEMPO.seguro(db,'revisao',q.usuario_id,cod,seg,novo);
+    res.json({ok:true,codigo:cod,modo,estoque:est?est.estoque:null,pedido:prog.pedido,feito:prog.feito,tempo});
   });
 
   /* Zera a revisao em andamento. Ela so existe na tela (o cronometro), entao
@@ -152,9 +199,10 @@ module.exports=function(app,db){
   app.post('/api/revisao/cancelar',(req,res)=>{
     const q=exigir(req,res); if(!q) return;
     const b=req.body||{};
-    const cod=String(b.codigo||'').trim().toUpperCase();
+    let cod=String(b.codigo||'').trim().toUpperCase();
     if(!cod) return res.status(400).json({erro:'codigo'});
-    evento(db,'cancelada',q,{codigo:cod,segundos:Math.round(+b.segundos||0),modo:modoDe(b),inicio:b.inicio,fim:b.fim});
+    { const t=ETQP.skuDoBipe(db,cod); if(t.etiqueta && t.sku) cod=t.sku; }
+    evento(db,'cancelada',q,{codigo:cod,segundos:Math.round(+b.segundos||0),modo:LISTA.modoPara(db,cod),inicio:b.inicio,fim:b.fim});
     res.json({ok:true});
   });
 
@@ -169,6 +217,10 @@ module.exports=function(app,db){
       const s=situacaoFila(db,c.id);
       desfazer={revisao_id:c.id,codigo:c.codigo,segundos:c.segundos,modo:c.modo,ha_seg:Math.max(0,c.ha_seg||0),
         pode:!s.motivo,motivo:s.motivo,erro:s.motivo?MSG[s.motivo]:null};
+    } else if(devolvidaHoje(db,q.usuario_id)){
+      /* a última revisão voltou da embalagem por defeito e foi apagada: a tela
+         diz o porquê em vez de o botão sumir calado */
+      desfazer={pode:false,motivo:'defeito',erro:MSG.defeito};
     }
     res.json({minimo_seg:minimoSeg(db),desfazer});
   });
@@ -188,7 +240,7 @@ module.exports=function(app,db){
       if(!c||c.id!==alvo.id) return recusa(409,'nao_e_a_ultima');
     } else {
       const c=candidata(db,q.usuario_id);
-      if(!c) return recusa(409,'nada');
+      if(!c) return recusa(409,devolvidaHoje(db,q.usuario_id)?'defeito':'nada');
       alvo=db.prepare('SELECT * FROM revisao WHERE id=?').get(c.id);
     }
     /* Numa transacao so: a copia, a revisao e a fila. Se a linha da fila nao
@@ -201,6 +253,7 @@ module.exports=function(app,db){
         if(s.motivo){ motivo=s.motivo; throw new Error(s.motivo); }
         evento(db,'desfeita',q,{revisao_id:alvo.id,codigo:alvo.codigo,segundos:alvo.segundos,modo:alvo.modo,inicio:alvo.inicio,fim:alvo.fim});
         db.prepare('DELETE FROM revisao WHERE id=?').run(alvo.id);
+        MONTP.revisaoApagada(db,alvo.id);   // a persiana em serie volta ao carrinho (§14.5)
         const del=db.prepare("DELETE FROM fila WHERE id=? AND situacao='aguardando'").run(s.fila.id);
         if(del.changes!==1){ motivo='embalada'; throw new Error('embalada'); }
       })();
@@ -214,7 +267,43 @@ module.exports=function(app,db){
 
   /* Saiu do server.js em 04/11/2026 sem mudar o SQL, para o teste alcancar:
      depois do desfazer, este numero tem que voltar ao de antes. */
+  /* AS PECAS QUE VOLTARAM DA EMBALAGEM POR DEFEITO (EMBALAGEM-DEFEITO-VOLTA,
+     R-EMB-11, 21/11/2026). O revisor confere: com defeito vai ao setor (vira a
+     peca com problema); sem defeito, a volta fecha e a peca e revisada de novo. */
+  DEFEITO.garantir(db);
+  /* A LISTA DA TELA ÚNICA: Hoje · Próximos dias · Completar o alvo, e a
+     semana só para ler. Leitura: cai no pre('/api/revisao') do permDaRota,
+     como o /dia (revisao.executar ou o admin). */
+  app.get('/api/revisao/lista',(req,res)=>{
+    /* A lista que não montou diz que não montou (a tela avisa), e não sai
+       com número faltando (③ REVISÃO). */
+    let l;
+    try{ l=LISTA.montar(db); }
+    catch(e){ console.error('[revisao] lista:', e); return res.status(500).json({erro:'Não deu para montar a lista da revisão. Tente de novo em instantes.'}); }
+    /* Quantas a PESSOA revisou hoje e a média dela (o topo da tela). Quem é vem
+       do login; sem id, nada. */
+    const uid=QUEM.idDe(req);
+    l.minhas = uid==null ? { qtd:0, media_seg:null } : db.prepare(`SELECT COUNT(*) qtd, ROUND(AVG(segundos)) media_seg
+      FROM revisao WHERE usuario_id=? AND data=date('now','localtime')`).get(uid);
+    res.json(l);
+  });
+  app.get('/api/revisao/semana',(req,res)=>{
+    try{ res.json(LISTA.semana(db)); }
+    catch(e){ console.error('[revisao] semana:', e); res.status(500).json({erro:'Não deu para montar a semana. Tente de novo em instantes.'}); }
+  });
+  app.get('/api/revisao/defeitos',(req,res)=> res.json({ abertas:DEFEITO.abertas(db), setores:DEFEITO.SETORES }));
+  app.post('/api/revisao/defeitos/:id/decidir',(req,res)=>{
+    const q=exigir(req,res); if(!q) return;
+    try{ res.json(Object.assign({ok:true}, db.transaction(()=>DEFEITO.decidir(db,req.params.id,req.body||{},q))())); }
+    catch(e){
+      if(e instanceof DEFEITO.Recusa) return res.status(e.status).json(Object.assign({erro:e.message},e.extra));
+      console.error('[revisao] decidir a volta por defeito falhou:', e);
+      res.status(500).json({erro:'Não deu para gravar a decisão: '+e.message+' — nada foi gravado.'});
+    }
+  });
   app.get('/api/revisao/hoje',(req,res)=> res.json(db.prepare(`SELECT codigo, COUNT(*) qtd, ROUND(AVG(segundos)) tmedio
   FROM revisao WHERE data=date('now','localtime') GROUP BY codigo ORDER BY qtd DESC`).all()));
 };
 module.exports.garantirSchema=garantirSchema;
+module.exports.minimoSeg=minimoSeg;
+module.exports.MINIMO_PADRAO=MINIMO_PADRAO;

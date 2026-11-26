@@ -45,7 +45,7 @@ const codigo = fs.readdirSync(__dirname).filter(f => /\.js$/.test(f) && !/^teste
 /* as rotas do sob medida moram em tecido/rotas, sem o prefixo /sobmedida */
 const codigoSm = fs.readdirSync(path.join(__dirname, 'tecido', 'rotas')).filter(f => /\.js$/.test(f))
   .map(f => fs.readFileSync(path.join(__dirname, 'tecido', 'rotas', f), 'utf8')).join('\n');
-const AMOSTRA = { '/api/lote/upload':1, '/api/carregamento/sobra':1, '/api/estoque/ajuste':1, '/api/inventario/terminar':1,
+const AMOSTRA = { '/api/lote/upload':1, '/api/carregamento/sobra':1, '/api/carrinho/nao-achou':1, '/api/etiqueta/trava/nao-encontrada':1, '/api/reimprimir':1, '/api/estoque/ajuste':1, '/api/inventario/terminar':1,
   '/api/inventario/geral/terminar-prateleira':1, '/api/inventario/rejeitar':1, '/api/skus':1, '/api/pedidos/:id/comprar':1,
   '/api/compras/rapida':1, '/api/recebimento':1, '/api/pedidos/:id/fechar':1, '/api/contagem-material/:id/terminar':1,
   '/api/componentes':1, '/sobmedida/api/boletos/:id/baixa':1, '/sobmedida/api/sobras/:id/descartar':1,

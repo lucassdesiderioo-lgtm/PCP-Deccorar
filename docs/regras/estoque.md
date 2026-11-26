@@ -39,15 +39,15 @@
 - **Regra:** o fim da embalagem soma +1 por um movimento `embalagem` no livro. As quatro escritas (`montagem`, `fila`, `skus`, `producao`) entram juntas ou nenhuma entra.
 - **Por quê:** é o primeiro momento em que a persiana está pronta e ensacada. Escrita pela metade deixava a peça na prateleira e em lugar nenhum do sistema.
 - **Exceções:** sob medida (R-EST-05).
-- **Teste que trava:** `teste_montagem.js` (64) · `teste_livro.js` (65).
+- **Teste que trava:** `teste_montagem.js` (158) · `teste_livro.js` (65).
 - **Status:** no ar desde 17/09/2026.
 - **História:** armadilha #26.
 
 ### R-EST-03 · A etiqueta de venda RESERVA; a conferência baixa uma por PEÇA
-- **Regra:** imprimir a etiqueta de venda **não mexe no saldo**: a caixa fica `embalado` sem `baixado_em` e **reserva** as persianas dela. A baixa (−1 de cada persiana, uma linha `conferencia` por SKU, referência `lote:<id>`) acontece **uma vez só**, quando a caixa é conferida — no bipe da área ou do canto (`carreg_route.js`), ou, se ela saiu sem ninguém conferir, no "foi no caminhão" do fechamento da saída (`saida_route.js`). `baixa_dominio.js` é o dono único da baixa, da reserva e do **livre** (saldo − reservado). Sem peça **livre**, não imprime.
+- **Regra:** imprimir a etiqueta de venda **não mexe no saldo**: a caixa fica `embalado` sem `baixado_em` e **reserva** as persianas dela. A baixa (−1 de cada persiana, uma linha `conferencia` por SKU, referência `lote:<id>`) acontece **uma vez só**, quando a caixa é conferida — no bipe da área ou do canto (`carreg_route.js`), ou, se ela saiu sem ninguém conferir, no "foi no caminhão" do fechamento da saída (`saida_route.js`) — ou, desde 19/11/2026, no passivo das caixas que saíram sem conferência (`fechar_saida_passivo.js --nao-bipadas`, R-PAS-02, com `baixado_em` no carimbo de saída). `baixa_dominio.js` é o dono único da baixa, da reserva e do **livre** (saldo − reservado). Sem peça **livre**, não imprime.
 - **Por quê:** decisão do dono (22/10/2026, spec `CONFERENCIA-E-BAIXA`, D1): a venda cancelada entre a impressão e o caminhão deixava o saldo baixo até alguém lembrar de devolver. Baixar uma numa caixa de três continua deixando duas peças fora do sistema — a conta segue por PEÇA (#23).
 - **Exceções:** sob medida (R-EST-05): não reserva e não baixa, mas a caixa fica marcada como baixada. As caixas impressas **antes** de 22/10/2026 baixaram na impressão: a **virada** (`config.virada_baixa_conferencia`, uma vez só) deu a elas `baixado_em = embalado_em`, e a conferência não baixa de novo. A caixa que **sobrou** (R-REC-01) volta +1 por peça pelo mesmo dono (`baixa_dominio.devolver`, movimento `sobra`), e só se já tinha baixado.
-- **Teste que trava:** `teste_baixa_conferencia.js` (69) · `teste_etiqueta.js` (84) · `teste_livro.js` (65).
+- **Teste que trava:** `teste_baixa_conferencia.js` (69) · `teste_etiqueta.js` (86) · `teste_livro.js` (65).
 - **Status:** no ar desde 22/10/2026 (fase 2-A, PR #218) · ✅ a primeira caixa conferida baixou o estoque no mesmo dia (relato do dono) · antes disso a etiqueta baixava.
 - **História:** CLAUDE.md §2 e §5, armadilha #23 · spec `CONFERENCIA-E-BAIXA`.
 
@@ -115,24 +115,24 @@
 
 ## A revisão
 
-### R-REV-01 · A tela de revisão tem três modos, e a cor é a trava
-- **Regra:** `/operador` abre exigindo a escolha: **vermelho** (pedidos de hoje), **azul** (produção pra estoque), **âmbar** (devoluções). O modo fica salvo por aparelho (`rev_modo`) e o botão "Trocar" força escolher de novo.
-- **Por quê:** a cor impede revisar meia hora no modo errado. Ela espelha os carrinhos físicos separados na produção.
-- **Exceções:** nenhuma.
-- **Teste que trava:** ⚠ **sem teste**.
-- **Status:** no ar.
+### R-REV-01 · A revisão é uma tela só, e quem decide para que a peça serve é o servidor
+- **Regra:** desde 23/11/2026 (spec `REVISAO-TELA-UNICA`) `/operador` abre direto no bipe, sem escolher cor. A lista tem três partes, cada uma com título: **Hoje** (as vendas da Etiqueta de Venda sem peça — o `a_produzir` do `ordem_dia.js`), **Próximos dias** (a falta por dia do `demanda_dominio.porDia`, de amanhã até sexta; na sexta e no sábado, só a segunda) e **Completar o alvo** (o `precisa` menos a falta até o fim da janela). `revisao_lista.js` é o dono da lista e não tem conta de quantidade própria. No bipe que fecha, o servidor grava `modo='hoje'` se a peça cobre uma venda de hoje sem peça, e `'estoque'` nos outros casos — o `modo` que a tela manda é ignorado. Enquanto o dia não termina, Hoje fica em destaque; terminado, faixa verde e os próximos dias no destaque. As devoluções continuam na 251, pelo "↩ Devoluções", que volta pelo "← Voltar para a Revisão".
+- **Por quê:** o dono, 23/11/2026: *"quero questionar se precisamos ter a tela azul e vermelha"*. O carrinho é um só, com o lugar de cada SKU, e a cor espelhava carrinhos separados que não existem. A decisão do modo no servidor tira do revisor uma escolha que ele podia errar.
+- **Exceções:** a peça revisada e ainda não embalada (fila `aguardando` de qualquer modo — estoque, devolução e a de `hoje` de dias anteriores; a de `hoje` revisada hoje já saiu de Hoje) sai **primeiro de Hoje** (decisão do dono, 24/11/2026: com 29 vendas paradas e 9 peças na embalagem, Hoje pede 20), depois dos próximos dias e depois do alvo; o cartão diz quantas *"já estão na embalagem"*, e a peça revisada com o Hoje do SKU já coberto vai como reposição (o `modoPara` usa a mesma conta). A venda do PDF de hoje é ligada à planilha pela venda ou pelo pack, com os filtros da 401, e sai do dia dela na planilha (a mesma venda não conta duas vezes); o alvo é a mesma conta acumulada até o fim, contra o mesmo livre. A venda de hoje da planilha que ainda não está na 201 não aparece em Hoje: aparece quando o PDF sobe.
+- **Teste que trava:** `teste_revisao_tela_unica.js` (66: a janela, as três partes somando o `precisa` da 401, a mesma venda que não conta duas vezes, o modo decidido no servidor, toda peça na fila descontada, o dia terminado, a lista que falha dizendo) · `teste_revisao_tela_unica_tela.js` (37, num Chromium) · `teste_revisao.js` (seção 2).
+- **Status:** construída em 23/11/2026, falta subir. Até ali: três modos escolhidos pela cor (vermelho, azul, âmbar), o modo gravado era o da cor.
 
-### R-REV-02 · SKU fora da lista no modo vermelho: avisa e deixa passar
-- **Regra:** bipar no vermelho um SKU que não está nos pedidos do dia mostra aviso **no início** da revisão, deixa revisar, e a peça conta como estoque. Nunca bloqueia.
+### R-REV-02 · SKU que não falta em lugar nenhum: avisa e deixa passar
+- **Regra:** bipar um SKU que não está em Hoje, nem nos Próximos dias, nem no alvo mostra no início da revisão *"Não falta em lugar nenhum: vai contar como estoque acima do alvo"*, deixa revisar, e a peça conta como estoque. Nunca bloqueia (o dono, 23/11/2026). Durante a revisão, a tela diz para onde a peça vai (*"Vai para: venda de hoje"*, *"… venda de amanhã"*, *"… completar o alvo"*), e ao fechar diz para onde foi.
 - **Por quê:** operador parado esperando alguém resolver custa mais que um número classificado de outro jeito.
 - **Exceções:** nenhuma.
-- **Teste que trava:** ⚠ **sem teste**.
-- **Status:** no ar.
+- **Teste que trava:** `teste_revisao_tela_unica_tela.js` (o "Vai para") · ⚠ o aviso do SKU que não falta só na tela, sem caso próprio.
+- **Status:** no ar (até 23/11/2026 valia só no modo vermelho, para o SKU fora dos pedidos de hoje).
 
 ### R-REV-03 · A tela azul é ordenada por prioridade, e cada linha diz por quê
 - **Regra:** com `config.ordem_por_falta = 0` (o padrão), quatro degraus, nesta ordem: 1) cliente com prazo até amanhã (a venda **atrasada** conta aqui), 2) sem estoque, 3) cobertura abaixo de metade dos dias de cobertura, 4) abaixo do alvo. **Com a chave ligada (fase 4 da `PLANEJAMENTO-VENDAS-FUTURAS`, 07/11/2026), a ordem é pela data em que a peça vai faltar**: a data mais cedo primeiro; no mesmo dia, venda feita antes de reposição; no mesmo dia e tipo, mais peças faltando primeiro. Venda feita: o primeiro dia de envio que o livre não cobre (a conta da aba por dia). Reposição: `hoje + (livre − comprometido) ÷ ritmo` (pelo livre desde 09/11/2026, R-PLN-06). O degrau 2 "sem estoque" e a cobertura também contam pelo livre. Cada linha traz o `motivo` — *"faltam 3 para ter 10/11 (vendidas)"* ou *"acaba qua 12/11 pelo ritmo (3,5/dia)"*. Sem venda na janela, a cobertura e a data são vazias, nunca zero.
 - **Por quê:** ordenar pelo que falta põe em cima o SKU que mais gira, que quase nunca é o que acaba primeiro. E a fábrica precisa andar 1, 2 ou 3 dias à frente das vendas: terminado o de hoje, a primeira linha é a falta de amanhã.
-- **Exceções:** a chave nasce **desligada** e só o **Admin Geral** (o setor, pelo `ehAdminGeral`) liga ou desliga (403 para os outros, antes de gravar qualquer campo do mesmo pedido). O modo vermelho e o âmbar não mudam.
+- **Exceções:** a chave nasce **desligada** e só o **Admin Geral** (o setor, pelo `ehAdminGeral`) liga ou desliga (403 para os outros, antes de gravar qualquer campo do mesmo pedido). ⚠️ **Desde 23/11/2026 a 101 não lê mais esta ordem** (R-REV-01): a parte Próximos dias da tela única ordena pela data da primeira falta, com ou sem a chave (o dono: *"já usa"*). A chave continua valendo para o `/api/revisao/producao`, que só o tablet com a página antiga ainda chama.
 - **Teste que trava:** `teste_vendas_futuras.js` (a ordem, os três desempates, o motivo, o caso do meio-dia, a chave desligada por padrão e o 403).
 - **Status:** os degraus no ar · a ordem pela falta no ar desde 07/11/2026 (PR #313), **desligada** até o dono ligar.
 
@@ -144,7 +144,7 @@
 - **Status:** no ar.
 
 ### R-REV-05 · A ordem urgente atendida pelo estoque não cobra produção
-- **Regra:** `ordem_dia.js` é o único que responde o que falta das ordens de hoje. A parte urgente cuja venda já saiu, ou que o estoque cobre, aparece em âmbar como "saiu do estoque — nada a produzir". Só `a_produzir` fica vermelho e toca o alarme. O tile, o aviso e a TV leem a mesma conta.
+- **Regra:** `ordem_dia.js` é o único que responde o que falta das ordens de hoje. A parte urgente cuja venda já saiu, ou que o estoque cobre, não cobra produção: só `a_produzir` conta. ~~Na tela vermelha aparecia em âmbar "saiu do estoque — nada a produzir"~~ — desde 23/11/2026 (R-REV-01) a parte Hoje da tela única mostra só o `a_produzir`, e o aviso de status da 101 saiu. A TV e o `/api/revisao/status` continuam lendo a mesma conta.
 - **Por quê:** em 08/09/2026 a tela cobrava 4 peças urgentes com todas as vendas já despachadas.
 - **Exceções:** ordem **manual** nunca é "atendida", porque não tem venda atrás. ⚠ Não mande a embalagem azul abater a ordem.
 - **Teste que trava:** `teste_ordem_dia.js` (17) · `teste_estoque.js` (caso da TV).
@@ -152,17 +152,17 @@
 - **História:** armadilha #20.
 
 ### R-REV-06 · Peça com problema volta para a produção e não entra na fila
-- **Regra:** durante a revisão, "Peça com problema" grava em `rejeicao` o motivo, o tempo até a detecção, o modo e quem rejeitou — o nome em `usuario` e, desde 04/11/2026, o `usuario_id` ao lado, pelo `quem.js`; sem login, 401. A peça não vai para a embalagem. Os motivos são cadastro (`listas`, tipo `rejeicao`). **É só para defeito de verdade**: o bipe errado se resolve no "Cancelar revisão" (R-REV-08).
-- **Por quê:** a peça com defeito não pode virar estoque.
+- **Regra:** durante a revisão, "Peça com problema" grava em `rejeicao` o motivo, o tempo até a detecção, o modo e quem rejeitou — o nome em `usuario` e, desde 04/11/2026, o `usuario_id` ao lado, pelo `quem.js`; sem login, 401. A peça não vai para a embalagem. Os motivos são cadastro (`listas`, tipo `rejeicao`). **É só para defeito de verdade**: o bipe errado se resolve no "Cancelar revisão" (R-REV-08). **Na tela (CONSERTO de 23/11/2026):** com a janela do motivo aberta o foco não volta ao campo do bipe e o bipe não fecha a revisão por baixo dela; a tela só diz "Voltou para a produção" quando o servidor gravou — recusa ou falta de conexão deixam a revisão aberta, dizendo por quê; sem motivo cadastrado, a janela diz onde cadastrar.
+- **Por quê:** a peça com defeito não pode virar estoque. E o dono, 23/11/2026: *"o botão aparece mas não consigo clicar, quando clico nele ele pisca o campo de sku"* — o foco que volta ao bipe roubava o toque da janela.
 - **Exceções:** nenhuma.
-- **Teste que trava:** `teste_revisao.js` (seção 15: quem rejeitou e o 401) · ⚠ que a peça rejeitada não entra na fila continua **sem teste**.
+- **Teste que trava:** `teste_revisao.js` (seção 15: quem rejeitou e o 401) · `teste_revisao_problema_tela.js` (29, num Chromium com toque de iPad; sem navegador diz PULADO) · ⚠ que a peça rejeitada não entra na fila continua **sem teste**.
 - **Status:** no ar; o `usuario_id` em código em 04/11/2026.
 
 ### R-REV-07 · Bipe de fim abaixo de 15 s é recusado, e a revisão continua
-- **Regra:** o bipe que fecharia uma revisão com menos de `config.rev_minimo_seg` segundos (padrão **15**, editável sem deploy) é **recusado, não perguntado**. A tela apita, diz "rápido demais — a revisão continua" e o cronômetro segue; o operador termina e bipa de novo. O `POST /api/revisao` recusa também (409, `motivo:'rapido_demais'`), sem `revisao` e sem `fila`, e grava o evento `rapido_demais` em `revisao_evento`, com quem bipou.
+- **Regra:** o bipe que fecharia uma revisão com menos de `config.rev_minimo_seg` segundos (padrão **15**, editável sem deploy — desde 24/11/2026 na **906 Parâmetros**, card "Tempo mínimo na bancada", por quem é nível Admin; inteiro, no mínimo 1) é **recusado, não perguntado**. A tela apita, diz "rápido demais — a revisão continua" e o cronômetro segue; o operador termina e bipa de novo. O `POST /api/revisao` recusa também (409, `motivo:'rapido_demais'`), sem `revisao` e sem `fila`, e grava o evento `rapido_demais` em `revisao_evento`, com quem bipou.
 - **Por quê:** o bipe duplo acidental gravava uma revisão de 1 s e mandava para a embalagem uma peça que ninguém revisou. Nos 30 dias até 04/11/2026 a revisão de verdade começa por volta de 20 s; abaixo de 15 s eram 23 revisões, quase só bipe acidental.
 - **Exceções:** ⚠ **o limite NÃO é 1 minuto**: quase metade das revisões reais fica abaixo de 60 s, e trava que dispara no caso normal vira desvio (#6).
-- **Teste que trava:** `teste_revisao.js` (seção 7).
+- **Teste que trava:** `teste_revisao.js` (seção 7) e `teste_tempos_minimos.js` (a 906).
 - **Status:** em código em 04/11/2026 (spec `QUEM-FEZ-E-REVISAO`, fase 1).
 
 ### R-REV-08 · "Cancelar revisão" zera a revisão em andamento
@@ -191,16 +191,16 @@
 - **Status:** no ar desde 17/09/2026.
 - **História:** armadilha #26.
 
-### R-EMB-02 · Embalar não exige a peça estar na fila
-- **Regra:** sem linha na `fila`, a embalagem grava e soma +1 do mesmo jeito, com `modo='estoque'`.
-- **Por quê:** é o que torna seguro limpar a fila velha sem travar a bancada.
-- **Exceções:** nenhuma. Isso **não** é defeito, embora pareça.
-- **Teste que trava:** `teste_montagem.js`.
+### R-EMB-02 · A persiana só embala se veio da Revisão (desde 21/11/2026)
+- **Regra:** a persiana (SKU de modelo com medida, `COALESCE(exige_medida,1)`; o SKU sem modelo conta como persiana) só embala se houver uma linha dela esperando na `fila` (`situacao='aguardando'`). Sem ela, `POST /api/montagem` responde 409 (`motivo:'sem_revisao'`), **nada grava** — nem `montagem`, nem o +1, nem a ordem do dia, nem a baixa de material — e a recusa vira uma linha `sem_revisao` em `montagem_evento`, com quem bipou. A ordem das recusas: login → SKU → **revisão** → kit → tempo. A tela avisa já no 1º bipe (*"Não passou pela Revisão"*), perguntando a fila de novo antes de recusar; quem decide é o servidor.
+- **Por quê:** decisão do dono em 21/11/2026, depois de uma persiana que ninguém revisou entrar no estoque: *"a tela de embalagem só pode seguir com alguma embalagem vindo da revisão"*. Até ali (desde 17/09/2026) embalar sem fila somava +1 com `modo='estoque'`, para limpar a fila velha não travar a bancada.
+- **Exceções:** kit, acessório e sob medida (modelo sem medida) não passam pela Revisão e embalam sem fila, como antes. A devolução reembalada entra pela fila (`modo='devolucao'`) e passa. **Não há liberação** (decisão do dono, *"sem exceção"*): a peça que sumiu da fila é revisada de novo. ⚠ **Por isso tirar da fila uma peça que existe tem consequência** — o "Tirar da fila" da Mesa de correções, o `limpar_fila.js` e o `ajustar_fila_embalagem.js` são para a peça que não existe; tirada por engano, ela volta revisando de novo ou desfazendo a correção na Mesa.
+- **Teste que trava:** `teste_montagem.js` (seção 10).
 - **Status:** no ar.
 
 ### R-EMB-03 · Só a embalagem de fila "hoje" abate a ordem do dia
-- **Regra:** a embalagem abate `producao` só quando consome fila de `modo='hoje'` (revisada na tela vermelha).
-- **Por quê:** a tela azul é produção para estoque; abater ali faria o estoque parecer reposto com a peça indo para o cliente.
+- **Regra:** a embalagem abate `producao` só quando consome fila de `modo='hoje'` — desde 23/11/2026 o servidor grava esse modo quando a peça revisada cobre uma venda de hoje sem peça (R-REV-01); até ali era a peça revisada na tela vermelha.
+- **Por quê:** a peça revisada para estoque não atende ordem; abater ali faria o estoque parecer reposto com a peça indo para o cliente.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_montagem.js` · `teste_ordem_dia.js`.
 - **Status:** no ar.
@@ -240,6 +240,49 @@
 - **Teste que trava:** `teste_revisao.js` (seção 6, com a tabela de antes, sem a coluna; seção 8, sem login é 401) · `teste_montagem.js` (6-B; 6-C, sem login é 401 e nada muda — nem o saldo, nem o livro, nem a ordem do dia).
 - **Status:** em código em 26/10/2026. Desde 04/11/2026 a revisão (fase 1) e a embalagem (fase 2) leem quem fez pelo `quem.js` (dono único, spec `QUEM-FEZ-E-REVISAO`) e recusam sem login (401), antes de olhar SKU e kit; a linha do livro do +1 (`movimento_estoque`) grava o mesmo quem. A Etiqueta de Venda entrou na fase 3 (05/11/2026, cartão R-QUEM-01). ~~Nenhuma tela mostra ainda~~ — desde 08/11/2026 a 905 Minha produção e a aba Por pessoa da 904 mostram (`produtividade_dominio.js`, CLAUDE.md §21).
 
+### R-EMB-09 · Bipe que fecha a embalagem abaixo de 45 s é recusado, e a embalagem continua
+- **Regra:** o 3º bipe (o SKU de novo) com menos de `config.emb_minimo_seg` segundos (padrão **45**, editável sem deploy — desde 24/11/2026 na **906 Parâmetros**, card "Tempo mínimo na bancada", por quem é nível Admin; inteiro, no mínimo 1, sem teto: acima de 600 s a tela só avisa) desde o 1º bipe — o kit no meio conta — é **recusado pelo servidor**: `POST /api/montagem` responde 409 (`motivo:'rapido_demais'`, com `minimo` e `segundos`) e nada grava (nem `montagem`, nem o +1 no livro, nem a fila, nem a ordem do dia, nem a baixa de material). A recusa vira uma linha `rapido_demais` em `montagem_evento`, com quem bipou. A tela reabre a embalagem com o kit já conferido e o cronômetro do mesmo início; a pessoa termina e bipa de novo. A ordem das recusas: login → SKU → kit → tempo.
+- **Por quê:** o espelho da R-REV-07, decidido pelo dono em 21/11/2026: o bipe duplo ou apressado fechava a embalagem sem a peça ter sido embalada de verdade.
+- **Exceções:** ⚠ **a frase do 409 serve às duas páginas** ("a embalagem NÃO foi gravada e o tempo recomeça: bipe o SKU agora e espere 45 s antes de bipar o kit e o SKU"): o tablet com a página antiga em cache já descartou a embalagem quando a lê. Na tela nova a embalagem fica de pé enquanto o servidor responde, o bipe nesse meio é ignorado, e o envio desiste em 20 s. ⚠ **a tela não recusa sozinha, ao contrário da Revisão**: quem decide é só o servidor. Uma tela com o número dela, no dia em que o `config` baixasse o mínimo, diria "continua" de uma embalagem já gravada, e o segundo bipe somaria +2. Vale para todo SKU, inclusive kit e acessório. A bancada do sob medida não entra.
+- **Teste que trava:** `teste_montagem.js` (seção 9) e `teste_tempos_minimos.js` (a 906).
+- **Status:** no ar desde 21/11/2026 (PR #359, spec `EMBALAGEM-TEMPO-MINIMO`).
+
+### R-EMB-10 · "Cancelar embalagem" zera a embalagem em andamento
+- **Regra:** com uma embalagem aberta, o botão "Cancelar embalagem" (embaixo do aviso) zera tudo num toque, sem motivo e sem confirmação. **Nada grava**: nem `montagem`, nem o +1, nem a fila — a persiana continua em "Aguardando embalagem" (kit, acessório e sob medida nunca estiveram nela, e a frase não fala da lista). Fica uma linha `cancelada` em `montagem_evento`, com quem cancelou e os segundos (`POST /api/montagem/cancelar`, `embalagem.executar`, 401 sem login). O aviso "Embalagem cancelada" fica até o próximo bipe. Com o envio do bipe final no ar, o botão some.
+- **Por quê:** o dono, 21/11/2026: quem precisa largar a bancada para atender outra pessoa não tinha saída — a tela ficava presa na peça ("Termine a persiana atual"). O espelho da R-REV-08.
+- **Exceções:** sem conexão, a embalagem é zerada na tela do mesmo jeito (nada foi gravado), e só o registro do cancelamento se perde. Ao voltar, o tempo recomeça no 1º bipe (R-EMB-09).
+- **Teste que trava:** `teste_montagem.js` (seção 11).
+- **Status:** no ar desde 21/11/2026 (PR #360).
+
+### R-TEM-01 · Ao terminar a peça, a pessoa vê o tempo dela ao lado da própria mediana
+- **Regra:** na Revisão (101) e na Embalagem (102), o aviso verde do fim mostra duas barras — **"Agora"** e **"Sua média"** — e o aviso **"Parabéns!"** (no tempo da mediana ou mais rápido) ou **"Você pode melhorar"** (acima dela). "Sua média" é a **mediana** da própria pessoa **naquele SKU** nos **últimos 30 dias** (`data >= hoje − 30`), sem contar a peça que acabou de gravar; sem peça do SKU no período, a de **todos os SKUs** ("(todos os SKUs)"); sem nenhuma, só a barra de agora e *"Primeira peça — ainda sem média"*, sem aviso. Conta só a linha com o id do login (a sem id não é de ninguém), sem teste e com tempo > 0. **Quem calcula e decide o aviso é o servidor** (`tempo_operador.js`, dono único), na resposta do bipe que grava (`tempo`); a tela só desenha (`public/tempo_bancada.js`). **Só a própria pessoa vê**, e só o dela. **Não trava nada**: as recusas por tempo continuam sendo só a R-REV-07 e a R-EMB-09.
+- **Por quê:** o dono, 21/11/2026: *"esse SKU fez em tanto tempo e a média do tempo que você tem é de tanto"*; escolheu as barras, a mediana (uma peça parada não puxa o número) e o aviso.
+- **Vale para as próximas telas:** toda tela nova que mede o tempo de uma atividade do operador registra a atividade no `tempo_operador.js` (`ATIVIDADES`), devolve `tempo` no bipe que fecha a peça e desenha com o `tempoBancada`.
+- **Exceções:** o sob medida (bancada 6xx) fica de fora até spec própria; o tablet com a página antiga ignora o campo até ser recarregado; a conta que falhar não derruba o bipe (vai ao log, `tempo:null`).
+- **Teste que trava:** `teste_tempo_operador.js` (28) e `teste_montagem.js` (seção 13).
+- **Status:** no ar desde 21/11/2026 (PR #361). Ainda não provado com dado real: a primeira pessoa da bancada vendo as barras com as peças dela.
+
+
+### R-EMB-11 · A persiana com defeito volta da Embalagem para a Revisão
+- **Regra:** com a embalagem aberta, "Peça com defeito" (só persiana, a régua da R-EMB-02). Quem embala decide sozinho, com motivo obrigatório da lista da Revisão (`listas` tipo `rejeicao`). **Nada embala e nada soma**; a linha `aguardando` **reservada** por quem embala (R-EMB-13; sem reserva, a mais antiga do SKU) passa a `defeito` (não é apagada) e nasce a volta em `embalagem_defeito`, com quem achou (`POST /api/montagem/defeito`, `embalagem.executar`, 401 sem login). Na Revisão, o bloco "Voltaram da embalagem por defeito" (`GET /api/revisao/defeitos`, `revisao.executar`): **"Tem defeito"** escolhe o setor (lista fixa: Corte de tecido · Corte de tubo e base · Kit de comando · Montagem · Outro) e grava a peça com problema (`rejeicao`, `origem='embalagem'`, `setor`), que vira material extra; **"Não tem defeito"** só fecha a volta, e a peça é revisada de novo pelos dois bipes (`POST /api/revisao/defeitos/:id/decidir`, `revisao.rejeitar`) — menos a peça de **devolução** (fila modo `devolucao`), que volta direto a `aguardando` com o modo. **Ao marcar, a revisão daquela peça é apagada** (deixa de contar na tela vermelha, na produtividade e na mediana), com o rastro em `revisao_evento` e na volta. A 104 separa "achado na revisão" e "achado na embalagem", com o setor, e na linha achada na embalagem a coluna Quem diz quem achou e quem conferiu (o dono, 21/11/2026). `defeito_dominio.js` é o dono da volta, e `rejeicao_dominio.js` o da peça com problema.
+- **Por quê:** o dono, 21/11/2026: quem embala e acha defeito embalava assim mesmo (a peça virava estoque) ou levava de volta na mão, com a fila dizendo que ela esperava embalagem.
+- **Exceções:** kit, acessório e sob medida não têm o botão. A devolução sem defeito volta direto à fila (22/11/2026). A peça que volta é a linha reservada por quem embala (23/11/2026); sem reserva, a mais antiga da fila do SKU (22/11/2026). A revisão apagada é a dela, até cada persiana ter identificação. Quem achou pode conferir a própria volta. Decidida não se decide de novo (409). A volta parada fica só na 101.
+- **Teste que trava:** `teste_defeito_volta.js` (65).
+- **Status:** construído em 21/11/2026, falta subir.
+
+### R-EMB-12 · A 102 embala primeiro o que destrava a venda de hoje
+- **Regra:** a lista "Aguardando embalagem" são quatro blocos, nesta ordem: **1 vermelho — Do dia** (SKU com venda de hoje sem peça livre na Etiqueta de Venda: a `falta` do `tarja_estoque.js`; toda peça aguardando do SKU conta ali, de qualquer modo), **2 âmbar — Pedido de hoje** (fila `hoje`), **3 azul — Reposição** (fila `estoque`, com o abaixo do alvo do `demanda_dominio`), **4 roxo — Devolução**. No vermelho, mais vendas paradas primeiro; depois a revisada há mais tempo. **O cartão mostra só o trabalho da embalagem** (decisão do dono, 24/11/2026): o número grande é **"para embalar"** (o menor entre as peças aqui e as vendas paradas), com *"N vendas de hoje esperando esta peça"*, um quadradinho amarelo por peça para embalar e o listrado da que outra pessoa está embalando — **nada de "com peça" (estoque) nem "na produção"**. O SKU do dia **sem peça aqui sai do vermelho** (com todas as peças com outra pessoa, ele vem em `so_reservadas`, para o bipe dizer quem está com ela), e a peça que passa das vendas paradas desce para a **Reposição**. O topo diz *"faltam embalar N peças do dia"*. Bipar fora do vermelho com peça do dia aqui e livre abre o aviso, e **o próximo bipe decide**: o kit segue (linha `fora_prioridade` em `montagem_evento`, com o SKU do dia em `detalhe`), o SKU do dia troca (`trocou_prioridade`, com o SKU para onde se trocou). Os botões valem o mesmo. A troca reserva a do dia antes de cancelar (R-EMB-13); recusada, o aviso não a oferece de novo; enquanto o servidor responde, o bipe não vale e Cancelar e Peça com defeito somem. `embalagem_prioridade.js` é o dono, sem conta própria; `GET /api/montagem/prioridade`. Se ela falhar, a lista cai no `GET /api/fila` (a bancada não para).
+- **Por quê:** o dono, 22/11/2026: *"a partir do momento que uma peça é revisada e precisa ser entregue no dia, ela tem que entrar como prioridade número 1"*, sem deixar a pessoa parada.
+- **Exceções:** "do dia" é a régua da Etiqueta de Venda (`fila_dia.js`): venda futura nunca é vermelha. Nunca trava: o aviso pergunta uma vez por embalagem, e é só do bloco 1. A lista não se reordena com uma embalagem aberta. Kit, acessório e sob medida ficam fora dos blocos. O `GET /api/fila` continua igual (tablet com a página antiga).
+- **Teste que trava:** `teste_embalagem_prioridade.js` (89).
+- **Status:** no ar desde 24/11/2026 (PR #365); ainda não provado com dado real. O cartão só da embalagem (24/11/2026) construído, falta subir.
+
+### R-EMB-13 · A peça fica reservada para quem está embalando
+- **Regra:** o 1º bipe do SKU reserva uma linha `aguardando` para a pessoa (`POST /api/montagem/reservar`, tabela `embalagem_reserva`), na ordem **`hoje` → `estoque` → `devolucao`**, a mais antiga no mesmo modo. É a linha que o bipe final consome e a que a "Peça com defeito" marca. Os outros a veem como *"sendo embalada por …"* e não a contam como aqui; sem peça livre do SKU, a recusa (409 `reservada`) vem no 1º bipe. A reserva é da **pessoa** (o login): uma por vez, a mesma em outro tablet, e bipar outro SKU troca. Solta ao embalar, cancelar, marcar defeito ou depois de `config.emb_reserva_min` (5) minutos sem bipe dela (o kit renova, `POST /api/montagem/renovar`). Sem cron: quem pergunta descarta as vencidas. `embalagem_reserva.js` é o dono.
+- **Por quê:** o dono, 23/11/2026: *"se uma pessoa estiver no meio de um processo de embalagem … ela deveria ficar reservada para a pessoa que está embalando"*.
+- **Exceções:** sem reserva (página antiga em cache, reserva vencida, sem rede), o bipe final pega a primeira livre na mesma ordem — **nunca a reservada por outra pessoa**: sem livre, 409 `reservada` antes de gravar (linha `reservada` em `montagem_evento`, com quem está com a peça), e quem leva o 409 é quem não reservou (③ REVISÃO, 23/11/2026). O `/reservar` desiste em 8 s na tela, e a embalagem abre sem reserva; a reserva antiga só sai quando a nova existe. Na troca pelo bipe, a peça do dia é reservada antes de cancelar a de agora (`cancelar` com `trocou` e `manter`); se ela não estiver aqui ou estiver com outra pessoa, a embalagem de agora continua. Kit, acessório e sob medida não reservam. A R-EMB-03 não mudou: só a fila `hoje` abate a ordem do dia — mudou qual linha sai, e por isso ela é abatida mais vezes (decisão do dono, 23/11/2026). Não mexe em saldo.
+- **Teste que trava:** `teste_embalagem_prioridade.js` (89).
+- **Status:** no ar desde 24/11/2026 (PR #365); ainda não provado com dado real.
 ---
 
 ## O kit e a etiqueta dele
@@ -443,8 +486,7 @@
 
 ## O que ainda não tem teste nesta área
 
-R-EST-04 (reimpressão não baixa), R-REV-01 (os três modos), R-REV-02 (SKU fora
-da lista), R-REV-06 (peça com problema),
+R-EST-04 (reimpressão não baixa), R-REV-02 (o aviso do SKU que não falta), R-REV-06 (que a peça rejeitada não entra na fila),
 R-EMB-05 (conferência no bipe 1) e as partes de tela de R-EST-11 e R-EST-17.
 Ficam aqui para virar trabalho, e não esquecimento.
 
@@ -522,8 +564,10 @@ Ficam aqui para virar trabalho, e não esquecimento.
   o `public/kit_bipe.js`, e duas réguas divergem no dia da troca (§4, #26)
 - ❌ Fazer a embalagem em modo teste consumir a fila REAL — era a dívida 1c, e a
   peça de verdade sumia quando os testes eram apagados (§4, armadilha #26)
-- ❌ "Consertar" a embalagem para exigir que a peça esteja na fila: a fila não é
-  obrigatória, é regra do §4, e é o que torna o `limpar_fila.js` seguro
+- ❌ Deixar a persiana embalar sem a linha dela na fila, ou criar uma liberação
+  "só desta vez": sem exceção, a peça é revisada de novo (R-EMB-02, 21/11/2026)
+- ❌ Tirar da fila uma peça que existe "para limpar": ela deixa de poder ser
+  embalada até ser revisada de novo (R-EMB-02)
 - ❌ Criar um campo separado para o código de barras da etiqueta do kit: ele é
   sempre o **Código do kit** salvo, senão o impresso e o bipe divergem (§4)
 - ❌ Decidir "cabe na etiqueta?" contando caracteres: 16 letras estreitas cabem

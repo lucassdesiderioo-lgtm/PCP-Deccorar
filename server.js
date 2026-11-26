@@ -19,6 +19,9 @@ require('./admin_telas')(app, db);
    linhas da central antes e depois das ações que criam pendência. Tem que vir
    ANTES de qualquer rota — middleware registrado depois não roda para ela. */
 require('./pendencias_vigia')(app, db);
+/* O tradutor da etiqueta de SKU em serie (PRODUCAO-MAPA-E-MOTOR v7, §14.2):
+   ANTES das rotas que bipam SKU, senao nao roda para elas. */
+require('./codigo_serie')(app, db);
 app.use(express.static(path.join(__dirname, 'public'), { index:false }));
 
 /* O cadastro de SKU (GET, POST e DELETE /api/skus) mora no
@@ -102,6 +105,8 @@ app.get('/painel',(req,res)=>res.sendFile(path.join(__dirname,'public','painel.h
 app.get('/embalagem',(req,res)=>res.sendFile(path.join(__dirname,'public','embalagem.html')));
 require('./carreg_route')(app, db);
 require('./saida_route')(app, db);   // a saida do caminhao da coleta (fase 3 da SAIDA-E-DUPLA-CONFERENCIA)
+require('./carrinho_route')(app, db);   // o carrinho e a entrega da 202 (spec CONFERENCIA-CARRINHOS)
+require('./trava_route')(app, db);
 app.get('/carregamento',(req,res)=>res.sendFile(path.join(__dirname,'public','carregamento.html')));
 require('./backup_route')(app, db);
 require('./rel_route')(app, db);
@@ -172,8 +177,19 @@ require('./coleta_horario_route')(app, db);
 app.get('/coleta-horarios',(req,res)=> res.sendFile(path.join(__dirname,'public','coleta-horarios.html')));
 /* A 106 Material extra (FICHAS-NO-CADASTRO-UNICO §3-G, 11/11/2026). */
 require('./material_extra_route')(app, db);
+/* A producao da medida padrao (PRODUCAO-MAPA-E-MOTOR v7, §14): a 107
+   Montagem, a 108 Corte de tecido, a 110 Serralheria e a aba de etiquetas da
+   401. As rotas /montagem e /api/montagem sao da EMBALAGEM (102) e nao mudam. */
+require('./producao_route')(app, db);
+app.get('/montagem-persiana',(req,res)=> res.sendFile(path.join(__dirname,'public','montagem-persiana.html')));
+app.get('/corte-tecido',(req,res)=> res.sendFile(path.join(__dirname,'public','corte-tecido.html')));
+app.get('/serralheria',(req,res)=> res.sendFile(path.join(__dirname,'public','serralheria.html')));
 app.get('/material-extra',(req,res)=> res.sendFile(path.join(__dirname,'public','material-extra.html')));
 app.get('/parametros',(req,res)=> res.sendFile(path.join(__dirname,'public','parametros.html')));   // 906 Parâmetros (ARRUMAR-O-LUGAR fase 3)
+/* A 907 Manual (spec MANUAL-DO-SISTEMA, fase 1, 21/11/2026): a ficha de cada
+   tela, lida pelo "?" e pela tela. Só leitura; as fichas são lidas no boot. */
+require('./manual_route')(app, db);
+app.get('/manual',(req,res)=> res.sendFile(path.join(__dirname,'public','manual.html')));
 // A central de pendencias (fase 1): so le, e pergunta a funcao de cada tela
 // dona — por isso depois de todas elas.
 require('./pendencias_route')(app, db);

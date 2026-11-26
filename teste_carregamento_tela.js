@@ -4,9 +4,10 @@
  *
  *   node teste_carregamento_tela.js
  *
- * Escritos ANTES do conserto de 20/10/2026. O que travam:
- * - o motivo do "Liberar com divergencia" (caminhao e viagem) sobrevive a
- *   atualizacao automatica de 4 s. Antes ela redesenhava o card por cima do
+ * Escritos ANTES do conserto de 20/10/2026, e refeitos em 25/11/2026 para a
+ * tela dos carrinhos (spec CONFERENCIA-CARRINHOS), sem perder o que travam:
+ * - o motivo do "Liberar com divergencia" (hoje no passo da entrega) sobrevive
+ *   a atualizacao automatica de 4 s. Antes ela redesenhava o card por cima do
  *   campo: o texto sumia e, no iPad, o teclado fechava no meio da frase;
  * - enquanto a pessoa digita num campo, a tela nao se redesenha por baixo;
  * - o bipe que nao chega ao sistema (rede caiu, servidor fora) AVISA, com som
@@ -38,8 +39,12 @@ const HTML=fs.readFileSync(path.join(__dirname,'public/carregamento.html'),'utf8
 const a=HTML.indexOf('<script>')+8, b=HTML.indexOf('</script>',a);
 const SCRIPT=HTML.slice(a,b);
 
-const vazio={ pilha:null, coleta:{faltam:[],aguardando:[],fechamentos:[],retiradas_hoje:0},
-  carregados:0, faltam:[], carro:{prontas:0,viagem_aberta:null,viagens_hoje:[]} };
+const vazio={ barras:{ entrega:{total:2,entregues:0,nos_carrinhos:1,sem_bipe:1,sem_etiqueta:0,faltam:2},
+    bipe:{impressas:2,bipadas:1,faltam:1,antes_sem_bipe:0} },
+  destinos:[{codigo:'A',nome:'Carrinho A',n:1,recontado:null},{codigo:'B',nome:'Carrinho B',n:0,recontado:null},
+            {codigo:'AG',nome:'Carro da agência',n:0,recontado:null}],
+  faltam:[], nos:[], entregues:[], sem_etiqueta:[], sem_carrinho:[], segundo_bipe:false, saidas_hoje:[] };
+const sobras=()=>({caixas:[],aguardando:[],pode_confirmar:false});
 
 /* A tela aberta. `rotas` responde cada URL (funcao que devolve o JSON, ou
    lanca para simular a rede caida). Devolve como mexer nela. */
@@ -75,13 +80,13 @@ function abrir(rotas){
     return { status:200, json:async()=>JSON.parse(JSON.stringify(v)) }; };
   let sons=[];
   const janela={ document:doc, fetch, console, JSON, Date, Math, String, Number, parseInt, Object, Array, Promise,
-    setInterval:(fn)=>{ timers.push(fn); }, setTimeout:()=>0,
-    location:{href:'/carregamento'}, confirm:()=>true, alert(){},
+    encodeURIComponent, setInterval:(fn)=>{ timers.push(fn); }, setTimeout:()=>0,
+    location:{href:'/carregamento'}, confirm:()=>true, prompt:()=>null, alert(){},
   };
   janela.window=janela;
   // o som vira registro: true = bipe bom, false = bipe de erro
   const codigo=SCRIPT.replace(/function beep\(ok\)\{/,'function beep(ok){ __sons.push(ok); return;')
-    +'\n;__t={ set divergPend(v){ divergPend=v; }, set divergV(v){ divergV=v; }, set modoEscolhido(v){ modoEscolhido=v; } };';
+    +'\n;__t={ set estado(v){ estado=v; }, set ENT(v){ ENT=v; }, desenhar(){ desenharPainel(); } };';
   janela.__sons=sons;
   vm.createContext(janela);
   vm.runInContext(codigo,janela);
@@ -97,57 +102,51 @@ function abrir(rotas){
   };
 }
 
-const saidaAberta={ saida:{id:1,nada_ficou:0}, sistema:5, sobras:[], levou:[], lista:[], candidatos:[] };
-const viagemAberta={ viagem:{id:1,aberta_em:'2026-10-20 09:00'}, sistema:3, prontas:[], lista:[] };
-const comSaida=()=>Object.assign({},vazio,{coleta:Object.assign({},vazio.coleta,{saida_aberta:1})});
-const comViagem=()=>Object.assign({},vazio,{carro:{prontas:0,viagem_aberta:1,viagens_hoje:[]}});
-
+/* A ENTREGA com o numero que nao bateu: o passo 3, com o campo do motivo. */
+const divergente=(para)=>({sel:['A'],passo:3,para:para||'motorista',foto:'data:x',numero:'4',levou:'',motivo:'',
+  res:{ok:false,motivo:'divergente',sistema:5,numero:4},previa:null});
+const rotas=extra=>Object.assign({'/api/conferencia/dia':()=>vazio,'/api/carregamento/sobras':sobras},extra||{});
 secao('\n── o motivo do "Liberar com divergencia" ─────────────────────────────\n');
-
-caso('CAMINHAO: o motivo digitado continua la depois da atualizacao de 4 s, e o foco tambem', async()=>{
-  const tela=abrir({'/api/carregamento':comSaida,'/api/saida/aberta':()=>saidaAberta});
-  await tela.ate(); tela.t().divergPend={motorista:4}; await tela.carregar(); await tela.ate();
+caso('ENTREGA: o motivo digitado continua la depois da atualizacao de 4 s, e o foco tambem', async()=>{
+  const tela=abrir(rotas());
+  await tela.ate(); tela.t().estado='entrega'; tela.t().ENT=divergente(); tela.t().desenhar();
   const m=tela.$('motivoLib'); m.focus(); m.value='o motorista contou a caixa da Ana duas vezes';
   await tela.tick();
   igual(tela.$('motivoLib').value,'o motorista contou a caixa da Ana duas vezes','motivo depois da atualizacao');
   igual(tela.doc.activeElement && tela.doc.activeElement.id,'motivoLib','campo com o foco');
 });
-
-caso('CAMINHAO: mesmo sem o foco no campo (a pessoa tocou fora), o texto nao se perde no redesenho', async()=>{
-  const tela=abrir({'/api/carregamento':comSaida,'/api/saida/aberta':()=>saidaAberta});
-  await tela.ate(); tela.t().divergPend={motorista:4}; await tela.carregar(); await tela.ate();
+caso('ENTREGA: mesmo sem o foco no campo (a pessoa tocou fora), o texto nao se perde no redesenho', async()=>{
+  const tela=abrir(rotas());
+  await tela.ate(); tela.t().estado='entrega'; tela.t().ENT=divergente(); tela.t().desenhar();
   tela.$('motivoLib').value='faltou a caixa do Joao'; tela.$('scan').focus();
   await tela.tick();
   igual(tela.$('motivoLib').value,'faltou a caixa do Joao','motivo depois do redesenho');
 });
-
-caso('VIAGEM: o motivo digitado continua la depois da atualizacao de 4 s', async()=>{
-  const tela=abrir({'/api/carregamento':comViagem,'/api/viagem/aberta':()=>viagemAberta});
-  await tela.ate(); tela.t().divergV={atendente:2}; await tela.carregar(); await tela.ate();
-  const m=tela.$('motivoLibV'); m.focus(); m.value='o atendente bipou uma caixa de outro vendedor';
+caso('AGENCIA: o motivo digitado continua la depois da atualizacao de 4 s', async()=>{
+  const tela=abrir(rotas());
+  await tela.ate(); tela.t().estado='entrega'; const e=divergente('agencia'); e.sel=['AG']; tela.t().ENT=e; tela.t().desenhar();
+  const m=tela.$('motivoLib'); m.focus(); m.value='o atendente bipou uma caixa de outro vendedor';
   await tela.tick();
-  igual(tela.$('motivoLibV').value,'o atendente bipou uma caixa de outro vendedor','motivo depois da atualizacao');
-  igual(tela.doc.activeElement && tela.doc.activeElement.id,'motivoLibV','campo com o foco');
+  igual(tela.$('motivoLib').value,'o atendente bipou uma caixa de outro vendedor','motivo depois da atualizacao');
+  igual(tela.doc.activeElement && tela.doc.activeElement.id,'motivoLib','campo com o foco');
 });
-
 caso('enquanto a pessoa digita o numero do motorista, a tela nao se redesenha por baixo', async()=>{
-  const tela=abrir({'/api/carregamento':comSaida,'/api/saida/aberta':()=>saidaAberta});
-  await tela.ate(); const antes=tela.chamadas.length;
-  tela.$('motQtd').focus(); await tela.tick();
+  const tela=abrir(rotas());
+  await tela.ate(); tela.t().estado='entrega'; tela.t().ENT=divergente(); tela.t().desenhar();
+  const antes=tela.chamadas.length;
+  tela.$('numEnt').focus(); await tela.tick();
   igual(tela.chamadas.length,antes,'consultas durante a digitacao');
 });
-
 caso('com o foco no campo do bipe (o normal), a atualizacao de 4 s continua acontecendo', async()=>{
-  const tela=abrir({'/api/carregamento':()=>vazio});
+  const tela=abrir(rotas());
   await tela.ate(); tela.$('scan').focus(); const antes=tela.chamadas.length;
   await tela.tick();
   if(tela.chamadas.length<=antes) throw new Error('a tela parou de se atualizar');
 });
-
 secao('\n── o bipe que nao chega ao sistema ───────────────────────────────────\n');
 
 caso('REDE CAIDA: o bipe avisa que nao chegou, com som de erro', async()=>{
-  const tela=abrir({'/api/carregamento':()=>vazio,'/api/carregar':()=>{ throw new TypeError('Failed to fetch'); }});
+  const tela=abrir(rotas({'/api/carregar':()=>{ throw new TypeError('Failed to fetch'); }}));
   await tela.ate(); tela.sons.length=0;
   await tela.bipar('7449000123');
   tem(tela.$('banner').innerHTML,/SEM CONEX/i,'aviso na tela');
@@ -155,7 +154,7 @@ caso('REDE CAIDA: o bipe avisa que nao chegou, com som de erro', async()=>{
 });
 
 caso('SERVIDOR FORA (responde pagina de erro em vez de JSON): o bipe tambem avisa', async()=>{
-  const tela=abrir({'/api/carregamento':()=>vazio,'/api/carregar':()=>({__html:1})});
+  const tela=abrir(rotas({'/api/carregar':()=>({__html:1})}));
   await tela.ate(); tela.sons.length=0;
   await tela.bipar('7449000123');
   tem(tela.$('banner').innerHTML,/SEM CONEX/i,'aviso na tela');
@@ -164,20 +163,32 @@ caso('SERVIDOR FORA (responde pagina de erro em vez de JSON): o bipe tambem avis
 
 caso('REDE CAIDA no meio da caixa de varias: o aviso manda recomecar a caixa (o bipe pode ter contado)', async()=>{
   let n=0;
-  const tela=abrir({'/api/carregamento':()=>vazio,
+  const tela=abrir(rotas({
     '/api/carregar':()=>({ok:false,motivo:'conferir_pecas',pedido:{id:9,buyer:'Ana',nf:'1'},pecas_total:2,bipadas:0,pecas:[]}),
-    '/api/carregar/peca':()=>{ n++; throw new TypeError('Failed to fetch'); }});
+    '/api/carregar/peca':()=>{ n++; throw new TypeError('Failed to fetch'); }}));
   await tela.ate(); await tela.bipar('ETIQ-VENDA'); await tela.bipar('SKU-A');
   igual(n,1,'tentativas do bipe de peca');
   tem(tela.$('banner').innerHTML,/SEM CONEX/i,'aviso na tela');
   tem(tela.$('banner').innerHTML,/Recome[cç]ar esta caixa/,'caminho para recomecar');
 });
 
+secao('\n── a caixa de varias durante a entrega ───────────────────────────────\n');
+caso('com a entrega do A aberta e nenhum carrinho ativo, as pecas da caixa de varias vao para o A', async()=>{
+  const corpos=[];
+  const tela=abrir(rotas({
+    '/api/carregar':c=>{ corpos.push(c); return {ok:false,motivo:'conferir_pecas',pedido:{id:9,buyer:'Ana',nf:'1'},pecas_total:2,bipadas:0,pecas:[]}; },
+    '/api/carregar/peca':c=>{ corpos.push(c); return {ok:true,bipadas:1,pecas_total:2,pecas:[],pedido:{id:9}}; },
+    '/api/entrega/previa?destinos=A':()=>({ok:true,sistema:1,caixas:[],faltam_bipar:[]})}));
+  await tela.ate(); tela.t().estado='entrega'; tela.t().ENT=divergente(); tela.t().desenhar();
+  await tela.bipar('ETIQ-VENDA'); await tela.bipar('SKU-A');
+  igual(corpos.map(c=>c.carrinho),['A','A'],'carrinho mandado na caixa e na peca');
+});
+
 secao('\n── o volume bloqueado ────────────────────────────────────────────────\n');
 
 caso('BLOQUEADO diz que esta bloqueado, com o motivo do servidor, e nao "etiqueta nao reconhecida"', async()=>{
-  const tela=abrir({'/api/carregamento':()=>vazio,'/api/carregar':()=>({ok:false,motivo:'bloqueado',
-    pedido:{id:3,buyer:'Maria Souza',nf:'7449',codigo:'BK180XYZ'},aviso:'SKU "BK180XYZ" nao esta no cadastro. Nao pode ser carregado.'})});
+  const tela=abrir(rotas({'/api/carregar':()=>({ok:false,motivo:'bloqueado',
+    pedido:{id:3,buyer:'Maria Souza',nf:'7449',codigo:'BK180XYZ'},aviso:'SKU "BK180XYZ" nao esta no cadastro. Nao pode ser carregado.'})}));
   await tela.ate(); tela.sons.length=0;
   await tela.bipar('7449000123');
   const h=tela.$('banner').innerHTML;
@@ -186,7 +197,7 @@ caso('BLOQUEADO diz que esta bloqueado, com o motivo do servidor, e nao "etiquet
 });
 
 caso('codigo que o sistema nao conhece continua "Etiqueta nao reconhecida"', async()=>{
-  const tela=abrir({'/api/carregamento':()=>vazio,'/api/carregar':()=>({ok:false,motivo:'nao_encontrado'})});
+  const tela=abrir(rotas({'/api/carregar':()=>({ok:false,motivo:'nao_encontrado'})}));
   await tela.ate(); await tela.bipar('QUALQUER');
   tem(tela.$('banner').innerHTML,/Etiqueta não reconhecida/,'aviso');
 });

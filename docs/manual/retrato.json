@@ -1,0 +1,1050 @@
+{
+ "cartoes": {
+  "R-ADI-01": "e0916c3eab6381e2",
+  "R-CAR-01": "3ad7691bdb47bcb7",
+  "R-CAR-02": "1d8ba83710440029",
+  "R-CAR-03": "a4742132bfa09f83",
+  "R-CMP-01": "6c56ef14e021ddb3",
+  "R-CMP-02": "cbfe35aa77c6878a",
+  "R-CMP-03": "a3cfc478c398c87f",
+  "R-CMP-04": "6b6dfb7c135d4784",
+  "R-CMP-05": "e0cedca3422aa582",
+  "R-CMP-06": "0b3ec4f138526b5d",
+  "R-CMP-07": "1181694a73a84ca9",
+  "R-CMP-08": "5d04bb27521e9f32",
+  "R-CMP-09": "6c8f492d9e8c5de8",
+  "R-CMP-10": "e7e88c2700be09f5",
+  "R-CMP-11": "b7443a24080025d0",
+  "R-CMP-12": "3d7d1925947812ea",
+  "R-CMP-13": "8f787b8d9af5acc3",
+  "R-CMP-14": "6b3876f453016128",
+  "R-CMP-15": "9aa41cf697d105c4",
+  "R-CMP-16": "ae0f2f76d7f32b3e",
+  "R-CMP-17": "02446534392551d3",
+  "R-CMP-18": "f9573ae985064ae9",
+  "R-CMP-19": "a5f8a5b7af02c0b5",
+  "R-CMP-20": "af12c2a8b16dc4d1",
+  "R-CMP-21": "d9fe9260b5a0df93",
+  "R-CMP-22": "05ab52eedd6b5831",
+  "R-CMP-23": "4b6a2b9dd1c3691c",
+  "R-CMP-24": "1843278a80a44fd7",
+  "R-CMP-25": "660ffca23862f546",
+  "R-CMP-26": "9c58451dfc34cc13",
+  "R-CMP-27": "2d9cb706fbdc9ce0",
+  "R-CMP-28": "b6821a1d6c230544",
+  "R-CMP-29": "9623699080fa0cd7",
+  "R-CMP-30": "1bcca2e099f5e52a",
+  "R-CMP-31": "d8fba2266a5c9d1a",
+  "R-CMP-32": "33e107ba4992caa8",
+  "R-CMP-33": "4be2c9f245d5bd70",
+  "R-CMP-34": "d389d4a3be5b830f",
+  "R-CMP-35": "1b9f02b6b3859c95",
+  "R-CMP-36": "996023882e439bbd",
+  "R-CMP-37": "3e7a0b6818550025",
+  "R-CMP-38": "5df6cead9d6f5484",
+  "R-CMP-39": "ca497652207ae30c",
+  "R-CMP-40": "c4bc7356bb67d26b",
+  "R-CMP-41": "cc96f48ca8e4512d",
+  "R-CMP-42": "b07846103d306680",
+  "R-CMP-43": "8deabe9ea4d4b715",
+  "R-CMP-44": "5437e5c1e3f6d85f",
+  "R-CMP-45": "f61d0ca2cb19c22c",
+  "R-CMP-46": "411d1e0c654f57b0",
+  "R-CMP-47": "2e8eba323f628908",
+  "R-CMP-48": "5efce54b43bfd4b8",
+  "R-CMP-49": "25b31e3858bde1df",
+  "R-CMP-50": "423d76374dc0223d",
+  "R-CMP-51": "4fe5636678fe9398",
+  "R-CMP-52": "7bb591a7e27af741",
+  "R-CMP-53": "6c5353a55203bab4",
+  "R-CMP-54": "df41956957deaca5",
+  "R-CMP-55": "d45e376aae7dacd7",
+  "R-CMP-56": "7ce2485ba6eb8a7f",
+  "R-COL-01": "90b16ea5296f35b2",
+  "R-COL-02": "d8e47e6a100fc4b7",
+  "R-COL-03": "fbc4df1e4bb28550",
+  "R-COL-04": "f3201c7d9a94caeb",
+  "R-CONF-01": "3163ed10d70897f8",
+  "R-CONF-02": "3081aedf113852a9",
+  "R-CONF-03": "81dbe60d751e1b60",
+  "R-CONF-04": "30cfbb4f9f5fd9d6",
+  "R-CONF-05": "648d7eb77ca10894",
+  "R-CONF-06": "c17a842ec89bca14",
+  "R-CONF-07": "98a346cfcd5db765",
+  "R-COR-01": "2ce6dd777cf29854",
+  "R-COR-02": "ec1b8544d4f6c7c8",
+  "R-COR-03": "07ed5ce4d93fb030",
+  "R-COR-04": "2f100bdd05b3137e",
+  "R-COR-05": "e83e38d8f2f91db2",
+  "R-COR-06": "1f20da268078d144",
+  "R-COR-07": "37fe295fd852527a",
+  "R-CRR-01": "6903d57b10603470",
+  "R-CRR-02": "7890dcf4fced2af9",
+  "R-CRR-03": "c0435d5f6da06db2",
+  "R-CRR-04": "f7f71f0eadfb8c00",
+  "R-CRR-05": "8e638877409e3931",
+  "R-EMB-01": "22ad1a743cbde25d",
+  "R-EMB-02": "e12038f15c20049f",
+  "R-EMB-03": "ac98d7177936c841",
+  "R-EMB-04": "32ce706aa0f191b3",
+  "R-EMB-05": "5a0e9832fea40533",
+  "R-EMB-06": "a991245752354381",
+  "R-EMB-07": "25b34fdd830acc26",
+  "R-EMB-08": "a41323c92d2bf4ce",
+  "R-EMB-09": "fc5292da3309196a",
+  "R-EMB-10": "754dc6056b8f74df",
+  "R-EMB-11": "3ea97ab5f438fd8c",
+  "R-EMB-12": "440684358b2635e1",
+  "R-EMB-13": "3b62c7fdf3dacf64",
+  "R-ENT-01": "8c1d2c458828596a",
+  "R-ENT-02": "228705614c79542f",
+  "R-ENT-03": "1c7e43311eb7f0c0",
+  "R-ENT-04": "ba4d8d68664a1251",
+  "R-ENT-05": "1db0b6134be36dd5",
+  "R-EST-01": "6cb7de19b6e17f38",
+  "R-EST-02": "50fcc9282e44164a",
+  "R-EST-03": "044d524d09846887",
+  "R-EST-04": "d4801e4580c371b0",
+  "R-EST-05": "afaf2cbb6b6faa4a",
+  "R-EST-06": "8d8d8df2cb612b79",
+  "R-EST-08": "5785ee20127eebd6",
+  "R-EST-09": "60ef740b95601eca",
+  "R-EST-11": "54ded9d73f8ac405",
+  "R-EST-12": "dbc707e1621a5d23",
+  "R-EST-13": "f6ea1e112a941164",
+  "R-EST-14": "346fd87440a98e53",
+  "R-EST-15": "9df044205b6b5601",
+  "R-EST-16": "4cb6b7cba20c61d3",
+  "R-EST-17": "6689f6b461bcf481",
+  "R-EST-18": "9a39c14bbd1cbd4b",
+  "R-EST-19": "1d031cbcfdf66a25",
+  "R-EST-20": "5e2cece30b76a58e",
+  "R-EST-21": "5a1d32a43f97405a",
+  "R-EST-22": "70660876ece21b68",
+  "R-EST-23": "b03af27f9bb27842",
+  "R-EST-24": "80ed2e326257f9fa",
+  "R-FIM-01": "9c1592b05a15565f",
+  "R-HCO-01": "a0e19f91a02a79f1",
+  "R-HCO-02": "e6b277e804e83828",
+  "R-HCO-03": "7d7b54aee14e5c46",
+  "R-HCO-04": "36ded085116947a9",
+  "R-HCO-05": "2802b08157e9fa94",
+  "R-HCO-06": "a889095f746059b6",
+  "R-HCO-07": "08af912eb63b4958",
+  "R-HCO-08": "9a4a304e5c0d07bc",
+  "R-HCO-09": "46bbced86b5514f3",
+  "R-HCO-10": "abf01de1d3f7b0e5",
+  "R-HCO-11": "6cd6e6ac337a8bed",
+  "R-HCO-12": "038a2682eeef030b",
+  "R-HCO-13": "a6be7bf6015251f2",
+  "R-HCO-14": "bacb4e86d91e001d",
+  "R-HCO-15": "4c1032b2ab6e4ba9",
+  "R-HCO-16": "ca3d540f1b74467e",
+  "R-INV-01": "531227b138430f03",
+  "R-KIT-01": "1d06aeb10c9aa0e4",
+  "R-KIT-02": "4405b575437c560d",
+  "R-KIT-03": "6da021ce279f4e5c",
+  "R-KIT-04": "b4a78250dc89b5d1",
+  "R-KIT-05": "347523fb3f944484",
+  "R-KIT-06": "e2a6db598adae9e9",
+  "R-KIT-07": "d80db9ab1b5d8e26",
+  "R-MOD-01": "4e7be035b759de62",
+  "R-MOD-02": "3b4ba2df934dac8e",
+  "R-MOD-03": "8d002883b5443344",
+  "R-MOD-04": "2a9f5cfcfa8eafce",
+  "R-PAS-01": "af1caf77aa2e5e06",
+  "R-PAS-02": "303670e5b1a46ca2",
+  "R-PDF-01": "9696768e5cdb107f",
+  "R-PDF-02": "acdbcdc32dfb9cd8",
+  "R-PDF-03": "5a1ceb96b98c1d6c",
+  "R-PDF-04": "c7a1cba0a91244d9",
+  "R-PDF-05": "0f71efe5e321f540",
+  "R-PDF-06": "709a31ad54a8d573",
+  "R-PDF-07": "afcb2b4ff15fc4c8",
+  "R-PDF-08": "006ad0064b21d75d",
+  "R-PDF-09": "1eca11e016c26eb1",
+  "R-PDF-10": "f2ce7ddebf28c4e5",
+  "R-PDF-11": "cc054e367cfa14c2",
+  "R-PEC-01": "8a44507b7c330cfb",
+  "R-PEC-02": "0173e28970ec73c1",
+  "R-PEC-03": "bfb42168ce8e641c",
+  "R-PEC-04": "3952c65fcfad4cc9",
+  "R-PEC-05": "58b0ea3ebaca87e6",
+  "R-PIL-01": "2d5dcc0a3ccccb4c",
+  "R-PIL-02": "a8f9a6e323d0858d",
+  "R-PIL-03": "5c97124867f2fd45",
+  "R-PIL-04": "89cd815aafc36e5d",
+  "R-PIL-05": "ee3e956ff86ff630",
+  "R-PLN-01": "66a5587af8b0ff25",
+  "R-PLN-02": "ef792f31c8a4af7f",
+  "R-PLN-03": "b43928d61cef12c9",
+  "R-PLN-04": "f77e762bb9edf224",
+  "R-PLN-05": "b9458af30991cdc7",
+  "R-PLN-06": "6f374f99def51c2b",
+  "R-PRD-01": "b488b84d4fa1c80d",
+  "R-QUEM-01": "16dea03eaf361318",
+  "R-QUEM-02": "cc062f22dc977ba9",
+  "R-REC-01": "d7e6de2939c27183",
+  "R-REC-02": "bc7a816bc95c501b",
+  "R-REC-03": "779d1a29ba219f49",
+  "R-REC-04": "319bad49d5b931c5",
+  "R-REC-05": "b041bed3746d12d0",
+  "R-REC-06": "c38664d1c7cf829b",
+  "R-REC-07": "ff71d683a9014480",
+  "R-REV-01": "5423b792f8b9db9a",
+  "R-REV-02": "9f70534cd046bc85",
+  "R-REV-03": "6fa200f05b3f0521",
+  "R-REV-04": "ef9f572600bf404c",
+  "R-REV-05": "9e6bfc96b3fd3dad",
+  "R-REV-06": "ab4cce34443ce9af",
+  "R-REV-07": "51a772bf5424e145",
+  "R-REV-08": "9b4b79dca19fcdd8",
+  "R-REV-09": "2624ef22be05b12e",
+  "R-SAI-01": "09d5e82f39b8f1d2",
+  "R-SAI-02": "426467c9a2174893",
+  "R-SAI-03": "4621f69418d54746",
+  "R-SAI-04": "46dc90590400ed1a",
+  "R-SAI-05": "7c0e3f304bd28510",
+  "R-SAI-06": "5830a0b184cda853",
+  "R-SAI-07": "7abcc870303c4231",
+  "R-SAI-08": "6b4b50706ec40308",
+  "R-SEG-01": "48c0a76573332822",
+  "R-SEG-02": "17d4fcbc6e8a3f64",
+  "R-SEG-03": "14a2394e05e3a602",
+  "R-SMA-01": "7dde84f5e0feab88",
+  "R-SMA-02": "586462077e1730c1",
+  "R-SMA-03": "a11f6b74aa1c4d1d",
+  "R-SMB-01": "93337441561f773e",
+  "R-SMB-02": "917fdd4df870b9c0",
+  "R-SMB-03": "075fcdd01b7e69e7",
+  "R-SMB-04": "7baf61f9c82dab5b",
+  "R-SMB-05": "2049c347afdc61ae",
+  "R-SMC-01": "10fd8dedfa4a1100",
+  "R-SMC-02": "86e4a99ef4be9663",
+  "R-SMC-03": "451b584c24ef23bc",
+  "R-SMC-04": "0e7eea8064b58ea8",
+  "R-SMD-01": "8e78fc94097cc64f",
+  "R-SME-01": "ba1b5b111e93ba9e",
+  "R-SME-02": "5a4d07697b885bda",
+  "R-SME-03": "83b1cba0e1f8a04f",
+  "R-SME-04": "c7d6e6886b1703a8",
+  "R-SMF-01": "023863bfe266da4a",
+  "R-SMF-02": "270d4d479bff94ce",
+  "R-SMF-03": "4c67f908dd44a201",
+  "R-SMF-04": "441eb2c78ca2c155",
+  "R-SMF-05": "a3337870e14947c4",
+  "R-SMF-06": "a6962ffeb9e7a2e4",
+  "R-SMF-07": "717f25a561e37b9d",
+  "R-SMF-08": "26c7b9d920d6e711",
+  "R-SMF-09": "525f8eb843473bb5",
+  "R-SMF-10": "75dc509814e3881e",
+  "R-SMF-11": "838ce6cd349ba3fb",
+  "R-SMF-12": "8057bb85180d8a16",
+  "R-SMI-01": "9cb75d77a0b68670",
+  "R-SMI-02": "b6251e9a60f86101",
+  "R-SMI-03": "c9d1e97ab9f40e49",
+  "R-SMI-04": "c605b3d7bdf5c9f9",
+  "R-SMI-05": "e9d7a250951d9c9d",
+  "R-SMI-06": "4b21a9aeac517261",
+  "R-SMI-07": "4c4e0ebf8f9a4219",
+  "R-SMK-01": "842597dc246d579f",
+  "R-SMK-02": "d755789fedf32f81",
+  "R-SMK-03": "720dc2da67227e58",
+  "R-SMK-04": "3d71e50e17e6c98a",
+  "R-SMK-05": "3c06fb8707ab5eed",
+  "R-SMK-06": "e15a6bcd487e4bc0",
+  "R-SMK-07": "a0dad5c8dda442bf",
+  "R-SMK-08": "eb2fd6eacf0fe613",
+  "R-SMK-09": "b6f391cdda108632",
+  "R-SMK-10": "2b3bb3d0f519fca4",
+  "R-SMK-11": "cd8547089caac2aa",
+  "R-SML-01": "e6d9f92a9a63f9f0",
+  "R-SML-02": "3652202a5c9d0983",
+  "R-SML-03": "5949ad5174e32ee4",
+  "R-SMM-01": "83d0f6cbfa306eb3",
+  "R-SMM-02": "5d6c8e64ddf397dc",
+  "R-SMM-03": "736081d5667b8356",
+  "R-SMN-01": "51ab0cc4a446f2c0",
+  "R-SMN-02": "d96b986f7c4b14f8",
+  "R-SMN-03": "bf6e167b64f74a67",
+  "R-SMN-04": "568fdedc1b8c2a1f",
+  "R-SMN-05": "3e2bf26255ddb5e6",
+  "R-SMN-06": "6607ced1603eeb0a",
+  "R-SMN-07": "d11e2bf93d7a641f",
+  "R-SMN-08": "8e13bfaa1b49c5f9",
+  "R-SMN-09": "e37337795333c623",
+  "R-SMN-10": "7ee79d6b9368a872",
+  "R-SMN-11": "f417c04b1fc4347e",
+  "R-SMN-12": "90af618b3e009085",
+  "R-SMN-13": "44c9129080287a1f",
+  "R-SMN-14": "43d23dc6703b320a",
+  "R-SMN-15": "cacd1cbe99862528",
+  "R-SMN-16": "cbf45e6dcc651520",
+  "R-SMN-17": "d2612a2f70e50808",
+  "R-SMN-18": "3906889a1f5ff908",
+  "R-SMP-01": "4e2911fb1aae41db",
+  "R-SMP-02": "70d0d5d4a3b5534a",
+  "R-SMP-03": "a136b69ff6c69a31",
+  "R-SMP-04": "c0e2faf4c2f81d7c",
+  "R-SMP-05": "82aff14f546fb2e5",
+  "R-SMP-06": "1c3fb360539cced1",
+  "R-SMP-07": "656e4a0a53f2727c",
+  "R-SMP-08": "0fcefefbb692ceb9",
+  "R-SMQ-01": "e4f08e4dbb5cd671",
+  "R-SMQ-02": "c9b90b478922b7ca",
+  "R-SMQ-03": "18884adf7c5bad5a",
+  "R-SMQ-04": "36b1365d540bbf7b",
+  "R-SMQ-05": "24392e1a9f266280",
+  "R-SMR-01": "9117af5adcd67691",
+  "R-SMR-02": "5110242204089e72",
+  "R-SMR-03": "123a64cdce438cc2",
+  "R-SMR-04": "3b54b0a2a79e29b5",
+  "R-SMR-05": "f6b178c05f742ec4",
+  "R-SMR-06": "c854b0655f276804",
+  "R-SMS-01": "57c9d4010220dec6",
+  "R-SMS-02": "0226b070366f6722",
+  "R-SMS-03": "c3046be43a4d419e",
+  "R-SMT-01": "4c920252aa482e46",
+  "R-SMT-02": "1d172600fedaa2f0",
+  "R-SMT-03": "2be2bc15f5b914f1",
+  "R-SMT-04": "63c9c360f8df161d",
+  "R-SMT-05": "108d8ade8d4e7054",
+  "R-SMT-06": "be40fb310eb0891f",
+  "R-SMU-01": "78a893f2c13e98ac",
+  "R-SMU-02": "cd9932c58f4c89d7",
+  "R-SMU-03": "da4b876430dc4605",
+  "R-SMU-04": "88152f739be8078e",
+  "R-SMU-05": "3e60fe194d8e92d7",
+  "R-SMU-06": "45ba5782209c8c3b",
+  "R-SMU-07": "b6d383bcd02c4c1c",
+  "R-SMU-08": "0a3f919ff7b9962f",
+  "R-SMV-01": "b784b62b7961f147",
+  "R-SMV-02": "f4328d4c5fa2b738",
+  "R-SMV-03": "f14f5744e8aad6f8",
+  "R-SMV-04": "4bea4e40a34da9f6",
+  "R-SMV-05": "5f3b043010fdd7ef",
+  "R-SMX-01": "c57a27b07e0d0d82",
+  "R-SMX-02": "ad02a79549799a5b",
+  "R-SMX-03": "bee8abeb288ffdd0",
+  "R-SMX-04": "41be51711be75b4f",
+  "R-SMX-05": "0496de5819fbffba",
+  "R-TEM-01": "fc5cf3c7c63539e6",
+  "R-TRV-01": "51945484bce5bbab",
+  "R-TRV-02": "1b1ff7bbc58212f0",
+  "R-TRV-03": "1ccdf48344431959",
+  "R-TRV-04": "dfe21efefdfec8c9",
+  "R-URG-01": "01fd9216f36e2cfb",
+  "R-URG-02": "e88c40a1019b0bf3",
+  "R-VAL-01": "a481ffd1c1c39a27",
+  "R-VAL-02": "06daa9c1fc7e8a82",
+  "R-VAL-03": "d873233246a73b7f",
+  "R-VAL-04": "a4adf404a9137327",
+  "R-VAL-05": "b6f8ded6c3283318",
+  "R-VAL-06": "ff009636fa051069",
+  "R-VAL-07": "75f0f437041cf36c",
+  "R-VIA-01": "57c52c3c44f42d04",
+  "R-VIA-02": "805bc8b397a567f5",
+  "R-VIA-03": "65097a223eba9897",
+  "R-VIA-04": "a1226e2a0d89b98d",
+  "R-VIA-05": "ad154cb7702eb5ea",
+  "R-VIA-06": "96bf78ff1464c83b",
+  "R-VOL-01": "4fea8d8eec9e7c78",
+  "R-VOL-02": "630b2f93c227a320",
+  "R-VOL-03": "ed2f4cc025d547f7",
+  "R-VOL-04": "aaf4cf5c43218782",
+  "R-VOL-05": "b37b9c9232bf59e9",
+  "R-VOL-06": "40f92aa3dfd73245",
+  "R-VOL-07": "b14d28f003d15412",
+  "R-VOL-08": "14cebcd2e28e731f",
+  "R-VOL-09": "057daa6bcab66e7a"
+ },
+ "fichas": {
+  "101": {
+   "acoes": [
+    "revisao.executar",
+    "revisao.rejeitar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com \"Parabéns!\" ou \"Você pode melhorar\". Só você vê o seu.",
+    "22/11/2026 — O tempo ao lado da sua média está no ar na bancada desde 21/11/2026.",
+    "22/11/2026 — Entrou o bloco \"Voltaram da embalagem por defeito\": a persiana que quem embala devolveu aparece aqui com o motivo e quem achou. \"Tem defeito\" escolhe o setor responsável e a peça vira peça com problema; \"Não tem defeito\" fecha a volta e a peça é revisada de novo pelos dois bipes (a peça de devolução volta direto à fila da embalagem). A revisão daquela peça deixa de contar.",
+    "23/11/2026 — Consertado o botão \"Peça com problema\": a janela do motivo deixou de devolver o foco ao campo do bipe (o campo piscava e o toque não pegava), o bipe não fecha mais a revisão por baixo dela, e a tela só diz \"Voltou para a produção\" quando o registro foi gravado.",
+    "23/11/2026 — A Revisão virou uma tela só: não se escolhe mais cor ao abrir. A lista mostra Hoje (as vendas de hoje sem peça), Próximos dias (até sexta) e Completar o alvo. Você bipa a peça que tem na mão, e a tela diz para onde ela vai; quem decide é o sistema. O dia de hoje fica em destaque e, quando termina, os próximos dias sobem. No topo aparecem as suas revisadas de hoje, a sua média, \"↩ Devoluções\" e \"Ver a semana\".",
+    "23/11/2026 — Enquanto a peça com problema está sendo registrada, a revisão fica parada: o bipe e o toque nos cartões esperam. Com a revisão aberta, tocar no cartão de outro SKU não faz nada. Com \"Ver a semana\" aberta, o bipe fecha a semana para você ver o que fez. O bipe na observação da peça com problema não vira texto. A venda que já foi revisada e voltou por \"Desfazer\" não aparece como venda nova.",
+    "23/11/2026 — Se a peça com problema não tiver resposta do servidor em 20 segundos, a tela desiste e avisa: confira em Problemas antes de registrar de novo. Tocar no cartão de outro SKU com a revisão aberta mostra o que fazer.",
+    "23/11/2026 — A venda que já está em Hoje não conta de novo nos Próximos dias, mesmo quando o Mercado Livre põe outra data para ela; e a peça revisada que ainda espera a embalagem (inclusive a de devolução) já sai do que falta.",
+    "23/11/2026 — O aviso vermelho de venda nova não aparece quando o estoque livre muda sem venda nova (uma peça embalada para estoque, uma etiqueta impressa).",
+    "23/11/2026 — A peça que volta da Embalagem por defeito é a que estava reservada para quem embalava; sem reserva, a mais antiga daquele SKU.",
+    "23/11/2026 — Quando o PDF de hoje chega antes da planilha do Mercado Livre, a lista não pede mais peças a menos: a venda nova conta também em \"Completar o alvo\". E o código bipado na observação da peça com problema sai do campo mesmo com o leitor mais lento.",
+    "24/11/2026 — O \"Hoje\" já desconta as peças revisadas que estão esperando na embalagem: com 29 vendas paradas e 9 peças na embalagem, pede 20. O cartão diz quantas já estão na embalagem.",
+    "24/11/2026 — O cartão escreve \"N de M para hoje já revisadas (K na embalagem)\", contando junto o produto do dia que já está todo na embalagem.",
+    "24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo.",
+    "25/11/2026 — a persiana que vem da montagem se revisa pela etiqueta de SKU em série, e a tela mostra quem cortou e quem montou"
+   ],
+   "situacao": "rascunho"
+  },
+  "102": {
+   "acoes": [
+    "embalagem.executar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "21/11/2026 — A persiana só embala se veio da Revisão: sem ela esperando na fila, o bipe final é recusado e nada é gravado; a peça volta para a Revisão. Kit, acessório e sob medida embalam como antes.",
+    "21/11/2026 — O bipe que fecha a embalagem antes do tempo mínimo da embalagem (contado desde o primeiro bipe) é recusado, nada é gravado e a embalagem continua aberta na tela.",
+    "21/11/2026 — Entrou o botão \"Cancelar embalagem\": zera a embalagem em andamento sem gravar nada; a persiana continua aguardando embalagem.",
+    "21/11/2026 — Ao terminar a peça, o aviso mostra o seu tempo ao lado da sua média (a mediana das suas peças recentes daquele SKU), com \"Parabéns!\" ou \"Você pode melhorar\". Só você vê o seu.",
+    "22/11/2026 — O tempo ao lado da sua média está no ar na bancada desde 21/11/2026.",
+    "22/11/2026 — Entrou o botão \"Peça com defeito\", só para persiana e com a embalagem aberta: escolhe-se o motivo e a peça volta para a Revisão; nada é embalado e nada entra no estoque.",
+    "23/11/2026 — A peça que abate a ordem do dia na embalagem é a que a Revisão marcou como venda de hoje; desde hoje é o sistema que decide isso na Revisão, e não mais a cor escolhida lá.",
+    "23/11/2026 — A lista virou quatro blocos, nesta ordem: vermelho (do dia: a peça que destrava uma venda de hoje parada na Etiqueta de Venda), âmbar (pedido de hoje), azul (reposição) e roxo (devolução). No vermelho, primeiro o que tem mais vendas paradas; a barra diz quantas vendas de hoje já têm peça.",
+    "23/11/2026 — Bipou uma peça que não é do dia com peça do dia esperando: aparece o aviso, e o próximo bipe decide — o kit segue com esta (fica registrado), o SKU do dia troca. Nunca trava.",
+    "23/11/2026 — A peça fica reservada para quem está embalando, do primeiro bipe ao fim: os outros veem \"sendo embalada por\", e a reserva solta em 5 minutos sem bipe. A peça com defeito marcada é a reservada.",
+    "24/11/2026 — A lista em quatro blocos, o aviso do bipe fora da prioridade e a peça reservada para quem embala estão no ar na bancada.",
+    "24/11/2026 — O cartão do bloco vermelho mostra só o que embalar: o número grande é \"para embalar\", sem o que já está no estoque nem o que ainda está na produção. O produto do dia sem peça para embalar sai do vermelho, e a peça a mais vai para a Reposição. O topo diz quantas peças do dia faltam embalar.",
+    "24/11/2026 — Quando todas as peças de um produto do dia estão com outra pessoa, ele não aparece na lista, e o bipe dele diz quem está com a peça.",
+    "24/11/2026 — Quando a peça que estava com outra pessoa volta a ficar livre, a tela não a anuncia mais como peça nova da Revisão.",
+    "24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo.",
+    "25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU"
+   ],
+   "situacao": "rascunho"
+  },
+  "103": {
+   "acoes": [
+    "pdf.subir",
+    "producao.lancar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "104": {
+   "acoes": [],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "22/11/2026 — A lista separa a peça com problema achada na Revisão da achada na Embalagem, com o setor responsável; na achada na Embalagem, a coluna Quem diz quem achou e quem conferiu.",
+    "23/11/2026 — Na Revisão, a peça com problema só aparece aqui quando o registro foi gravado: se a gravação falhar, a tela da Revisão avisa e a revisão continua aberta.",
+    "23/11/2026 — Na Revisão, a mesma peça com problema não é mais registrada duas vezes, nem vai também para a embalagem quando alguém bipa enquanto ela está sendo gravada.",
+    "23/11/2026 — Na Revisão, se o registro da peça com problema não tiver resposta em 20 segundos, a tela avisa: confira nesta lista se ela entrou antes de registrar de novo.",
+    "23/11/2026 — A peça achada na Embalagem é a que estava reservada para quem embalava; sem reserva, a mais antiga daquele SKU.",
+    "23/11/2026 — Na Revisão, o código bipado por engano na observação da peça com problema não vai mais junto para esta lista, nem com o leitor mais lento."
+   ],
+   "situacao": "rascunho"
+  },
+  "105": {
+   "acoes": [
+    "painel.ver"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "106": {
+   "acoes": [
+    "material.extra"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "107": {
+   "acoes": [
+    "producao.montar"
+   ],
+   "corpo": "cbdbe6f9bf8c02d6",
+   "linhas": [
+    "25/11/2026 — tela nova: a montagem da persiana com a etiqueta de SKU em série, o tecido e o tubo"
+   ],
+   "situacao": "pronta"
+  },
+  "108": {
+   "acoes": [
+    "producao.cortar_tecido"
+   ],
+   "corpo": "b16ab01e27098d5c",
+   "linhas": [
+    "25/11/2026 — tela nova: o corte de tecido pela lista do planejamento, com o maço de etiquetas em branco"
+   ],
+   "situacao": "pronta"
+  },
+  "110": {
+   "acoes": [
+    "producao.cortar_tubo"
+   ],
+   "corpo": "13cba994c2d43903",
+   "linhas": [
+    "25/11/2026 — tela nova: o corte de tubo e base pela lista do planejamento, com o maço de etiquetas em branco"
+   ],
+   "situacao": "pronta"
+  },
+  "201": {
+   "acoes": [
+    "etiqueta.emitir",
+    "expedicao.caixa_nao_encontrada"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "19/11/2026 — A etiqueta continua só reservando a peça. A caixa que saiu da fábrica sem passar pela Conferência passa a ter o estoque baixado quando o acerto das caixas não conferidas é feito, uma vez só.",
+    "25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU",
+    "25/11/2026 — trava: com caixa impressa num dia anterior e sem conferência, a etiqueta nova não sai até a caixa ser bipada na Conferência; a reimpressão continua liberada, e quem tem a permissão \"Caixa não encontrada\" solta a caixa perdida e decide a caixa reimpressa no dia seguinte",
+    "25/11/2026 — \"Persiana perdida\" só aparece depois que a caixa reimpressa for bipada na Conferência; quem só decide a trava abre a tela e vê só o quadro",
+    "25/11/2026 — a caixa de várias persianas com um item cancelado pelo Mercado Livre depois da etiqueta não trava mais a tela; ela continua esperando decisão no card das canceladas",
+    "25/11/2026 — no ar: a conferência nos carrinhos, a entrega por carrinho e a trava do dia seguinte passaram a valer na fábrica"
+   ],
+   "situacao": "rascunho"
+  },
+  "202": {
+   "acoes": [
+    "cancelamento.confirmar",
+    "carregamento.executar",
+    "saida.liberar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "25/11/2026 — O segundo bipe (o SKU da persiana depois da etiqueta) liga e desliga na 906 Parâmetros; a Conferência só mostra no topo se ele está ligado.",
+    "25/11/2026 — A caixa de agência com despacho futuro que foi bipada vai na entrega do dia, e a tela avisa quantas são adiantadas e para que dia, antes de continuar.",
+    "25/11/2026 — Ajustes da conferência nos carrinhos: a tela não escolhe mais o carrinho sozinha (pede para bipar a etiqueta do carrinho), o foco volta sempre ao campo do bipe, a caixa achada durante a entrega entra no carrinho que está sendo entregue, a caixa de várias persianas mostra cada SKU, o nome de quem imprimiu sai em linha própria e a caixa do \"a coleta não passou\" volta a aparecer em cima, com o selo \"de ontem\".",
+    "25/11/2026 — A tela passou a conferir nos carrinhos: a caixa de coleta vai para o carrinho escolhido (bipar a etiqueta do carrinho troca), a de agência vai sozinha para o Carro da agência, e em cima aparecem duas barras (quanto falta entregar no dia e quanto falta bipar do que foi impresso). A entrega é por carrinho, com a foto e o número do motorista; não se bipam mais as sobras, e a caixa a mais do motorista é bipada na hora. Cada carrinho pode ser recontado sem ver o número esperado, e a caixa não achada vira pendência sem mexer no estoque.",
+    "21/11/2026 — ficha criada em rascunho",
+    "19/11/2026 — A caixa que saiu sem ninguém conferir e é fechada depois pelo acerto das caixas não conferidas tem o estoque baixado nesse acerto, uma vez só, como se tivesse sido conferida aqui.",
+    "25/11/2026 — aceita a etiqueta de SKU em série no bipe de cada persiana",
+    "25/11/2026 — no ar: a conferência nos carrinhos, a entrega por carrinho e a trava do dia seguinte passaram a valer na fábrica"
+   ],
+   "situacao": "rascunho"
+  },
+  "204": {
+   "acoes": [
+    "bloqueio.liberar",
+    "pacote.assinar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "25/11/2026 — Os botões \"Fechar vencidos em bloco…\" e \"Fechar conferências antigas em bloco…\" e o clique num volume da lista voltaram a abrir o quadro (ou o volume) já na tela de Correções. Desde a separação do Admin em telas, a tela de Correções abria vazia."
+   ],
+   "situacao": "rascunho"
+  },
+  "205": {
+   "acoes": [
+    "correcao.executar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "19/11/2026 — O fechamento das caixas que saíram sem conferência passa a baixar o estoque da caixa que nunca baixou; a data de corte é no máximo ontem; a venda cancelada e a caixa de várias persianas com item cancelado ficam de fora.",
+    "25/11/2026 — Os botões \"Fechar vencidos em bloco…\" e \"Fechar conferências antigas em bloco…\" e o clique num volume da lista voltaram a abrir o quadro (ou o volume) já na tela de Correções. Desde a separação do Admin em telas, a tela de Correções abria vazia."
+   ],
+   "situacao": "rascunho"
+  },
+  "206": {
+   "acoes": [
+    "coleta.horario",
+    "horarios.editar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "251": {
+   "acoes": [
+    "devolucao.registrar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "23/11/2026 — O botão \"Trocar\" do topo virou \"Revisão\" (só para quem revisa). Quem chega pelo \"↩ Devoluções\" da Revisão vê \"← Voltar para a Revisão\"."
+   ],
+   "situacao": "rascunho"
+  },
+  "252": {
+   "acoes": [
+    "devolucao.acompanhar",
+    "devolucao.dinheiro",
+    "devolucao.lancar",
+    "devolucao.valores"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "253": {
+   "acoes": [
+    "devolucao.baixar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "301": {
+   "acoes": [
+    "alvo.editar",
+    "estoque.ajustar",
+    "estoque.aprovar_ajuste"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "302": {
+   "acoes": [
+    "contagem.ajustar",
+    "contagem.planejar",
+    "contagem.relatorio",
+    "contagem.resolver"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "303": {
+   "acoes": [
+    "contagem.contar",
+    "contagem.desempatar",
+    "contagem.recontar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU"
+   ],
+   "situacao": "rascunho"
+  },
+  "401": {
+   "acoes": [
+    "necessidade.ver",
+    "planilha.importar",
+    "producao.corrigir",
+    "producao.etiqueta"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "23/11/2026 — A tela da Revisão deixou de ter as telas vermelha e azul: a falta por dia e o alvo calculados aqui aparecem lá como \"Próximos dias\" e \"Completar o alvo\", e a ordem pela data da falta vale lá sempre, com a chave ligada ou não.",
+    "25/11/2026 — nova aba Etiquetas da produção: as etiquetas de SKU em série e os maços de tecido e de tubo; o Supervisor abre a tela só nesta aba"
+   ],
+   "situacao": "rascunho"
+  },
+  "402": {
+   "acoes": [
+    "modelo.cadastrar",
+    "sku.cadastrar",
+    "sku.excluir"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "25/11/2026 — O código de um SKU novo não pode ter a forma das etiquetas da produção (PS seguido de 8 números, ou TC ou TB seguido de 6): o leitor confundiria o SKU com a etiqueta. O SKU que já existia assim continua valendo."
+   ],
+   "situacao": "rascunho"
+  },
+  "403": {
+   "acoes": [],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "404": {
+   "acoes": [
+    "custo.ver"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "501": {
+   "acoes": [
+    "alcada.definir",
+    "compras.valores",
+    "compras.ver",
+    "pedido.aprovar",
+    "pedido.criar",
+    "pedido.pagar",
+    "preco.lancar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "502": {
+   "acoes": [
+    "pedido.devolver",
+    "pedido.receber",
+    "pedido.ver"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "503": {
+   "acoes": [
+    "volume.movimentar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "504": {
+   "acoes": [
+    "contagem.aprovar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "601": {
+   "acoes": [
+    "sobmedida.modulo.entrar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "602": {
+   "acoes": [
+    "sobmedida.corte.aprovar_correcao",
+    "sobmedida.corte.gerir",
+    "sobmedida.corte.pedir_correcao",
+    "sobmedida.parametro.ler",
+    "sobmedida.plano.calcular",
+    "sobmedida.plano.confirmar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "603": {
+   "acoes": [
+    "sobmedida.sobra.aprovar_descarte",
+    "sobmedida.sobra.corrigir",
+    "sobmedida.sobra.criar",
+    "sobmedida.sobra.descartar",
+    "sobmedida.sobra.ler",
+    "sobmedida.sobra.propor"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "604": {
+   "acoes": [
+    "sobmedida.endereco.criar",
+    "sobmedida.rolo.ajustar",
+    "sobmedida.rolo.encerrar",
+    "sobmedida.rolo.entrada",
+    "sobmedida.rolo.ler",
+    "sobmedida.rolo.nota"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "605": {
+   "acoes": [
+    "sobmedida.etiqueta.imprimir"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "606": {
+   "acoes": [
+    "sobmedida.cadastro.editar",
+    "sobmedida.cadastro.ler"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "607": {
+   "acoes": [
+    "sobmedida.custo.ver",
+    "sobmedida.painel.ler"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "608": {
+   "acoes": [
+    "sobmedida.catalogo.editar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "609": {
+   "acoes": [
+    "sobmedida.catalogo.ler",
+    "sobmedida.preco.ver"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "610": {
+   "acoes": [
+    "sobmedida.credito.editar",
+    "sobmedida.revenda.editar",
+    "sobmedida.revenda.ler"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "611": {
+   "acoes": [
+    "sobmedida.pedido.aprovar",
+    "sobmedida.pedido.aprovar_qualquer",
+    "sobmedida.pedido.cancelar",
+    "sobmedida.pedido.lancar",
+    "sobmedida.pedido.ler",
+    "sobmedida.pedido.prazo"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "612": {
+   "acoes": [
+    "sobmedida.etiqueta_producao.imprimir",
+    "sobmedida.etiqueta_producao.ler"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "613": {
+   "acoes": [
+    "sobmedida.colecao",
+    "sobmedida.embalagem",
+    "sobmedida.montagem",
+    "sobmedida.producao.bipar",
+    "sobmedida.producao.pendencia",
+    "sobmedida.revisao",
+    "sobmedida.serralheria"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "614": {
+   "acoes": [],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "615": {
+   "acoes": [],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "616": {
+   "acoes": [
+    "sobmedida.boleto.aprovar_baixa",
+    "sobmedida.boleto.editar",
+    "sobmedida.boleto.ler"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "901": {
+   "acoes": [
+    "auditoria.ver",
+    "pessoas.gerenciar",
+    "setores.gerenciar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "902": {
+   "acoes": [
+    "kit.editar",
+    "kit.imprimir",
+    "listas.editar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "25/11/2026 — Nova lista \"Carrinhos da expedição\" (nasce com A e B), com o botão da etiqueta de código de barras de cada carrinho. Carrinho com caixa dentro não pode ser removido.",
+    "21/11/2026 — ficha criada em rascunho",
+    "25/11/2026 — no ar: a conferência nos carrinhos, a entrega por carrinho e a trava do dia seguinte passaram a valer na fábrica"
+   ],
+   "situacao": "rascunho"
+  },
+  "904": {
+   "acoes": [
+    "produtividade.equipe",
+    "produtividade.nominal",
+    "relatorios.ver"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "905": {
+   "acoes": [
+    "produtividade.propria"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "906": {
+   "acoes": [
+    "sobmedida.parametro.editar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho",
+    "24/11/2026 — Entrou o card \"Tempo mínimo na bancada\": quem é nível Admin muda aqui o tempo mínimo da Embalagem e o da Revisão, em segundos (no mínimo 1). Vale no próximo bipe. Acima de 10 minutos a tela avisa antes de salvar.",
+    "24/11/2026 — Ao baixar o tempo mínimo da Revisão, recarregue os tablets da Revisão: a tela aberta guarda o número de antes. Na Embalagem, acima de 5 minutos a tela avisa que a reserva da peça solta no meio da embalagem.",
+    "24/11/2026 — Todo ajuste desta tela diz em que tela ele vale (por exemplo, \"vale na 102 Embalagem\"). Se você abre aquela tela, o nome vira um link para ela.",
+    "25/11/2026 — Entrou o card \"Etiqueta da produção parada\", para quem corrige as etiquetas da produção: quantos dias uma etiqueta impressa e não usada espera até ficar em destaque na lista das não usadas (a aba Etiquetas da produção da 401). Começa em 15."
+   ],
+   "situacao": "rascunho"
+  },
+  "907": {
+   "acoes": [
+    "manual.ler",
+    "manual.ver_todas"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "1101": {
+   "acoes": [
+    "componente.cadastrar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "1102": {
+   "acoes": [
+    "fornecedor.cadastrar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "1103": {
+   "acoes": [
+    "almoxarifado.cadastrar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "1201": {
+   "acoes": [
+    "recebimento.liberar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "1301": {
+   "acoes": [
+    "nota.lancar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  },
+  "1302": {
+   "acoes": [
+    "certificado.gerenciar"
+   ],
+   "corpo": "da39a3ee5e6b4b0d",
+   "linhas": [
+    "21/11/2026 — ficha criada em rascunho"
+   ],
+   "situacao": "rascunho"
+  }
+ }
+}

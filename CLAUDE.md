@@ -155,6 +155,7 @@ R6. `escrivao-papel` antes do commit final.
 | resolveu dívida | risque na §14, com data |
 | trabalhou numa spec | STATUS da spec + índice em `docs/specs/README.md` |
 | terminou a spec inteira | spec vai para `docs/arquivo/` |
+| mexeu em tela, botão, número mostrado ou regra que a tela aplica | a ficha da tela em `docs/manual/`, com a linha datada em "Mudanças", e `node manual_retrato.js` regravado (§26) |
 
 10. Commit com mensagem clara. Em branch: **abra o PR**.
 11. Entregue o **FECHAMENTO** e **✋ espere o "pode subir"** antes de merge ou deploy:
@@ -207,7 +208,7 @@ Ordem de produção → REVISÃO → FILA → EMBALAGEM → ESTOQUE → ETIQUETA
 | Peça **revisada** | **NENHUM.** Entra na tabela `fila` com `situacao='aguardando'` | nenhuma |
 | Peça **embalada** (com kit conferido) | **+1** — é aqui que vira estoque | `embalagem` · `montagem:<id>` |
 | **Etiqueta de venda** impressa | **NENHUM** desde 22/10/2026 — a peça fica **reservada** (até ali era o −1) | nenhuma |
-| Caixa **conferida** (bipe da área ou do canto), ou que saiu sem conferência no "foi no caminhão" | **−1 por peça** — é aqui que sai, uma vez só | `conferencia` · `lote:<id>`, **uma por SKU** da caixa |
+| Caixa **conferida** (bipe da área ou do canto), ou que saiu sem conferência no "foi no caminhão" ou no passivo das nunca conferidas (`fechar_saida_passivo.js --nao-bipadas`, desde 19/11/2026) | **−1 por peça** — é aqui que sai, uma vez só | `conferencia` · `lote:<id>`, **uma por SKU** da caixa |
 | Caixa **separada como venda cancelada** na Conferência (etiqueta + SKU de cada persiana) | **NENHUM** desde 03/11/2026 — a caixa só fica separada | nenhuma |
 | Venda cancelada **confirmada** por outra pessoa (`cancelamento.confirmar`) | **+1 por peça**, se a caixa já tinha baixado; senão só solta a reserva | `sobra` · `lote:<id>`, **uma por SKU** |
 | Etiqueta de venda **reimpressa** | **NENHUM** — mesmo volume, mesmo cliente | nenhuma |
@@ -279,12 +280,100 @@ devolução:** `node teste_sobra.js` e `node teste_conferencia_expedicao.js`.
 
 ---
 
-## 3. Os três modos da tela de Revisão
+## 3. A tela de Revisão (até 23/11/2026, "os três modos")
 
-> **Os três modos** (🔴 pedidos de hoje · 🔵 produção pra estoque · 🟡
-> devoluções) e por que a cor é a trava: cartão R-REV-01 em
-> [`docs/regras/estoque.md`](docs/regras/estoque.md). O resto desta seção é a
-> planilha do ML, a média e a venda cancelada, que ainda moram aqui.
+> ~~**Os três modos** (🔴 pedidos de hoje · 🔵 produção pra estoque · 🟡
+> devoluções) e por que a cor é a trava~~ — **desde 23/11/2026 a 101 é uma tela
+> só** (spec `REVISAO-TELA-UNICA`, cartões R-REV-01 a R-REV-03 em
+> [`docs/regras/estoque.md`](docs/regras/estoque.md)). O resto desta seção é a
+> planilha do ML, a média e a venda cancelada, que ainda moram aqui. Onde abaixo
+> se lê "tela azul", leia a parte **Próximos dias / Completar o alvo** da tela
+> única: ela lê as mesmas contas (`demanda_dominio`).
+
+### ⚠️ A 101 REVISÃO É UMA TELA SÓ, E O SERVIDOR DECIDE PARA QUE A PEÇA SERVE (23/11/2026)
+
+Spec `docs/specs/REVISAO-TELA-UNICA.md`, duas linhas em `docs/DECISOES.md`. O
+dono: *"quero questionar se precisamos ter a tela azul e vermelha"*. O que parece
+bug e não é:
+
+- **Ninguém escolhe cor ao abrir.** A lista tem **Hoje** (as vendas da 201 sem
+  peça — o `a_produzir` do `ordem_dia.js`), **Próximos dias** (a falta por dia do
+  `demanda_dominio.porDia`, de amanhã até sexta; na sexta e no sábado, só a
+  segunda) e **Completar o alvo** (o `precisa` menos a falta até o fim da
+  janela). `revisao_lista.js` é o dono da lista, **sem conta de quantidade
+  própria** (#12): sem peça esperando a embalagem, Hoje + Próximos + Alvo de um
+  SKU é o `precisa` da 401.
+- ⚠️ **A MESMA VENDA NÃO CONTA EM HOJE E NOS PRÓXIMOS DIAS** (③ REVISÃO): Hoje
+  vem do PDF e os próximos dias da planilha, e a planilha pode pôr a venda de
+  hoje noutra data ("próxima coleta", NF a emitir). A venda do PDF de hoje é
+  **ligada à planilha pela venda ou pelo pack** (a régua do `demanda_dominio`)
+  e sai do dia dela na planilha; todo o PDF de hoje entra como o primeiro a usar
+  o livre, como na urgência. ⚠️ **Descontar "do dia mais cedo", sem ligar venda
+  a venda, apagava a falta de OUTRO cliente** quando a venda do PDF ainda não
+  estava na planilha (achado na rodada 2) — não volte a isso. **A ligação usa
+  os mesmos filtros da 401** (a futura, sem a venda que já tem etiqueta), e **o
+  alvo é a mesma conta acumulada até o fim** (a venda depois da janela e o alvo
+  do SKU somados contra o mesmo livre): a venda do PDF que a planilha ainda não
+  traz usa o livre nos próximos dias **e** no alvo (rodada 4, 23/11/2026).
+- ⚠️ **O `modo` que a tela manda no `POST /api/revisao` é IGNORADO**: o servidor
+  grava `hoje` se a peça cobre uma venda de hoje sem peça (o mesmo `a_produzir`),
+  e `estoque` nos outros casos. A revisão `hoje` abate a ordem do dia na
+  embalagem (R-EMB-03), como sempre. A conta que falhar não derruba o bipe (vai
+  como estoque, e o log diz).
+- **A peça revisada e ainda não embalada** (fila `aguardando` de qualquer modo —
+  estoque, devolução e a de `hoje` de dias anteriores; a de `hoje` revisada hoje
+  já está em Hoje) ~~sai primeiro dos próximos dias e depois do alvo~~ — **desde
+  24/11/2026 sai primeiro de Hoje** (item logo abaixo): o livre só sobe na
+  embalagem, e sem isso a bancada revisaria a mesma falta duas vezes.
+- ⚠️ **Enquanto a peça com problema vai para o servidor, a revisão fica
+  travada** (`RJ_ENVIANDO`): o bipe, o toque no cartão e o "Cancelar" esperam.
+  Um bipe nessa espera mandava a mesma peça para a fila e para a rejeição. Com a
+  rede pendurada a tela desiste em 20 s e diz que a peça **pode ter sido
+  gravada** (confira na 104 antes de registrar de novo).
+- **Venda nova é a falta de hoje que subiu SEM a revisada ter descido**
+  (`revisadas_hoje` da lista): o "Desfazer" e a peça devolvida pela embalagem
+  sobem a falta e descem a revisada, e não disparam a faixa; a venda nova de um
+  SKU que tinha saído de Hoje pelo estoque dispara.
+- **Com a revisão aberta, o toque no cartão de outro SKU não faz nada** (diz
+  para terminar antes); o bipe com "Ver a semana" aberta fecha a semana; o
+  bipe no campo da observação da peça com problema não vira texto: sai o que
+  chegou em rajada (menos de 50 ms entre teclas) antes do Enter, **e** o SKU
+  cadastrado que termina o campo, colado ou não ao texto — o leitor lento
+  também não escreve ali (rodada 4). Confira no iPad da bancada. A lista que não
+  carrega diz que não carregou.
+- ⚠️ **A venda de hoje da planilha que ainda não está na 201 não aparece em
+  Hoje**: Hoje é a 201 (o dono). Ela aparece quando o PDF sobe.
+- ⚠️ **A peça já revisada e esperando a embalagem sai PRIMEIRO de Hoje**
+  (decisão do dono, 24/11/2026: *"tem 29 na embalagem, já tem 9 … deveria
+  aparecer 20"*), de qualquer modo, e só o que sobra sai dos próximos dias e do
+  alvo. O cartão diz *"N de M para hoje já revisadas (K na embalagem)"* e as conta na
+  barra; a peça revisada com o Hoje do SKU coberto vai como reposição (o
+  `modoPara` usa a mesma fila). ✅ **No ar desde 24/11/2026** (PR #368): o
+  dono conferiu na bancada o cartão com o "(K na embalagem)".
+- **O dia de hoje fica em destaque**; terminado (nada faltando para as vendas de
+  hoje), faixa verde e os Próximos dias sobem. Venda nova de hoje traz faixa
+  vermelha e um som, uma vez, sem travar. O SKU que não falta em lugar nenhum
+  avisa e deixa passar.
+- **"↩ Devoluções"** leva à 251 (`?de=revisao`), que mostra "← Voltar para a
+  Revisão"; com a revisão aberta, não sai. **"Ver a semana"** abre por cima o
+  quadro SKU × dia, só leitura.
+- **As rotas antigas da tela** (`/api/revisao/dia`, `/producao`, `/adiantar`,
+  `/status`) continuam no ar para o tablet com a página velha em cache. **Depois
+  do deploy, recarregue os tablets da Revisão.** A chave `ordem_por_falta` não
+  manda mais na 101 (a parte Próximos dias ordena pela data da falta sempre).
+
+**Rode `node teste_revisao_tela_unica.js` (66) e `node
+teste_revisao_tela_unica_tela.js` (37, num Chromium; sem navegador diz PULADO) ao
+mexer no `revisao_lista.js`, no modo do `POST /api/revisao`, no `operador.html`
+ou no botão de volta da 251** — e `node teste_revisao.js`, `node
+teste_ordem_dia.js` e `node teste_vendas_futuras.js`.
+
+✅ **No ar desde 24/11/2026** (PR #366): o dono fez o backup, o deploy e o teste
+de segurança e disse *"deu tudo certo no deploy"*. ⚠️ **Ainda não provado com
+dado real:** a lista batendo com a 401 SKU a SKU num dia de fábrica, a primeira
+venda nova de hoje trazendo a faixa vermelha na bancada, o "Peça com problema"
+num iPad de verdade e o leitor lento sem escrever na observação. Prova que não
+foi feita se escreve como não feita.
 
 ### ⚠️ ARMADILHA #11 — a planilha do ML é ESPELHO, e um recorte apaga a média
 
@@ -734,17 +823,24 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 |---|---|
 | R-REV-05 | A ordem urgente atendida pelo estoque não cobra produção (`ordem_dia.js`, #20) |
 | R-REV-06 | Peça com problema volta para a produção e não entra na fila |
+| R-REV-01 | A revisão é uma tela só (Hoje · Próximos dias · Alvo), e o servidor decide para que a peça serve (23/11/2026) |
 | R-REV-07 | Bipe de fim abaixo de 15 s (`config.rev_minimo_seg`) é recusado, e a revisão continua |
 | R-REV-08 | "Cancelar revisão" zera a revisão em andamento — não é "Peça com problema" |
 | R-REV-09 | "Desfazer última": só a própria, só do dia, só antes de embalar, uma vez |
 | R-EMB-01 | Sem o bipe do kit a embalagem não fecha — a trava é do servidor (#26) |
-| R-EMB-02 | Embalar não exige a peça estar na fila (não é defeito) |
+| R-EMB-02 | A persiana só embala se veio da Revisão (linha na fila); kit, acessório e sob medida não (21/11/2026) |
 | R-EMB-03 | Só a embalagem de fila "hoje" abate a ordem do dia |
 | R-EMB-04 | SKU sem cadastro não embala; as quatro escritas são uma transação |
 | R-EMB-05 | A conferência da peça é no bipe 1 da embalagem (`pecaTexto`) |
 | R-EMB-06 | Em modo teste a embalagem consome fila de teste |
 | R-EMB-07 | Limpar a fila apaga só o que espera |
 | R-EMB-08 | A revisão e a embalagem gravam quem fez (`usuario_id`, `usuario_nome`) |
+| R-EMB-09 | Bipe que fecha a embalagem abaixo de 45 s (`config.emb_minimo_seg`) é recusado pelo servidor, e a embalagem continua (21/11/2026) |
+| R-EMB-10 | "Cancelar embalagem" zera a embalagem em andamento; nada grava e a peça continua na fila (21/11/2026) |
+| R-EMB-11 | A persiana com defeito volta da Embalagem para a Revisão: quem embala marca com motivo, nada soma; o revisor manda ao setor ou revisa de novo (21/11/2026) |
+| R-EMB-12 | A 102 embala primeiro o que destrava a venda de hoje: quatro blocos (do dia · pedido de hoje · reposição · devolução); o bipe fora da prioridade avisa e o próximo bipe decide (23/11/2026) |
+| R-EMB-13 | A peça fica reservada para quem está embalando, do 1º bipe ao fim; é da pessoa, e solta em 5 min sem bipe; o bipe final consome `hoje` → `estoque` → `devolucao` (23/11/2026) |
+| R-TEM-01 | Ao terminar a peça, duas barras ("Agora" e a mediana da própria pessoa no SKU, 30 dias) e "Parabéns!" ou "Você pode melhorar"; vale para toda tela nova que medir tempo do operador (21/11/2026) |
 | R-KIT-01 | Trocar o código do kit exige `confirmar` (servidor) |
 | R-KIT-02 | O código do kit não pode ser SKU de persiana |
 | R-KIT-03 | O código do kit é conferido quando vem, e não exigido |
@@ -757,7 +853,7 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 `ordem_dia.js`, `modo_route.js` ou `st_route.js`: `node teste_ordem_dia.js`. No
 `kit_pdf.js`, no card do kit, no `kit_etiqueta.js`, no `qr.js` ou no
 `barras.js`: `node teste_kit.js` e `node teste_qr.js` (e, no `barras.js`, também
-`cd tecido && npm test`). Na revisão: `node teste_revisao.js`.
+`cd tecido && npm test`). Na revisão: `node teste_revisao.js`, e na tela da 101 (o botão "Peça com problema", o foco que volta ao bipe) `node teste_revisao_problema_tela.js` (29, num Chromium com toque de iPad; sem navegador diz PULADO). No tempo da bancada (`tempo_operador.js`, `public/tempo_bancada.js`, o `tempo` da resposta da Revisão e da Embalagem): `node teste_tempo_operador.js`. Na peça com defeito que volta da Embalagem (`defeito_dominio.js`, `rejeicao_dominio.js`, o botão da 102, o bloco da 101, a 104): `node teste_defeito_volta.js`. Na prioridade ou na reserva da Embalagem (`embalagem_prioridade.js`, `embalagem_reserva.js`, a linha que o bipe final consome, a lista da 102): `node teste_embalagem_prioridade.js`.
 
 > ⚠️ **A REVISÃO RECUSA O BIPE RÁPIDO, CANCELA E DESFAZ (04/11/2026)** — fase 1
 > da spec `QUEM-FEZ-E-REVISAO`, cartões R-REV-07 a R-REV-09. O bipe duplo
@@ -794,11 +890,183 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 > quem lançou e quem encerrou o caso, **todo** evento do caso, a coleta, o
 > anexo, quem contou e quem aprovou o material (§9, §9-B, §18). `node
 > teste_quem_devolucao_contagem.js` (89).
-> **`node teste_revisao.js` (120)**: dez defeitos foram reintroduzidos um a
+> **`node teste_revisao.js` (122)**: dez defeitos foram reintroduzidos um a
 > um — a barreira desligada (reprova 13), sem "só a própria" (1), a pilha de
 > desfazer (4), sem "só do dia" (1), desfazer embalada (2), desfazer em modo
 > teste a de verdade (1), `revisao_evento` fora de `TABELAS` (3), sem a linha no
 > `permDaRota` (3), sem login gravando (9) e a fila sem `revisao_id` (17).
+
+> ⚠️ **A EMBALAGEM RECUSA O BIPE DE FIM ABAIXO DE 45 s (21/11/2026)** — spec
+> `EMBALAGEM-TEMPO-MINIMO`, cartão R-EMB-09, linha em `docs/DECISOES.md`. O 3º
+> bipe com menos de `config.emb_minimo_seg` (45) desde o 1º é 409
+> (`rapido_demais`) e nada grava — nem o +1. A recusa vira linha em
+> `montagem_evento`, e a tela reabre a embalagem com o kit conferido. ⚠️ **Ao
+> contrário da Revisão, a tela da Embalagem NÃO recusa sozinha**: com um número
+> próprio, no dia em que o `config` baixasse o mínimo ela diria "continua" de
+> uma embalagem já gravada, e o segundo bipe somaria +2. **Teste ou script que
+> embala tem que mandar `segundos` ≥ o mínimo** (o `teste_montagem.js` zera o
+> mínimo nas seções que não são sobre tempo). ⚠️ **A frase do 409 diz
+> "NÃO foi gravada e o tempo recomeça: bipe o SKU agora e espere 45 s antes de
+> bipar o kit e o SKU"** (③ REVISÃO): ela é o que o tablet com a página
+> ANTIGA em cache mostra, e lá a embalagem já foi descartada e o cronômetro
+> recomeça no SKU — "a embalagem continua" fazia ensacar a peça sem o +1. **Depois do
+> deploy, recarregue os tablets da Embalagem.** E na tela nova a embalagem fica
+> de pé enquanto o servidor responde (`emb.enviando`): o bipe nesse meio é
+> ignorado, e o envio desiste em 20 s (cai no "Falha de conexão") para a rede
+> pendurada não travar a bancada — e a falha de conexão avisa que a peça **pode
+> ter sido gravada** (confira o contador antes de embalar de novo). ✅ **No ar
+> desde 21/11/2026** (PR #359): o dono fez o deploy e disse *"deu tudo certo no
+> deploy"*. ⚠️ **Ainda não provado com dado real:** o primeiro bipe de fim
+> recusado na bancada, com a embalagem reaberta e o contador sem subir.
+>
+> ⚠️ **OS DOIS TEMPOS MÍNIMOS SE MUDAM NA 906 PARÂMETROS (24/11/2026, AJUSTE)**,
+> card "Tempo mínimo na bancada", por quem é nível Admin (`/api/config/tempos-minimos`,
+> `@admin`, como o segundo bipe; a rota mora no `mont_route.js` e lê o da revisão
+> pelo `revisao_route.minimoSeg`). Inteiro, **no mínimo 1** — zero desligaria a
+> trava, e a tela recusa (o SQL ainda aceita, e aí a trava some); **sem teto**:
+> acima de 600 s a tela só avisa. Campo ausente fica; número impossível é 400
+> dizendo qual, e nada grava; a troca vai para a auditoria (`tempo_minimo`) com o
+> antes e o depois. Vale no próximo bipe — ⚠️ **menos na Revisão quando o número
+> DESCE**: a 101 recusa sozinha com o número que leu ao abrir, e só o relê depois
+> de uma revisão gravada; ao baixar, recarregue os tablets da Revisão (a tela diz).
+> ⚠️ **O número que não se guarda é recusado** (③ REVISÃO: `Number.isSafeInteger`
+> — o enorme virava "1e+21" e a trava lia 1), e só número ou texto vale (a lista
+> não). ⚠️ **A tela avisa, sem travar, quando o mínimo da embalagem passa do
+> tempo da reserva** (`emb_reserva_min`, 5 min, R-EMB-13; a leitura manda
+> `reserva_seg`): a reserva só se renova no bipe, e soltaria no meio de toda
+> embalagem. ⚠️ **O alerta da embalagem demorada**
+> (acima de 600 s, avisando quem supervisiona a pessoa) **não existe**: o dono
+> pediu, e é NOVIDADE que espera spec — o sistema não tem "quem supervisiona esta
+> pessoa". `node teste_tempos_minimos.js` (35). Construído, falta subir.
+>
+> ⚠️ **A PERSIANA SÓ EMBALA SE VEIO DA REVISÃO (21/11/2026)** — spec
+> `EMBALAGEM-SO-DA-REVISAO`, cartão R-EMB-02 (mudou), linha em
+> `docs/DECISOES.md`. Até aqui embalar sem linha na `fila` somava +1 com
+> `modo='estoque'`, e uma persiana que ninguém revisou entrou no estoque. Agora
+> a persiana (modelo com medida; SKU sem modelo conta como persiana) sem linha
+> `aguardando` na fila é **409 `sem_revisao`** e nada grava; a recusa vira linha
+> em `montagem_evento`. Ordem: login → SKU → **revisão** → kit → tempo. A tela
+> avisa no 1º bipe (*"Não passou pela Revisão"*), perguntando a fila de novo
+> antes de recusar. O que parece bug e não é: **kit, acessório e sob medida**
+> (modelo sem medida) embalam sem fila, como antes; **não há liberação** (o
+> dono: *"sem exceção"*) — a peça que sumiu da fila é revisada de novo; e
+> ⚠️ **tirar da fila uma peça que existe passou a ter consequência**: o "Tirar
+> da fila" da Mesa, o `limpar_fila.js` e o `ajustar_fila_embalagem.js` são para
+> a peça que não existe (tirada por engano, volta revisando de novo ou
+> desfazendo na Mesa). **Teste ou script que embala persiana põe a peça na fila
+> antes.** ✅ **No ar desde 21/11/2026** (PR #360): o dono fez o deploy e disse
+> *"deu tudo certo no deploy"*. ⚠️ **Ainda não provado com dado real:** a
+> primeira persiana recusada na bancada por não ter vindo da Revisão.
+>
+> ⚠️ **"CANCELAR EMBALAGEM" (21/11/2026, AJUSTE, cartão R-EMB-10)**: o espelho do
+> "Cancelar revisão". Com a embalagem aberta, um toque zera tudo; **nada grava**
+> e a peça continua em "Aguardando embalagem". Fica só a linha `cancelada` em
+> `montagem_evento`, com quem cancelou (`POST /api/montagem/cancelar`, com linha
+> própria no `permDaRota`). ✅ **No ar desde 21/11/2026** (PR #360). ⚠️ **Ainda
+> não provado com dado real:** o primeiro cancelamento de verdade na bancada.
+>
+> ⚠️ **O RESULTADO DO BIPE FINAL FICA NA TELA ATÉ O PRÓXIMO BIPE** (AJUSTE de
+> 21/11/2026): o redesenho de 4 s trocava o "Embalada ✓" por "Pronto" em menos
+> de 1 s, e quem não lia a tempo podia embalar a peça de novo. O "Embalada ✓",
+> o "Não deu pra embalar" e o "Falha de conexão" usam o mesmo `avisoFixo` dos
+> outros avisos. `teste_montagem.js` (seção 12). ✅ No ar desde 21/11/2026 (PR #361): o
+> dono fez o deploy e disse *"deu tudo certo no deploy"*.
+>
+> ⚠️ **AO TERMINAR A PEÇA, A PESSOA VÊ O TEMPO DELA AO LADO DA PRÓPRIA MEDIANA
+> (21/11/2026)** — spec `TEMPO-NA-BANCADA`, cartão R-TEM-01, linha em
+> `docs/DECISOES.md`. Na Revisão e na Embalagem, duas barras ("Agora" e "Sua
+> média") e "Parabéns!" ou "Você pode melhorar". O que parece bug e não é: **"Sua
+> média" é a MEDIANA** (decisão do dono), da própria pessoa naquele SKU nos 30
+> dias, sem a peça que acabou de gravar — e, sem peça do SKU, a de todos os SKUs;
+> **no tempo exato da mediana é "Parabéns!"**; **quem calcula e decide o aviso é o
+> servidor** (`tempo_operador.js`, dono único; a tela só desenha com o
+> `public/tempo_bancada.js`); a linha sem id do login não conta para ninguém; e a
+> conta que falhar não derruba o bipe (`tempo:null`). **Tela nova que mede tempo
+> do operador entra no `ATIVIDADES` do `tempo_operador.js` e usa o
+> `tempoBancada`.** ✅ **No ar desde 21/11/2026** (PR #361): o dono fez o deploy e disse
+> *"deu tudo certo no deploy"*. ⚠️ **Ainda não provado com dado real:** as barras
+> e o aviso aparecendo para alguém da bancada com as peças dela dos últimos 30 dias.
+
+> ⚠️ **A PERSIANA COM DEFEITO VOLTA DA EMBALAGEM PARA A REVISÃO (21/11/2026)** —
+> spec `EMBALAGEM-DEFEITO-VOLTA`, cartão R-EMB-11, linha em `docs/DECISOES.md`.
+> Com a embalagem aberta, **"Peça com defeito"** (só persiana): quem embala decide
+> sozinho, com motivo obrigatório da mesma lista da Revisão. O que parece bug e não é:
+> - **nada embala e nada soma**, e a linha da fila **não é apagada**: passa à
+>   situação `defeito` (rastro de onde a peça estava). Sem linha `aguardando`, a
+>   persiana não embala de novo (R-EMB-02);
+> - **"não tem defeito" NÃO devolve a peça à fila**: a volta fecha e a peça é
+>   **revisada de novo** pelos dois bipes — uma porta só para a fila. ⚠️ **A
+>   exceção é a peça de DEVOLUÇÃO** (fila modo `devolucao`, que nunca teve revisão):
+>   sem defeito, a mesma linha volta a `aguardando`, com o modo, e embala como
+>   devolução (decisão do dono, 22/11/2026). **"Tem
+>   defeito"** escolhe o setor de uma lista fixa (`defeito_dominio.SETORES`) e grava
+>   a peça com problema de sempre (`rejeicao`, `origem='embalagem'`, com o setor),
+>   que vira material extra na 106;
+> - **quem achou pode conferir** a própria volta (decisão do dono); a volta parada
+>   fica só no bloco da 101, não na 204;
+> - **a peça com problema tem um dono só desde aqui** (`rejeicao_dominio.js`): o
+>   `POST /api/rejeicao` da Revisão e a volta confirmada passam por ele; a linha de
+>   antes, sem `origem`, conta como achada na revisão na 104;
+> - ⚠️ **a revisão da peça devolvida É APAGADA ao marcar** (decisão do dono,
+>   22/11/2026), como no "Desfazer última": sem isso a tela vermelha dava a ordem
+>   por cumprida com a peça com defeito, e o "sem defeito" contava duas vezes. O
+>   rastro fica em `revisao_evento` (`devolvida_embalagem`) e na volta
+>   (`revisao_id`, `revisado_por`, `revisao_segundos`); o revisor perde aquela
+>   peça na produtividade e na mediana. A revisão de antes dele **não** vira a
+>   "última" para desfazer, e o desfazer diz que a peça voltou por defeito.
+> - ⚠️ **a peça que volta é a linha RESERVADA por quem embala** (R-EMB-13,
+>   23/11/2026); sem reserva, a **mais antiga** da fila do SKU (decisão do dono,
+>   22/11/2026): com duas iguais na fila, a revisão apagada pode ser a de outra
+>   pessoa. Fica assim até cada persiana ter identificação própria — não
+>   "conserte" escolhendo outra.
+> `defeito_dominio.js` é o dono único da volta (tabela `embalagem_defeito`, no modo
+> teste). Construído, falta subir.
+
+> ⚠️ **A 102 EMBALA PRIMEIRO O QUE DESTRAVA A VENDA DE HOJE, E A PEÇA FICA
+> RESERVADA PARA QUEM EMBALA (23/11/2026)** — spec `EMBALAGEM-PRIORIDADE`, cartões
+> R-EMB-12 e R-EMB-13, seis linhas em `docs/DECISOES.md`. O que parece bug e não é:
+> - **a lista são quatro blocos**, e o vermelho é o SKU com venda de hoje sem peça
+>   livre na Etiqueta de Venda — a `falta` do `tarja_estoque.js`, a mesma conta da
+>   tarja "sem estoque". `embalagem_prioridade.js` não tem conta própria (#12).
+>   **A peça de reposição ou de devolução de um SKU vermelho conta no vermelho**:
+>   embalada, ela destrava a venda do mesmo jeito. Venda futura nunca é vermelha;
+> - ⚠️ **o cartão do vermelho mostra só o trabalho da embalagem** (24/11/2026,
+>   decisão do dono): o número é **"para embalar"** (o menor entre peça aqui e
+>   venda parada); não há "com peça" nem "na produção"; o SKU do dia sem peça
+>   aqui não aparece; a peça a mais desce para a Reposição; o topo diz *"faltam
+>   embalar N peças do dia"*. ⚠️ O SKU do dia com **todas** as peças com outra
+>   pessoa não aparece, mas vem em `so_reservadas`, e a tela o conta na trava da
+>   Revisão: o bipe dele diz quem está com a peça (409 `reservada`), e não "não
+>   passou pela Revisão" (③ REVISÃO). Construído, falta subir;
+> - **o bipe fora da prioridade nunca trava**: o aviso pergunta uma vez, e o
+>   próximo bipe decide (o kit segue e fica `fora_prioridade` em `montagem_evento`;
+>   o SKU do dia troca). A pessoa pode embalar outra coisa para não ficar parada;
+> - ⚠️ **na troca, a peça do dia é reservada ANTES de cancelar a de agora** (pelo
+>   bipe e pelo botão; o `cancelar` vai com `trocou` e `manter`, e não solta a
+>   reserva nova). Se a do dia não está aqui ou está com outra pessoa, **a troca
+>   não acontece** e a embalagem de agora continua, com o motivo no aviso — e o
+>   aviso não oferece de novo a peça recusada. Enquanto o servidor responde, o
+>   bipe não vale e o Cancelar e a Peça com defeito somem; sem resposta, a tela
+>   segue com a de agora e pede de volta a reserva dela. O `/reservar` desiste em
+>   8 s, e a embalagem abre sem reserva;
+> - ⚠️ **o bipe final passou a consumir a linha `hoje` primeiro**, depois
+>   `estoque`, depois `devolucao` (a reservada, quando há). A R-EMB-03 não mudou,
+>   mas a ordem do dia é abatida mais vezes que antes — decisão do dono;
+> - **a reserva é da pessoa, não do tablet**, e solta em `config.emb_reserva_min`
+>   (5) minutos sem bipe dela; sem cron, quem pergunta descarta as vencidas;
+> - ⚠️ **a peça reservada por outra pessoa nunca se consome no fim** (③ REVISÃO):
+>   quem não reservou (a página antiga em cache, a reserva vencida) leva 409
+>   `reservada` antes de gravar (linha `reservada` em `montagem_evento`, com quem
+>   está com a peça em `detalhe`), e não quem reservou. Se a prioridade não carregar,
+>   a lista cai no `GET /api/fila` (a bancada não para);
+> - **o `GET /api/fila` continua respondendo igual**: é o que o tablet com a página
+>   antiga lê. A tela nova lê `GET /api/montagem/prioridade`.
+> **Depois do deploy, recarregue os tablets da Embalagem.** ✅ **No ar desde
+> 24/11/2026** (PR #365): o dono fez o deploy e disse que a tela da Embalagem deu
+> certo. A spec foi para `docs/arquivo/`. ⚠️ **Ainda não provado com dado real:**
+> o bloco vermelho num dia de vendas de hoje sem peça, o aviso respondido pelo
+> bipe e duas pessoas no mesmo SKU com a reserva. Prova que não foi feita se
+> escreve como não feita.
 
 > ⚠️ **A FILA DA EMBALAGEM FOI ACERTADA PELA MESA DO FIM DO DIA 04/11/2026**
 > (linha em `docs/DECISOES.md`). `node ajustar_fila_embalagem.js` simula, e
@@ -884,7 +1152,8 @@ Etiqueta de Venda (`etq_route.js`, `embalagem.html`): `node teste_etiqueta.js`.
 No cruzamento: `node teste_cruzamento.js`. No `carreg_route.js`: `node
 teste_carga.js`. Na Mesa de correções ou nos scripts de passivo: `node
 teste_correcao.js`, `teste_correcao2.js`, `teste_correcao3.js` e
-`teste_conferencia_antiga.js`. Em permissão:
+`teste_conferencia_antiga.js` — e, no clique da 204 que leva à 205, `node
+teste_mesa_ir_tela.js` (num Chromium). Em permissão:
 `node teste_acesso.js` e `node teste_cobertura.js`. E **abra a tela**: a caixa
 de várias, o painel "depois" e a Mesa são texto montado.
 
@@ -947,6 +1216,25 @@ em saldo. **As vendas que não entraram** entram subindo o mesmo PDF de novo pel
 > entrado antes do #343 — o `gravar_nf_da_nota.js` as completa). ⚠️ **Ainda não
 > provado:** o próximo PDF neste formato fechando a conta sozinho, no primeiro
 > upload. Prova que não foi feita se escreve como não feita.
+
+> ⚠️ **O NÚMERO DO ENVIO APARECE NA TELA DESDE 16/11/2026** (AJUSTE, NF 9927):
+> os cards de Pendências diziam "pack — · venda —", e a pessoa não tinha número
+> para achar o pedido no ML. Os três cards (dúvida na leitura, caixa de várias,
+> modalidade), o "Confira esta venda" e o "Já impressos" escrevem **"envio
+> 48462356937"**, sem espaço, e um toque seleciona o número inteiro; a busca do
+> "Já impressos" acha pelo envio. ⚠️ **O card "venda na folha sem etiqueta"
+> NÃO ganhou o envio, e não é esquecimento:** o item da folha só com "Envio:" e
+> sem etiqueta nunca vira esse card (o `parse.js` só o abre com pack ou venda) —
+> cai na conta do PDF que não fecha. Mudar isso é coluna nova e muda o que vira
+> pendência (REGRA). E o volume de antes de 12/11/2026 continua sem o envio na
+> tela (o número só está nos `codes`). ⚠️ **Na Etiqueta de Venda o bipe espera
+> a cópia** (③ REVISÃO): tocar o número (`data-copiar`) segura o "foco volta ao
+> bipe" enquanto ele está selecionado, e no máximo 6 s — sem isso o foco apagava a
+> seleção e o número não se copiava. O toque também agenda a volta: vindo da
+> busca, o campo do bipe nunca perde o foco, e o bipe seguinte se perdia calado. `node teste_divergencia.js`, `node
+> teste_impressos.js` e `node teste_etiqueta.js`.
+> ⚠️ **Construído, falta subir.** Ainda não provado com dado real: o card de
+> uma etiqueta só com "Envio:" mostrando o número, e a cópia na 201 num iPad.
 
 **Rode `node teste_casos_reais.js` e `node teste_parse.js`** ao mexer na leitura
 do envio ou na folha inteira, **e `node teste_upload.js`** na duplicidade do
@@ -1075,6 +1363,18 @@ ciclo fechado contando (2).
   motivo, desfazer —, e clicar num volume ou num "em bloco" leva até lá
   (`corIrMesa`). A aba Correções ficou com a busca, o painel e o histórico. Uma
   porta só para decidir.
+
+> ⚠️ **O CLIQUE DA 204 LEVA O PEDIDO NO ENDEREÇO DA 205** (CONSERTO de
+> 25/11/2026). Desde que o Admin virou telas (04/11/2026), ir à aba Correções
+> TROCA DE PÁGINA, e o segundo passo do clique (`corIrMesa();corVencidos()`)
+> rodava na página deixada e se perdia: o "Fechar vencidos em bloco…", o
+> "Fechar conferências antigas em bloco…" e o clique num volume abriam a 205
+> vazia, e o bloco só se fazia pelo terminal. Hoje o clique é `corIr(pedido)`:
+> vai para `/admin/correcoes#abrir=vencidos` (ou `conferencias`, `lote-N`,
+> `fila-N`), e a 205 executa o pedido ao abrir e limpa o endereço. **Não volte
+> a encadear duas chamadas num clique que troca de tela.** A regra do bloco não
+> mudou (data vazia, nunca hoje, motivo, desfazer). `node
+> teste_mesa_ir_tela.js` (8, num Chromium; sem navegador diz PULADO).
 
 > ⚠️ **AS SOBRAS NÃO VIERAM PARA A CENTRAL, e a spec dizia que viriam.** O ↩
 > Sobrou exige bipar a etiqueta e o SKU de cada persiana, com a caixa na mão,
@@ -1208,7 +1508,7 @@ caixinha para clicar e ir para a tela de pendência — em todas as telas"*.
 
 - **Quem sabe é o servidor** (`pendencias_vigia.js`): para as ações da lista
   `VIGIA` (o upload da 103, a venda cancelada da 202, o pedido de ajuste da 301,
-  o terminar do Inventário, o salvar SKU, o pedido acima da alçada e a compra
+  o terminar do Inventário, a caixa não encontrada e a reimpressão de caixa que trava a 201, o salvar SKU, o pedido acima da alçada e a compra
   rápida, o recebimento e o "fechar com falta", o terminar da 504 e o salvar
   material), ele conta as linhas da central **antes** e
   **depois**; se uma subiu, a resposta de sucesso ganha `pendencias` (frase,
@@ -1337,13 +1637,22 @@ ou fornecedor criado na bancada (606).
 (`pendencias_pcp.test.js`) ao mexer no `pendencias_pcp.js`, na porta, nas linhas
 `sm_*`, no `abre_tela.js` ou nas rotas de lá vigiadas.**
 
-**Rode `node teste_pendencias_caminho.js` (78) ao mexer no `pendencias_vigia.js`, no
+**Rode `node teste_pendencias_caminho.js` (87) ao mexer no `pendencias_vigia.js`, no
 `tela`/`frase` das linhas da central, na caixinha do `pendencias_aviso.js` ou na
-ordem do `server.js`** — e `node teste_pendencias.js`. **E `node teste_pendencias_menu.js` (49)** ao mexer no `minhas`, na rota `/minhas`, na bolinha do `menu_telas.js` ou na chamada dela nos dois `nav.js`.
+ordem do `server.js`** — e `node teste_pendencias.js`. **E `node teste_pendencias_menu.js` (52)** ao mexer no `minhas`, na rota `/minhas`, na bolinha do `menu_telas.js` ou na chamada dela nos dois `nav.js`.
 
 Ferramentas que só leem: `node rastrear.js --lote` (os sete degraus do PDF até a
 tela), `node rastrear.js --auditar [dias]`, `node conferir_nf.js --pdf` e `node
-conferir_carregados.js`.
+conferir_carregados.js`. **E `node diagnosticar_diferenca_telas.js`** (21/11/2026,
+copia o banco com `db.backup()`): quando a Etiqueta de Venda e a Conferência
+parecem não bater, ele relê os PDFs dos dois últimos dias (novas · recusadas como
+repetidas · não achadas), procura venda repetida no histórico inteiro, conta o dia
+em caixas **e** persianas por situação e prazo, faz a ponte entre as duas telas
+caixa a caixa e lista o que sobrou de antigo — pelas réguas das telas
+(`fila_dia.js`, `carga.js`, `parse.js`). ⚠️ **As duas telas contam CAIXAS, e o
+ML conta UNIDADES**; e a caixa que saiu sem o bipe da Conferência (ou com o "a
+coleta não passou" tocado por engano) continua na lista até a limpeza das nunca
+conferidas. `--dias`, `--sem-pdf`. `node teste_diagnosticar_diferenca_telas.js` (27).
 
 ---
 
@@ -1419,7 +1728,9 @@ anúncio ser corrigido na origem. Isso força a padronização em vez de mascar�
 
 **O código do SKU é uma etiqueta livre.** Pode ter espaços, hífens, números no
 meio — `ROLO SOB MEDIDA 137x212` é um SKU válido. O sistema não interpreta o
-código para descobrir nada.
+código para descobrir nada. ⚠️ **A única forma proibida, desde 25/11/2026, é a
+das etiquetas da produção** (PS + 8 números, TC ou TB + 6): o SKU novo assim é
+recusado no cadastro, porque o leitor o confundiria com a etiqueta (§25).
 
 O que a peça É vive em **colunas** de `skus`:
 
@@ -2423,15 +2734,126 @@ da saída teria de ser conferido em três lugares.
 > ⚠️ **A TELA ACHOU DOIS DEFEITOS QUE OS TESTES DE ROTA NÃO PEGAM**: o texto do
 > fim do dia saía grande (a regra `.sub3` valia só dentro da lista), e o
 > cabeçalho "Conferidas" nasceu **âmbar** — a classe `conf` já era do botão
-> "Conferir carga do carro", que saiu. **`node teste_conferencia_tela.js`** (38,
-> num Chromium de verdade; sem navegador diz PULADO e o CI não o roda) trava a
-> cor do cabeçalho.
+> "Conferir carga do carro", que saiu. ~~**`node teste_conferencia_tela.js`** (38)
+> trava a cor do cabeçalho~~ — desde 25/11/2026 ele confere a tela dos
+> carrinhos (bloco logo abaixo).
 >
 > ✅ **AS QUATRO FASES ESTÃO NO AR DESDE 04/11/2026** (PRs #261 e #263): o dono
 > fez o deploy e disse *"deu tudo certo"*. ⚠️ **AINDA NÃO PROVADO:** a primeira
 > viagem fechada com quem levou, o primeiro "a coleta não passou" com o selo
 > no dia seguinte e a primeira venda cancelada separada por um e confirmada
 > por outro. Prova que não foi feita se escreve como não feita.
+
+### ⚠️ A 202 CONFERE NOS CARRINHOS E ENTREGA POR CARRINHO (25/11/2026)
+
+Spec `docs/specs/CONFERENCIA-CARRINHOS.md` (fases 1 e 2, construídas juntas por
+decisão do dono), cinco linhas em `docs/DECISOES.md`, cartões **R-CRR-01 a 05** e
+**R-ENT-01 a 05** em [`docs/regras/carregamento.md`](docs/regras/carregamento.md).
+O dono: *"às vezes o pessoal bipa e não termina o processo porque não está
+intuitivo"*. A tela foi desenhada com ele num protótipo antes das regras. O que
+parece bug e não é:
+
+- **O bipe não tem modo.** A caixa de coleta vai para o **carrinho ativo** do
+  aparelho (A, B…, a lista "Carrinhos da expedição" da 902, com a etiqueta
+  `CARRINHO-A` em PDF); a de agência vai sozinha para o **Carro da agência**
+  (`AG`). Bipar a etiqueta do carrinho troca o ativo. O destino é
+  `lote.carrinho`, e o `carrinho_dominio.js` é o dono único.
+- ⚠️ **A COLETA CONFERIDA CONTINUA `carregado` E A AGÊNCIA CONFERIDA CONTINUA
+  `embalado` com `conferido_em`** — o canto e a área de antes —, de propósito: a
+  pilha, o adiantado, as canceladas e as rotas antigas leem esses estágios. O
+  carrinho é uma coluna a mais, e "está num destino" é o `NA_FABRICA` do domínio.
+- **A baixa não mudou de lugar**: é o bipe (R-EST-03). O carrinho entra na mesma
+  transação. **"Quem imprimiu não confere" continua.**
+- **A entrega é por carrinho** (`POST /api/entrega/fechar`): o motorista leva o
+  carrinho inteiro, um ou vários com uma foto só; não se bipam sobras. **Não
+  existe "foi sem conferir"**: a caixa a mais é achada e bipada no caminhão; sem
+  fechar, só `saida.liberar` com motivo (`/api/entrega/liberar`). Na agência,
+  quem levou (pessoa ativa). Quem entrega é o login — sem PIN no meio.
+- ⚠️ **A RECONTAGEM É CEGA, E O "NÃO ACHEI" NÃO MEXE NO ESTOQUE** (decisão do
+  dono, 25/11/2026; a spec dizia "volta para faltam bipar"): a caixa sai do
+  carrinho, continua conferida (já baixou) e vira a pendência "Conferência —
+  caixa não achada no carrinho" na 204. Achada, entra num carrinho pelo bipe,
+  **sem baixar de novo**.
+- ⚠️ **A CAIXA CONFERIDA SEM CARRINHO entra num carrinho pelo bipe, sem baixar
+  de novo** — é o caminho das caixas que estavam no canto e na área no dia do
+  deploy, e da página antiga em cache (que confere sem mandar o carrinho). A
+  tela as mostra no filtro "Conferidas sem carrinho".
+- ⚠️ **AS ROTAS DA SAÍDA DO CAMINHÃO E DA VIAGEM CONTINUAM NO AR** (`/api/saida/*`,
+  `/api/viagem/*`), só para o tablet com a página velha em cache. **Depois do
+  deploy, recarregue os tablets e o notebook da Conferência.**
+- **As duas barras** (`carrinho_dominio.barras`): "Entrega do dia" = sem
+  etiqueta ainda (o `VENCE_HOJE` do `fila_dia.js`) + impressas sem bipe + nos
+  destinos + entregues hoje; "Bipar o que foi impresso hoje" = impressas hoje ×
+  bipadas.
+- **O segundo bipe (SKU) liga na 906** (`conf_carregamento`), e o dono decidiu
+  ligá-lo; a 202 só mostra se está ligado.
+- **Carrinho com caixa dentro não se desativa** na 902 (409).
+- A faixa "Carrinho B com 6 — falta entregar" é só da 202 (decisão do dono).
+- ⚠️ **A ③ REVISÃO (25/11/2026) ACHOU E CONSERTOU, e cada um tem teste:** a
+  trava de 700 ms do bipe de peça tinha sumido da tela nova (R-PEC-04); o nome
+  de quem imprimiu tinha saído da linha própria (R-SEG-03) e a lista dos SKUs
+  da caixa de várias, da tela (R-PEC-02); **o foco saía do campo do bipe** e o
+  bipe seguinte do leitor se perdia calado (§12); a caixa achada no caminhão ia
+  para o carrinho ativo e não para o que estava sendo entregue; **a tela
+  escolhia o Carrinho A sozinha**; a barra contava a conferida sem carrinho em
+  "nos carrinhos"; o selo "de ontem" do "a coleta não passou" tinha sumido
+  (R-FIM-01); e o ALTER das colunas novas do `lote` rodava antes dos de
+  `resolvido_por_id`, `horario_id` e `envio` — o banco antigo terminaria noutra
+  ordem que o novo (§17, o `teste_quem.js` pegou). A saída ou a viagem aberta
+  por um aparelho com a página antiga aparece como faixa na tela nova.
+
+**Rode `node teste_carrinhos.js` (44) e `node teste_entrega.js` (28) ao mexer no
+`carrinho_dominio.js`, no `carrinho_route.js`, no bipe do `carreg_route.js` ou na
+lista da 902 — e `node teste_conferencia_tela.js` (38, num Chromium; sem navegador
+diz PULADO) e `node teste_carregamento_tela.js` (11) ao mexer na tela.**
+
+✅ **Fases 1 e 2 no ar desde 25/11/2026** (PR #375, deploy junto com a fase 3):
+o dono disse *"deu tudo certo no deploy"*. Ainda não provado com dado real: a primeira conferência nos carrinhos com o leitor, a
+primeira entrega de carrinho com a foto do motorista, e as caixas do canto de
+antes entrando num carrinho.
+
+### ⚠️ A 201 TRAVA COM CAIXA DE DIA ANTERIOR SEM CONFERÊNCIA (fase 3, 25/11/2026)
+
+Cartões **R-TRV-01 a 04** em [`docs/regras/carregamento.md`](docs/regras/carregamento.md).
+O dono: *"a tela de etiqueta de venda não pode deixar avançar se tiver peças que
+não foram conferidas"*. O que parece bug e não é:
+
+- **A adiantada trava também** (D18): as 15 adiantadas de hoje para a coleta de
+  amanhã, se amanhã cedo não tiverem bipe, travam a 201. A impressa **hoje** não
+  trava. O sob medida trava igual (D19), e a trava vale para todo mundo (D11).
+- **`trava_dominio.js` é o dono único** da régua (caixa `embalado`, sem
+  `conferido_em`, impressa antes de hoje, fora de saída, sem "não encontrada").
+  ⚠️ **A caixa de várias com item cancelado pelo ML fica fora** (decisão do dono,
+  25/11/2026): ela espera decisão no card "Canceladas depois da etiqueta".
+  O `/api/embalar` recusa com 409 `trava_dia` e a lista; o `/api/proximo` manda
+  `trava` para a tela avisar no bipe.
+- **A reimpressão nunca trava** (R-TRV-02), mas a reimpressão de uma caixa que
+  está travando abre a pendência **"caixa reimpressa no dia seguinte"** (§7 da
+  spec): *achei a caixa velha* · *foi só a etiqueta* · *persiana perdida*, que só
+  abre o **pedido** de ajuste −1 por peça — outra pessoa aprova (R-EST-20); nada
+  aqui mexe em saldo.
+- **"Caixa não encontrada"** (`expedicao.caixa_nao_encontrada`, Supervisor,
+  sensível, tela 201, nasce só para o Admin Geral) solta a trava com motivo; a
+  caixa não muda de estágio nem de saldo (continua reservando a peça) e fica na
+  204 até alguém escrever o que foi decidido com o ML, ou até ser bipada.
+- **A conta que falhar não derruba a bancada**: vai ao log e a 201 diz *"não
+  consegui conferir a trava"* (só num banco sem as colunas, que o de produção
+  não é).
+- ⚠️ **No primeiro dia depois do deploy a 201 já pode amanhecer travada.** Antes,
+  rode `node diagnosticar_trava.js` (só lê, copia o banco): ele lista as caixas
+  que travariam. As muito antigas saem pelo passivo das nunca conferidas
+  (`fechar_saida_passivo.js --nao-bipadas --ate …`, que dá a baixa).
+
+**Rode `node teste_trava_dia.js` (66) ao mexer no `trava_dominio.js`, no
+`trava_route.js`, na `/api/embalar`, na `/api/reimprimir` ou no quadro da 201.**
+
+✅ **No ar desde 25/11/2026** (PR #377): o dono fez o deploy e disse *"deu tudo
+certo no deploy"*. Antes, a limpeza das nunca conferidas fechou as 27 caixas
+de 23 e 24/11 que já tinham saído (saída #42, 28 peças baixadas), e a contagem
+do dono bateu com o sistema: as 15 caixas na fábrica estavam conferidas no
+carrinho A. ⚠️ **Ainda não provado com dado real:** a primeira manhã com a 201
+travada (a #5680, que saiu em 25/11 sem bipe) e solta pela limpeza de 25/11, e
+a primeira caixa reimpressa no dia seguinte decidida.
 
 | Cartão | Regra em uma linha |
 |---|---|
@@ -2482,7 +2904,21 @@ da saída teria de ser conferido em três lugares.
 | R-VIA-06 | O "No carro" do topo e a viagem dizem o mesmo número |
 | R-ADI-01 | Adiantado é o que sai antes do despacho, em PEÇAS; na coleta conta o caminhão |
 | R-PAS-01 | O passivo da coleta bipada sai na data do bipe de cada caixa |
-| R-PAS-02 | O passivo das nunca bipadas exige data de corte de quem viu sair |
+| R-PAS-02 | O passivo das nunca conferidas exige data de corte (no máximo ontem) e DÁ A BAIXA na que nunca baixou (19/11/2026) |
+| R-CRR-01 | A caixa conferida vai para um destino: um carrinho ou o Carro da agência (`lote.carrinho`) (25/11/2026) |
+| R-CRR-02 | O bipe não tem modo: coleta no carrinho ativo, agência no Carro da agência; a etiqueta do carrinho troca o ativo |
+| R-CRR-03 | Os carrinhos são a lista "Carrinhos da expedição" (902), com a etiqueta; com caixa dentro não se desativa |
+| R-CRR-04 | A recontagem é cega; o "não achei" tira do carrinho, não mexe no estoque e vira pendência |
+| R-CRR-05 | A caixa conferida sem carrinho entra num carrinho pelo bipe, sem baixar de novo |
+| R-ENT-01 | A entrega leva destinos inteiros; quem entrega é o login; não se bipam sobras |
+| R-ENT-02 | Antes de entregar, a tela mostra o que ficou sem bipe |
+| R-ENT-03 | Não existe "foi sem conferir": a caixa a mais é bipada no caminhão; senão, `saida.liberar` com motivo |
+| R-ENT-04 | A agência pelo carro fecha com quem levou; o Carro da agência pode ir ao motorista |
+| R-ENT-05 | As duas barras do dia saem do `carrinho_dominio.barras`, sem conta própria de prazo |
+| R-TRV-01 | A 201 não imprime etiqueta nova com caixa de dia anterior sem conferência, adiantada ou não (25/11/2026) |
+| R-TRV-02 | A reimpressão nunca trava |
+| R-TRV-03 | Solta: o bipe na 202, a venda cancelada, ou "caixa não encontrada" com motivo (vira pendência) |
+| R-TRV-04 | Fora da trava a conferida, a cancelada, a que saiu; a reimpressa no dia seguinte vira pendência, e "perdida" só pede ajuste |
 
 **Ao mexer em** `parse.js` (modalidade): `node teste_parse.js` (caso 15) e `node
 teste_etiqueta_envios.js` (o formato "Etiqueta válida para envíos"). Na
@@ -2493,8 +2929,10 @@ teste_segunda_pessoa.js` e `node teste_pecas_carga.js`. No `saida_route.js`:
 `node teste_saida_coleta.js` e `node teste_saida_agencia.js`. Na recusa do
 motorista ou na venda cancelada: `node teste_sobra.js`. Nas fases 2 a 4 da
 `CONFERENCIA-EXPEDICAO` (viagem com quem levou, fim do dia, cancelamento em
-duas pessoas): `node teste_conferencia_expedicao.js` (92) e, na tela, `node
-teste_conferencia_tela.js` (38). No `POST /api/embalar`, no
+duas pessoas): `node teste_conferencia_expedicao.js` (91). No carrinho e na
+entrega (`carrinho_dominio.js`, `carrinho_route.js`): `node teste_carrinhos.js`
+(44) e `node teste_entrega.js` (28); na tela, `node teste_conferencia_tela.js`
+(38) e `node teste_carregamento_tela.js` (11). No `POST /api/embalar`, no
 `POST /api/reimprimir` ou no `fechar_saida_passivo.js`: `node teste_saida.js`.
 Em `saida.liberar` ou outra chave: `node teste_acesso.js` e `node
 teste_cobertura.js`. E **abra a tela**, a 1440 e a 400 px: a pilha, a tela
@@ -2504,6 +2942,37 @@ Ferramentas: `node backfill_modalidade.js` (volume antigo sem modalidade) e
 `node fechar_saida_passivo.js [--nao-bipadas] --ate AAAA-MM-DD` — a data de corte é
 obrigatória nos dois modos desde 22/10/2026 (R-PAS-01), e os dois
 simulam sem `--aplicar`.
+
+> ⚠️ **O `--nao-bipadas` DÁ A BAIXA DESDE 19/11/2026** (spec
+> `LIMPEZA-SAIU-SEM-CONFERENCIA`, linha em `docs/DECISOES.md`, R-PAS-02). Ele
+> foi escrito quando a baixa era na impressão e só fechava a caixa; desde
+> 22/10/2026 a caixa impressa e nunca conferida **nunca baixou**, e fechá-la
+> sem baixar deixava o saldo alto para sempre (e o livre subia, porque a caixa
+> fechada deixa de reservar). Agora, na mesma transação, cada caixa que nunca
+> baixou recebe a baixa pelo `baixa_dominio.baixar` — o mesmo caminho do "foi
+> no caminhão": −1 por persiana, uma linha por SKU, sob medida não move saldo.
+> O que parece bug e não é:
+> - **`baixado_em` é o carimbo de saída da caixa** (o dia do despacho às 15:00),
+>   e não a hora da rodada — o gráfico conta a baixa pelo dia dela. A linha do
+>   livro tem a hora real e o motivo *"passivo: caixa saiu sem conferência"*.
+> - **`conferido_em` e `conferido_por` ficam vazios**: ninguém conferiu.
+> - **A data de corte é no máximo ONTEM** (o modo da coleta continua aceitando
+>   hoje): a caixa impressa hoje é trabalho da conferência.
+> - ⚠️ **A caixa de várias com item cancelado (`cancelada_varias=1`) fica de
+>   fora**, decidida ou não: o script não sabe qual peça o ML cancelou. A que
+>   espera decisão está no card "Canceladas depois da etiqueta"; a já decidida
+>   na Mesa se confere na Conferência ou se acerta pela 301. A simulação conta
+>   as duas, separadas. SKU fora do cadastro aparece ⛔ na simulação, e o
+>   `--aplicar` recusa sem gravar nada.
+> - **A que já tinha baixado (antes de 22/10) só fecha**, e a simulação diz
+>   quantas. O saldo negativo fica negativo (R-EST-08), e o quadro por SKU da
+>   simulação marca quais; o **livre não muda**.
+> - ✅ **NO AR E APLICADO EM 19/11/2026** (PR #357): o dono fez o deploy e
+>   rodou a limpeza — a saída #30 (19/11/2026, 17:10) fechou **188 caixas** impressas de 10 a 18/11 (as 187 e a #4581, depois de desfeita a correção #64) e baixou **195 peças** em **23 SKUs** (190 linhas no livro); `SUM(delta) = skus.estoque` em todos os SKUs, e a simulação seguinte deu "Nada a fechar". As 560 caixas de
+>   coleta do mesmo período saíram conferidas e baixadas como sempre. A spec foi
+>   para `docs/arquivo/`. ⚠️ **Ainda não conferido na tela:** a 204 com o
+>   contador "caixas impressas sem conferência" só com as impressas depois de
+>   18/11 (62 no dia 20/11, trabalho da Conferência).
 
 ---
 
@@ -3490,7 +3959,7 @@ logado"*. Linhas em `docs/DECISOES.md`.
 > recusado na bancada, um desfazer de verdade e a primeira sessão nova gravada
 > em `sessao`. Prova que não foi feita se escreve como não feita.
 
-**Rode `node teste_quem.js` (308) ao criar QUALQUER rota de escrita, mexer no
+**Rode `node teste_quem.js` (344) ao criar QUALQUER rota de escrita, mexer no
 `quem.js` ou num `require` de módulo de rotas.** Ele sobe os módulos na ordem do
 `server.js` e chama cada escrita sem login; rota nova que não passa pelo `quem.js`
 reprova no mesmo minuto em que é escrita.
@@ -3534,7 +4003,9 @@ sob medida tiram a dela do `TELA_DA_CHAVE` do módulo.
 > dois divergiram: 104 Problemas e 204 Pendências ficaram **Admin** (a proposta
 > era Supervisor, que daria a tela a quem hoje não abre o Admin), e o 401
 > Planejamento ficou Admin abrindo com `planilha.importar` (decisão D1 (b) do
-> dono). Para mudar, é decisão dele, e muda a linha do mapa.
+> dono). Para mudar, é decisão dele, e muda a linha do mapa. ~~O 401 Admin~~ —
+> **desde 25/11/2026 a 401 é nível Supervisor e abre também com
+> `producao.etiqueta`**, e o Supervisor a vê só na aba das etiquetas (§25).
 >
 > ⚠️ **A ORDEM DE CHEGADA É UMA LISTA PRÓPRIA** (`CHEGADA`), e não a ordem do
 > mapa: ela decide para onde cada pessoa vai de manhã, e é a do `PADRAO` antigo.
@@ -3712,7 +4183,8 @@ Esperado: telas `302`, API `401`, `/login` `200`.
 fase 2), e a 106 `/material-extra` (FICHAS-NO-CADASTRO-UNICO) — e, desde
 05/11/2026, a tela 206 `/coleta-horarios` (HORARIOS-DE-COLETA) — e, desde
 08/11/2026, a 905 `/minha-producao` (RELATORIOS-UNIFICADOS) — e, desde
-11/11/2026, a 906 `/parametros` (ARRUMAR-O-LUGAR fase 3).
+11/11/2026, a 906 `/parametros` (ARRUMAR-O-LUGAR fase 3) — e, desde 21/11/2026,
+a 907 `/manual` (MANUAL-DO-SISTEMA fase 1; e `/api/manual/minhas` tem que dar 401). — e, desde 25/11/2026, a 107 `/montagem-persiana`, a 108 `/corte-tecido` e a 110 `/serralheria` (PRODUCAO-MAPA-E-MOTOR v7; e `/api/producao/etiquetas` tem que dar 401).
 
 Proteção contra força bruta: 5 PINs errados bloqueiam a pessoa por 1 minuto —
 **inclusive com o PIN certo**, senão a trava só atrasaria quem chuta —, e a trava é
@@ -3770,7 +4242,7 @@ guarda o saldo é a coluna, o movimento é só a história dela.
 (04/11/2026, conferência v2), `revisao_evento` (04/11/2026, a revisão
 cancelada, recusada e desfeita — QUEM-FEZ-E-REVISAO), `lote_reimpressao`
 (05/11/2026, cada reimpressão da etiqueta de venda, com quem),
-`volume_material`, `volume_evento`, `contagem_material` (+ `_item` e `_linha`),
+`montagem_evento` (21/11/2026, o bipe de fim da embalagem recusado por rápido demais), `embalagem_defeito` (21/11/2026, a peça devolvida à Revisão por defeito), `embalagem_reserva` (23/11/2026, a peça reservada para quem embala), `volume_material`, `volume_evento`, `contagem_material` (+ `_item` e `_linha`),
 `nota_compra` (+ `_item`), `pagamento_parcela` e `compra_anexo` (07/11/2026,
 COMPRAS-E-RECEBIMENTO — a `dfe_documento` fica fora: a nota apagada não se baixa de
 novo), `material_extra` (11/11/2026, FICHAS-NO-CADASTRO-UNICO; a linha da recusa
@@ -4190,7 +4662,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). ~~**Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa~~ — **fechado em 08/11/2026**: a 905 Minha produção e a aba Por pessoa da 904 (§21) · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (27 casos), `teste_carga.js` (67), `teste_divergencia.js` (62) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (84), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (371), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (64), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (62), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (308), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (10), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (120), `teste_upload.js` (84), `teste_impressos.js` (33), `teste_quantidade.js` (42), `teste_casos_reais.js` (85), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (67), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (92) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (45), `teste_nivel.js` (98), `teste_admin_telas.js` (67), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (109), `teste_501_so_compra.js` (93), `teste_custo_historico.js` (15), `teste_parametros.js` (113), `teste_gravar_nf_da_nota.js` (28), `teste_pendencias_caminho.js` (78), `teste_fichas_material.js` (64), `teste_pendencias_menu.js` (49), `teste_pendencias_sobmedida.js` (67), `teste_roteiro.js` (25), `teste_material_ficha.js` (6); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (27 casos), `teste_carga.js` (63), `teste_divergencia.js` (70) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (86), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (378), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (158), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (87), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (344), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (11), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (122), `teste_upload.js` (84), `teste_impressos.js` (42), `teste_quantidade.js` (42), `teste_casos_reais.js` (85), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (115), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (67), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (91) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (46), `teste_nivel.js` (98), `teste_admin_telas.js` (66), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (109), `teste_501_so_compra.js` (93), `teste_custo_historico.js` (15), `teste_parametros.js` (113), `teste_gravar_nf_da_nota.js` (28), `teste_pendencias_caminho.js` (87), `teste_fichas_material.js` (64), `teste_pendencias_menu.js` (52), `teste_pendencias_sobmedida.js` (67), `teste_roteiro.js` (25), `teste_diagnosticar_diferenca_telas.js` (27), `teste_tempo_operador.js` (28), `teste_tempos_minimos.js` (35), `teste_parametros_onde.js` (62), `teste_defeito_volta.js` (65), `teste_embalagem_prioridade.js` (89), `teste_revisao_problema_tela.js` (29, precisa de navegador), `teste_revisao_tela_unica.js` (66), `teste_revisao_tela_unica_tela.js` (37, precisa de navegador); `teste_etiqueta_producao.js` (63), `teste_producao_motor.js` (112), `teste_producao_revisao.js` (47), `teste_carrinhos.js` (44), `teste_entrega.js` (28), `teste_mesa_ir_tela.js` (8, precisa de navegador), `teste_trava_dia.js` (66), `teste_material_ficha.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -4202,7 +4674,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 20 | ~~**Editar um setor APAGA, sem avisar, as permissões que ele tem acima do próprio nível.**~~ **RESOLVIDO em 26/10/2026** (fase 3 da `ACESSOS-UNIFICADOS`, R-ACE-03) — o nível do setor virou **etiqueta**: a tela mostra a caixinha acima do nível como ela está (marcada, com o aviso "acima do nível do setor") e manda a lista inteira (`todas`); a tela antiga, sem a marca, não apaga nada. A permissão **sensível nova** pede confirmação (409 `sensiveis`) antes de entrar. As três **intransferíveis** continuam fora de qualquer setor que não seja o Admin Geral, agora por trava própria, e não mais pelo nível · `teste_setor_salvar.js` (26). **Desde 04/11/2026 o nível volta a travar** (fase 4 da `ACESSO-POR-TELA-E-NIVEL`), mas recusando a chave **nova** na hora, dizendo por quê — a que já estava fica, nunca se apaga (§10) | — |
 | 21 | ~~**A tarja "sem estoque" da Etiqueta de Venda só acusa o livre ≤ 0**, e não a fila inteira do SKU~~ **RESOLVIDO em 06/11/2026** (CONSERTO) — a linha e a peça da caixa contam a fila inteira de hoje do SKU (`tarja_estoque.js`, dono único), o sob medida não ganha tarja e o JOIN da linha é em maiúscula. A trava da impressão não mudou. **Fica aberto:** o painel "Pra despachar depois" continua com a regra antiga · `teste_tarja_estoque.js` (23) | — |
 | 22 | **O `pdfjs-dist` está na versão 3.11, e o `npm audit` acusa.** A falha (PDF malicioso rodando JavaScript) está fechada pela opção `isEvalSupported:false` em todo `getDocument` (07/11/2026, §12), mas a versão continua acusada, e com ela a instalação opcional do `canvas` (`@mapbox/node-pre-gyp`, `tar`), que o PCP nunca chama e que só roda no `npm install`. O conserto do audit é a **versão 6**: só carrega por `import` (ESM) e mexe no texto que o `parse.js` lê — tem que passar pelo caderno de casos reais inteiro (R-INV-01) antes de subir. O Express (`proxy-addr`, `body-parser`, `qs`) foi consertado no mesmo dia, e o `tecido/` dá 0 vulnerabilidades. ✅ No ar desde 07/11/2026 (PR #307) | Baixo enquanto a opção estiver em todo `getDocument` |
-| 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **três formas**: dado que ninguém preencheu, **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2; o `POST /api/componentes` ficou **oito meses**, e no lugar dele se fazia `INSERT` à mão — §7-B, armadilha #33) e **chave de permissão que nenhuma rota lê** (a `minimo.definir` da linha abaixo). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
+| 18 | **Nada acusa uma regra INERTE** — e ela tem pelo menos **três formas**: dado que ninguém preencheu, **rota que nenhuma tela chama** (o extrato do livro ficou um dia no ar sem botão, §2; o `POST /api/componentes` ficou **oito meses**, e no lugar dele se fazia `INSERT` à mão — §7-B, armadilha #33) e **chave de permissão que nenhuma rota lê** (a `minimo.definir` da linha abaixo). `modelo.sob_medida` ficou três semanas sem nenhuma linha marcada: a regra do §7 estava escrita e codificada, e não pegava em ninguém — sem erro, sem log, sem sinal em tela nenhuma (§7, armadilha #30). O §18 já tem o desenho que falta aqui: a auditoria do parse reporta a **cobertura** de cada trava e fica âmbar abaixo de 100%. O equivalente para flags de cadastro não existe. Descoberto por acaso, por um script escrito para outra coisa. **Desde 21/11/2026 o manual (§26) cobre a ponta de quem opera:** tela, ação ou regra sem a ficha reprova o `teste_manual.js` — a regra que ninguém explica à bancada passa a acusar; a flag não preenchida continua sem quem acuse | Médio — o modo de falhar é silencioso, e o desvio acontece fora da vista do sistema |
 
 ---
 
@@ -4870,10 +5342,22 @@ A fábrica tem **duas operações**: a medida padrão (tudo até a §18, banco
 > boleto. ⚠️ **O descarte de sobra não ganhou o mesmo**: sobra usada no corte
 > continua esperando quem recuse com motivo, como sempre foi.
 >
-> ⚠️ **AINDA NÃO NO AR, E O SCRIPT AINDA NÃO RODOU NO SERVIDOR.** A prova: a
-> simulação lista os pedidos órfãos, o `--aplicar` os fecha, a linha da baixa de
-> boleto na 616 e na 204 desce, e a segunda rodada diz "nenhum". Prova que não foi
-> feita se escreve como não feita.
+> ✅ **NO AR DESDE 12/11/2026** (PR #352): o dono fez o deploy (`/login` 200) e
+> rodou o script — a simulação e o `--aplicar` acharam **0** pedidos órfãos, e
+> não havia nada a fechar. ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** o primeiro
+> boleto cancelado com uma baixa esperando, a baixa saindo da 616 e da 204 na
+> hora. Prova que não foi feita se escreve como não feita.
+
+> ⚠️ **O `detalhe` DA AUDITORIA RODA SOBRE O DADO JÁ PODADO, E DEPOIS DA ESCRITA**
+> (CONSERTO de 12/11/2026). O vendedor sem `preco.ver` (§23) clicava "Enviar" na
+> 611 e levava 500: o `detalhe` lia `d.preco.valor_total`, e o `preco` não viaja
+> para ele. O pedido já estava enviado, com número, mas a tela dizia erro e a
+> auditoria não gravava quem enviou. Duas coisas: o `detalhe` do enviar só
+> escreve o total se ele veio; e o `tecido/nucleo/registro.js` roda **todo**
+> `detalhe` num `try` próprio — se estourar, vai ao log, a linha da auditoria grava
+> quem fez com *"(detalhe falhou)"*, e a escrita que gravou responde 200.
+> **`detalhe` novo lê o resultado com guarda** (`d&&d.x`), lembrando que campo de
+> dinheiro pode ter sido podado. `pedido_enviar_sem_preco.test.js` (3).
 
 ### ⚠️ O CADASTRO DE PRODUTO — o que parece bug e não é (28/10/2026)
 
@@ -4945,7 +5429,7 @@ de material do PCP (marca e modelo): `node teste_componentes.js`. Todos os
 ### Teste obrigatório
 
 ```bash
-cd tecido && npm test          # 903 casos
+cd tecido && npm test          # 907 casos
 ```
 
 E o teste de segurança da §10, agora incluindo os caminhos novos:
@@ -5152,7 +5636,7 @@ estiveram no ar até 02/10/2026:
   e não no `NOMES`.
 
 **Rode `cd tecido && npm test` ao criar tela** — o `telas_listas.test.js`
-(5 casos) recusa tela declarada sem porta na inicial ou sem `modulo` e `bloco`,
+(6 casos) recusa tela declarada sem porta na inicial ou sem `modulo` e `bloco`,
 porta que aponta para tela que não existe, e o rodapé de volta no `nav.js`. Os dois defeitos foram
 reintroduzidos, e cada um reprova o seu caso.
 
@@ -5422,7 +5906,8 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 >   chaves do sob medida são de Supervisor (R-SMA-02), e o setor "Sob medida /
 >   Cadastros" perderia os parâmetros e os feriados. As partes da medida padrão
 >   continuam só para Admin, porque as chaves delas são de Admin;
-> - **ela abre com `sobmedida.parametro.ler`, `sobmedida.parametro.editar` ou o
+> - **ela abre com `sobmedida.parametro.ler`, `sobmedida.parametro.editar`,
+>   `producao.corrigir` (desde 25/11/2026, a etiqueta parada, §25) ou o
 >   nível Admin** (a `horarios.editar` saiu com os horários) — o ganho nomeado é quem é
 >   Supervisor com a `parametro.ler` abrir a tela só para ler o que a rota já
 >   lhe entregava;
@@ -5451,6 +5936,16 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 > - **a lista do que está fora do lugar está VAZIA**: o que sair do lugar amanhã
 >   entra nela, com a spec que arruma.
 >
+> ⚠️ **TODO AJUSTE DA 906 DIZ A TELA ONDE VALE** (AJUSTE de 24/11/2026, decisão
+> do dono: *"deve informar de qual tela é a informação"*). Cada card e cada linha
+> escreve *"vale na 102 Embalagem →"*: o número, o nome e o endereço saem dos dois
+> mapas pelo `parametros_onde.js` (dono único da ligação chave → tela, rota `GET
+> /api/parametros/onde`, de quem abre a 906), nunca escritos à mão. A tela que a
+> pessoa abre vira link; a que ela não abre fica só escrita; sem tela conhecida,
+> nada. **Parâmetro novo na 906 entra no `ONDE` do `parametros_onde.js`** — o
+> `teste_parametros_onde.js` (62) reprova o do sob medida (lido do banco novo de
+> lá) e os da medida padrão sem a tela. Construído, falta subir.
+>
 > **Rode `node teste_parametros.js` (113) ao mexer na 906, no horário padrão da
 > 206, no `POST /api/config/horarios`, no card do segundo bipe, na aba Parâmetros
 > que saiu da 606 ou no calendário da 610** — e `node teste_horario_coleta.js`
@@ -5476,7 +5971,7 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 | 600 | **fechada** — as 16 telas do sob medida ficam com o número; nenhuma nasce aqui | — |
 | 700 | Frota | reservado |
 | 800 | Mercado Livre (integração) | reservado |
-| 900 | Administração | existe (hoje "Sistema") |
+| 900 | Administração | existe (hoje "Sistema"); desde 21/11/2026 também a 907 Manual (§26) |
 | 1000 | Comercial | existe em parte (609–611) · consumidor final reservado |
 | 1100 | Cadastros | existe (402–404, 902, 606/608 e, desde 11/11/2026, 1101–1103) |
 | 1200 | Almoxarifado | existe (502–504, 603–605 e, desde 11/11/2026, 1201) |
@@ -5525,7 +6020,7 @@ assunto mora** — a 501 Compras ganhou dez abas, seis que não são compra.
 `tecido/nucleo/telas.js`.** Nove defeitos foram reintroduzidos um a um, e cada
 um reprova (mais seis na ③ REVISÃO, um a um: o módulo ou o bloco trocado numa
 tela ou numa parte que o inventário não conferia — ele passou de 26 para as 45
-telas e as duas partes; hoje são 52 telas e nenhuma parte): tela sem módulo (2), módulo inventado (3), aba de outro assunto fora
+telas e as duas partes; hoje são 55 telas e nenhuma parte): tela sem módulo (2), módulo inventado (3), aba de outro assunto fora
 da lista (2), aba registrada sem declaração no mapa (1), tela nova na faixa 600
 (3), item arrumado esquecido na lista (2), bloco "Revenda" numa tela de Produção
 (2), a lista de números antigos crescendo (1) e tela nova fora da faixa do módulo (2).
@@ -5806,6 +6301,239 @@ não é:
 fórmula ou no roteiro da 404** — e `node teste_ficha.js` e `node
 teste_corte_separacao.js`.
 
-⚠️ **Construído, falta subir** (12/11/2026). As fases 2 a 6 (o corte com o maço de
-etiquetas, a montagem, os kits, a rejeição com dono, o cartão de ponto) não
-começaram.
+⚠️ A fase 1 está **construída, falta subir** (12/11/2026).
+
+### As fases 2 e 3 — as etiquetas, o corte, a montagem e a revisão em série (v7, 25/11/2026)
+
+Spec v7 aprovada pelo dono (§14 dela), desenhada num protótipo clicável; linha em
+`docs/DECISOES.md`. **As duas fases entram juntas** (§14.10): a lista do corte
+desconta a prateleira, e quem tira da prateleira é a montagem.
+
+| Dono único | O quê |
+|---|---|
+| `etiqueta_producao.js` | as três etiquetas (maço TC e TB em branco, a persiana PS em série), a numeração, usar, cancelar, reimprimir, e **o tradutor** (`traduzir`, `skuDoBipe`) |
+| `producao_lista.js` | as listas da 108, 110, 107 e da aba de etiquetas da 401 — **sem conta própria** (#12): parte da lista da 101 (`revisao_lista.montar`) e desconta, na ordem hoje → próximos dias → alvo, o que já está pronto à frente; o que cada SKU usa sai da ficha (as linhas de etapa "corte de tecido" e a primeira de "corte de tubo e base") |
+| `corte_bancada.js` | o corte (108 e 110): o lote, as peças ligadas a uma etiqueta, a peça perdida, a entrada inicial |
+| `montagem_persiana.js` | a montagem (107): a persiana ligada ao tecido, ao tubo e a quem montou; o carrinho da revisão; a revisão pela etiqueta |
+| `codigo_serie.js` | o tradutor na porta das rotas que bipam SKU (e `public/codigo_serie.js` nas telas que conferem no tablet) |
+
+O que parece bug e não é:
+
+- ⚠️ **A SEQUÊNCIA DA ETIQUETA DE PERSIANA É POR SKU, E O CÓDIGO DE BARRAS NÃO É O
+  SKU NEM O NÚMERO ESCRITO.** A pessoa lê *"BK160140BEGE Nº 41"*; o código de
+  barras é `PS` + 8 dígitos (o número da etiqueta na fábrica), e não vai escrito:
+  o código do SKU é livre e o leitor tira espaço e hífen. **O cadastro de SKU recusa
+  código com a forma de etiqueta** (`PS` + 8 dígitos, `TC`/`TB` + 6).
+- **O maço de tecido e o de tubo é EM BRANCO** (só o número): a 108 e a 110 ligam a
+  etiqueta à peça no bipe. A peça cortada vai para a prateleira da sua cor e medida.
+- **As cinco chaves nascem só para o Admin Geral** (R-ALC-06): `producao.cortar_tecido`
+  (108), `producao.cortar_tubo` (110) e `producao.montar` (107), de nível
+  Operação; `producao.etiqueta` (401) e `producao.corrigir` (401, sensível), de
+  Supervisor. As três telas são Produção · Medida padrão · nível Operação.
+- **Imprimir é só na aba "Etiquetas da produção" da 401, e só o Supervisor ou
+  acima** (`producao.etiqueta`). **A 401 passou a nível Supervisor**, e o Supervisor
+  a abre **só nessa aba**: as outras continuam recusando nas rotas delas
+  (`@admin`/`planilha.importar`). A conta é do servidor: a tela só manda a parte.
+- ⚠️ **A REGRA F** (§14.3): o dia imprime tudo, **sem limite**; os próximos dias abrem
+  com o dia todo impresso e o alvo com o **dia seguinte** todo impresso, e os dois
+  **só até o tecido e o tubo cortados livres** (o cortado menos o que as etiquetas
+  impressas e não montadas vão usar). Venda nova depois da impressão volta a pedir
+  **só a diferença**, e a numeração continua.
+- **A etiqueta impressa e parada há mais de N dias** (15, na 906, `etiqueta_parada_dias`)
+  fica em âmbar na lista das não usadas, **e não vai para a 204**. Cancelar é
+  `producao.corrigir` (sensível), com motivo; o número não volta.
+- **Bipes do corte:** 1 peça = a mesma etiqueta no início e no fim; lote = a primeira
+  no início e **cada uma** ao colar (o dono quer todas bipadas). **Montagem:** quatro
+  bipes por peça (① SKU em série ② tecido ③ tubo, ④ SKU de novo), o tecido e o tubo
+  **conferidos contra a ficha**; no lote, ①②③ de cada uma e cada peça fecha com o
+  seu ④. **Nada disso mexe em saldo**: o +1 continua na embalagem (R-EST-02), e o
+  material continua baixando na embalagem (§24).
+- **A entrada inicial** (o que já estava cortado no dia da virada) é o mesmo fluxo,
+  só para `producao.corrigir`, e **não conta tempo**.
+- ⚠️ **A REVISÃO PELA ETIQUETA EM SÉRIE** (início e fim pela mesma etiqueta) recusa a
+  etiqueta que **não passou pela montagem** e a já revisada, mostra **quem cortou o
+  tecido, o tubo e quem montou**, e liga a revisão à persiana (`persiana.revisao_id`).
+  O "Desfazer" e a peça devolvida pela embalagem **devolvem a persiana ao carrinho**.
+  **A peça antiga (sem série) continua pelo SKU, como sempre.**
+- ⚠️ **O TRADUTOR FICA ANTES DAS ROTAS NO `server.js`** e só troca o código nas rotas
+  da lista (`CORPO` do `codigo_serie.js`: Embalagem, Etiqueta de Venda, Conferência
+  peça a peça e venda cancelada, Inventário). **A Revisão não passa por ele**: ela
+  precisa do código em série. TC, TB e PS desconhecido passam como vieram.
+- ⚠️ **O QUE A ③ REVISÃO MUDOU, E PARECE BUG** (25/11/2026):
+  - **a persiana devolvida por defeito pela Embalagem nem sempre é a que voltou**:
+    a fila escolhe a revisão mais antiga do SKU (R-EMB-11), e a persiana dela volta
+    ao carrinho **marcada** (`persiana.voltou_defeito`). Se o revisor bipa OUTRA,
+    já revisada, do mesmo SKU, as duas **trocam de lugar** — sem o "já foi
+    revisada" e sem a revisão de antes perder a peça;
+  - **a peça com problema na revisão** (a persiana em série) sai do carrinho e
+    volta a ser revisável depois de consertada; **a volta da Embalagem decidida
+    "tem defeito" faz o mesmo** com a persiana marcada. A tela 101 não decide
+    sozinha se a persiana revisa: pergunta ao servidor (`revisavel` do `GET
+    /api/producao/persiana/:codigo`, pela régua do `paraRevisar`). ⚠️ **Enquanto
+    houver uma persiana marcada do SKU, qualquer já revisada do mesmo SKU passa
+    pela troca**: o duplo bipe de uma persiana que está na mesa da Embalagem
+    durante essa janela não é pego (a janela fecha na revisão de novo ou na
+    decisão "tem defeito");
+  - **dois lotes de montagem não prometem o mesmo tecido ou tubo**: o lote aberto
+    reserva o que ainda vai tirar da prateleira, e o segundo recebe *"já está
+    separado para outra montagem em andamento"*. E a peça já bipada numa
+    montagem aberta conta **uma vez** nas listas do corte;
+  - **a entrada inicial só aceita item que algum SKU ativo usa** (a tela lista
+    esses itens): inventado é 409 e a etiqueta continua livre;
+  - **o PDF é conferido ANTES de gravar** (`conferirSerie`): o SKU sem medida ou
+    de código que não cabe nas barras é recusado e nenhuma etiqueta nasce;
+  - **no máximo 200 por vez**; acima disso a tela diz para imprimir de novo;
+  - **a bancada mostra a próxima etiqueta LIVRE do maço** (e não a próxima a
+    imprimir), e a etiqueta já usada diz quando, por quem e como;
+  - **o tempo da montagem conta do primeiro ①**, e não do "iniciar";
+  - **a bolinha do ☰ Menu na 401 soma as etiquetas de hoje a imprimir**, só para
+    quem imprime (não é pendência da 204);
+  - **o redesenho da aba de etiquetas devolve o digitado e as caixinhas marcadas**
+    (§12), e espera enquanto alguém digita;
+  - **as três telas novas têm área de chegada** (`PERM_AREA` e `CHEGADA`): quem só
+    corta ou monta cai na tela dela depois do PIN.
+- ⚠️ **A Embalagem só traduz; ela ainda não consome a linha exata da persiana** —
+  isso é a fase 4, como a 111 Kits. A troca de etiqueta entre duas persianas montadas
+  **não é pega** (o dono aceita, §14.4).
+
+**Rode `node teste_etiqueta_producao.js` (63), `node teste_producao_motor.js` (112) e
+`node teste_producao_revisao.js` (47) ao mexer em qualquer um desses donos, nas
+telas 107, 108, 110, na aba da 401 ou nas rotas que o tradutor cobre.** E abra as
+telas: a lista e os bipes são texto montado.
+
+⚠️ **Construído, falta subir.** Depois do deploy, **recarregue os tablets** da
+Revisão, da Embalagem e da Etiqueta de Venda. A virada (§14.10 da spec) pede antes
+a ficha técnica de todo SKU produzido e as chaves dadas na tela de Acessos (todas
+nascem só para o Admin Geral). ⚠️ **Ainda não provado com dado real:** o primeiro
+dia de corte, montagem e revisão pela etiqueta em série na fábrica.
+
+---
+
+## 26. O manual do sistema — a ficha de cada tela, dentro da tela (21/11/2026)
+
+Spec `docs/specs/MANUAL-DO-SISTEMA.md`, fase 1 (a fundação) construída em
+21/11/2026, falta subir; duas linhas em `docs/DECISOES.md` (D7 e D8). O dono:
+*"estar a regra de cada tela … dentro de cada tela eu também consigo ler como
+funciona … tudo que for novo, esse manual vai se atualizando"*.
+
+| Dono único | O quê |
+|---|---|
+| `manual.js` | ler, validar e montar a ficha; o retrato; **o único que lê `docs/manual/`** |
+| `manual_route.js` | as seis leituras (`/api/manual/*`), sem escrita |
+| `manual_retrato.js` | regrava `docs/manual/retrato.json` e **recusa** sem a linha de "Mudanças" |
+| `public/manual_ajuda.js` | o botão "?" e o desenho da ficha, um só para as duas operações |
+| `public/manual.html` | a 907 Manual (Administração · Comum, nível Operação, `manual.ler`) |
+| `docs/manual/NNN-nome.md` | uma ficha por tela, as 56 (desde 25/11/2026); `glossario.md` |
+
+O que parece bug e não é:
+
+- **As 53 fichas de 21/11/2026 estão em RASCUNHO, e a 907 não foi apresentada ao time** (as 107, 108 e 110 nasceram `pronta`, em 25/11/2026). A
+  fase 1 é a fundação: o teste já cobra tela nova, e o dono confere a tela. O
+  texto é das fases 2 a 4. A lista `RASCUNHOS_INICIAIS` do `teste_manual.js`
+  **só encolhe** (R-ORG-14): ficha escrita sai dela, e tela nova nasce `pronta`.
+- **Cada pessoa vê só as telas que opera (D7)**, pela conta do portão
+  (`abre_tela.js`, a mesma do ☰ Menu). A tela que ela não opera volta **só** nome,
+  módulo e nível — nenhuma seção. **"Ver todas" é a chave `manual.ver_todas`**
+  (D8), nível Supervisor: dada por exceção a quem é Operação, não vale (teto).
+- **As duas chaves nascem só para o Admin Geral** (R-ALC-06), sem backfill. No
+  deploy da fase 1 **ninguém da bancada vê o "?"**, e é assim que deve ser até a
+  fase 2, quando o dono marca `manual.ler` nos setores.
+- **O que o sistema sabe, o manual lê na hora e nunca copia:** as telas e o
+  `liga` (os dois mapas), as ações pelo `permissoes.js` e pelo `TELA_DA_CHAVE`,
+  o valor de hoje de cada parâmetro (`config`, a cada pedido). As fichas são
+  lidas **no boot** (§12): editou, reinicia.
+- ⚠️ **O RETRATO É O QUE FAZ A RÉGUA SER TESTE, E NÃO PAPEL.** `retrato.json`
+  guarda a impressão digital do corpo de cada ficha, **a lista das linhas** de
+  "Mudanças", a situação e as ações da tela, e a impressão de cada cartão de
+  `docs/regras/` citado. Texto, cartão ou ação que mudou sem linha nova em
+  "Mudanças" é **recusado** pelo `manual_retrato.js`, e o `teste_manual.js`
+  exige que o retrato bata com os arquivos. **Não se regrava para o teste
+  passar** — a linha é o que a 907 mostra em "O que mudou". Mudar só o
+  cabeçalho, ou só acrescentar uma linha em "Mudanças", não pede linha.
+  ⚠️ **"LINHA NOVA" É A LISTA DE ANTES INTEIRA MAIS PELO MENOS UMA** (③ REVISÃO,
+  22/11/2026): a primeira versão comparava só a linha de data mais recente, e
+  por isso editar o texto dela passava por linha nova, e a linha legítima
+  datada pelo dia da regra (19/11, o passivo que dá a baixa) numa ficha nascida
+  em 21/11 era recusada — foi o que aconteceu ao mesclar o `main`. Hoje a
+  linha de qualquer data conta, duas do mesmo dia contam, e editar a última não
+  conta. **Sem `retrato.json` é recusa** (o primeiro retrato aconteceu em
+  21/11/2026; `--primeiro-retrato` grava um do zero de propósito), e a ficha
+  com história que não está no retrato também: a entrada foi apagada. **E a
+  linha que estava no retrato e sumiu (apagada ou com o texto trocado) é
+  recusa, com o corpo igual ou não** (2ª rodada): a linha é registro — em duas
+  rodadas o corpo mudaria sem linha que o explicasse; para corrigir uma linha,
+  acrescenta-se outra.
+- **A ficha não tem R$, nome de arquivo, rota, SQL, código de cartão nem nome
+  de tabela** no corpo (os cartões vão no cabeçalho; o detector pega
+  `venda_futura`), e a Regra B do §20 vale nela: o `teste_linguagem.js` passou
+  a varrer `docs/manual/`. ⚠️ **As STRINGS do `liga` do mapa (`'skus'`,
+  `'lote'`) NÃO chegam à ficha** (③ REVISÃO): são nome de tabela, escritas para
+  quem edita o mapa (R-ORG-07); o "Onde entra no fluxo" leva só as telas
+  numeradas. O "Também usa" da primeira versão escrevia `skus` para o operador.
+- **O parâmetro tem NOME na ficha** (`parametros: rev_minimo_seg = Tempo mínimo
+  da revisão (segundos)`, ③ REVISÃO): a chave do `config` é o que o código lê,
+  o nome é o que a tela escreve — a primeira versão escrevia "rev minimo seg",
+  chave de banco em tela (§19). Parâmetro sem nome reprova o `validar`. ⚠️ **E
+  O SEGREDO DA `config` NUNCA É PARÂMETRO**: `backup_token` (o que protege o
+  `/baixar-backup`), senha e chave cifrada são recusados pelo `validar`, e o
+  `montar` e a rota não os deixam viajar mesmo assim (`parametroPermitido`) —
+  o `parametroExiste` só sabe que a palavra aparece no código.
+- **O "?" só pergunta a ficha a quem tem `manual.ler`** (ou ao Admin Geral), pela
+  resposta do `/api/telas/minhas` que **os dois `nav.js` guardam em
+  `window.TELAS_MINHAS`** (③ REVISÃO): sem a chave, nenhum pedido — a primeira
+  versão disparava um 403 no console de toda tela de toda pessoa até o dono
+  marcar a chave. Sem a chave a rota continua 403 e o botão não nasce. ⚠️ **É
+  UM GLOBAL NOMEADO, E NÃO O `MENU` DO `nav.js`**: o `MENU` do sob medida vive
+  dentro de um IIFE, e a versão que lia `window.MENU` fazia o "?" nunca nascer
+  no `/sobmedida` — nem para o Admin Geral (o testador de tela achou; a regra
+  inerte da dívida 18). O `teste_manual_tela.js` não sobe o sob medida: a prova
+  de lá é o A13 do `teste_manual.js` (os dois `nav.js` gravam o global) e a
+  conferência na tela.
+- **As ações do sob medida entram UMA vez na ficha**: o `permissoes.js` da raiz
+  já traz `sobmedida.<chave>` com a tela, e o laço do `TELA_DA_CHAVE` do
+  `acoesDaTela` as repetia — a 602 saía com 12 ações, 6 em dobro (testador de
+  tela). O retrato guarda a lista das ações, e foi regravado.
+- **O "?" não toma o foco, e o ✕ do painel também não** (③ REVISÃO): na 101,
+  102, 201 e 202 a tela puxa o bipe de volta ("o bipe não pode ficar sem
+  dono"), mas a 251 Receber peça e a 303 Inventário não puxam — com o foco no
+  ✕, o bipe seguinte caía no botão e o Enter do leitor fechava o painel com o
+  código perdido, calado. O painel é leitura, abre na mesma página (nunca em
+  aba nova, §12) e fecha devolvendo o foco a quem o tinha.
+- **O "Onde entra no fluxo" é gerado do `liga`**; a ficha pode trazer uma frase
+  a mais, nunca substituí-lo. O `[[Termo]]` abre o glossário da 907 **no
+  próprio termo** (`#termo=…`), e o apelido `/sobmedida/inicio` acha a 601. O
+  apelido do termo é **uma régua só** (`MANUAL_FICHA.apelidoTermo`, que a 907
+  usa no id do `<dt>`) e sai do texto **cru**, antes do escape — rodando sobre o
+  texto escapado, "Etiqueta & NF" virava `etiqueta-amp-nf` no link e
+  `etiqueta-nf` no glossário (2ª rodada).
+- **Na 907, o mapa MEDE o nome da tela contra a caixa** (nunca conta letras,
+  §12), a tela não operada é escrita em `#5a6472` (5,5:1 — o cinza de antes
+  dava 2,7:1), e a busca em "Todas as telas" alcança o que a chave dá. **No
+  painel do "?", os chips, o "Abrir o manual" e o ✕ têm 44 px** (o alvo de
+  toque do `DESIGN.md` §4; saíam com 31). ⚠️ O botão "?" segue a altura dos
+  outros botões da barra de sessão (36 px): mudar é da barra, não do manual.
+
+**Rode `node teste_manual.js` (115) ao mexer em qualquer ficha, cartão, no
+`manual.js`, no `manual_route.js`, no `manual_retrato.js`, no `permissoes.js`
+ou nos dois mapas de telas** — oito defeitos foram reintroduzidos um a um, e
+cada um reprova: a 907 sem ficha (3 casos), cartão inexistente citado (1), texto
+mudado sem a linha de "Mudanças" (2), a ficha inteira a quem não opera (2), o
+"todas" sem exigir a chave (3), o `permDaRota` sem as linhas (1, mais 1 no
+`teste_cobertura.js`), cartão mudado sem regravar o retrato (2) e um segundo
+leitor de `docs/manual/` (1); e, na ③ REVISÃO de 22/11/2026, o segredo
+viajando no `montar` (1), a assinatura só pela última linha (3), o
+apelido sem resolver (1), o "Também usa" de volta (1), a linha de "Mudanças"
+apagada ou trocada passando (2), o apelido do termo em duas réguas (1), as
+ações do sob medida em dobro (2) e o "?" lendo o `MENU` (1). **`node teste_manual_tela.js` (55, num Chromium; sem
+navegador diz PULADO) ao mexer na 907, no `manual_ajuda.js` ou nas barras** —
+o foco no ✕ (2), a chave do config como rótulo (1), o cinza claro no
+mapa (1), a busca filtrando em "Todas" (1), o pedido da ficha sem a chave
+(1) e o nome cortado sem medir (1) reprovam; **e `node manual_retrato.js`
+depois de escrever a linha de "Mudanças".** Também `teste_mapa`, `teste_lugar`,
+`teste_cobertura`, `teste_acesso`, `teste_menu`, `teste_linguagem` e `cd tecido
+&& npm test` ganharam a 907.
+
+⚠️ **Construído, falta subir.** Ainda não provado com dado real: a 907 aberta
+pelo dono no servidor com as 53 em rascunho e o mapa; `/manual` dando 302 sem
+login no servidor; o "?" aparecendo para o Admin Geral e para ninguém mais.
+Prova que não foi feita se escreve como não feita.

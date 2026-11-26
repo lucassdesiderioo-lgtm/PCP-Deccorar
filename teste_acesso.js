@@ -229,6 +229,23 @@ ok('...mas o Admin Geral imprime desde o primeiro boot',
 ok('e quem so tem kit.editar NAO imprime',
   AC.decidir({ id:ua, nome:'Gestao' }, '/api/kit/etiqueta/imprimir', 'POST').ok === false);
 
+console.log('\n── 6-A2. o manual (spec MANUAL-DO-SISTEMA, fase 1): duas chaves, nascem so para o Admin Geral ──');
+/* `manual.ler` abre a 907 e o "?"; `manual.ver_todas` mostra o manual inteiro
+   (D8), e e de nivel Supervisor por decisao do dono. Sem backfill (R-ALC-06):
+   o dono marca `manual.ler` nos setores na fase 2. */
+ok('as duas chaves do manual estao declaradas, penduradas na 907',
+  P.some(p => p.chave === 'manual.ler' && p.tela === 907 && p.nivel === 'operacao')
+  && P.some(p => p.chave === 'manual.ver_todas' && p.tela === 907 && p.nivel === 'supervisor'));
+eq('GET /api/manual/todas pede manual.ver_todas', AC.permDaRota('/api/manual/todas', 'GET'), 'manual.ver_todas');
+eq('GET /api/manual/minhas pede manual.ler', AC.permDaRota('/api/manual/minhas', 'GET'), 'manual.ler');
+eq('a tela /manual sai do mapa, com manual.ler', AC.permDaRota('/manual', 'GET'), 'manual.ler');
+const comManual = db.prepare(`SELECT s.nome FROM setores s
+  JOIN setor_permissao sp ON sp.setor_id=s.id WHERE sp.chave IN ('manual.ler','manual.ver_todas')`).all().map(r => r.nome);
+eq('nenhum setor nasce com as chaves do manual (sem backfill, R-ALC-06)',
+  comManual.filter(x => x !== 'Admin Geral').length, 0, 'setores com a chave: ' + (comManual.join(', ') || '(nenhum)'));
+ok('...mas o Admin Geral abre o manual inteiro desde o primeiro boot',
+  AC.decidir(g2, '/api/manual/todas', 'GET').ok === true);
+
 console.log('\n── 6-B. o sob medida: setores proprios, e NENHUMA chave admin ──');
 /* Desde a fase 2 da ACESSOS-UNIFICADOS (26/10/2026) as chaves do sob medida
    moram nesta lista como `sobmedida.<chave>`, e os setores "Sob medida /"
@@ -464,13 +481,17 @@ eq('mas .html NAO e arquivo de apoio — herda a tela', AC.permDaRota('/operador
 
 console.log('\n── 13. a gemea .html vale o mesmo que a tela ──');
 const GEMEAS = [['/operador','revisao.executar'],['/montagem','embalagem.executar'],
-  ['/embalagem','etiqueta.emitir'],['/carregamento','carregamento.executar'],
+  /* A 201 abre tambem com `expedicao.caixa_nao_encontrada` (CONFERENCIA-CARRINHOS
+     fase 3, 25/11/2026): o Supervisor decide a trava la. */
+  ['/embalagem',['etiqueta.emitir','expedicao.caixa_nao_encontrada']],['/carregamento','carregamento.executar'],
   ['/devolucao','devolucao.registrar'],
   ['/painel','painel.ver'],['/relatorios','relatorios.ver'],
-  ['/planejamento','planilha.importar'],['/recebimento','pedido.receber']];
+  /* A 401 abre tambem com `producao.etiqueta` (PRODUCAO-MAPA-E-MOTOR v7, 25/11/2026). */
+  ['/planejamento',['planilha.importar','producao.etiqueta']],['/recebimento','pedido.receber']];
 let gemeasOk = 0;
 for(const [rota,chave] of GEMEAS){
-  if(AC.permDaRota(rota,'GET') === chave && AC.permDaRota(rota+'.html','GET') === chave) gemeasOk++;
+  const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  if(igual(AC.permDaRota(rota,'GET'), chave) && igual(AC.permDaRota(rota+'.html','GET'), chave)) gemeasOk++;
   else console.log('       ' + rota + ': rota=' + AC.permDaRota(rota,'GET') + ' gemea=' + AC.permDaRota(rota+'.html','GET'));
 }
 eq('as 9 telas e as 9 gemeas pedem a MESMA chave (a 203 /expedicao saiu em 05/11/2026)', gemeasOk, GEMEAS.length);

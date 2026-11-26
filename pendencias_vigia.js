@@ -33,6 +33,9 @@ const AT = require('./abre_tela');
 const VIGIA = [
   [/^\/api\/lote\/upload$/,                 ['bloqueados']],                          // 103 Subir PDF
   [/^\/api\/carregamento\/sobra$/,          ['sobras']],                              // 202 ✕ Venda cancelada
+  [/^\/api\/etiqueta\/trava\/nao-encontrada$/, ['trava_nao_encontrada']],              // 201 caixa não encontrada
+  [/^\/api\/reimprimir$/,                    ['caixa_reimpressa']],                    // 201 reimpressa no dia seguinte
+  [/^\/api\/carrinho\/nao-achou$/,         ['carrinho_nao_achada']],                 // 202 recontagem: não achei
   [/^\/api\/estoque\/ajuste$/,              ['ajuste']],                              // 301 pedir ajuste
   [/^\/api\/inventario\/(terminar|geral\/terminar-prateleira|rejeitar)$/, ['inventario_aprovar']], // 303
   [/^\/api\/skus$/,                         ['sku']],                                 // 402 salvar SKU
