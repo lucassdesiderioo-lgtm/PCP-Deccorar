@@ -2,11 +2,22 @@
 
 ```
 STATUS
-Situação: RASCUNHO · aguardando a aprovação do dono
+Situação: APROVADA pelo dono em 26/11/2026 ("pode ser o painel, eu caio às 5h, pode seguir")
 Criada em: 26/11/2026
 Última atualização: 26/11/2026
-Fase atual: nenhuma construída
-Fases: 1 ☐  2 ☐  3 ☐  4 ☐
+Fase atual: 1 construída, falta subir · próxima: fase 2
+Fases: 1 ☑  2 ☐  3 ☐  4 ☐
+Respostas do dono (26/11/2026): P1 sim, o login "Painel da fábrica" isento do corte e da
+  inatividade · P2 o Lucas cai às 5h (a inatividade dele fica para a fase 2) · P3 e P4 em aberto
+Divergências na construção (valem sobre o texto da spec):
+  D-C1 o administrador que ZERA o PIN de alguém na 901 também derruba as sessões dessa pessoa
+       (é uma troca de PIN como a dela; a spec dizia "como hoje"). Zerando o próprio, o aparelho
+       de onde zerou continua. Fica para o dono confirmar (FECHAMENTO da fase 1).
+  D-C2 a marca é por sessão (sessao.derrubada), em toda linha da pessoa, aberta ou fechada
+       (③ REVISÃO: a fechada pelo bloqueio ou pelo "Sair" voltava a valer depois da troca); o
+       cookie de antes, sem número de sessão, cai por usuarios.pin_trocado_em.
+  D-C3 a troca e a derrubada são uma transação: falhou, o PIN não muda (500).
+  D-C4 o `r` da tela de PIN só vale como caminho deste sistema (começa com uma barra só).
 Risco: 🔴 (acesso e login da fábrica inteira)
 Tipo: REGRA (muda como o login funciona) + NOVIDADE (o botão de trocar o PIN, o aviso)
 Depende de: QUEM-FEZ-E-REVISAO fase 6 (as tabelas `sessao` e `sessao_evento`, o número
