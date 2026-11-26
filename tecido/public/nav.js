@@ -108,6 +108,12 @@ function sessao(eu,dest){
   trocar.className='trocaOp'; trocar.href='/setor'; trocar.textContent='Trocar setor';
   b.appendChild(trocar);
 
+  // "Trocar meu PIN" (LOGIN-PESSOAL fase 1): o mesmo da barra da medida padrao.
+  var tpin=document.createElement('a');
+  tpin.className='trocaOp'; tpin.textContent='Trocar meu PIN';
+  tpin.href='/login?trocar=1&r='+encodeURIComponent(location.pathname+location.search+location.hash);
+  b.appendChild(tpin);
+
   // Sair e do PCP: a sessao e uma so, e sair "so do sob medida" nao existe
   // mais — era justamente a confusao dos dois PINs.
   var sair=document.createElement('button');

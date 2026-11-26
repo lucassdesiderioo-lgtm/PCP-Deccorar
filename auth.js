@@ -101,7 +101,7 @@ const API_ADMIN=['/api/teste','/api/usuarios','/api/estoque','/api/alvo','/api/b
 const LIVRE=['/login','/login.html','/nav.js','/favicon.ico'];
 
 module.exports=function(app, db){
-  db.exec("CREATE TABLE IF NOT EXISTS usuarios(id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, salt TEXT NOT NULL, pin_hash TEXT NOT NULL, areas TEXT NOT NULL DEFAULT '', ativo INTEGER NOT NULL DEFAULT 1, criado_em TEXT DEFAULT (datetime('now','localtime')), pin_curto INTEGER NOT NULL DEFAULT 1, fora_rodizio INTEGER DEFAULT 0, nivel TEXT)");
+  db.exec("CREATE TABLE IF NOT EXISTS usuarios(id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, salt TEXT NOT NULL, pin_hash TEXT NOT NULL, areas TEXT NOT NULL DEFAULT '', ativo INTEGER NOT NULL DEFAULT 1, criado_em TEXT DEFAULT (datetime('now','localtime')), pin_curto INTEGER NOT NULL DEFAULT 1, fora_rodizio INTEGER DEFAULT 0, nivel TEXT, pin_trocado_em TEXT)");
   /* PIN DE 6 DIGITOS (ACESSOS-UNIFICADOS fase 5-A, 21/10/2026). `pin_curto=1`
      quer dizer "esta pessoa ainda entra com o PIN de 4 e tem que trocar". O
      hash nao diz o tamanho do PIN, entao a marca e uma coluna: quem ja estava
@@ -121,6 +121,13 @@ module.exports=function(app, db){
      linha nasceu por SQL direto, um teste ou um script) e nao corta nada; a
      pessoa criada pela tela nasce `operacao`, gravado aqui no `criar`. */
   try{ if(db.prepare("SELECT name FROM pragma_table_info('usuarios')").all().every(c=>c.name!=='nivel')) db.exec("ALTER TABLE usuarios ADD COLUMN nivel TEXT"); }catch(e){ console.log('[auth] coluna nivel falhou: '+e.message); }
+  /* QUANDO O PIN FOI TROCADO (LOGIN-PESSOAL fase 1, 26/11/2026). Trocar o PIN
+     (pela propria pessoa ou zerado pelo administrador) derruba as outras
+     sessoes dela; o cookie de antes, sem numero de sessao, nao tem linha para
+     fechar — ele deixa de valer quando esta coluna tem data. Vazio: o PIN
+     nunca foi trocado depois do deploy, e nada muda. No fim, como o SQLite
+     acrescenta (§17). */
+  try{ if(db.prepare("SELECT name FROM pragma_table_info('usuarios')").all().every(c=>c.name!=='pin_trocado_em')) db.exec("ALTER TABLE usuarios ADD COLUMN pin_trocado_em TEXT"); }catch(e){ console.log('[auth] coluna pin_trocado_em falhou: '+e.message); }
   /* A ENTRADA E A SAIDA DO LOGIN (QUEM-FEZ-E-REVISAO fase 6, 05/11/2026). Uma
      linha de `sessao` por login — quem, quando entrou, quando e COMO saiu
      (logout, bloqueado, expirou), o IP e o aparelho —, e cada coisa que
@@ -139,12 +146,16 @@ module.exports=function(app, db){
   db.exec(`CREATE TABLE IF NOT EXISTS sessao (
       id INTEGER PRIMARY KEY AUTOINCREMENT, usuario_id INTEGER NOT NULL, usuario_nome TEXT,
       entrou_em TEXT DEFAULT (datetime('now','localtime')), saiu_em TEXT, como_saiu TEXT,
-      ip TEXT, aparelho TEXT);
+      ip TEXT, aparelho TEXT, derrubada INTEGER);
     CREATE INDEX IF NOT EXISTS idx_sessao_aberta ON sessao(saiu_em);
     CREATE TABLE IF NOT EXISTS sessao_evento (
       id INTEGER PRIMARY KEY AUTOINCREMENT, sessao_id INTEGER, usuario_id INTEGER, usuario_nome TEXT,
       tipo TEXT NOT NULL, detalhe TEXT, em TEXT DEFAULT (datetime('now','localtime')), ip TEXT);
     CREATE INDEX IF NOT EXISTS idx_sessao_evento_usuario ON sessao_evento(usuario_id);`);
+  /* A SESSAO DERRUBADA PELA TROCA DE PIN (LOGIN-PESSOAL fase 1): marcada em
+     toda linha da pessoa, aberta OU fechada (③ REVISAO: a fechada pelo
+     bloqueio ou pelo "Sair" voltava a valer depois da troca). No fim (§17). */
+  try{ if(db.prepare("SELECT name FROM pragma_table_info('sessao')").all().every(c=>c.name!=='derrubada')) db.exec("ALTER TABLE sessao ADD COLUMN derrubada INTEGER"); }catch(e){ console.log('[auth] coluna derrubada falhou: '+e.message); }
   const ipDe=req=>String((req&&req.headers&&req.headers['x-forwarded-for'])||(req&&req.socket&&req.socket.remoteAddress)||'').split(',')[0].trim()||null;
   const aparelhoDe=req=>{ const a=String((req&&req.headers&&req.headers['user-agent'])||'').slice(0,200); return a||null; };
   /* Registrar NUNCA derruba o login: o registro e historia, a entrada e o
@@ -214,10 +225,23 @@ module.exports=function(app, db){
     if(assina(corpo)!==sig) return null;
     try{
       const o=JSON.parse(Buffer.from(corpo,'base64').toString('utf8'));
-      const u=db.prepare('SELECT id,nome,areas,ativo,pin_curto FROM usuarios WHERE id=?').get(o.id);
+      const u=db.prepare('SELECT id,nome,areas,ativo,pin_curto,pin_trocado_em FROM usuarios WHERE id=?').get(o.id);
       /* Bloqueado no cadastro: a sessao cai (como sempre) e, se ela tem
          numero, fecha como "bloqueado" — uma vez so, nao a cada pedido. */
       if(!u||!u.ativo){ if(u&&Number.isInteger(o.s)) fecharSessao(o.s,'bloqueado',{id:u.id,nome:u.nome},req); return null; }
+      /* O PIN TROCADO DERRUBA AS OUTRAS SESSOES (LOGIN-PESSOAL fase 1): a
+         sessao fechada pela troca nao vale mais; e o cookie de antes, sem
+         numero, nao vale depois de qualquer troca. A sessao fechada por
+         "Sair" continua como era (a fase 3 da spec muda isso). */
+      /* A linha tem que ser DESTA pessoa (um backup restaurado reaproveita
+         numeros); linha que nao existe e julgada como o cookie sem numero.
+         E a consulta que falha (a coluna nao subiu) NAO tranca ninguem: vai
+         ao log e a sessao segue — como o resto do portao (③ REVISAO). */
+      let ls;
+      try{ ls=Number.isInteger(o.s)?db.prepare('SELECT derrubada FROM sessao WHERE id=? AND usuario_id=?').get(o.s,u.id):undefined; }
+      catch(e){ console.log('[auth] conferir sessao derrubada falhou: '+e.message); ls={derrubada:0}; }
+      if(ls){ if(ls.derrubada) return null; }
+      else if(u.pin_trocado_em) return null;
       const s={id:u.id,nome:u.nome,areas:u.areas.split(',').filter(Boolean),trocarPin:!!u.pin_curto};
       /* O numero da sessao viaja escondido: nao entra no `...u` do
          /api/auth/eu, e a tela nao precisa dele. */
@@ -310,6 +334,37 @@ module.exports=function(app, db){
      efeito e o proprio cookie dele ficar mais restrito. */
   const seguro=req=>String(req.headers['x-forwarded-proto']||'').split(',')[0].trim().toLowerCase()==='https'?'; Secure':'';
 
+  /* Abre a linha da sessao e manda o cookie com o numero dela. O login usa, e
+     a troca de PIN feita pelo cookie de antes (sem numero) tambem: sem isso a
+     pessoa cairia do proprio tablet ao trocar. */
+  function abrirSessao(u,req,res,tipo){
+    let sessaoId=null;
+    try{ sessaoId=db.prepare('INSERT INTO sessao (usuario_id,usuario_nome,ip,aparelho) VALUES (?,?,?,?)')
+      .run(u.id,u.nome,ipDe(req),aparelhoDe(req)).lastInsertRowid; }
+    catch(e){ console.log('[auth] abrir sessao falhou: '+e.message); }
+    sessEvento(sessaoId,u,tipo,null,req);
+    const corpo=Buffer.from(JSON.stringify(sessaoId?{id:u.id,s:Number(sessaoId)}:{id:u.id})).toString('base64');
+    res.setHeader('Set-Cookie','sess='+encodeURIComponent(corpo+'.'+assina(corpo))+'; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax'+seguro(req));
+    return sessaoId;
+  }
+  /* Troca o PIN e derruba as outras sessoes da pessoa (LOGIN-PESSOAL fase 1),
+     NUMA TRANSACAO SO (③ REVISAO): se derrubar falha, o PIN nao muda e a rota
+     responde erro — a tela nunca diz "os outros aparelhos foram
+     desconectados" sem que tenham sido. Toda linha da pessoa, menos a
+     `manter`, fica marcada como derrubada (aberta ou fechada); as abertas
+     fecham com o motivo; e a hora da troca derruba o cookie de antes, sem
+     numero de sessao. */
+  const trocarPinEDerrubar=db.transaction((uid,pin,manter,como)=>{
+    gravarPin(uid,pin);
+    db.prepare("UPDATE usuarios SET pin_trocado_em=datetime('now','localtime') WHERE id=?").run(uid);
+    const abertas=db.prepare('SELECT id,usuario_id,usuario_nome FROM sessao WHERE usuario_id=? AND saiu_em IS NULL AND id IS NOT ?').all(uid,manter||null);
+    db.prepare('UPDATE sessao SET derrubada=1 WHERE usuario_id=? AND id IS NOT ?').run(uid,manter||null);
+    abertas.forEach(v=>{
+      db.prepare("UPDATE sessao SET saiu_em=datetime('now','localtime'), como_saiu=? WHERE id=? AND saiu_em IS NULL").run(como,v.id);
+      sessEvento(v.id,{id:v.usuario_id,nome:v.usuario_nome},como,null,null);
+    });
+  });
+
   app.post('/api/auth/login',(req,res)=>{
     const {id,pin}=req.body||{};
     const shim=n=>({usuario:{id:id||null,nome:n||''},headers:req.headers,socket:req.socket});
@@ -323,13 +378,7 @@ module.exports=function(app, db){
     }
     delete falhas[id];
     fecharExpiradas();
-    let sessaoId=null;
-    try{ sessaoId=db.prepare('INSERT INTO sessao (usuario_id,usuario_nome,ip,aparelho) VALUES (?,?,?,?)')
-      .run(u.id,u.nome,ipDe(req),aparelhoDe(req)).lastInsertRowid; }
-    catch(e){ console.log('[auth] abrir sessao falhou: '+e.message); }
-    sessEvento(sessaoId,u,'login',null,req);
-    const corpo=Buffer.from(JSON.stringify(sessaoId?{id:u.id,s:Number(sessaoId)}:{id:u.id})).toString('base64');
-    res.setHeader('Set-Cookie','sess='+encodeURIComponent(corpo+'.'+assina(corpo))+'; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax'+seguro(req));
+    abrirSessao(u,req,res,'login');
     aud({usuario:{id:u.id,nome:u.nome},headers:req.headers,socket:req.socket},'acesso','login',u.nome,'');
     const areasU=u.areas.split(',').filter(Boolean);
     res.json({ok:true,nome:u.nome,areas:areasU,destino:destino(areasU),trocar_pin:!!u.pin_curto});
@@ -354,9 +403,12 @@ module.exports=function(app, db){
     }
     delete falhas[s.id];
     if(!PIN_OK.test(String(novo==null?'':novo))) return res.status(400).json({erro:ERRO_PIN});
-    gravarPin(s.id,String(novo));
+    if(String(novo)===String(atual)) return res.status(400).json({erro:'O PIN novo tem que ser diferente do de hoje.'});
+    try{ trocarPinEDerrubar(s.id,String(novo),s.sessao,'troca_pin'); }
+    catch(e){ console.log('[auth] troca de PIN falhou: '+e.message); return res.status(500).json({erro:'Não deu para trocar o PIN. Nada foi mudado; tente de novo.'}); }
     aud(quem,'acesso','troca_pin',s.nome,'');
     sessEvento(s.sessao,s,'troca_pin',null,req);
+    if(!s.sessao) abrirSessao(u,req,res,'login');
     res.json({ok:true,destino:destino(s.areas)});
   });
 
@@ -409,10 +461,22 @@ module.exports=function(app, db){
       // RECUSADO antes de gravar qualquer coisa — ate 21/10/2026 um PIN de 3
       // digitos era ignorado em silencio e a tela dizia "salvo".
       if(pin!==undefined&&pin!==null&&pin!==''&&!PIN_OK.test(String(pin))) return res.status(400).json({erro:ERRO_PIN});
+      /* O PROPRIO PIN NAO SE TROCA AQUI (LOGIN-PESSOAL fase 1, decisao do dono,
+         26/11/2026): esta rota nao pede o PIN de hoje, e quem pegasse o
+         computador aberto trocaria o PIN de quem esta logado e o derrubaria de
+         todo aparelho. Recusa antes de gravar qualquer campo. */
+      const eleMesmo=req.usuario&&Number(req.usuario.id)===Number(id);
+      if(pin&&eleMesmo) return res.status(400).json({erro:'O seu próprio PIN se troca pelo “Trocar meu PIN”, na barra de cima: ele pede o PIN de hoje.'});
       db.prepare('UPDATE usuarios SET nome=? WHERE id=?').run(nome,id);
       if(areas!==undefined) db.prepare('UPDATE usuarios SET areas=? WHERE id=?').run((areas||[]).join(','),id);
       if(ativo!==undefined) db.prepare('UPDATE usuarios SET ativo=? WHERE id=?').run(ativo?1:0,id);
-      if(pin) gravarPin(id,String(pin));
+      if(pin){
+        /* PIN zerado pelo administrador: TODAS as sessoes da pessoa caem
+           (LOGIN-PESSOAL fase 1, decisao do dono, 26/11/2026). O proprio PIN
+           nunca chega aqui (recusado acima). */
+        try{ trocarPinEDerrubar(Number(id),String(pin),null,'pin_zerado'); }
+        catch(e){ console.log('[auth] zerar PIN falhou: '+e.message); return res.status(500).json({erro:'Não deu para gravar o PIN. Tente de novo.'}); }
+      }
     } else {
       if(!PIN_OK.test(String(pin==null?'':pin))) return res.status(400).json({erro:ERRO_PIN});
       const r=criar(nome,pin,areas||[]);

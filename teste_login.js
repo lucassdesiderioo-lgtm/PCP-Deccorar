@@ -291,6 +291,9 @@ async function main(){
     const assinar = v => crypto.createHmac('sha256', SEG).update(v).digest('hex').slice(0, 32);
     const corpoVelho = Buffer.from(JSON.stringify({ id:IVO })).toString('base64');
     const ckVelho = 'sess=' + encodeURIComponent(corpoVelho + '.' + assinar(corpoVelho));
+    /* O Ivo trocou o PIN acima, e desde a LOGIN-PESSOAL a troca derruba o
+       cookie de antes (secao 12). Aqui ele e a pessoa que nunca trocou. */
+    db.prepare('UPDATE usuarios SET pin_trocado_em=NULL WHERE id=?').run(IVO);
     const nSessoes = db.prepare('SELECT COUNT(*) n FROM sessao').get().n;
     eq('o cookie de antes (sem o numero da sessao) continua valendo', (await eu(ckVelho)).nome, 'Ivo');
     eq('   a troca de setor com ele e registrada', await setor(ckVelho, 'padrao'), 200);
@@ -327,7 +330,16 @@ async function main(){
 
     /* O banco e o modo teste. */
     const cS = db.prepare("SELECT name FROM pragma_table_info('sessao')").all().map(c => c.name).join(',');
-    eq('a tabela sessao', cS, 'id,usuario_id,usuario_nome,entrou_em,saiu_em,como_saiu,ip,aparelho');
+    eq('a tabela sessao (com a marca da troca de PIN no fim, LOGIN-PESSOAL)', cS, 'id,usuario_id,usuario_nome,entrou_em,saiu_em,como_saiu,ip,aparelho,derrubada');
+    {
+      /* O banco que ja tinha a tabela sem a coluna ganha ela no fim, na mesma ordem (§17). */
+      const dbS = new Database(path.join(tmp, 'sessao_velha.db'));
+      dbS.exec("CREATE TABLE sessao (id INTEGER PRIMARY KEY AUTOINCREMENT, usuario_id INTEGER NOT NULL, usuario_nome TEXT, entrou_em TEXT, saiu_em TEXT, como_saiu TEXT, ip TEXT, aparelho TEXT)");
+      require('./auth')(express(), dbS);
+      eq('o banco antigo termina com as mesmas colunas, na mesma ordem', dbS.prepare("SELECT name FROM pragma_table_info('sessao')").all().map(c => c.name).join(','), cS);
+      eq('e a tabela usuarios tambem', dbS.prepare("SELECT name FROM pragma_table_info('usuarios')").all().map(c => c.name).pop(), 'pin_trocado_em');
+      dbS.close();
+    }
     const cE = db.prepare("SELECT name FROM pragma_table_info('sessao_evento')").all().map(c => c.name).join(',');
     eq('a tabela sessao_evento', cE, 'id,sessao_id,usuario_id,usuario_nome,tipo,detalhe,em,ip');
     const tr = fs.readFileSync(path.join(__dirname, 'teste_route.js'), 'utf8');
@@ -362,6 +374,144 @@ async function main(){
     ok('sair por https apaga o cookie, com Secure', /^sess=;/.test(ck) && /Max-Age=0/.test(ck) && /Secure/i.test(ck), ck);
     ck = await sair(null);
     ok('sair por http apaga o cookie, sem Secure', /^sess=;/.test(ck) && /Max-Age=0/.test(ck) && !/Secure/i.test(ck), ck);
+
+    console.log('\n── 12. cada um troca o proprio PIN, e a troca derruba as outras sessoes (LOGIN-PESSOAL fase 1) ──');
+    /* O PIN e de quem usa (spec LOGIN-PESSOAL, 26/11/2026). Quem desconfia que
+       outra pessoa sabe o PIN dela troca, e o tablet onde o login estava aberto
+       cai na hora. A sessao de onde a troca foi feita continua. */
+    const SEG12 = fs.readFileSync(SEGREDO, 'utf8').trim();
+    const cookieAntigo = id => { const c = Buffer.from(JSON.stringify({ id })).toString('base64');
+      return 'sess=' + encodeURIComponent(c + '.' + crypto.createHmac("sha256", SEG12).update(c).digest('hex').slice(0, 32)); };
+    const trocar2 = async (cookie, atual, novo) => {
+      const q = await fetch(base + '/api/auth/trocar-pin', { method:'POST',
+        headers: Object.assign({ 'content-type':'application/json' }, cookie ? { cookie } : {}),
+        body: JSON.stringify({ atual, novo }) });
+      return { status: q.status, body: await q.json(), cookie: q.headers.get('set-cookie') || '' };
+    };
+    const LIZA = pessoa('Lia', '111222', 'painel'); db.prepare('UPDATE usuarios SET pin_curto=0 WHERE id=?').run(LIZA);
+    const cLiaA = sess((await login(LIZA, '111222')).cookie);
+    const cLiaB = sess((await login(LIZA, '111222')).cookie);
+    const cLiaVelho = cookieAntigo(LIZA);
+    eq('a Lia esta logada no tablet A', (await eu(cLiaA)).logado, true);
+    eq('e no tablet B', (await eu(cLiaB)).logado, true);
+    eq('e o cookie de antes (sem numero de sessao) tambem vale', (await eu(cLiaVelho)).logado, true);
+    r = await trocar2(cLiaA, '111222', '111222');
+    eq('o PIN novo igual ao de hoje e recusado (400)', r.status, 400);
+    ok('dizendo que tem que ser diferente', /diferente/.test(r.body.erro || ''), JSON.stringify(r.body));
+    eq('e o tablet B continua logado', (await eu(cLiaB)).logado, true);
+    eq('e o PIN de hoje continua valendo', (await login(LIZA, '111222')).status, 200);
+    r = await trocar2(cLiaA, '111222', '333444');
+    eq('PIN novo diferente: trocado', r.status, 200);
+    eq('o tablet de onde ela trocou continua logado', (await eu(cLiaA)).logado, true);
+    eq('e usa a API', (await fetch(base + '/api/coisa', { headers:{ cookie: cLiaA } })).status, 200);
+    eq('o tablet B caiu', (await eu(cLiaB)).logado, false);
+    eq('e a API dele e 401', (await fetch(base + '/api/coisa', { headers:{ cookie: cLiaB } })).status, 401);
+    eq('o cookie de antes, sem numero de sessao, caiu tambem', (await eu(cLiaVelho)).logado, false);
+    const sB = JSON.parse(Buffer.from(decodeURIComponent(cLiaB.slice(5)).split('.')[0], 'base64').toString('utf8')).s;
+    const linhaB = db.prepare('SELECT saiu_em,como_saiu FROM sessao WHERE id=?').get(sB);
+    eq('a sessao do tablet B fecha como troca de PIN', linhaB && linhaB.como_saiu, 'troca_pin');
+    ok('com a hora', !!(linhaB && linhaB.saiu_em));
+    eq('o PIN antigo deixou de entrar', (await login(LIZA, '111222')).status, 401);
+    const cLiaC = sess((await login(LIZA, '333444')).cookie);
+    eq('o novo entra, e a sessao nova vale', (await eu(cLiaC)).logado, true);
+    eq('a sessao aberta depois da troca nao cai por ela', (await eu(cLiaC)).logado, true);
+    const OTO = pessoa('Oto', '555777', 'painel'); db.prepare('UPDATE usuarios SET pin_curto=0 WHERE id=?').run(OTO);
+    const cOto = sess((await login(OTO, '555777')).cookie);
+    await trocar2(cLiaC, '333444', '999000');
+    eq('a troca da Lia nao derruba a sessao de outra pessoa', (await eu(cOto)).logado, true);
+    eq('mas derruba a outra sessao da propria Lia (o tablet A)', (await eu(cLiaA)).logado, false);
+    const cLiaD = sess((await login(LIZA, '999000')).cookie);
+    const cLiaLogout = sess((await login(LIZA, '999000')).cookie);
+    await fetch(base + '/api/auth/logout', { method:'POST', headers:{ cookie: cLiaLogout } });
+
+    /* ③ REVISAO: a sessao que ja estava FECHADA por outro motivo (o bloqueio,
+       o "Sair") tambem nao volta a valer depois da troca. Sem isso, o tablet
+       da pessoa bloqueada voltava a funcionar no nome dela quando o
+       administrador a reativava e zerava o PIN. */
+    const NEI = pessoa('Nei', '676767', 'painel'); db.prepare('UPDATE usuarios SET pin_curto=0 WHERE id=?').run(NEI);
+    const cNeiX = sess((await login(NEI, '676767')).cookie);
+    const cNeiY = sess((await login(NEI, '676767')).cookie);
+    db.prepare('UPDATE usuarios SET ativo=0 WHERE id=?').run(NEI);
+    eq('bloqueado, o tablet X cai (e a sessao dele fecha como bloqueado)', (await eu(cNeiX)).logado, false);
+    db.prepare('UPDATE usuarios SET ativo=1 WHERE id=?').run(NEI);
+    eq('reativado, o tablet X volta (como sempre foi)', (await eu(cNeiX)).logado, true);
+    await fetch(base + '/api/auth/logout', { method:'POST', headers:{ cookie: cNeiY } });
+    const cNeiZ = sess((await login(NEI, '676767')).cookie);
+    eq('o Nei troca o PIN no tablet Z', (await trocar2(cNeiZ, '676767', '898989')).status, 200);
+    eq('o tablet X, que tinha caido pelo bloqueio, nao volta depois da troca', (await eu(cNeiX)).logado, false);
+    eq('nem o cookie da sessao fechada pelo "Sair"', (await eu(cNeiY)).logado, false);
+    eq('e o tablet Z, de onde ele trocou, continua', (await eu(cNeiZ)).logado, true);
+
+    /* Trocar a partir do cookie de antes: a pessoa ganha uma sessao com numero,
+       e nao cai do proprio tablet. */
+    const MIA = pessoa('Mia', '121212', 'painel'); db.prepare('UPDATE usuarios SET pin_curto=0 WHERE id=?').run(MIA);
+    const cMiaVelho = cookieAntigo(MIA);
+    r = await trocar2(cMiaVelho, '121212', '343434');
+    eq('trocar pelo cookie de antes: trocado', r.status, 200);
+    ok('e a resposta traz o cookie novo', /^sess=/.test(r.cookie), r.cookie);
+    eq('o cookie novo vale', (await eu(sess(r.cookie))).nome, 'Mia');
+    eq('e o de antes nao vale mais', (await eu(cMiaVelho)).logado, false);
+
+    /* O administrador zera o PIN de alguem: as sessoes dessa pessoa caem; a
+       dele, nao. */
+    const cAdm2 = sess((await login(ADMIN, '975310')).cookie);
+    const zerar = async (cookie, body) => (await fetch(base + '/api/usuarios', { method:'POST',
+      headers:{ 'content-type':'application/json', cookie }, body: JSON.stringify(body) })).status;
+    eq('o administrador zera o PIN da Lia', await zerar(cAdm2, { id:LIZA, nome:'Lia', pin:'202020' }), 200);
+    eq('a sessao da Lia caiu', (await eu(cLiaD)).logado, false);
+    const sD = JSON.parse(Buffer.from(decodeURIComponent(cLiaD.slice(5)).split('.')[0], 'base64').toString('utf8')).s;
+    eq('e fecha como PIN zerado', db.prepare('SELECT como_saiu FROM sessao WHERE id=?').get(sD).como_saiu, 'pin_zerado');
+    eq('a sessao do administrador continua', (await eu(cAdm2)).logado, true);
+    eq('editar so o nome da pessoa nao derruba ninguem', await zerar(cAdm2, { id:OTO, nome:'Oto Lima' }), 200);
+    eq('o Oto continua logado', (await eu(cOto)).logado, true);
+    /* O PROPRIO PIN NAO SE TROCA PELA TELA DE ACESSOS (decisao do dono,
+       26/11/2026): ali nao se pede o PIN de hoje, e quem pegasse o computador
+       aberto trocaria o PIN do administrador e o derrubaria de todo aparelho.
+       O caminho e o "Trocar meu PIN". */
+    const zr = await fetch(base + '/api/usuarios', { method:'POST',
+      headers:{ 'content-type':'application/json', cookie: cAdm2 },
+      body: JSON.stringify({ id:ADMIN, nome:'Adm Trocado', pin:'864200' }) });
+    eq('o administrador NAO troca o proprio PIN pela tela de Acessos (400)', zr.status, 400);
+    ok('e a recusa manda usar o "Trocar meu PIN"', /Trocar meu PIN/.test((await zr.json()).erro || ''));
+    eq('nada mudou: o PIN de hoje continua entrando', (await login(ADMIN, '975310')).status, 200);
+    eq('nem o nome', db.prepare('SELECT nome FROM usuarios WHERE id=?').get(ADMIN).nome, 'Administrador');
+    eq('e ele continua logado', (await eu(cAdm2)).logado, true);
+    eq('editar so o proprio nome continua livre', await zerar(cAdm2, { id:ADMIN, nome:'Administrador' }), 200);
+
+    /* A tela: o botao em toda barra, e a tela de PIN no modo de troca. */
+    const navPcp = fs.readFileSync(path.join(__dirname, 'public', 'nav.js'), 'utf8');
+    const navSm = fs.readFileSync(path.join(__dirname, 'tecido', 'public', 'nav.js'), 'utf8');
+    const telaLogin = fs.readFileSync(path.join(__dirname, 'public', 'login.html'), 'utf8');
+    ok('a barra da medida padrao tem "Trocar meu PIN"', /Trocar meu PIN/.test(navPcp) && /\/login\?trocar=1/.test(navPcp));
+    ok('a barra do sob medida tambem', /Trocar meu PIN/.test(navSm) && /\/login\?trocar=1/.test(navSm));
+    ok('a tela de PIN abre a troca para quem pediu (trocar=1), e nao so para o PIN de 4', /voluntaria/.test(telaLogin) && /q\.get\('trocar'\)/.test(telaLogin));
+    ok('e a tela recusa o PIN novo igual ao de hoje antes de mandar', /diferente do de hoje/.test(telaLogin));
+    {
+      /* A guarda do "r", tirada da propria tela e rodada aqui. */
+      const m = telaLogin.match(/var destino=(\(function\(r\)\{[\s\S]*?\}\))\(q\.get/);
+      ok('a tela tem a guarda do "r"', !!m);
+      const location = { origin:'https://pcp.deccorar.com.br' };
+      const guarda = m ? eval(m[1]) : (() => 'x');
+      eq('o "r" deste sistema passa, com a busca e a ancora', guarda('/operador?x=1#h'), 'https://pcp.deccorar.com.br/operador?x=1#h');
+      const fora = ['/.//outro.site','/..//outro.site','/./\\outro.site','/x/..//outro.site','/%2e//outro.site'];
+      ok('e o "." e o ".." nao abrem caminho para fora: o que volta e sempre deste sistema',
+        fora.every(r => { const v = guarda(r); return v === '' || new URL(v).origin === location.origin; }), fora.map(guarda).join(' | '));
+      ok('e nenhum leva para fora: javascript:, https://, //, barra invertida, tab', ['javascript:alert(1)','https://outro.site','//outro.site','/\\outro.site','/\t/outro.site','/\n/outro.site'].every(r => guarda(r) === ''));
+    }
+    ok('e o teclado para ANTES de mandar a troca (um OK a mais nao conta erro na trava)', /feito=true;\s*fetch\('\/api\/auth\/trocar-pin'/.test(telaLogin) && /\|\|feito\) return/.test(telaLogin));
+
+    /* ③ REVISAO (2a rodada): a linha da sessao tem que ser da pessoa, e a
+       consulta que falha nao tranca ninguem. */
+    const RUI = pessoa('Rui', '232323', 'painel'); db.prepare('UPDATE usuarios SET pin_curto=0 WHERE id=?').run(RUI);
+    const cRui = sess((await login(RUI, '232323')).cookie);
+    const cRuiB = sess((await login(RUI, '232323')).cookie);
+    const sRuiB = JSON.parse(Buffer.from(decodeURIComponent(cRuiB.slice(5)).split('.')[0], 'base64').toString('utf8')).s;
+    db.prepare('UPDATE sessao SET usuario_id=? WHERE id=?').run(OTO, sRuiB);
+    await trocar2(cRui, '232323', '454545');
+    eq('o cookie cuja linha e de outra pessoa cai depois da troca (julgado como o cookie sem numero)', (await eu(cRuiB)).logado, false);
+    db.exec('ALTER TABLE sessao RENAME COLUMN derrubada TO derrubada_x');
+    eq('sem a coluna, a sessao nao tranca: a pessoa continua logada', (await eu(cRui)).logado, true);
+    db.exec('ALTER TABLE sessao RENAME COLUMN derrubada_x TO derrubada');
   } finally {
     srv.close();
   }
