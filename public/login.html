@@ -68,8 +68,10 @@ var voluntaria=false;
 var destino=(function(r){
   if(!/^\/(?![\/\\])/.test(r)) return '';
   /* E o endereco resolvido tem que ficar neste sistema: o navegador descarta
-     tab e quebra de linha ("/<tab>/outro" vira "//outro"). */
-  try{ var u=new URL(r,location.origin); return u.origin===location.origin?(u.pathname+u.search+u.hash):''; }catch(e){ return ''; }
+     tab e quebra de linha ("/<tab>/outro" vira "//outro"). Devolve o endereco
+     INTEIRO, com a origem: o caminho resolvido sozinho ("/.//outro" vira
+     "//outro") levaria para fora (③ REVISAO, 3a rodada). */
+  try{ var u=new URL(r,location.origin); return u.origin===location.origin?u.href:''; }catch(e){ return ''; }
 })(q.get('r')||'');
 var feito=false;
 var MAX=6;

@@ -481,7 +481,10 @@ async function main(){
       ok('a tela tem a guarda do "r"', !!m);
       const location = { origin:'https://pcp.deccorar.com.br' };
       const guarda = m ? eval(m[1]) : (() => 'x');
-      eq('o "r" deste sistema passa, com a busca e a ancora', guarda('/operador?x=1#h'), '/operador?x=1#h');
+      eq('o "r" deste sistema passa, com a busca e a ancora', guarda('/operador?x=1#h'), 'https://pcp.deccorar.com.br/operador?x=1#h');
+      const fora = ['/.//outro.site','/..//outro.site','/./\\outro.site','/x/..//outro.site','/%2e//outro.site'];
+      ok('e o "." e o ".." nao abrem caminho para fora: o que volta e sempre deste sistema',
+        fora.every(r => { const v = guarda(r); return v === '' || new URL(v).origin === location.origin; }), fora.map(guarda).join(' | '));
       ok('e nenhum leva para fora: javascript:, https://, //, barra invertida, tab', ['javascript:alert(1)','https://outro.site','//outro.site','/\\outro.site','/\t/outro.site','/\n/outro.site'].every(r => guarda(r) === ''));
     }
     ok('e o teclado para ANTES de mandar a troca (um OK a mais nao conta erro na trava)', /feito=true;\s*fetch\('\/api\/auth\/trocar-pin'/.test(telaLogin) && /\|\|feito\) return/.test(telaLogin));
