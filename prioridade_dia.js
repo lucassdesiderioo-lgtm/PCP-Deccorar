@@ -43,6 +43,12 @@ function semColeta(db, d){
   catch(e){ return false; }
 }
 
+/* `d` é dia de coleta? Segunda a sexta, sem o "sem coleta" da 206. */
+function ehDiaDeColeta(db, d){
+  const w = diaSemana(d);
+  return w !== 0 && w !== 6 && !semColeta(db, d);
+}
+
 /* O próximo dia de coleta depois de `h` (hoje, se não vier). Três semanas sem
    coleta nenhuma não existem; se existirem, vale o dia seguinte. */
 function proximaSaida(db, h){
@@ -50,10 +56,7 @@ function proximaSaida(db, h){
   let d = h;
   for(let i = 0; i < 21; i++){
     d = addDias(d, 1);
-    const w = diaSemana(d);
-    if(w === 0 || w === 6) continue;
-    if(semColeta(db, d)) continue;
-    return d;
+    if(ehDiaDeColeta(db, d)) return d;
   }
   return addDias(h, 1);
 }
@@ -95,4 +98,4 @@ function pedido(db){
   return m;
 }
 
-module.exports = { proximaSaida, rotulo, regua, pedido, addDias, hoje };
+module.exports = { ehDiaDeColeta, proximaSaida, rotulo, regua, pedido, addDias, hoje };

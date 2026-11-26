@@ -92,17 +92,24 @@ function aplicar(db){
    com as vendas de hoje (subidas ontem à noite) sem peça. A primeira leitura
    do dia (101, 102, TV, aviso de status) aplica uma vez, sem cron, como a
    lista do Inventário. Idempotente (R-URG-02).
-   ⚠️ Só aplica quando NINGUÉM aplicou hoje e não há ordem do PDF de hoje: a
-   ordem gravada de hoje nunca é refeita por uma leitura. */
+   ⚠️ Só aplica quando NINGUÉM aplicou hoje, não há ordem do PDF de hoje e hoje
+   é dia de coleta: a ordem gravada de hoje nunca é refeita por uma leitura. */
 function marcarDia(db){
   try{ db.prepare("INSERT INTO config (chave,valor) VALUES ('urgencia_dia', date('now','localtime')) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor").run(); }
-  catch(e){}
+  catch(e){
+    /* Sem a marca, a próxima leitura aplicaria de novo (③ REVISÃO): o log diz. */
+    if(!/no such table/.test(e.message)) console.error('[urgencia] não consegui marcar o dia aplicado:', e.message);
+  }
 }
 function garantirDia(db){
   try{
     const h = db.prepare("SELECT date('now','localtime') d").get().d;
     const c = db.prepare("SELECT valor FROM config WHERE chave='urgencia_dia'").get();
     if(c && c.valor === h) return false;
+    /* ⚠️ SÓ NO DIA DE COLETA (③ REVISÃO): no sábado, no domingo e no "sem
+       coleta" da 206 a leitura não lança — com a TV ligada, a venda de segunda
+       virava falta de sábado e de domingo na 904. O upload continua aplicando. */
+    if(!require('./prioridade_dia').ehDiaDeColeta(db, h)) return false;
     const tem = db.prepare("SELECT 1 FROM producao WHERE data=date('now','localtime') AND origem='ml' LIMIT 1").get();
     if(tem){ marcarDia(db); return false; }
     const fn = () => aplicar(db);

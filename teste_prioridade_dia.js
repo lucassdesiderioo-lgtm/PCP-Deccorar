@@ -93,6 +93,9 @@ eq('COBERTO: nada urgente', u.COBERTO.urgente, 0);
 eq('com a data explícita (o rastrear), a régua antiga: só o PDF daquele dia', URG.calcular(db, ontem).map(x => [x.codigo, x.pendentes]), [['SOAMANHA', 2]]);
 
 console.log('\n── 4. a virada do dia ──');
+/* O teste roda em qualquer dia: aqui hoje conta como dia de coleta (a guarda
+   do fim de semana tem caso próprio na seção 8). */
+const ehColetaDe = P.ehDiaDeColeta; P.ehDiaDeColeta = () => true;
 db.prepare("DELETE FROM producao").run();
 db.prepare("DELETE FROM config WHERE chave='urgencia_dia'").run();
 const ORDEM = require('./ordem_dia');
@@ -158,6 +161,28 @@ const lista = chamar('GET', '/api/revisao/lista').body;
 const it = lista.hoje_lista.concat(lista.proximos_lista, lista.alvo_lista).find(x => x.codigo === 'SOAMANHA');
 eq('a venda de amanhã subida ontem está em Hoje', it && it.hoje, 2);
 eq('e não conta de novo nos próximos dias', it && it.proximos, 0);
+
+console.log('\n── 8. os achados da ③ REVISÃO ──');
+P.ehDiaDeColeta = ehColetaDe;
+/* A virada só no dia de coleta: sábado, domingo e o "sem coleta" da 206 não
+   lançam urgência pela leitura (a TV ligada no fim de semana gravava a venda
+   de segunda como falta de sábado e de domingo na 904). */
+ok('sábado não é dia de coleta', !P.ehDiaDeColeta(db, '2026-11-28'));
+ok('domingo não é dia de coleta', !P.ehDiaDeColeta(db, '2026-11-29'));
+ok('quarta é', P.ehDiaDeColeta(db, '2026-11-25'));
+db.prepare("DELETE FROM producao").run();
+db.prepare("DELETE FROM config WHERE chave='urgencia_dia'").run();
+db.prepare("INSERT INTO saida_dia (data,sem_coleta) VALUES (?,1) ON CONFLICT(data) DO UPDATE SET sem_coleta=1").run(hoje);
+ORDEM.linhas(db);
+eq('hoje "sem coleta" (ou fim de semana): a leitura não lança urgência', ord().length, 0);
+db.prepare("DELETE FROM saida_dia WHERE data=?").run(hoje);
+URG.aplicar(db);
+ok('mas o upload (aplicar) lança, como sempre', ord().length > 0);
+/* O diagnóstico da tarja usa a mesma conta da tela (#12). */
+const DIAG = require('./diagnosticar_tarja_estoque').diagnosticar(db);
+const dg = DIAG.find(x => x.codigo === 'HOJEAMANHA');
+ok('o diagnóstico vê a tarja que a tela mostra (falta da próxima saída)', dg && dg.lugares.some(x => x.tarja), dg);
+eq('e não manda conferir a prateleira por ela', dg && dg.grupo, 'OK');
 
 console.log('\n' + (falhas ? 'FALHARAM ' + falhas + ' de ' + n : 'todos os ' + n + ' casos passaram'));
 process.exit(falhas ? 1 : 0);
