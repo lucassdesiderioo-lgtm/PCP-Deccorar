@@ -305,7 +305,9 @@ bug e não é:
   SKU é o `precisa` da 401.
 - ⚠️ **A MESMA VENDA NÃO CONTA EM HOJE E NOS PRÓXIMOS DIAS** (③ REVISÃO): Hoje
   vem do PDF e os próximos dias da planilha, e a planilha pode pôr a venda de
-  hoje noutra data ("próxima coleta", NF a emitir). A venda do PDF de hoje é
+  hoje noutra data ("próxima coleta", NF a emitir). A venda do PDF de hoje *(desde
+  26/11/2026, toda a prioridade até a próxima saída, quando a urgência de hoje foi
+  aplicada — §5)* é
   **ligada à planilha pela venda ou pelo pack** (a régua do `demanda_dominio`)
   e sai do dia dela na planilha; todo o PDF de hoje entra como o primeiro a usar
   o livre, como na urgência. ⚠️ **Descontar "do dia mais cedo", sem ligar venda
@@ -838,7 +840,7 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 | R-EMB-09 | Bipe que fecha a embalagem abaixo de 45 s (`config.emb_minimo_seg`) é recusado pelo servidor, e a embalagem continua (21/11/2026) |
 | R-EMB-10 | "Cancelar embalagem" zera a embalagem em andamento; nada grava e a peça continua na fila (21/11/2026) |
 | R-EMB-11 | A persiana com defeito volta da Embalagem para a Revisão: quem embala marca com motivo, nada soma; o revisor manda ao setor ou revisa de novo (21/11/2026) |
-| R-EMB-12 | A 102 embala primeiro o que destrava a venda de hoje: quatro blocos (do dia · pedido de hoje · reposição · devolução); o bipe fora da prioridade avisa e o próximo bipe decide (23/11/2026) |
+| R-EMB-12 | A 102 embala primeiro o que destrava a venda do dia — hoje e, desde 26/11/2026, a próxima saída (R-PRI-02): quatro blocos (do dia · pedido de hoje · reposição · devolução); o bipe fora da prioridade avisa e o próximo bipe decide (23/11/2026) |
 | R-EMB-13 | A peça fica reservada para quem está embalando, do 1º bipe ao fim; é da pessoa, e solta em 5 min sem bipe; o bipe final consome `hoje` → `estoque` → `devolucao` (23/11/2026) |
 | R-TEM-01 | Ao terminar a peça, duas barras ("Agora" e a mediana da própria pessoa no SKU, 30 dias) e "Parabéns!" ou "Você pode melhorar"; vale para toda tela nova que medir tempo do operador (21/11/2026) |
 | R-KIT-01 | Trocar o código do kit exige `confirmar` (servidor) |
@@ -1029,7 +1031,9 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 >   livre na Etiqueta de Venda — a `falta` do `tarja_estoque.js`, a mesma conta da
 >   tarja "sem estoque". `embalagem_prioridade.js` não tem conta própria (#12).
 >   **A peça de reposição ou de devolução de um SKU vermelho conta no vermelho**:
->   embalada, ela destrava a venda do mesmo jeito. Venda futura nunca é vermelha;
+>   embalada, ela destrava a venda do mesmo jeito. ~~Venda futura nunca é vermelha~~ —
+>   **desde 26/11/2026 a venda da próxima saída é vermelha, atrás da de hoje**
+>   (bloco "A VENDA DA PRÓXIMA SAÍDA É PRIORIDADE", §5); a de mais adiante, nunca;
 > - ⚠️ **o cartão do vermelho mostra só o trabalho da embalagem** (24/11/2026,
 >   decisão do dono): o número é **"para embalar"** (o menor entre peça aqui e
 >   venda parada); não há "com peça" nem "na produção"; o SKU do dia sem peça
@@ -1126,6 +1130,9 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 | R-URG-01 | O PDF gera só urgência |
 | R-URG-02 | O recálculo é idempotente e não apaga o manual |
 | R-PRD-01 | A urgência do PDF entra sozinha na ordem do dia no fim de cada upload; não há lançamento à mão (05/11/2026) |
+| R-PRI-01 | A próxima saída é o próximo dia de coleta: seg a sex, sem sábado, pulando o "sem coleta" da 206 (26/11/2026) |
+| R-PRI-02 | A venda até a próxima saída é prioridade assim que o PDF sobe — urgência, vermelho da 102 e tarja da 201; o "Faltam imprimir" não muda (26/11/2026) |
+| R-PRI-03 | A urgência se refaz sozinha na primeira leitura do dia (26/11/2026) |
 | R-CAR-01 | O carregamento não filtra por dia (#9) |
 | R-CAR-02 | Só carrega o que passou pela Etiqueta de Venda (#27) |
 | R-CAR-03 | O segundo bipe do carregamento, quando ligado, é cego |
@@ -1450,7 +1457,7 @@ recusada só no bipe — com mais vendas que peças na mesma lista, com o SKU na
 Agência **e** na Coleta, e com o SKU também dentro de caixa de várias.
 
 - **`tarja_estoque.js` é o dono único** de "a fila de hoje tem peça para todas?":
-  soma o que a fila de **hoje** pede de cada SKU (a régua do `filaDoDia`, com as
+  soma o que a fila de **hoje** pede de cada SKU *(desde 26/11/2026, a próxima saída também: bloco "A VENDA DA PRÓXIMA SAÍDA É PRIORIDADE", §5)* (a régua do `filaDoDia`, com as
   peças da caixa de várias pelo `qtd` do `lote_item`), e cada linha do
   `GET /api/pendentes` e cada peça do `GET /api/pendentes/varias` levam
   `pedido_hoje`, `falta` e `sob_medida`. A tela só desenha (`tarjaEstoque`, no
@@ -1468,7 +1475,8 @@ Agência **e** na Coleta, e com o SKU também dentro de caixa de várias.
 - ⚠️ **O JOIN DA LINHA POR SKU É EM MAIÚSCULA** (`s.codigo=UPPER(l.codigo)`),
   como o da caixa de várias: o código escrito em minúscula no `lote` deixava a
   linha sem número, e sem tarja nunca.
-- ⚠️ **O PAINEL "PRA DESPACHAR DEPOIS" FICOU COM A REGRA DE ANTES** (livre ≤ 0):
+- ⚠️ **O PAINEL "PRA DESPACHAR DEPOIS" FICOU COM A REGRA DE ANTES** (livre ≤ 0)
+  — **menos a venda da próxima saída, que desde 26/11/2026 ganha a tarja nova** (§5):
   ele não recebe `falta`, e a tela, sem `falta`, volta à regra antiga — que é
   também o que vale para a página antiga num tablet com cache. Contar o que sobra
   depois de hoje, data a data, é outra conta, e ficou de fora.
@@ -1499,6 +1507,63 @@ frase é texto montado.
 > conta**, e a tela da bancada mostrando a tarja antes do bipe num SKU que tem
 > alguma peça, mas não para todas. Prova que não foi feita se escreve como não
 > feita.
+
+### ⚠️ A VENDA DA PRÓXIMA SAÍDA É PRIORIDADE ASSIM QUE O PDF SOBE (REGRA de 26/11/2026)
+
+Spec `docs/specs/PRIORIDADE-PROXIMA-SAIDA.md`, linha em `docs/DECISOES.md`,
+cartões **R-PRI-01 a 03** em [`docs/regras/expedicao.md`](docs/regras/expedicao.md).
+O dono, 25/11/2026, às 18h, com as etiquetas do dia seguinte lançadas e várias
+sem estoque: *"essas peças já precisam passar a ser prioridades"*. Havia duas
+réguas de "venda de hoje": a urgência contava o PDF subido **hoje** (de manhã o
+da véspera sumia dela), e a 102 e a tarja da 201 só a venda que **vence** hoje.
+O que parece bug e não é:
+
+- **`prioridade_dia.js` é o dono único**: a **próxima saída** é o próximo dia de
+  segunda a sexta (sem sábado, decisão do dono), pulando o "sem coleta" da 206;
+  a **prioridade** é toda venda `pendente` com SKU que vence até ela — e a
+  atrasada e a sem data —, **qualquer que seja o dia do upload**, separada em
+  **hoje** (em cima, usa o livre primeiro) e **próxima saída**.
+- **O `diagnosticar_tarja_estoque.js` usa a mesma conta da tela** (a tarja
+  conta a próxima saída; a recusa no bipe continua sendo só a de hoje), e o
+  `rastrear.js` compara as ordens de hoje com a régua nova.
+- **Quem lê a régua nova:** a urgência (`urgencia.calcular`, e por ela a 101, a
+  TV e o aviso de status), o vermelho da 102 (`embalagem_prioridade.js`, com
+  `paradas_hoje`, `paradas_proxima` e `faltam_embalar_proxima`), a tarja "sem
+  estoque" da 201 (`tarja_estoque.pedidoPrioridade`; a linha diz *"só 2 livres
+  para 3 de hoje e 4 de amanhã"*) e a ligação PDF × planilha da 101
+  (`revisao_lista.js`: a mesma venda não conta em Hoje e nos Próximos dias).
+- ⚠️ **O `fila_dia.js` NÃO MUDOU**: a lista "Faltam imprimir" da 201, a trava da
+  201, o fechar vencidos e as barras da 202 continuam só com a venda de hoje. A
+  venda que vence **depois** da próxima saída não é prioridade; no painel "Pra
+  despachar depois" ela fica com a tarja de antes, e a da próxima saída ganha a nova.
+- ⚠️ **A URGÊNCIA SE REFAZ NA PRIMEIRA LEITURA DO DIA** (`urgencia.garantirDia`,
+  chamada pelo `ordem_dia.linhas`, sem cron; `config.urgencia_dia`). Só quando
+  ninguém aplicou hoje, não há ordem do PDF de hoje gravada **e hoje é dia de
+  coleta** (no sábado, no domingo e no "sem coleta" só o upload lança, ③
+  REVISÃO): uma leitura nunca refaz o que o upload gravou. Falhar vai ao log e
+  não derruba a leitura.
+- ⚠️ **NO FIM DE SEMANA E NO "SEM COLETA", SEM UPLOAD, A 101 DEIXA A VENDA DA
+  PRÓXIMA SAÍDA NOS PRÓXIMOS DIAS** (`urgencia.aplicadaHoje`, ③ REVISÃO rodada
+  2): sem a ordem do dia, ligá-la a Hoje a faria sumir das duas partes. A 102
+  continua a pintando de vermelho nesses dias, e é de propósito: embalar a peça
+  dela primeiro continua certo.
+- ⚠️ **`urgencia.calcular(db, data)` com a data explícita fica pela régua antiga**
+  (o dia do upload): é a pergunta do `rastrear.js` — "o que UM PDF gerou".
+- ⚠️ **A FALTA DE ESTOQUE DA 904 NÃO MUDOU DE CONTA** (decisão do dono, opção
+  "a"): ela é o retrato da urgência de cada dia, e a venda de amanhã subida hoje
+  entra hoje e de novo em cada dia de coleta até sair, se continuar sem peça. A
+  tela diz isso.
+- A TV chama a coluna de **"Falta do dia"**.
+- **Nada mexe em saldo**: a trava da impressão, a baixa e o livre não mudaram.
+
+**Rode `node teste_prioridade_dia.js` (47) ao mexer no `prioridade_dia.js`, na
+urgência, no `ordem_dia.js`, na ligação do `revisao_lista.js`, no
+`tarja_estoque.js` ou no vermelho da 102** — e `node teste_cruzamento.js`,
+`node teste_tarja_estoque.js`, `node teste_embalagem_prioridade.js` e `node
+teste_revisao_tela_unica.js`. **Depois do deploy, recarregue os tablets da
+Embalagem e da Etiqueta de Venda.** ⚠️ Construído, falta subir. Ainda não
+provado com dado real: o PDF de amanhã subido às 18h pondo as peças sem estoque
+no vermelho da 102, e a manhã seguinte sem PDF novo com a urgência de pé.
 
 ### ⚠️ A AÇÃO QUE CRIA PENDÊNCIA MOSTRA A CAIXINHA "ABRIR EM PENDÊNCIAS" (12/11/2026)
 
@@ -4693,7 +4758,7 @@ Ordenadas por risco. Não são bugs desconhecidos — são decisões adiadas.
 | 7 | ~~SKU `BK110X240BEGE` fora do padrão~~ **RESOLVIDO em 23/08/2026** — não há mais padrão de SKU; etiqueta e seletor leem as colunas (§7) | — |
 | 8 | ~~`/devolucao` não está no menu do rodapé (`nav.js`)~~ **RESOLVIDO em 02/10/2026** — botão "Devoluções" no rodapé, ao lado de Inventário | — |
 | 9 | ~~Revisão e embalagem não gravam **quem** fez (só `rejeicao` grava)~~ **RESOLVIDO em 26/10/2026** (fase 4 da `ACESSOS-UNIFICADOS`, R-ACE-06) — `revisao` e `montagem` ganharam `usuario_id` e `usuario_nome` (o nome como retrato), gravados pelo bipe; o ALTER guardado está na rota que grava (`revisao_route.js`) e no dono da tabela (`mont_route.js`). ~~**Fica aberto:** nenhuma tela ainda mostra produtividade por pessoa~~ — **fechado em 08/11/2026**: a 905 Minha produção e a aba Por pessoa da 904 (§21) · `teste_revisao.js` e `teste_montagem.js` | — |
-| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (27 casos), `teste_carga.js` (63), `teste_divergencia.js` (70) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (86), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (378), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (158), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (87), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (344), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (11), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (122), `teste_upload.js` (84), `teste_impressos.js` (42), `teste_quantidade.js` (42), `teste_casos_reais.js` (85), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (170), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (67), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (91) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (46), `teste_nivel.js` (98), `teste_admin_telas.js` (66), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (109), `teste_501_so_compra.js` (93), `teste_custo_historico.js` (15), `teste_parametros.js` (113), `teste_gravar_nf_da_nota.js` (28), `teste_pendencias_caminho.js` (87), `teste_fichas_material.js` (64), `teste_pendencias_menu.js` (52), `teste_pendencias_sobmedida.js` (67), `teste_roteiro.js` (25), `teste_diagnosticar_diferenca_telas.js` (27), `teste_tempo_operador.js` (28), `teste_tempos_minimos.js` (35), `teste_parametros_onde.js` (62), `teste_defeito_volta.js` (65), `teste_embalagem_prioridade.js` (89), `teste_revisao_problema_tela.js` (29, precisa de navegador), `teste_revisao_tela_unica.js` (66), `teste_revisao_tela_unica_tela.js` (37, precisa de navegador); `teste_etiqueta_producao.js` (63), `teste_producao_motor.js` (112), `teste_producao_revisao.js` (47), `teste_carrinhos.js` (44), `teste_entrega.js` (28), `teste_mesa_ir_tela.js` (8, precisa de navegador), `teste_trava_dia.js` (66); o resto não tem | Médio a longo prazo |
+| 10 | Sem testes automatizados na maior parte — hoje há `teste_parse.js` (27 casos), `teste_carga.js` (63), `teste_divergencia.js` (70) `teste_estoque.js` (90), `teste_contagem.js` (36), `teste_inventario.js` (98), `teste_regras_estoque.js` (97, com o servidor de verdade), `teste_ajuste.js` (53), `teste_backup.js` (10), `teste_livro.js` (65), `teste_cruzamento.js` (18), `teste_etiqueta.js` (86), `teste_ficha.js` (40), `teste_ordem_dia.js` (17), `teste_acesso.js` (378), `teste_acessos_f2.js` (89), `teste_setor_salvar.js` (26), `teste_cobertura.js` (10), `teste_kit.js` (133), `teste_qr.js` (45), `teste_skus.js` (63), `teste_montagem.js` (158), `teste_carregados.js` (28), `teste_arrumar_sobmedida.js` (63), `teste_compras_sobmedida.js` (29), `teste_componentes.js` (43), `teste_saida.js` (87), `teste_area.js` (30), `teste_segunda_pessoa.js` (26), `teste_quem_carregamento.js` (56), `teste_quem_devolucao_contagem.js` (89), `teste_quem.js` (344), `teste_saida_coleta.js` (57), `teste_saida_agencia.js` (45), `teste_media.js` (25), `teste_cancelada.js` (38), `teste_caminhos.js` (7), `teste_destino.js` (15), `teste_linguagem.js` (13) `teste_correcao.js` (112), `teste_correcao2.js` (98), `teste_correcao3.js` (23), `teste_acuracidade.js` (23), `teste_pecas_carga.js` (37), `teste_tablets.js` (83), `teste_sobra.js` (102), `teste_modo_teste_caixa.js` (18), `teste_coleta_vps.js` (76), `teste_atalho.js` (8), `teste_carregamento_tela.js` (11), `teste_etiqueta_sku.js` (54), `teste_revisao.js` (122), `teste_upload.js` (84), `teste_impressos.js` (42), `teste_quantidade.js` (42), `teste_casos_reais.js` (85), `teste_sem_etiqueta.js` (36), `teste_devolucao.js` (48), `teste_login.js` (170), `teste_conferencia_antiga.js` (64), `teste_baixa_conferencia.js` (69), `teste_pendencias.js` (67), `teste_conta_aberta.js` (42) e `teste_religar_sem_etiqueta.js` (9) e `teste_devolucao_casos.js` (1104) e `teste_devolucao_casos_tela.js` (247, precisa de navegador), `teste_conferencia_expedicao.js` (91) e `teste_conferencia_tela.js` (38, precisa de navegador), `teste_conferir_contagem_persianas.js` (22), `teste_aplicar_contagem_persianas.js` (41), `teste_ajustar_fila_embalagem.js` (26), `teste_etiqueta_envios.js` (46), `teste_mapa.js` (46), `teste_nivel.js` (98), `teste_admin_telas.js` (66), `teste_menu.js` (42), `teste_horario_coleta.js` (161), `teste_tarja_estoque.js` (23), `teste_diagnosticar_tarja_estoque.js` (13), `teste_revisao_compras.js` (46), `teste_migrar_simula.js` (4), `teste_acesso_compras.js` (78), `teste_tarja_modo_teste.js` (26), `teste_audit.js` (6), `teste_vendas_futuras.js` (134), `teste_relatorios.js` (68), `teste_corte_separacao.js` (32), `teste_lugar.js` (25), `teste_menu_unico.js` (27), `teste_valor.js` (109), `teste_501_so_compra.js` (93), `teste_custo_historico.js` (15), `teste_parametros.js` (113), `teste_gravar_nf_da_nota.js` (28), `teste_pendencias_caminho.js` (87), `teste_fichas_material.js` (64), `teste_pendencias_menu.js` (52), `teste_pendencias_sobmedida.js` (67), `teste_roteiro.js` (25), `teste_diagnosticar_diferenca_telas.js` (27), `teste_tempo_operador.js` (28), `teste_tempos_minimos.js` (35), `teste_parametros_onde.js` (62), `teste_defeito_volta.js` (65), `teste_embalagem_prioridade.js` (89), `teste_revisao_problema_tela.js` (29, precisa de navegador), `teste_revisao_tela_unica.js` (66), `teste_revisao_tela_unica_tela.js` (37, precisa de navegador); `teste_etiqueta_producao.js` (63), `teste_producao_motor.js` (112), `teste_producao_revisao.js` (47), `teste_carrinhos.js` (44), `teste_entrega.js` (28), `teste_mesa_ir_tela.js` (8, precisa de navegador), `teste_trava_dia.js` (66), `teste_prioridade_dia.js` (47), `teste_material_ficha.js` (6); o resto não tem | Médio a longo prazo |
 | 11 | ~~**A investigar: o que é o `Quantidade` da folha**~~ **RESPONDIDA em 15/09/2026** — é o pacote de vários produtos do ML: uma etiqueta com mais de uma persiana. Ver §5, armadilha #23 | — |
 | 12 | **NO RADAR: trazer para o PCP o que o sob medida já tem** — decisão de 03/09/2026, sem prazo. Quatro coisas, em ordem de valor: (a) tabela `parametro` com rótulo, unidade e a explicação do que o número muda, no lugar do `config` chave/valor cru; (b) migrações numeradas com tabela `migracao`, que mata a dívida do §17 de vez; ~~(c) registro de rotas em que rota sem permissão declarada nasce negada~~ **FEITO em 17/09/2026** com a dívida 16 (§10, armadilha #29): o padrão é negar e a cobertura varre o Express; (d) envelope único `{ok,dados}` / `{ok,motivo,mensagem}`, hoje cada rota responde de um jeito | Nenhum enquanto não for feito — é melhoria, não correção. Mas cada mês que passa é mais rota nova no padrão antigo |
 | 13 | ~~**Carregamento aceita volume que não foi embalado**~~ **RESOLVIDO em 17/09/2026** — o bipe exige `estagio='embalado'` (a régua do `carga.js`), recusa dizendo por onde imprimir e registra na auditoria; o `GET /api/print/:id` deixou de imprimir volume `pendente`, que era a boca do buraco. Ver §5, armadilha #27. **Fica aberto**: os volumes que já saíram assim continuam com o saldo alto. `node conferir_carregados.js` conta esse passivo (só lê); a correção é contagem + Admin → Estoque, nunca os scripts do §5 | — |
@@ -6319,6 +6384,14 @@ não é:
   travando o custo com e sem etapa.
 - `GET /api/formulas/roteiro/:modelo_id` cai na regra das leituras da ficha (as
   chaves da 404). Nenhuma tela, ação ou setor novo.
+- ⚠️ **A 404 LÊ OS MATERIAIS POR `GET /api/componentes/para-ficha`, E NÃO PELA
+  LISTA DE COMPRAS** (AJUSTE de 12/11/2026). A `/api/componentes` é de
+  `compras.ver` e traz preço, estoque e consumo: quem abria a 404 só com
+  "cadastrar modelo" via a lista vazia e não conseguia acrescentar material. A
+  rota nova abre com as chaves da 404 e leva **só** id, código MAT, nome,
+  unidade, família, ativo e "vai para a ficha" — o teste confere a lista exata de
+  campos, e um `c.*` reprova. Voltar a 404 para a lista de Compras traz o
+  dinheiro de volta à tela (§23). `node teste_material_ficha.js` (6).
 
 **Rode `node teste_roteiro.js` (25) ao mexer no `etapas.js`, na etapa da rota da
 fórmula ou no roteiro da 404** — e `node teste_ficha.js` e `node

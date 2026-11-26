@@ -786,6 +786,7 @@ async function carregarPend(){
    no primeiro preço lançado, e as duas estariam "certas", cada uma na sua
    régua. É a armadilha #12. */
 let COMPS=[];
+let FXCOMPS=[];   // os materiais da 404: a lista SEM dinheiro (/api/componentes/para-ficha), das chaves da 404
 /* Um timer por caixa de mensagem. Com setTimeout solto, o temporizador de uma
    gravacao apagava a mensagem da gravacao SEGUINTE — e quem cadastra varias
    linhas seguidas via "salvou" sumir e nao sabia se tinha salvado. */
@@ -939,8 +940,10 @@ async function conferirSm(){
 
 async function carregarFicha(){
   catalogoSobMedida();
-  try{ COMPS=await (await fetch('/api/componentes')).json(); }catch(e){ COMPS=[]; }
-  if(!Array.isArray(COMPS)) COMPS=[];   // sem compras.ver a rota responde {erro}: lista vazia, e nao estouro (rodada 2)
+  /* A lista de Compras é de compras.ver; a da ficha abre com as chaves da 404,
+     e não traz preço nem estoque (AJUSTE de 12/11/2026). */
+  try{ FXCOMPS=await (await fetch('/api/componentes/para-ficha')).json(); }catch(e){ FXCOMPS=[]; }
+  if(!Array.isArray(FXCOMPS)) FXCOMPS=[];
   /* A aba pode abrir antes do carregar() geral preencher os SKUS (③ REVISÃO,
      11/11/2026): sem isto a faixa dizia "nenhum SKU aponta para este modelo"
      com o modelo cheio de SKU — o §12, cache lido antes de existir. */
@@ -1192,9 +1195,9 @@ function prepararEditor(){
        simplesmente não roda. Tecido se aponta pela FAMÍLIA, e a cor do SKU mais
        a largura da bobina decidem qual item de estoque sai. */
     c.innerHTML='<option value="">— escolha —</option>'
-      +COMPS.filter(x=>x.ativo && !x.familia && x.vai_ficha!==0).map(x=>'<option value="'+x.id+'">'+esc((x.codigo_cadastro?x.codigo_cadastro+' · ':'')+x.nome)
+      +FXCOMPS.filter(x=>x.ativo && !x.familia && x.vai_ficha!==0).map(x=>'<option value="'+x.id+'">'+esc((x.codigo_cadastro?x.codigo_cadastro+' · ':'')+x.nome)
         +(x.unidade?' ('+esc(x.unidade)+')':'')+'</option>').join('')
-      +[...new Set(COMPS.filter(x=>x.familia && x.ativo && x.vai_ficha!==0).map(x=>x.familia))]
+      +[...new Set(FXCOMPS.filter(x=>x.familia && x.ativo && x.vai_ficha!==0).map(x=>x.familia))]
         .map(fam=>'<option value="fam:'+esc(fam)+'">Tecido da família '+esc(fam)
           +' (a cor do SKU escolhe a bobina)</option>').join('');
   }
@@ -1266,7 +1269,7 @@ async function previewEditor(){
   const uni=fam?'m linear':(function(){
     const id=FXEDIT==='novo' ? +($('#edComp')||{}).value
              : (FXLINHAS.find(x=>x.id==FXEDIT)||{}).componente_id;
-    const c=COMPS.find(x=>x.id===id); return c&&c.unidade?c.unidade:'';
+    const c=FXCOMPS.find(x=>x.id===id); return c&&c.unidade?c.unidade:'';
   })();
   /* O corte de uma medida: acha pelo par largura × altura, e não pela posição —
      a lista do corte pode ter ignorado uma medida que a do consumo não ignorou. */
