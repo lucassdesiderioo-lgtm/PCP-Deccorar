@@ -22,3 +22,4 @@ parametros: kit_codigo = Código do kit de instalação
 ## Mudanças
 - 25/11/2026 — Nova lista "Carrinhos da expedição" (nasce com A e B), com o botão da etiqueta de código de barras de cada carrinho. Carrinho com caixa dentro não pode ser removido.
 - 21/11/2026 — ficha criada em rascunho
+- 25/11/2026 — no ar: a conferência nos carrinhos, a entrega por carrinho e a trava do dia seguinte passaram a valer na fábrica

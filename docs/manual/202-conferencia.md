@@ -27,3 +27,4 @@ parametros: conf_carregamento = Segundo bipe na Conferência (1 = ligado)
 - 21/11/2026 — ficha criada em rascunho
 - 19/11/2026 — A caixa que saiu sem ninguém conferir e é fechada depois pelo acerto das caixas não conferidas tem o estoque baixado nesse acerto, uma vez só, como se tivesse sido conferida aqui.
 - 25/11/2026 — aceita a etiqueta de SKU em série no bipe de cada persiana
+- 25/11/2026 — no ar: a conferência nos carrinhos, a entrega por carrinho e a trava do dia seguinte passaram a valer na fábrica

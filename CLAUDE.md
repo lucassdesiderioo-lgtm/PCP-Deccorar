@@ -2807,8 +2807,8 @@ parece bug e não é:
 lista da 902 — e `node teste_conferencia_tela.js` (38, num Chromium; sem navegador
 diz PULADO) e `node teste_carregamento_tela.js` (11) ao mexer na tela.**
 
-⚠️ **Fases 1 e 2 mescladas em 25/11/2026** (PR #375); o deploy é do dono. Ainda
-não provado com dado real: a primeira conferência nos carrinhos com o leitor, a
+✅ **Fases 1 e 2 no ar desde 25/11/2026** (PR #375, deploy junto com a fase 3):
+o dono disse *"deu tudo certo no deploy"*. Ainda não provado com dado real: a primeira conferência nos carrinhos com o leitor, a
 primeira entrega de carrinho com a foto do motorista, e as caixas do canto de
 antes entrando num carrinho.
 
@@ -2847,9 +2847,13 @@ não foram conferidas"*. O que parece bug e não é:
 **Rode `node teste_trava_dia.js` (66) ao mexer no `trava_dominio.js`, no
 `trava_route.js`, na `/api/embalar`, na `/api/reimprimir` ou no quadro da 201.**
 
-⚠️ **Construído, falta subir.** Ainda não provado com dado real: a primeira
-manhã com a 201 travada por caixa de ontem e solta pelo bipe na 202, e a
-primeira caixa reimpressa no dia seguinte decidida.
+✅ **No ar desde 25/11/2026** (PR #377): o dono fez o deploy e disse *"deu tudo
+certo no deploy"*. Antes, a limpeza das nunca conferidas fechou as 27 caixas
+de 23 e 24/11 que já tinham saído (saída #42, 28 peças baixadas), e a contagem
+do dono bateu com o sistema: as 15 caixas na fábrica estavam conferidas no
+carrinho A. ⚠️ **Ainda não provado com dado real:** a primeira manhã com a 201
+travada (a #5680, que saiu em 25/11 sem bipe) e solta pela limpeza de 25/11, e
+a primeira caixa reimpressa no dia seguinte decidida.
 
 | Cartão | Regra em uma linha |
 |---|---|
