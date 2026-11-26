@@ -115,7 +115,7 @@ function proxRot(p){ return (p&&p.dia&&p.dia.proxima&&p.dia.proxima.rotulo)||'am
 function vendasDia(d,p){
   const h=d.paradas_hoje==null?d.paradas:d.paradas_hoje, x=d.paradas_proxima||0, out=[];
   if(h) out.push(plural(h,'venda de hoje','vendas de hoje'));
-  if(x) out.push(x+' de '+proxRot(p));
+  if(x) out.push(h ? x+' de '+proxRot(p) : plural(x,'venda de '+proxRot(p),'vendas de '+proxRot(p)));
   return out.join(' e ')||plural(d.paradas||0,'venda','vendas');
 }
 async function carregarFila(){
@@ -327,7 +327,7 @@ function mostrarFora(){
   p.style.display='';
   p.innerHTML='<div class="ft">TEM PEÇA DO DIA ESPERANDO</div>'
     +'<div class="fq1">Você bipou a <span style="font-family:ui-monospace,monospace">'+esc(emb.codigo)+'</span>, que não é do dia.</div>'
-    +'<div class="fq2">A <b>'+esc(d.codigo)+'</b> tem '+plural(d.para_embalar||d.aqui,'peça do dia para embalar','peças do dia para embalar')+' e <b>'+vendasDia(d,PRIO)+'</b> sem peça'+(d.paradas_hoje?' na Etiqueta de Venda':'')+(d.paradas_proxima?' (a de '+esc(proxRot(PRIO))+' ainda no "Pra despachar depois")':'')+'.<br>'
+    +'<div class="fq2">A <b>'+esc(d.codigo)+'</b> tem '+plural(d.para_embalar||d.aqui,'peça do dia para embalar','peças do dia para embalar')+'. Esperando por ela: <b>'+esc(vendasDia(d,PRIO))+'</b>'+(d.paradas_proxima?(d.paradas_proxima===1?' (a de ':' (as de ')+esc(proxRot(PRIO))+(d.paradas_proxima===1?' está':' estão')+' no "Pra despachar depois")':'')+'.<br>'
     +(emb.foraRecusada===d.codigo?'Siga com esta: <b>bipe o kit</b>.':'Para trocar, <b>bipe a '+esc(d.codigo)+'</b>. Para seguir com esta, <b>bipe o kit</b>.')+'</div>'
     +(emb.foraErro?'<div style="color:var(--red);font-weight:700;margin-top:8px">'+emb.foraErro+'</div>':'')
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+(emb.foraRecusada===d.codigo?'':'<button type="button" class="bd1" id="foraTroca">Vou embalar a '+esc(d.codigo)+'</button>')
