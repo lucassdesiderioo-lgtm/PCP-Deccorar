@@ -2,7 +2,7 @@
 tela: 102
 titulo: Embalagem
 situacao: rascunho
-atualizada_em: 2026-11-25
+atualizada_em: 2026-11-26
 cartoes: R-EMB-01, R-EMB-02, R-EMB-03, R-EMB-04, R-EMB-05, R-EMB-06, R-EMB-07, R-EMB-08, R-EMB-09, R-EMB-10, R-EST-02, R-EST-05, R-KIT-03, R-TEM-01, R-EMB-11, R-EMB-12, R-EMB-13
 parametros: kit_codigo = Código do kit de instalação, emb_minimo_seg = Tempo mínimo da embalagem (segundos)
 ---
@@ -37,3 +37,5 @@ parametros: kit_codigo = Código do kit de instalação, emb_minimo_seg = Tempo 
 - 24/11/2026 — Quando a peça que estava com outra pessoa volta a ficar livre, a tela não a anuncia mais como peça nova da Revisão.
 - 24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo.
 - 25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU
+- 26/11/2026 — O bloco vermelho "Do dia" passou a ter também as vendas da próxima saída (o próximo dia de coleta) cujo PDF já subiu, sempre atrás das de hoje; o cartão e o topo dizem quantas são de amanhã.
+- 26/11/2026 — A regra da prioridade da embalagem passou a se chamar "o que destrava a venda do dia": hoje e a próxima saída.

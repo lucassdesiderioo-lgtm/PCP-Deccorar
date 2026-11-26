@@ -508,16 +508,21 @@ async function verLote(){
      ferramenta de diagnostico com regua propria e pior que nenhuma: ela
      confirma com autoridade um numero que a tela nao usa (mesmo motivo pelo
      qual a fila de hoje vem do `fila_dia.js`). */
-  const linhas=require('./urgencia').calcular(db, dia)
+  /* ⚠️ HOJE A URGÊNCIA É A PRIORIDADE ATÉ A PRÓXIMA SAÍDA, e não o PDF do dia
+     (PRIORIDADE-PROXIMA-SAIDA, 26/11/2026): para comparar com as ordens
+     gravadas hoje, a conta de hoje é a da régua nova; de outro dia, o que
+     aquele PDF trazia (③ REVISÃO). */
+  const ehHoje=dia===db.prepare("SELECT date('now','localtime') d").get().d;
+  const linhas=require('./urgencia').calcular(db, ehHoje?undefined:dia)
     .map(l=>({c:l.codigo, q:l.pendentes, est:l.estoque, u:l.urgente}));
   let urg=0, cobertos=0;
   linhas.forEach(l=>{ urg+=l.u; cobertos+=l.q-l.u; });
   T('  - cobertos por estoque      : '+cobertos+'   (saem direto pra Etiqueta de Venda)');
-  T('  = URGENTES (tela vermelha)  : '+urg);
+  T('  = URGENTES'+(ehHoje?' (Revisão, até a próxima saída)':' (o PDF deste dia)')+' : '+urg);
   const lancados=db.prepare("SELECT COALESCE(SUM(qtd),0) n FROM producao WHERE data=? AND origem='ml'").get(dia).n;
   const manual=db.prepare("SELECT COALESCE(SUM(qtd),0) n FROM producao WHERE data=? AND COALESCE(origem,'')<>'ml'").get(dia).n;
   T('');
-  T('ordens do PDF ja lancadas     : '+lancados+(lancados!==urg?'   ← diferente do calculo acima: falta clicar em "Lancar urgentes"':''));
+  T('ordens do PDF ja lancadas     : '+lancados+(lancados!==urg?(ehHoje?'   ← diferente do calculo acima: as ordens se refazem no proximo upload':'   ← as ordens gravadas seguem a prioridade ate a proxima saida, nao so este PDF'):''));
   if(manual) T('ordens lancadas na mao        : '+manual+'   (nao vem do PDF; somam na tela)');
   T('a tela vermelha soma          : '+(lancados+manual)+'   ← o numero que o operador ve');
 

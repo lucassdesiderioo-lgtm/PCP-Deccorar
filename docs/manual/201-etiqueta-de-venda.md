@@ -2,7 +2,7 @@
 tela: 201
 titulo: Etiqueta de Venda
 situacao: rascunho
-atualizada_em: 2026-11-25
+atualizada_em: 2026-11-26
 cartoes: R-EST-03, R-EST-04, R-VOL-05, R-VOL-06, R-VOL-07, R-COL-01, R-COL-02, R-QUEM-01, R-CAR-02, R-PDF-08, R-TRV-01, R-TRV-02, R-TRV-03, R-TRV-04
 parametros: 
 ---
@@ -27,3 +27,4 @@ parametros:
 - 25/11/2026 — "Persiana perdida" só aparece depois que a caixa reimpressa for bipada na Conferência; quem só decide a trava abre a tela e vê só o quadro
 - 25/11/2026 — a caixa de várias persianas com um item cancelado pelo Mercado Livre depois da etiqueta não trava mais a tela; ela continua esperando decisão no card das canceladas
 - 25/11/2026 — no ar: a conferência nos carrinhos, a entrega por carrinho e a trava do dia seguinte passaram a valer na fábrica
+- 26/11/2026 — O aviso "sem estoque" passou a contar também as vendas da próxima saída (o próximo dia de coleta) cujo PDF já subiu: "só 2 livres para 3 de hoje e 4 de amanhã — faltam 5". A lista "Faltam imprimir" continua só com as de hoje.

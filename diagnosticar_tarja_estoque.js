@@ -22,7 +22,8 @@
  *
  * DESDE O CONSERTO DE 06/11/2026 (dívida 21) a tela usa a conta da FILA
  * INTEIRA do SKU, e este diagnóstico usa a MESMA (tarja_estoque.js, dono único):
- *   tela (linha por SKU e peça da caixa): falta = o que a fila de hoje pede − livre > 0
+ *   tela (linha por SKU e peça da caixa): falta = o que a fila de hoje e a da
+ *     próxima saída pedem − livre > 0 (desde 26/11/2026, PRIORIDADE-PROXIMA-SAIDA)
  *   trava da impressão (etq_route.js, /api/embalar): livre < o que ESTA caixa pede
  *   livre = skus.estoque − peças em caixa impressa e não conferida (baixa_dominio.reservados)
  * Até ali a linha só acusava livre ≤ 0 e a peça comparava o livre só com a
@@ -47,9 +48,15 @@ const up = s => String(s || '').toUpperCase();
    teste confere (teste_diagnosticar_tarja_estoque.js). */
 function diagnosticar(db){
   const resv = BAIXA.reservados(db);
-  const ped = TARJA.pedidoHoje(db);
+  /* A MESMA CONTA DA TELA, que desde 26/11/2026 conta também a próxima saída
+     (PRIORIDADE-PROXIMA-SAIDA; ③ REVISÃO: com o pedido de hoje, o diagnóstico
+     dizia "sem tarja" onde a tela mostra). A trava da impressão (`recusadas`)
+     continua sendo só a fila de hoje. */
+  const ped = TARJA.pedidoPrioridade(db);
+  const pedeTudo = c => { const v = ped.get(up(c)); return v ? v.hoje + v.proxima : 0; };
+  const pedeProx = c => { const v = ped.get(up(c)); return v ? v.proxima : 0; };
   /* a tarja da tela: a conta do tarja_estoque (sob medida nunca) */
-  const tarjaTela = (c, livre, sob) => !sob && livre != null && ((ped.get(up(c))||0) - Math.max(0, livre)) > 0;
+  const tarjaTela = (c, livre, sob) => !sob && livre != null && (pedeTudo(c) - Math.max(0, livre)) > 0;
 
   /* 1. AS LINHAS POR SKU DA TELA — o mesmo SELECT do `linhasDeSku` do
      exp_route.js (o JOIN em maiúscula, como lá desde 06/11/2026). */
@@ -120,7 +127,9 @@ function diagnosticar(db){
       return s;
     }
     s.recusadas = Math.max(0, s.pede - Math.max(0, s.livre));
-    if(s.recusadas === 0){ s.grupo = 'SISTEMA_ACHA_QUE_TEM'; return s; }
+    s.pede_proxima = pedeProx(s.codigo);
+    const faltaTudo = Math.max(0, s.pede + s.pede_proxima - Math.max(0, s.livre));
+    if(s.recusadas === 0 && faltaTudo === 0){ s.grupo = 'SISTEMA_ACHA_QUE_TEM'; return s; }
     if(s.tarjas === s.lugares.length) s.grupo = 'OK';
     else s.grupo = s.tarjas ? 'TARJA_EM_PARTE' : 'TARJA_FALTANDO';
     if(s.grupo !== 'OK'){

@@ -27,7 +27,7 @@ db.exec(`
     produzido INTEGER DEFAULT 0, data TEXT DEFAULT (date('now','localtime')),
     origem TEXT DEFAULT 'manual', urgente INTEGER DEFAULT 0, teste INTEGER DEFAULT 0);
   CREATE TABLE lote (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, packId TEXT, venda TEXT,
-    estagio TEXT DEFAULT 'pendente', data TEXT DEFAULT (date('now','localtime')));
+    estagio TEXT DEFAULT 'pendente', data TEXT DEFAULT (date('now','localtime')), despachar_em TEXT);
 `);
 
 const sku = db.prepare("INSERT INTO skus (codigo,estoque) VALUES (?,?)");
@@ -53,8 +53,11 @@ vol.run('BK150150BRANCO','331','931','pendente',hoje);
 vol.run('BK140140BEGE','114','904','embalado',hoje);
 /* Bloqueado também não gera ordem — ninguém sabe ainda qual peça é. */
 vol.run('BK140140BEGE','115','905','bloqueado',hoje);
-/* De ontem: o cruzamento é do dia da importação. */
+/* Subiu ontem e só vence daqui a 30 dias: depois da próxima saída, fica fora
+   (PRIORIDADE-PROXIMA-SAIDA, 26/11/2026 — até ali a régua era o dia da
+   importação, e o "de ontem" ficava fora por ter subido ontem). */
 vol.run('BK140140BEGE','116','906','pendente',ontem);
+db.prepare("UPDATE lote SET despachar_em=date('now','localtime','+30 day') WHERE venda='906'").run();
 
 const rotas = {};
 const app = { get:(p,...h)=>{ rotas['GET '+p]=h[h.length-1]; },
@@ -97,7 +100,7 @@ const ok = (n, c, extra) => { casos++;
   ok('volume já embalado não vira ordem', por.BK140140BEGE.pendentes === 3);
   ok('volume bloqueado também não: ninguém sabe qual peça é',
      por.BK140140BEGE.pendentes === 3);
-  ok('e o cruzamento é do dia da importação (o de ontem fica fora)',
+  ok('a venda que vence depois da próxima saída fica fora, mesmo subida antes',
      por.BK140140BEGE.pendentes === 3);
 
   // ── APLICAR: o que vai pra produção ──────────────────────────────────────
