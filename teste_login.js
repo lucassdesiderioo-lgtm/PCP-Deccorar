@@ -475,7 +475,14 @@ async function main(){
     ok('a barra do sob medida tambem', /Trocar meu PIN/.test(navSm) && /\/login\?trocar=1/.test(navSm));
     ok('a tela de PIN abre a troca para quem pediu (trocar=1), e nao so para o PIN de 4', /voluntaria/.test(telaLogin) && /q\.get\('trocar'\)/.test(telaLogin));
     ok('e a tela recusa o PIN novo igual ao de hoje antes de mandar', /diferente do de hoje/.test(telaLogin));
-    ok('e o "r" so leva a um caminho deste sistema (sem redirecionar para outro site)', /\^\\\/\(\?!\\\/\)/.test(telaLogin));
+    {
+      /* A guarda do "r", tirada da propria tela e rodada aqui. */
+      const m = telaLogin.match(/var destino=\(function\(r\)\{ return (\/.+\/)\.test\(r\)/);
+      ok('a tela tem a guarda do "r"', !!m);
+      const re = m ? eval(m[1]) : /^$/;
+      ok('e o "r" so leva a um caminho deste sistema', re.test('/operador?x=1#h')
+        && !re.test('javascript:alert(1)') && !re.test('https://outro.site') && !re.test('//outro.site') && !re.test('/\\outro.site'));
+    }
     ok('e depois de trocar o teclado para (um OK a mais nao conta erro na trava)', /feito=true/.test(telaLogin) && /\|\|feito\) return/.test(telaLogin));
   } finally {
     srv.close();

@@ -63,9 +63,9 @@
 var alvo=null, pin='', etapa='pin', atual='', novoPin='';
 var q=new URLSearchParams(location.search);
 var voluntaria=false;
-/* O `r` so vale como caminho DESTE sistema (comeca com uma barra so): sem a
+/* O `r` so vale como caminho DESTE sistema (comeca com uma barra so, e sem a barra invertida, que o navegador le como barra): sem a
    guarda, /login?r=https://outro-site levaria a pessoa para fora depois do PIN. */
-var destino=(function(r){ return /^\/(?!\/)/.test(r)?r:''; })(q.get('r')||'');
+var destino=(function(r){ return /^\/(?![\/\\])/.test(r)?r:''; })(q.get('r')||'');
 var feito=false;
 var MAX=6;
 function $(s){return document.querySelector(s);}
@@ -160,6 +160,8 @@ function enviar(){
          if(!voluntaria) return seguir(r.j.destino);
          feito=true;
          $('#pede').textContent='PIN trocado. Os outros aparelhos que estavam com o seu login foram desconectados.';
+         $('#pede').style.cssText='color:#3ddc84;font-size:18px;font-weight:600';
+         document.querySelector('.pad').classList.add('hide'); document.querySelector('.dots').classList.add('hide'); $('#volta').classList.add('hide');
          return setTimeout(function(){ location.href=destino||'/setor'; },2500);
        }
        /* O PIN de hoje estava errado: volta a pedi-lo. Os outros erros
