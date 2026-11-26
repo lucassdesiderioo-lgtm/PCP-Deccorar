@@ -962,7 +962,10 @@ module.exports=function(app,db){
      dívida 21): cada linha leva `pedido_hoje` e `falta`, do tarja_estoque.js.
      O JOIN acima passou a usar UPPER, como o da caixa de várias: o código
      escrito em minúscula no lote deixava a linha sem número e sem tarja nunca. */
-  app.get('/api/pendentes',(req,res)=> res.json(require('./tarja_estoque').marcar(db, livre(linhasDeSku(filaDoDia('l'),false)))));
+  /* Desde 26/11/2026 a tarja conta também a venda da próxima saída
+     (PRIORIDADE-PROXIMA-SAIDA); a lista continua só com a de hoje. */
+  app.get('/api/pendentes',(req,res)=>{ const T=require('./tarja_estoque');
+    res.json(T.marcar(db, livre(linhasDeSku(filaDoDia('l'),false)), T.pedidoPrioridade(db))); });
   /* ⚠️ AS CAIXAS DE VARIAS PERSIANAS TEM CARD PROPRIO, E POR UM MOTIVO FISICO.
      A coleta ganhou card proprio porque e um LUGAR diferente (§8-B); esta ganha
      porque e uma EMBALAGEM diferente — saco maior, as pecas juntas com fita, em
@@ -1029,7 +1032,11 @@ module.exports=function(app,db){
     const cxs=caixasDeVarias(depois ? DEPOIS('l') : filaDoDia('l'));
     /* As peças da caixa de HOJE levam a mesma conta da fila (tarja_estoque.js);
        o painel do "depois" fica com a regra de antes. */
-    if(!depois){ const T=require('./tarja_estoque'), ped=T.pedidoHoje(db); cxs.forEach(v=>T.marcar(db, v.itens, ped)); }
+    /* Desde 26/11/2026 (PRIORIDADE-PROXIMA-SAIDA) a caixa da próxima saída, no
+       painel do "depois", ganha a mesma tarja; a de mais adiante fica com a
+       regra de antes. */
+    { const T=require('./tarja_estoque'), ped=T.pedidoPrioridade(db);
+      cxs.forEach(v=>{ if(!depois || (v.despachar_em && v.despachar_em<=ped.ate)) T.marcar(db, v.itens, ped); }); }
     res.json(cxs);
   });
   /* O GROUP BY repete a expressao em vez de usar o apelido `modalidade`: com o
@@ -1076,7 +1083,12 @@ module.exports=function(app,db){
      caixa ja esta montada".
      `qtd` continua sendo CAIXA e `pecas` e PERSIANA — os dois nomes, nunca um
      so, e eles nao se somam (mesma regra do `faltaHoje` x `precisa`, §18). */
-  app.get('/api/pendentes/futuros',(req,res)=> res.json(livre(linhasDeSku(DEPOIS('l'),true))));
+  /* A linha da próxima saída ganha a tarja com a conta da prioridade
+     (PRIORIDADE-PROXIMA-SAIDA, 26/11/2026); a de mais adiante, a de antes. */
+  app.get('/api/pendentes/futuros',(req,res)=>{ const T=require('./tarja_estoque'), ped=T.pedidoPrioridade(db);
+    const l=livre(linhasDeSku(DEPOIS('l'),true));
+    T.marcar(db, l.filter(x=>x.despachar_em && x.despachar_em<=ped.ate), ped);
+    res.json(l); });
   app.get('/api/lote',(req,res)=> res.json(db.prepare("SELECT id,codigo,cor,buyer,city,nf,estagio FROM lote WHERE data=date('now','localtime') ORDER BY id").all()));
 
   // ── Reimpressao ───────────────────────────────────────────────────────────

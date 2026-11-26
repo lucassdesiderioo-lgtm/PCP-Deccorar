@@ -109,6 +109,15 @@ function linhaDia(c){ c=String(c||'').toUpperCase(); return PRIO?PRIO.dia.linhas
 /* A peça do dia que está aqui e livre, a primeira da ordem (o aviso da §4). */
 function primeiraDoDia(){ return PRIO?PRIO.dia.linhas.find(d=>d.aqui>(d.minha?1:0))||null:null; }
 function plural(n,a,b){ return n+' '+(n===1?a:b); }
+/* "DO DIA" É HOJE E A PRÓXIMA SAÍDA (PRIORIDADE-PROXIMA-SAIDA, 26/11/2026): o
+   PDF de amanhã sobe no fim do dia. A frase separa as duas. */
+function proxRot(p){ return (p&&p.dia&&p.dia.proxima&&p.dia.proxima.rotulo)||'amanhã'; }
+function vendasDia(d,p){
+  const h=d.paradas_hoje==null?d.paradas:d.paradas_hoje, x=d.paradas_proxima||0, out=[];
+  if(h) out.push(plural(h,'venda de hoje','vendas de hoje'));
+  if(x) out.push(x+' de '+proxRot(p));
+  return out.join(' e ')||plural(d.paradas||0,'venda','vendas');
+}
 async function carregarFila(){
   try{
     let p=null;
@@ -151,13 +160,13 @@ function desenhar(){
   if(L.length){
     /* SÓ O TRABALHO DA EMBALAGEM (decisão do dono, 24/11/2026): o número
        grande é quanto embalar agora; nada de estoque nem de produção. */
-    const fe=p.dia.faltam_embalar||0;
-    h+='<div class="bloco b1"><div class="bh">1 · DO DIA — EMBALAR PRIMEIRO<span class="bd">faltam embalar <b>'+fe+'</b> '+(fe===1?'peça':'peças')+' do dia</span></div>';
+    const fe=p.dia.faltam_embalar||0, fp=p.dia.faltam_embalar_proxima||0, rot=proxRot(p);
+    h+='<div class="bloco b1"><div class="bh">1 · DO DIA — EMBALAR PRIMEIRO<span class="bd">faltam embalar <b>'+fe+'</b> '+(fe===1?'peça':'peças')+' do dia'+(fp?' ('+fp+' para '+esc(rot)+')':'')+'</span></div>';
     L.forEach(function(d){
       const q=d.quadros, sq=[];
       for(let i=0;i<q.amarelo;i++) sq.push('<span class="a"></span>');
       for(let i=0;i<q.listrado;i++) sq.push('<span class="l"></span>');
-      const partes=[plural(d.paradas,'venda de hoje esperando esta peça','vendas de hoje esperando esta peça')];
+      const partes=[vendasDia(d,p)+' esperando esta peça'];
       if(d.sendo.length) partes.push(plural(d.sendo.length,'sendo embalada','sendo embaladas')+' por '+esc(d.sendo.join(', ')));
       h+='<div class="ln'+(cur===d.codigo?' agora':'')+'"><div><div class="cod">'+esc(d.codigo)
         +(NOVA===d.codigo&&d.aqui?'<span class="selo">NOVA</span>':'')+(cur===d.codigo?'<span class="selo">EMBALANDO AGORA</span>':'')+'</div>'
@@ -185,9 +194,9 @@ function desenhar(){
   if(!h) h='<div class="bloco"><div style="color:var(--muted);font-size:14px">Nada aguardando. A revis&atilde;o ainda n&atilde;o liberou pe&ccedil;as.</div></div>';
   /* As faixas do topo da lista (F6, F7, F8). */
   const ln=NOVA&&linhaDia(NOVA);
-  if(ln && ln.aqui) fx='<div class="faixa nova"><span class="selo" style="margin:0 8px 0 0">NOVA</span><span class="ft1">Chegou da Revisão uma peça do dia</span><div class="ft2"><b style="font-family:ui-monospace,monospace">'+esc(ln.codigo)+'</b> — '+plural(ln.paradas,'venda de hoje esperando','vendas de hoje esperando')+'. Ela está no bloco vermelho.</div></div>';
+  if(ln && ln.aqui) fx='<div class="faixa nova"><span class="selo" style="margin:0 8px 0 0">NOVA</span><span class="ft1">Chegou da Revisão uma peça do dia</span><div class="ft2"><b style="font-family:ui-monospace,monospace">'+esc(ln.codigo)+'</b> — '+vendasDia(ln,PRIO)+' esperando. Ela está no bloco vermelho.</div></div>';
   else if(semDiaAqui) fx='<div class="faixa esp"><div class="ft1">Nenhuma peça do dia para embalar agora</div><div class="ft2">Embale o bloco 2. Quando uma peça do dia sair da Revisão, ela aparece em cima.</div></div>';
-  else if(p.dia.todas) fx='<div class="faixa feito"><div class="ft1">Todas as '+p.dia.m+' vendas de hoje têm peça ✓</div><div class="ft2">A prioridade agora é o bloco 2. Se entrar venda nova de hoje sem peça, o vermelho volta aqui em cima.</div></div>';
+  else if(p.dia.todas) fx='<div class="faixa feito"><div class="ft1">Todas as '+p.dia.m+' vendas de hoje'+(p.dia.m_proxima?' e de '+esc(proxRot(p)):'')+' têm peça ✓</div><div class="ft2">A prioridade agora é o bloco 2. Se entrar venda nova de hoje sem peça, o vermelho volta aqui em cima.</div></div>';
   document.getElementById('faixa').innerHTML=fx;
   document.getElementById('filaLista').innerHTML=h;
 }
@@ -318,7 +327,7 @@ function mostrarFora(){
   p.style.display='';
   p.innerHTML='<div class="ft">TEM PEÇA DO DIA ESPERANDO</div>'
     +'<div class="fq1">Você bipou a <span style="font-family:ui-monospace,monospace">'+esc(emb.codigo)+'</span>, que não é do dia.</div>'
-    +'<div class="fq2">A <b>'+esc(d.codigo)+'</b> tem '+plural(d.para_embalar||d.aqui,'peça do dia para embalar','peças do dia para embalar')+' e <b>'+plural(d.paradas,'venda de hoje parada','vendas de hoje paradas')+'</b> na Etiqueta de Venda.<br>'
+    +'<div class="fq2">A <b>'+esc(d.codigo)+'</b> tem '+plural(d.para_embalar||d.aqui,'peça do dia para embalar','peças do dia para embalar')+' e <b>'+plural(d.paradas,'venda parada','vendas paradas')+'</b> na Etiqueta de Venda'+(d.paradas_proxima?' ('+d.paradas_proxima+' de '+esc(proxRot(PRIO))+')':'')+'.<br>'
     +(emb.foraRecusada===d.codigo?'Siga com esta: <b>bipe o kit</b>.':'Para trocar, <b>bipe a '+esc(d.codigo)+'</b>. Para seguir com esta, <b>bipe o kit</b>.')+'</div>'
     +(emb.foraErro?'<div style="color:var(--red);font-weight:700;margin-top:8px">'+emb.foraErro+'</div>':'')
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+(emb.foraRecusada===d.codigo?'':'<button type="button" class="bd1" id="foraTroca">Vou embalar a '+esc(d.codigo)+'</button>')

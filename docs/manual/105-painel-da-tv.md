@@ -2,7 +2,7 @@
 tela: 105
 titulo: Painel da TV
 situacao: rascunho
-atualizada_em: 2026-11-21
+atualizada_em: 2026-11-26
 cartoes: R-EST-12
 parametros: 
 ---
@@ -21,3 +21,4 @@ parametros:
 
 ## Mudanças
 - 21/11/2026 — ficha criada em rascunho
+- 26/11/2026 — A coluna "Falta hoje" passou a se chamar "Falta do dia": conta as vendas de hoje e as da próxima saída cujo PDF já subiu.

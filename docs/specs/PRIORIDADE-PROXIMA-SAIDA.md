@@ -1,6 +1,22 @@
 # PRIORIDADE-PROXIMA-SAIDA — a venda da próxima saída vira prioridade assim que o PDF sobe
 
-> **STATUS — 26/11/2026: RASCUNHO, esperando a aprovação do dono.** Nada construído.
+> **STATUS — 26/11/2026: APROVADA PELO DONO** (*"a, sem coleta no sábado, pode
+> seguir"*) · **as duas fases construídas juntas em 26/11/2026, falta subir** ·
+> `teste_prioridade_dia.js` (39) · cartões R-PRI-01 a 03 em
+> `docs/regras/expedicao.md`; linha em `docs/DECISOES.md`.
+>
+> **O que mudou na construção** (vale o que está aqui):
+> - **sem coleta no sábado** (o dono): a próxima saída é de segunda a sexta;
+> - **relatórios: opção (a)** — a falta de estoque da 904 não muda de conta, e a
+>   tela diz que a venda de amanhã subida hoje pode contar nos dois dias;
+> - o dono único se chama `prioridade_dia.js`, e a urgência com a data explícita
+>   (o `rastrear.js`) fica pela régua antiga, porque pergunta o que UM PDF gerou;
+> - a virada (R-PRI-06 aqui, **R-PRI-03** no cartão) só aplica quando ninguém
+>   aplicou hoje e não há ordem do PDF de hoje gravada;
+> - os cartões ficaram três (R-PRI-01 a 03): a ordem, o dono e o que não muda
+>   estão dentro do R-PRI-02.
+>
+> ~~RASCUNHO, esperando a aprovação do dono. Nada construído.~~
 > Tipo: `REGRA` · risco 🟡 (muda prioridade e número mostrado em tela; **não mexe
 > em saldo, na baixa nem na trava da impressão**). Nasceu da revisão da 102
 > Embalagem pedida pelo dono em 25/11/2026, às 18h, com as etiquetas do dia
@@ -16,7 +32,7 @@
 >    imprimir" continua só com a de hoje;
 > 4. a urgência da 101 usa a mesma régua, **sem depender do dia em que o PDF
 >    subiu**;
-> 5. relatórios — em aberto (§6).
+> 5. relatórios — opção (a) (§6); e não há coleta no sábado.
 
 ---
 

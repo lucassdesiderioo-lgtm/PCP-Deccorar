@@ -45,20 +45,33 @@ function sobMedida(db){
   }catch(e){ return () => false; }
 }
 
+/* A TARJA CONTA TAMBÉM A PRÓXIMA SAÍDA (PRIORIDADE-PROXIMA-SAIDA, decisão do
+   dono de 26/11/2026): o PDF do dia seguinte sobe no fim do dia, e a venda
+   dele sem peça tem que aparecer já. O pedido é o do `prioridade_dia.pedido`
+   (dono único), separado em hoje e próxima saída; a lista "Faltam imprimir"
+   continua só com a de hoje (o `fila_dia.js`). */
+function pedidoPrioridade(db){ return require('./prioridade_dia').pedido(db); }
+
 /* Marca cada pedaço (linha por SKU ou peça da caixa) com `pedido_hoje`,
-   `falta` e `sob_medida`. `estoque` já é o LIVRE. Sem o número do cadastro
-   (SKU não achado) a falta fica 0: não há o que comparar, e a trava do SKU não
-   cadastrado (§6) é que cuida dele. */
+   `pedido_proxima`, `falta` (das duas), `falta_hoje` e `sob_medida`. `estoque`
+   já é o LIVRE, e hoje o usa primeiro. `ped` pode ser o pedido de hoje (número
+   por SKU, a régua antiga) ou o da prioridade ({hoje, proxima}). Sem o número
+   do cadastro (SKU não achado) a falta fica 0: não há o que comparar, e a
+   trava do SKU não cadastrado (§6) é que cuida dele. */
 function marcar(db, pedacos, ped){
   ped = ped || pedidoHoje(db);
   const sm = sobMedida(db);
   for(const p of pedacos){
-    const c = up(p.codigo);
+    const c = up(p.codigo), v = ped.get(c);
     p.sob_medida = sm(c);
-    p.pedido_hoje = ped.get(c) || 0;
-    p.falta = (p.sob_medida || p.estoque == null) ? 0 : Math.max(0, p.pedido_hoje - Math.max(0, p.estoque));
+    p.pedido_hoje = v == null ? 0 : (typeof v === 'object' ? v.hoje : v);
+    p.pedido_proxima = v != null && typeof v === 'object' ? v.proxima : 0;
+    if(ped.rotulo) p.proxima_rotulo = ped.rotulo;
+    const livre = Math.max(0, p.estoque || 0), conta = !(p.sob_medida || p.estoque == null);
+    p.falta_hoje = conta ? Math.max(0, p.pedido_hoje - livre) : 0;
+    p.falta = conta ? Math.max(0, p.pedido_hoje + p.pedido_proxima - livre) : 0;
   }
   return pedacos;
 }
 
-module.exports = { pedidoHoje, marcar };
+module.exports = { pedidoHoje, pedidoPrioridade, marcar };

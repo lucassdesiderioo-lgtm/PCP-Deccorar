@@ -629,7 +629,13 @@ function tarjaEstoque(o){
     return (o.estoque<=0 || (o.peca && o.estoque<Math.max(1,o.qtd||1))) ? 'sem estoque — precisa produzir' : '';
   if(!(o.falta>0)) return '';
   if(o.estoque<=0) return 'sem estoque — precisa produzir';
-  return 'só '+o.estoque+(o.estoque===1?' livre':' livres')+' para '+o.pedido_hoje+' de hoje — '+(o.falta===1?'falta 1':'faltam '+o.falta)+': precisa produzir';
+  /* A próxima saída conta junto (PRIORIDADE-PROXIMA-SAIDA, 26/11/2026): o PDF do
+     dia seguinte sobe no fim do dia, e a falta dele aparece já. */
+  var pr=o.pedido_proxima||0, rot=o.proxima_rotulo||'amanhã';
+  var para=[];
+  if(o.pedido_hoje) para.push(o.pedido_hoje+' de hoje');
+  if(pr) para.push(pr+' de '+rot);
+  return 'só '+o.estoque+(o.estoque===1?' livre':' livres')+' para '+para.join(' e ')+' — '+(o.falta===1?'falta 1':'faltam '+o.falta)+': precisa produzir';
 }
 /*TARJA_ESTOQUE_FIM*/
 function blocoCaixa(v, sep, naColuna){
