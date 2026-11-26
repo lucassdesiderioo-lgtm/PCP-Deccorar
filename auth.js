@@ -461,16 +461,21 @@ module.exports=function(app, db){
       // RECUSADO antes de gravar qualquer coisa — ate 21/10/2026 um PIN de 3
       // digitos era ignorado em silencio e a tela dizia "salvo".
       if(pin!==undefined&&pin!==null&&pin!==''&&!PIN_OK.test(String(pin))) return res.status(400).json({erro:ERRO_PIN});
+      /* O PROPRIO PIN NAO SE TROCA AQUI (LOGIN-PESSOAL fase 1, decisao do dono,
+         26/11/2026): esta rota nao pede o PIN de hoje, e quem pegasse o
+         computador aberto trocaria o PIN de quem esta logado e o derrubaria de
+         todo aparelho. Recusa antes de gravar qualquer campo. */
+      const eleMesmo=req.usuario&&Number(req.usuario.id)===Number(id);
+      if(pin&&eleMesmo) return res.status(400).json({erro:'O seu próprio PIN se troca pelo “Trocar meu PIN”, na barra de cima: ele pede o PIN de hoje.'});
       db.prepare('UPDATE usuarios SET nome=? WHERE id=?').run(nome,id);
       if(areas!==undefined) db.prepare('UPDATE usuarios SET areas=? WHERE id=?').run((areas||[]).join(','),id);
       if(ativo!==undefined) db.prepare('UPDATE usuarios SET ativo=? WHERE id=?').run(ativo?1:0,id);
       if(pin){
-        /* PIN zerado pelo administrador: as sessoes da pessoa caem (LOGIN-PESSOAL
-           fase 1). Se ele zerou o proprio, o aparelho de onde zerou continua. */
-        const eleMesmo=req.usuario&&Number(req.usuario.id)===Number(id);
-        try{ trocarPinEDerrubar(Number(id),String(pin),eleMesmo?req.usuario.sessao:null,'pin_zerado'); }
+        /* PIN zerado pelo administrador: TODAS as sessoes da pessoa caem
+           (LOGIN-PESSOAL fase 1, decisao do dono, 26/11/2026). O proprio PIN
+           nunca chega aqui (recusado acima). */
+        try{ trocarPinEDerrubar(Number(id),String(pin),null,'pin_zerado'); }
         catch(e){ console.log('[auth] zerar PIN falhou: '+e.message); return res.status(500).json({erro:'Não deu para gravar o PIN. Tente de novo.'}); }
-        if(eleMesmo&&!req.usuario.sessao){ const uu=db.prepare('SELECT id,nome FROM usuarios WHERE id=?').get(id); if(uu) abrirSessao(uu,req,res,'login'); }
       }
     } else {
       if(!PIN_OK.test(String(pin==null?'':pin))) return res.status(400).json({erro:ERRO_PIN});

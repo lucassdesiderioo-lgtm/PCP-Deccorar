@@ -464,8 +464,19 @@ async function main(){
     eq('a sessao do administrador continua', (await eu(cAdm2)).logado, true);
     eq('editar so o nome da pessoa nao derruba ninguem', await zerar(cAdm2, { id:OTO, nome:'Oto Lima' }), 200);
     eq('o Oto continua logado', (await eu(cOto)).logado, true);
-    eq('o administrador zera o proprio PIN pela tela de Acessos', await zerar(cAdm2, { id:ADMIN, nome:'Administrador', pin:'864200' }), 200);
-    eq('e continua logado no aparelho de onde zerou', (await eu(cAdm2)).logado, true);
+    /* O PROPRIO PIN NAO SE TROCA PELA TELA DE ACESSOS (decisao do dono,
+       26/11/2026): ali nao se pede o PIN de hoje, e quem pegasse o computador
+       aberto trocaria o PIN do administrador e o derrubaria de todo aparelho.
+       O caminho e o "Trocar meu PIN". */
+    const zr = await fetch(base + '/api/usuarios', { method:'POST',
+      headers:{ 'content-type':'application/json', cookie: cAdm2 },
+      body: JSON.stringify({ id:ADMIN, nome:'Adm Trocado', pin:'864200' }) });
+    eq('o administrador NAO troca o proprio PIN pela tela de Acessos (400)', zr.status, 400);
+    ok('e a recusa manda usar o "Trocar meu PIN"', /Trocar meu PIN/.test((await zr.json()).erro || ''));
+    eq('nada mudou: o PIN de hoje continua entrando', (await login(ADMIN, '975310')).status, 200);
+    eq('nem o nome', db.prepare('SELECT nome FROM usuarios WHERE id=?').get(ADMIN).nome, 'Administrador');
+    eq('e ele continua logado', (await eu(cAdm2)).logado, true);
+    eq('editar so o proprio nome continua livre', await zerar(cAdm2, { id:ADMIN, nome:'Administrador' }), 200);
 
     /* A tela: o botao em toda barra, e a tela de PIN no modo de troca. */
     const navPcp = fs.readFileSync(path.join(__dirname, 'public', 'nav.js'), 'utf8');
