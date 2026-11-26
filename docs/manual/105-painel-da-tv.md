@@ -22,3 +22,4 @@ parametros:
 ## Mudanças
 - 21/11/2026 — ficha criada em rascunho
 - 26/11/2026 — A coluna "Falta hoje" passou a se chamar "Falta do dia": conta as vendas de hoje e as da próxima saída cujo PDF já subiu.
+- 26/11/2026 — A regra da falta de estoque passou a usar o nome novo da coluna, "Falta do dia".

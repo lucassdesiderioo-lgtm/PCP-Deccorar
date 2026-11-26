@@ -94,7 +94,7 @@
   "R-EMB-09": "fc5292da3309196a",
   "R-EMB-10": "754dc6056b8f74df",
   "R-EMB-11": "3ea97ab5f438fd8c",
-  "R-EMB-12": "34457905e19a20d8",
+  "R-EMB-12": "95e3e5e643c6687b",
   "R-EMB-13": "3b62c7fdf3dacf64",
   "R-ENT-01": "8c1d2c458828596a",
   "R-ENT-02": "228705614c79542f",
@@ -110,7 +110,7 @@
   "R-EST-08": "5785ee20127eebd6",
   "R-EST-09": "60ef740b95601eca",
   "R-EST-11": "54ded9d73f8ac405",
-  "R-EST-12": "dbc707e1621a5d23",
+  "R-EST-12": "8a397bacf3ff82fb",
   "R-EST-13": "f6ea1e112a941164",
   "R-EST-14": "346fd87440a98e53",
   "R-EST-15": "9df044205b6b5601",
@@ -191,7 +191,7 @@
   "R-REC-05": "b041bed3746d12d0",
   "R-REC-06": "c38664d1c7cf829b",
   "R-REC-07": "ff71d683a9014480",
-  "R-REV-01": "5423b792f8b9db9a",
+  "R-REV-01": "07882cf25b283063",
   "R-REV-02": "9f70534cd046bc85",
   "R-REV-03": "6fa200f05b3f0521",
   "R-REV-04": "ef9f572600bf404c",
@@ -382,7 +382,8 @@
     "24/11/2026 — O cartão escreve \"N de M para hoje já revisadas (K na embalagem)\", contando junto o produto do dia que já está todo na embalagem.",
     "24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo.",
     "25/11/2026 — a persiana que vem da montagem se revisa pela etiqueta de SKU em série, e a tela mostra quem cortou e quem montou",
-    "26/11/2026 — Hoje passou a ter também as vendas da próxima saída (o próximo dia de coleta) cujo PDF já subiu, mesmo que o PDF tenha subido ontem; e na primeira abertura do dia a lista já vem com elas, sem esperar um PDF novo."
+    "26/11/2026 — Hoje passou a ter também as vendas da próxima saída (o próximo dia de coleta) cujo PDF já subiu, mesmo que o PDF tenha subido ontem; e na primeira abertura do dia a lista já vem com elas, sem esperar um PDF novo.",
+    "26/11/2026 — Correção da linha acima: a primeira abertura só traz as vendas da próxima saída em dia de coleta; no fim de semana e no dia sem coleta, sem PDF novo, elas ficam em Próximos dias."
    ],
    "situacao": "rascunho"
   },
@@ -409,7 +410,8 @@
     "24/11/2026 — Quando a peça que estava com outra pessoa volta a ficar livre, a tela não a anuncia mais como peça nova da Revisão.",
     "24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo.",
     "25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU",
-    "26/11/2026 — O bloco vermelho \"Do dia\" passou a ter também as vendas da próxima saída (o próximo dia de coleta) cujo PDF já subiu, sempre atrás das de hoje; o cartão e o topo dizem quantas são de amanhã."
+    "26/11/2026 — O bloco vermelho \"Do dia\" passou a ter também as vendas da próxima saída (o próximo dia de coleta) cujo PDF já subiu, sempre atrás das de hoje; o cartão e o topo dizem quantas são de amanhã.",
+    "26/11/2026 — A regra da prioridade da embalagem passou a se chamar \"o que destrava a venda do dia\": hoje e a próxima saída."
    ],
    "situacao": "rascunho"
   },
@@ -446,7 +448,8 @@
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
     "21/11/2026 — ficha criada em rascunho",
-    "26/11/2026 — A coluna \"Falta hoje\" passou a se chamar \"Falta do dia\": conta as vendas de hoje e as da próxima saída cujo PDF já subiu."
+    "26/11/2026 — A coluna \"Falta hoje\" passou a se chamar \"Falta do dia\": conta as vendas de hoje e as da próxima saída cujo PDF já subiu.",
+    "26/11/2026 — A regra da falta de estoque passou a usar o nome novo da coluna, \"Falta do dia\"."
    ],
    "situacao": "rascunho"
   },
@@ -604,7 +607,8 @@
    ],
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
-    "21/11/2026 — ficha criada em rascunho"
+    "21/11/2026 — ficha criada em rascunho",
+    "26/11/2026 — A regra da falta de estoque passou a chamar a coluna da TV de \"Falta do dia\"; nada mudou nesta tela."
    ],
    "situacao": "rascunho"
   },
@@ -645,7 +649,8 @@
    "linhas": [
     "21/11/2026 — ficha criada em rascunho",
     "23/11/2026 — A tela da Revisão deixou de ter as telas vermelha e azul: a falta por dia e o alvo calculados aqui aparecem lá como \"Próximos dias\" e \"Completar o alvo\", e a ordem pela data da falta vale lá sempre, com a chave ligada ou não.",
-    "25/11/2026 — nova aba Etiquetas da produção: as etiquetas de SKU em série e os maços de tecido e de tubo; o Supervisor abre a tela só nesta aba"
+    "25/11/2026 — nova aba Etiquetas da produção: as etiquetas de SKU em série e os maços de tecido e de tubo; o Supervisor abre a tela só nesta aba",
+    "26/11/2026 — A regra da falta de estoque passou a chamar a coluna da TV de \"Falta do dia\"; nada mudou nesta tela."
    ],
    "situacao": "rascunho"
   },
@@ -953,7 +958,8 @@
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
     "21/11/2026 — ficha criada em rascunho",
-    "26/11/2026 — A falta de estoque passou a contar as vendas até a próxima saída: a venda de amanhã cujo PDF subiu hoje já entra hoje e, se continuar sem peça, entra de novo no dia dela. A tela diz isso."
+    "26/11/2026 — A falta de estoque passou a contar as vendas até a próxima saída: a venda de amanhã cujo PDF subiu hoje já entra hoje e, se continuar sem peça, entra de novo no dia dela. A tela diz isso.",
+    "26/11/2026 — Correção da linha acima: a venda que continua sem peça entra de novo em cada dia de coleta até sair, e não só no dia dela."
    ],
    "situacao": "rascunho"
   },

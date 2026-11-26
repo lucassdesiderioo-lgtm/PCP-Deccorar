@@ -273,7 +273,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Regra:** a primeira leitura do dia da ordem do dia (`ordem_dia.linhas`: 101, 102, TV, aviso de status) aplica a urgência uma vez (`urgencia.garantirDia`, sem cron), e marca `config.urgencia_dia`. O upload continua aplicando, como sempre (R-PRD-01).
 - **Por quê:** sem isso a manhã nascia com a ordem do dia vazia, e as vendas de hoje (subidas ontem à noite) sem peça não chegavam à Revisão até alguém subir outro PDF.
 - **Exceções:** a leitura **nunca refaz** um dia que já foi aplicado, nem um dia com ordem do PDF gravada, e **só lança em dia de coleta** (③ REVISÃO): no sábado, no domingo e no "sem coleta" da 206 só o upload lança — com a TV ligada, a venda de segunda virava falta de sábado e de domingo na 904. Nesses dias, sem upload, a 101 não liga a venda da próxima saída a Hoje (`urgencia.aplicadaHoje`): ela fica nos Próximos dias, e a 102 continua a pintando de vermelho. Falhar não derruba a leitura (log).
-- **Teste que trava:** `teste_prioridade_dia.js` (seção 4).
+- **Teste que trava:** `teste_prioridade_dia.js` (seções 4 e 8).
 - **Status:** construído em 26/11/2026, falta subir.
 
 ### R-PRD-01 · A urgência do PDF entra sozinha; não há lançamento à mão (05/11/2026)

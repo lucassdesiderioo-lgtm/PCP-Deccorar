@@ -38,3 +38,4 @@ parametros: kit_codigo = Código do kit de instalação, emb_minimo_seg = Tempo 
 - 24/11/2026 — O tempo mínimo da peça passou a se mudar pela tela 906 Parâmetros, por quem é nível Admin. O número de hoje continua o mesmo.
 - 25/11/2026 — aceita a etiqueta de SKU em série no lugar do SKU
 - 26/11/2026 — O bloco vermelho "Do dia" passou a ter também as vendas da próxima saída (o próximo dia de coleta) cujo PDF já subiu, sempre atrás das de hoje; o cartão e o topo dizem quantas são de amanhã.
+- 26/11/2026 — A regra da prioridade da embalagem passou a se chamar "o que destrava a venda do dia": hoje e a próxima saída.

@@ -305,7 +305,9 @@ bug e não é:
   SKU é o `precisa` da 401.
 - ⚠️ **A MESMA VENDA NÃO CONTA EM HOJE E NOS PRÓXIMOS DIAS** (③ REVISÃO): Hoje
   vem do PDF e os próximos dias da planilha, e a planilha pode pôr a venda de
-  hoje noutra data ("próxima coleta", NF a emitir). A venda do PDF de hoje é
+  hoje noutra data ("próxima coleta", NF a emitir). A venda do PDF de hoje *(desde
+  26/11/2026, toda a prioridade até a próxima saída, quando a urgência de hoje foi
+  aplicada — §5)* é
   **ligada à planilha pela venda ou pelo pack** (a régua do `demanda_dominio`)
   e sai do dia dela na planilha; todo o PDF de hoje entra como o primeiro a usar
   o livre, como na urgência. ⚠️ **Descontar "do dia mais cedo", sem ligar venda
@@ -1029,7 +1031,9 @@ encerra, consome a `fila`, soma **+1** e abate a ordem do dia.
 >   livre na Etiqueta de Venda — a `falta` do `tarja_estoque.js`, a mesma conta da
 >   tarja "sem estoque". `embalagem_prioridade.js` não tem conta própria (#12).
 >   **A peça de reposição ou de devolução de um SKU vermelho conta no vermelho**:
->   embalada, ela destrava a venda do mesmo jeito. Venda futura nunca é vermelha;
+>   embalada, ela destrava a venda do mesmo jeito. ~~Venda futura nunca é vermelha~~ —
+>   **desde 26/11/2026 a venda da próxima saída é vermelha, atrás da de hoje**
+>   (bloco "A VENDA DA PRÓXIMA SAÍDA É PRIORIDADE", §5); a de mais adiante, nunca;
 > - ⚠️ **o cartão do vermelho mostra só o trabalho da embalagem** (24/11/2026,
 >   decisão do dono): o número é **"para embalar"** (o menor entre peça aqui e
 >   venda parada); não há "com peça" nem "na produção"; o SKU do dia sem peça
@@ -1453,7 +1457,7 @@ recusada só no bipe — com mais vendas que peças na mesma lista, com o SKU na
 Agência **e** na Coleta, e com o SKU também dentro de caixa de várias.
 
 - **`tarja_estoque.js` é o dono único** de "a fila de hoje tem peça para todas?":
-  soma o que a fila de **hoje** pede de cada SKU (a régua do `filaDoDia`, com as
+  soma o que a fila de **hoje** pede de cada SKU *(desde 26/11/2026, a próxima saída também: bloco "A VENDA DA PRÓXIMA SAÍDA É PRIORIDADE", §5)* (a régua do `filaDoDia`, com as
   peças da caixa de várias pelo `qtd` do `lote_item`), e cada linha do
   `GET /api/pendentes` e cada peça do `GET /api/pendentes/varias` levam
   `pedido_hoje`, `falta` e `sob_medida`. A tela só desenha (`tarjaEstoque`, no
@@ -1471,7 +1475,8 @@ Agência **e** na Coleta, e com o SKU também dentro de caixa de várias.
 - ⚠️ **O JOIN DA LINHA POR SKU É EM MAIÚSCULA** (`s.codigo=UPPER(l.codigo)`),
   como o da caixa de várias: o código escrito em minúscula no `lote` deixava a
   linha sem número, e sem tarja nunca.
-- ⚠️ **O PAINEL "PRA DESPACHAR DEPOIS" FICOU COM A REGRA DE ANTES** (livre ≤ 0):
+- ⚠️ **O PAINEL "PRA DESPACHAR DEPOIS" FICOU COM A REGRA DE ANTES** (livre ≤ 0)
+  — **menos a venda da próxima saída, que desde 26/11/2026 ganha a tarja nova** (§5):
   ele não recebe `falta`, e a tela, sem `falta`, volta à regra antiga — que é
   também o que vale para a página antiga num tablet com cache. Contar o que sobra
   depois de hoje, data a data, é outra conta, e ficou de fora.

@@ -87,7 +87,7 @@ function aplicar(db){
   return { urgentes, linhas };
 }
 
-/* A URGÊNCIA SE REFAZ SOZINHA NA VIRADA DO DIA (R-PRI-06). Até aqui ela só se
+/* A URGÊNCIA SE REFAZ SOZINHA NA VIRADA DO DIA (R-PRI-03). Até aqui ela só se
    refazia no upload, e de manhã, sem PDF novo, a ordem do dia nascia vazia —
    com as vendas de hoje (subidas ontem à noite) sem peça. A primeira leitura
    do dia (101, 102, TV, aviso de status) aplica uma vez, sem cron, como a

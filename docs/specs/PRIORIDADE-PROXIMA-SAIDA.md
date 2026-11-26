@@ -14,7 +14,18 @@
 > - a virada (R-PRI-06 aqui, **R-PRI-03** no cartão) só aplica quando ninguém
 >   aplicou hoje e não há ordem do PDF de hoje gravada;
 > - os cartões ficaram três (R-PRI-01 a 03): a ordem, o dono e o que não muda
->   estão dentro do R-PRI-02.
+>   estão dentro do R-PRI-02;
+> - **③ REVISÃO (três rodadas):** a virada só lança em **dia de coleta** (no
+>   sábado, no domingo e no "sem coleta", só o upload: a TV ligada gravava a venda
+>   de segunda como falta de sábado e domingo); nesses dias, sem upload, a 101 não
+>   liga a venda a Hoje (`urgencia.aplicadaHoje`) e ela fica nos Próximos dias; o
+>   `diagnosticar_tarja_estoque.js` passou à conta da tela; o `rastrear.js` compara
+>   as ordens de hoje com a régua nova; as frases da 102. Ficaram de fora: a caixa
+>   de várias contada por volume na urgência (já era assim; mudar é REGRA) e a TV
+>   contando a ordem crua de manhã com peça de ontem na embalagem (dúvida);
+> - o `teste_cruzamento.js` mudou um caso: o "de ontem fica fora" virou "vence
+>   depois da próxima saída fica fora" — a regra antiga era o dia do upload;
+> - o cartão da 102 escreve "3 vendas de hoje e 2 de amanhã" (ou "de seg 30/11").
 >
 > ~~RASCUNHO, esperando a aprovação do dono. Nada construído.~~
 > Tipo: `REGRA` · risco 🟡 (muda prioridade e número mostrado em tela; **não mexe
@@ -55,9 +66,7 @@ subiram na véspera (e com PDF novo, só as do PDF novo contam).
 
 **R-PRI-01 — A próxima saída.** É o **próximo dia de coleta depois de hoje**: o
 próximo dia de segunda a sexta, pulando o dia que a 206 marca "sem coleta"
-(feriado ou outro motivo). Na sexta e no sábado é a segunda. *(Confirmar: há
-coleta no sábado? Hoje a 206 lança de segunda a sábado e a 101 olha de segunda a
-sexta.)*
+(feriado ou outro motivo). Na sexta e no sábado é a segunda. *(Respondido em 26/11/2026: não há coleta no sábado.)*
 
 **R-PRI-02 — O que é prioridade.** Toda venda **já no sistema** (o PDF subiu),
 **sem etiqueta impressa**, que vence **até a próxima saída** — e a atrasada e a
@@ -120,7 +129,7 @@ As duas podem entrar juntas (a 102 sem a urgência certa mostraria vermelho que 
   `teste_revisao_tela_unica.js`, `teste_diagnosticar_tarja_estoque.js`.
 - Abrir a 102, a 201 e a 101 com um banco às 18h de uma sexta.
 
-## 6. Em aberto — os relatórios
+## 6. Os relatórios — decidido: opção (a)
 
 A 904 tem a linha **"falta de estoque"**, que é o retrato da urgência de cada dia
 (o último PDF do dia, `urgencia.porDia`). Com a régua nova:

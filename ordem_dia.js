@@ -31,7 +31,7 @@
 const URGENCIA = require('./urgencia');
 
 function linhas(db){
-  /* A virada do dia (R-PRI-06): a primeira leitura refaz a urgência. */
+  /* A virada do dia (R-PRI-03): a primeira leitura refaz a urgência. */
   URGENCIA.garantirDia(db);
   const ordens = db.prepare(`SELECT p.codigo, s.descricao, s.cor, SUM(p.qtd) qtd,
       SUM(p.produzido) produzido,
