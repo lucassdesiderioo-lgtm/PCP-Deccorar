@@ -175,6 +175,11 @@ db.prepare("DELETE FROM config WHERE chave='urgencia_dia'").run();
 db.prepare("INSERT INTO saida_dia (data,sem_coleta) VALUES (?,1) ON CONFLICT(data) DO UPDATE SET sem_coleta=1").run(hoje);
 ORDEM.linhas(db);
 eq('hoje "sem coleta" (ou fim de semana): a leitura não lança urgência', ord().length, 0);
+/* E a 101 não pode perder a venda nesse dia (③ REVISÃO, rodada 2): sem a
+   urgência aplicada, a venda da próxima saída fica nos Próximos dias. */
+const ls = chamar('GET', '/api/revisao/lista').body;
+const its = ls.hoje_lista.concat(ls.proximos_lista, ls.alvo_lista).find(x => x.codigo === 'SOAMANHA');
+eq('sem a urgência aplicada, a venda da próxima saída fica nos Próximos dias', its && [its.hoje, its.proximos], [0, 2]);
 db.prepare("DELETE FROM saida_dia WHERE data=?").run(hoje);
 URG.aplicar(db);
 ok('mas o upload (aplicar) lança, como sempre', ord().length > 0);

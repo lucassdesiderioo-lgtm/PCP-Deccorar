@@ -2,7 +2,7 @@
 
 > **STATUS — 26/11/2026: APROVADA PELO DONO** (*"a, sem coleta no sábado, pode
 > seguir"*) · **as duas fases construídas juntas em 26/11/2026, falta subir** ·
-> `teste_prioridade_dia.js` (46) · cartões R-PRI-01 a 03 em
+> `teste_prioridade_dia.js` (47) · cartões R-PRI-01 a 03 em
 > `docs/regras/expedicao.md`; linha em `docs/DECISOES.md`.
 >
 > **O que mudou na construção** (vale o que está aqui):

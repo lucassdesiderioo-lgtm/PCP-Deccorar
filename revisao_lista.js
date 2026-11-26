@@ -108,8 +108,13 @@ function montar(db){
      ontem à noite está em Hoje, e a mesma venda não pode contar também nos
      Próximos dias. Pelo dia do upload, ela saía do Hoje na virada e voltava
      para o dia dela na planilha. */
+  /* ⚠️ SÓ COM A URGÊNCIA DE HOJE APLICADA (③ REVISÃO, rodada 2): no sábado, no
+     domingo e no "sem coleta" a leitura não lança a ordem do dia, e sem ela a
+     venda ligada aqui sumiria de Hoje e dos Próximos dias. Nesse dia nada se
+     liga, e ela fica nos Próximos dias, pela planilha. (A ordem do dia já foi
+     lida acima, e por isso a virada já rodou.) */
   const PRI = require('./prioridade_dia');
-  const REG = PRI.regua('l', PRI.proximaSaida(db, hoje));
+  const REG = require('./urgencia').aplicadaHoje(db) ? PRI.regua('l', PRI.proximaSaida(db, hoje)) : '0';
   const pdfHoje = contar(db, `SELECT UPPER(l.codigo) c, COUNT(*) n FROM lote l
     WHERE ${REG} GROUP BY UPPER(l.codigo)`);
   /* A ligação só olha a linha da planilha que a 401 conta: os MESMOS filtros

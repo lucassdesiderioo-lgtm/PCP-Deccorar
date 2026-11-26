@@ -259,20 +259,20 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Regra:** a próxima saída é o próximo dia de **segunda a sexta** depois de hoje (não há coleta no sábado, decisão do dono), pulando o dia que a 206 marca **"sem coleta"** (`saida_dia.sem_coleta`). Na sexta, no sábado e no domingo é a segunda. `prioridade_dia.js` é o dono (`proximaSaida`).
 - **Por quê:** o dono sobe o PDF do dia seguinte no fim do dia anterior — na sexta, o da segunda.
 - **Exceções:** três semanas sem coleta não existem; se existirem, vale o dia seguinte. Banco sem a tabela da 206: nenhum dia é sem coleta.
-- **Teste que trava:** `teste_prioridade_dia.js` (46).
+- **Teste que trava:** `teste_prioridade_dia.js` (47).
 - **Status:** construído em 26/11/2026, falta subir.
 
 ### R-PRI-02 · A venda até a próxima saída é prioridade assim que o PDF sobe (26/11/2026)
 - **Regra:** é prioridade toda venda **já no sistema**, sem etiqueta impressa (`pendente`), com SKU lido, que vence **até a próxima saída** — e a atrasada e a sem data lida —, **qualquer que seja o dia do upload**. Dentro dela, a que vence hoje (ou já venceu, ou não tem data) é **hoje** e fica **em cima**, usando o livre primeiro; o resto é a **próxima saída**. A régua vale para a **urgência** (101 Revisão, TV, aviso de status — `urgencia.calcular`), o **vermelho da 102** (`embalagem_prioridade.js`) e a **tarja "sem estoque" da 201** (`tarja_estoque.pedidoPrioridade`). `prioridade_dia.pedido` é o dono (#12).
 - **Por quê:** o dono, 25/11/2026, às 18h, com as etiquetas do dia seguinte lançadas e sem estoque: *"essas peças já precisam passar a ser prioridades"*. Até ali a urgência contava o PDF subido **hoje** (de manhã o PDF da véspera sumia dela) e a 102 e a tarja só a venda que vence hoje (a de amanhã caía no âmbar).
 - **Exceções:** ⚠ **o `fila_dia.js` não mudou**: a lista "Faltam imprimir" da 201, a trava da 201, o fechar vencidos e as barras da 202 continuam só com a venda de hoje. A venda que vence **depois** da próxima saída não é prioridade (o PDF traz vendas de semanas à frente, #7); no painel "Pra despachar depois" ela fica com a tarja de antes. A trava da impressão, a baixa e o livre não mudaram. O `rastrear.js`, que pergunta o que **um** PDF gerou, chama a urgência com a data e fica pela régua antiga.
-- **Teste que trava:** `teste_prioridade_dia.js` (46) e `teste_cruzamento.js` (18).
+- **Teste que trava:** `teste_prioridade_dia.js` (47) e `teste_cruzamento.js` (18).
 - **Status:** construído em 26/11/2026, falta subir.
 
 ### R-PRI-03 · A urgência se refaz sozinha na virada do dia (26/11/2026)
 - **Regra:** a primeira leitura do dia da ordem do dia (`ordem_dia.linhas`: 101, 102, TV, aviso de status) aplica a urgência uma vez (`urgencia.garantirDia`, sem cron), e marca `config.urgencia_dia`. O upload continua aplicando, como sempre (R-PRD-01).
 - **Por quê:** sem isso a manhã nascia com a ordem do dia vazia, e as vendas de hoje (subidas ontem à noite) sem peça não chegavam à Revisão até alguém subir outro PDF.
-- **Exceções:** a leitura **nunca refaz** um dia que já foi aplicado, nem um dia com ordem do PDF gravada, e **só lança em dia de coleta** (③ REVISÃO): no sábado, no domingo e no "sem coleta" da 206 só o upload lança — com a TV ligada, a venda de segunda virava falta de sábado e de domingo na 904. Falhar não derruba a leitura (log).
+- **Exceções:** a leitura **nunca refaz** um dia que já foi aplicado, nem um dia com ordem do PDF gravada, e **só lança em dia de coleta** (③ REVISÃO): no sábado, no domingo e no "sem coleta" da 206 só o upload lança — com a TV ligada, a venda de segunda virava falta de sábado e de domingo na 904. Nesses dias, sem upload, a 101 não liga a venda da próxima saída a Hoje (`urgencia.aplicadaHoje`): ela fica nos Próximos dias, e a 102 continua a pintando de vermelho. Falhar não derruba a leitura (log).
 - **Teste que trava:** `teste_prioridade_dia.js` (seção 4).
 - **Status:** construído em 26/11/2026, falta subir.
 

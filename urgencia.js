@@ -101,6 +101,16 @@ function marcarDia(db){
     if(!/no such table/.test(e.message)) console.error('[urgencia] não consegui marcar o dia aplicado:', e.message);
   }
 }
+/* A urgência de hoje foi aplicada (pelo upload ou pela virada)? A 101 só põe a
+   prioridade em Hoje quando sim: sem a ordem do dia, a venda da próxima saída
+   ficaria fora de Hoje E dos Próximos dias (③ REVISÃO, rodada 2). */
+function aplicadaHoje(db){
+  try{
+    const c = db.prepare("SELECT valor FROM config WHERE chave='urgencia_dia'").get();
+    if(c && c.valor === db.prepare("SELECT date('now','localtime') d").get().d) return true;
+    return !!db.prepare("SELECT 1 FROM producao WHERE data=date('now','localtime') AND origem='ml' LIMIT 1").get();
+  }catch(e){ return false; }
+}
 function garantirDia(db){
   try{
     const h = db.prepare("SELECT date('now','localtime') d").get().d;
@@ -143,4 +153,4 @@ function primeira(db){
   try{ return db.prepare("SELECT MIN(data) d FROM producao WHERE origem='ml' AND urgente=1 AND COALESCE(teste,0)=0").get().d || null; }catch(e){ return null; }
 }
 
-module.exports = { calcular, aplicar, garantirDia, porDia, porSku, primeira };
+module.exports = { calcular, aplicar, garantirDia, aplicadaHoje, porDia, porSku, primeira };
