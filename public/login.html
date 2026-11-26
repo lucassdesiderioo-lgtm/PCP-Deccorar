@@ -53,22 +53,30 @@
      pin   — o PIN de entrar
      atual — o PIN de hoje, para trocar (so quando chegou ja logado)
      novo  — o PIN novo de 6
-     conf  — o PIN novo de novo, para conferir */
+     conf  — o PIN novo de novo, para conferir
+
+   TROCAR O PROPRIO PIN (LOGIN-PESSOAL fase 1, 26/11/2026): o "Trocar meu PIN"
+   da barra traz a pessoa logada aqui com ?trocar=1. E a mesma troca, com o PIN
+   de hoje pedido de novo (num tablet deixado logado, quem passa nao troca o PIN
+   de quem esta na sessao), e "Cancelar" volta a tela de onde ela veio. A troca
+   derruba os outros aparelhos com o login dela (o servidor). */
 var alvo=null, pin='', etapa='pin', atual='', novoPin='';
 var q=new URLSearchParams(location.search);
+var voluntaria=false;
 var destino=q.get('r')||'';
 var MAX=6;
 function $(s){return document.querySelector(s);}
 var TEXTO={
   pin:'Digite seu PIN. Se ele tem 4 números, toque OK.',
   atual:'O PIN agora tem 6 números. Para trocar, digite o seu PIN de hoje e toque OK.',
+  atualVol:'Para trocar o seu PIN, digite o PIN de hoje.',
   novo:'Crie seu PIN novo, com 6 números.',
   conf:'Digite o PIN novo de novo, para conferir.'
 };
 function mostrar(e){
   etapa=e; pin=''; pontos();
-  $('#pede').textContent=TEXTO[e];
-  $('#volta').textContent=(e==='pin')?'Nao sou eu \u2014 trocar':'Entrar com outro usuario';
+  $('#pede').textContent=(e==='atual'&&voluntaria)?TEXTO.atualVol:TEXTO[e];
+  $('#volta').textContent=voluntaria?'Cancelar e voltar':(e==='pin')?'Nao sou eu \u2014 trocar':'Entrar com outro usuario';
   $('#etapa1').classList.add('hide'); $('#etapa2').classList.remove('hide');
 }
 fetch('/api/auth/pessoas').then(r=>r.json()).then(function(l){
@@ -78,6 +86,9 @@ fetch('/api/auth/pessoas').then(r=>r.json()).then(function(l){
 fetch('/api/auth/eu').then(r=>r.json()).then(function(e){
   if(e&&e.logado&&e.trocarPin){
     alvo={id:e.id,nome:e.nome}; $('#oi').textContent='Ola, '+e.nome; mostrar('atual');
+  } else if(e&&e.logado&&q.get('trocar')==='1'){
+    voluntaria=true;
+    alvo={id:e.id,nome:e.nome}; $('#oi').textContent='Trocar o PIN de '+e.nome; mostrar('atual');
   }
 }).catch(function(){});
 document.addEventListener('click',function(e){
@@ -85,6 +96,7 @@ document.addEventListener('click',function(e){
   if(n){ alvo={id:+n.dataset.id,nome:n.textContent}; $('#err').textContent='';
          $('#oi').textContent='Ola, '+alvo.nome; mostrar('pin'); return; }
   if(e.target.id==='volta'){
+    if(voluntaria){ location.href=destino||'/setor'; return; }
     if(etapa==='pin'){ $('#etapa2').classList.add('hide'); $('#etapa1').classList.remove('hide'); return; }
     fetch('/api/auth/logout',{method:'POST'}).finally(function(){ location.href='/login'; });
     return;
@@ -136,11 +148,16 @@ function enviar(){
   if(etapa==='conf'){
     if(pin.length<MAX) return;
     if(pin!==novoPin){ mostrar('novo'); return erro('Os dois PINs não batem. Crie de novo.'); }
+    if(novoPin===atual){ mostrar('novo'); return erro('O PIN novo tem que ser diferente do de hoje.'); }
     fetch('/api/auth/trocar-pin',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({atual:atual,novo:novoPin})})
      .then(r=>r.json().then(j=>({ok:r.ok,status:r.status,j:j})))
      .then(function(r){
-       if(r.ok) return seguir(r.j.destino);
+       if(r.ok){
+         if(!voluntaria) return seguir(r.j.destino);
+         $('#pede').textContent='PIN trocado. Os outros aparelhos que estavam com o seu login foram desconectados.';
+         return setTimeout(function(){ location.href=destino||'/setor'; },2500);
+       }
        /* O PIN de hoje estava errado: volta a pedi-lo. Os outros erros
           (429, formato) voltam ao PIN novo, com a frase do servidor. */
        if(r.status===401){ mostrar('atual'); return erro(r.j.erro||'PIN atual incorreto'); }

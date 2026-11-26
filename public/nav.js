@@ -181,7 +181,11 @@ function estiloDasPermissoes(d){
     var atalho=(dest.duas&&dest.sobmedida) ? '<a class="sessOp atalho" id="sessAtalho" href="'+dest.sobmedida+'">Sob medida →</a>' : '';
     d.innerHTML=fadj+'<button class="sessOp" id="sessMenu" aria-expanded="false" aria-controls="menuTelas">☰ Menu</button>'+
       '<span><b style="color:'+CH.sName+'">'+u.nome+'</b></span>'+
-      atalho+'<a class="sessOp" id="sessSetor" href="/setor">Trocar setor</a><button id="sessSair">Sair</button>';
+      atalho+'<a class="sessOp" id="sessSetor" href="/setor">Trocar setor</a>'+
+      /* "Trocar meu PIN" (LOGIN-PESSOAL fase 1): a pessoa troca o proprio PIN, e
+         a troca derruba os outros aparelhos com o login dela; volta a esta tela. */
+      '<a class="sessOp" id="sessPin" href="/login?trocar=1&amp;r='+encodeURIComponent(location.pathname+location.search+location.hash)+'">Trocar meu PIN</a>'+
+      '<button id="sessSair">Sair</button>';
     document.body.insertBefore(d, document.body.firstChild);
     /* O MENU (fase 6): a lista sai do /api/telas/minhas (acima). Abre e fecha
        no botão; quem tem uma tela só vê só ela. */
