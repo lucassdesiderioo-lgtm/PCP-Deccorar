@@ -2,11 +2,26 @@
 
 ```
 STATUS
-Situação: em código — as seis fases, conferidas num servidor local; falta subir
+Situação: NO AR em 28/10/2026 (PR #244) — falta a prova da fase 6 (pedido real)
 Criada em: 27/10/2026
-Última atualização: 28/10/2026 (spec final do dono; kit em todo produto §8.5 e etiqueta sem "…" §8.2 em código; conferência dos 21 itens da §15)
-Fase atual: as seis em código; espera o "pode subir" (§14)
-Fases: 1 ☑ em código  2 ☑ em código  3 ☑ em código  4 ☑ em código  5 ☑ em código  6 ☑ em código
+Última atualização: 28/10/2026 (deploy feito e conferido em produção — ver "No ar", abaixo)
+Fase atual: as seis no ar; falta o pedido real de Romana e de Painel com o leitor na mão
+Fases: 1 ☑  2 ☑  3 ☑  4 ☑  5 ☑  6 ☑ no ar (a prova da 6 pendente)
+No ar (28/10/2026, PR #244): o dono fez o deploy fora da expedição, com
+  node backup.js antes; as migrações 32 a 38 estão no tecido.db; o teste de
+  segurança passou (telas 302, API 401, /sobmedida/telas/corte.html 403 logado).
+  ✅ O ROLÔ REAL NÃO MUDOU: as três conferências da §4.5 no simulador de
+  produção (1% · Branco · Branco · comando direito · pela frente) deram
+  Tubo 32 · 0,970 · 0,965×1,200 · 0,970 · R$ 165,00 / Tubo 41 · 1,960 ·
+  1,955×2,250 · 1,960 · R$ 440,00 / Tubo 41 · 2,360 · 2,355×2,250 · 2,360 ·
+  barra 2,391 · redução automática · R$ 618,80 — igual à conta, número por
+  número, com consumo = corte e o kit certo (tradicional, tradicional, barra).
+  ⚠️ O QUE NÃO FOI PROVADO EM PRODUÇÃO: os itens 3, 7 e 8 da §15 (a cópia do
+  Rolô, os seis casos da Romana e os nove do Painel) — em produção não existe
+  ainda cópia, Romana nem Painel, e criá-los grava no banco. A prova é o dono
+  conferir no simulador, com o produto ainda inativo, quando cadastrar. E o
+  pedido REAL de Romana e de Painel com o leitor na mão, atravessando os cinco
+  setores (prova da fase 6), vem ANTES de vender para a revenda.
 Risco: 🔴 (schema do catálogo, preço, etiqueta de produção, ficha congelada)
 Módulo: sob medida (tecido/) — ler tecido/README.md e a spec
         SOBMEDIDA-PEDIDO-REVENDA.md (§4.2 a §4.14) antes de mexer
