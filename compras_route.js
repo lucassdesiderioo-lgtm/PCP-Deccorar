@@ -127,6 +127,18 @@ module.exports = function(app, db){
   /* O codigo de cadastro (MAT-0001) e o "usado em" vao junto (spec
      FICHAS-NO-CADASTRO-UNICO): as duas fichas, lidas do dono de cada uma — a da
      medida padrao aqui, a do sob medida pela porta (sem a porta, so a de ca). */
+  /* A LISTA DE MATERIAIS DA FICHA TECNICA (404), sem dinheiro (AJUSTE de
+     12/11/2026). Quem abre a 404 so com "cadastrar modelo" precisa escolher o
+     material de uma linha nova; a lista de baixo e de compras.ver e traz preco,
+     estoque e consumo. Esta leva SO o que a ficha precisa — nenhum valor, saldo
+     ou fornecedor (§23). A trava do "vai para a ficha" continua na rota da
+     formula (R-CMP-02). */
+  app.get('/api/componentes/para-ficha',(req,res)=>{
+    const lista = db.prepare('SELECT id, nome, unidade, familia, ativo, vai_ficha FROM componente ORDER BY ativo DESC, nome').all();
+    res.json(lista.map(c => ({ id:c.id, codigo_cadastro:MAT.codigoCadastro(c.id), nome:c.nome, unidade:c.unidade,
+      familia:c.familia, ativo:c.ativo, vai_ficha:c.vai_ficha })));
+  });
+
   app.get('/api/componentes',(req,res)=>{
     const lista = db.prepare(`SELECT c.*, a.nome almoxarifado_nome FROM componente c
       LEFT JOIN almoxarifado a ON a.id=c.almoxarifado_id ORDER BY c.ativo DESC, c.nome`).all();
