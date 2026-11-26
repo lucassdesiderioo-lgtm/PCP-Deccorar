@@ -19,11 +19,35 @@
  * volume `bloqueado` (ninguém sabe ainda qual peça é — §5 e §6).
  */
 
+/* ⚠️ A URGÊNCIA É A PRIORIDADE ATÉ A PRÓXIMA SAÍDA, E NÃO O PDF DO DIA
+   (spec PRIORIDADE-PROXIMA-SAIDA, decisão do dono de 26/11/2026). Até ali ela
+   contava só o volume subido HOJE (`lote.data`): o PDF de amanhã subido às 18h
+   entrava, mas na manhã seguinte ele era "de ontem" e sumia da urgência — e o
+   atrasado de outro dia nunca entrava. Hoje é a régua do `prioridade_dia.js`:
+   toda venda sem etiqueta que vence até a próxima saída, qualquer que seja o
+   dia do upload.
+   `data` explícito (o `rastrear.js`, que explica o que UM PDF gerou) continua
+   pela régua antiga: é a pergunta dele. */
+/* Banco sem `despachar_em` (um teste de antes da coluna): sem data lida, toda
+   venda é urgente — é o que a régua diz da venda sem data. */
+function pendentesPrioridade(db){
+  const P = require('./prioridade_dia');
+  try{
+    return db.prepare(`SELECT codigo, COUNT(*) qtd FROM lote WHERE ${P.regua('', P.proximaSaida(db))}
+      GROUP BY codigo ORDER BY codigo`).all();
+  }catch(e){
+    if(!/no such column: despachar_em/.test(e.message)) throw e;
+    return db.prepare(`SELECT codigo, COUNT(*) qtd FROM lote WHERE codigo IS NOT NULL AND estagio='pendente'
+      GROUP BY codigo ORDER BY codigo`).all();
+  }
+}
+
 function calcular(db, data){
-  const pend = db.prepare(`SELECT codigo, COUNT(*) qtd FROM lote
-    WHERE data = COALESCE(?, date('now','localtime'))
-      AND codigo IS NOT NULL AND estagio='pendente'
-    GROUP BY codigo ORDER BY codigo`).all(data || null);
+  const pend = data
+    ? db.prepare(`SELECT codigo, COUNT(*) qtd FROM lote
+        WHERE data = ? AND codigo IS NOT NULL AND estagio='pendente'
+        GROUP BY codigo ORDER BY codigo`).all(data)
+    : pendentesPrioridade(db);
 
   /* O LIVRE, e nao o saldo (CONFERENCIA-E-BAIXA, fase 2-A, 22/10/2026): a peca
      que ja esta numa caixa impressa continua no saldo ate a conferencia, mas
@@ -59,7 +83,54 @@ function aplicar(db){
   db.prepare("DELETE FROM producao WHERE data=date('now','localtime') AND origem='ml'").run();
   const ins = db.prepare("INSERT INTO producao (codigo,qtd,origem,urgente) VALUES (?,?,'ml',1)");
   for(const l of linhas){ if(l.urgente > 0){ ins.run(l.codigo, l.urgente); urgentes += l.urgente; } }
+  marcarDia(db);
   return { urgentes, linhas };
+}
+
+/* A URGÊNCIA SE REFAZ SOZINHA NA VIRADA DO DIA (R-PRI-03). Até aqui ela só se
+   refazia no upload, e de manhã, sem PDF novo, a ordem do dia nascia vazia —
+   com as vendas de hoje (subidas ontem à noite) sem peça. A primeira leitura
+   do dia (101, 102, TV, aviso de status) aplica uma vez, sem cron, como a
+   lista do Inventário. Idempotente (R-URG-02).
+   ⚠️ Só aplica quando NINGUÉM aplicou hoje, não há ordem do PDF de hoje e hoje
+   é dia de coleta: a ordem gravada de hoje nunca é refeita por uma leitura. */
+function marcarDia(db){
+  try{ db.prepare("INSERT INTO config (chave,valor) VALUES ('urgencia_dia', date('now','localtime')) ON CONFLICT(chave) DO UPDATE SET valor=excluded.valor").run(); }
+  catch(e){
+    /* Sem a marca, a próxima leitura aplicaria de novo (③ REVISÃO): o log diz. */
+    if(!/no such table/.test(e.message)) console.error('[urgencia] não consegui marcar o dia aplicado:', e.message);
+  }
+}
+/* A urgência de hoje foi aplicada (pelo upload ou pela virada)? A 101 só põe a
+   prioridade em Hoje quando sim: sem a ordem do dia, a venda da próxima saída
+   ficaria fora de Hoje E dos Próximos dias (③ REVISÃO, rodada 2). */
+function aplicadaHoje(db){
+  try{
+    const c = db.prepare("SELECT valor FROM config WHERE chave='urgencia_dia'").get();
+    if(c && c.valor === db.prepare("SELECT date('now','localtime') d").get().d) return true;
+    return !!db.prepare("SELECT 1 FROM producao WHERE data=date('now','localtime') AND origem='ml' LIMIT 1").get();
+  }catch(e){ return false; }
+}
+function garantirDia(db){
+  try{
+    const h = db.prepare("SELECT date('now','localtime') d").get().d;
+    const c = db.prepare("SELECT valor FROM config WHERE chave='urgencia_dia'").get();
+    if(c && c.valor === h) return false;
+    /* ⚠️ SÓ NO DIA DE COLETA (③ REVISÃO): no sábado, no domingo e no "sem
+       coleta" da 206 a leitura não lança — com a TV ligada, a venda de segunda
+       virava falta de sábado e de domingo na 904. O upload continua aplicando. */
+    if(!require('./prioridade_dia').ehDiaDeColeta(db, h)) return false;
+    const tem = db.prepare("SELECT 1 FROM producao WHERE data=date('now','localtime') AND origem='ml' LIMIT 1").get();
+    if(tem){ marcarDia(db); return false; }
+    const fn = () => aplicar(db);
+    if(db.inTransaction) fn(); else db.transaction(fn)();
+    return true;
+  }catch(e){
+    /* Banco sem `config` ou sem `producao` (um script, um teste): a leitura
+       segue sem a virada, e o log diz. */
+    if(!/no such table/.test(e.message)) console.error('[urgencia] não consegui refazer a urgência do dia:', e.message);
+    return false;
+  }
 }
 
 /* A FALTA DE ESTOQUE NO RELATORIO (RELATORIOS-UNIFICADOS, 08/11/2026): as
@@ -82,4 +153,4 @@ function primeira(db){
   try{ return db.prepare("SELECT MIN(data) d FROM producao WHERE origem='ml' AND urgente=1 AND COALESCE(teste,0)=0").get().d || null; }catch(e){ return null; }
 }
 
-module.exports = { calcular, aplicar, porDia, porSku, primeira };
+module.exports = { calcular, aplicar, garantirDia, aplicadaHoje, porDia, porSku, primeira };

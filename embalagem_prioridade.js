@@ -2,8 +2,9 @@
  * (spec EMBALAGEM-PRIORIDADE §2 e §3, decisão do dono de 22–23/11/2026).
  *
  * Quatro blocos:
- *   1 vermelho  DO DIA      SKU com venda de hoje sem peça livre na Etiqueta de
- *                           Venda (a `falta` do tarja_estoque.js). Toda peça
+ *   1 vermelho  DO DIA      SKU com venda de hoje OU DA PRÓXIMA SAÍDA sem peça
+ *                           livre (a `falta` do tarja_estoque.js, pela régua do
+ *                           prioridade_dia.js; hoje em cima). Toda peça
  *                           aguardando do SKU conta aqui, de qualquer modo.
  *   2 âmbar     PEDIDO DE HOJE   fila modo `hoje` de SKU fora do bloco 1
  *   3 azul      REPOSIÇÃO        fila modo `estoque` de SKU fora do bloco 1
@@ -78,8 +79,11 @@ function montar(db, opcoes){
     porSku.set(c, g);
   }
 
-  // A falta de hoje: os pedaços são os SKUs que a fila de hoje pede e os da fila.
-  const ped = TARJA.pedidoHoje(db);
+  /* A falta do dia: os pedaços são os SKUs que a prioridade pede e os da fila.
+     ⚠️ "DO DIA" É HOJE E A PRÓXIMA SAÍDA (PRIORIDADE-PROXIMA-SAIDA, decisão do
+     dono de 26/11/2026): o PDF de amanhã sobe no fim do dia, e a venda dele
+     sem peça é vermelha já — atrás da de hoje, que usa o livre primeiro. */
+  const ped = TARJA.pedidoPrioridade(db);
   const rv = BAIXA.reservados(db);
   const codigos = new Set([...ped.keys(), ...porSku.keys()]);
   const pedacos = [...codigos].map(c => { const s = sku(c);
@@ -88,11 +92,11 @@ function montar(db, opcoes){
   const falta = new Map(pedacos.map(p => [p.codigo, p]));
 
   // A barra do dia: M = peças que a fila de hoje pede (fora o sob medida e o kit).
-  let m = 0, faltaTotal = 0;
+  let m = 0, mProx = 0, faltaTotal = 0;
   for(const p of pedacos){
     const s = sku(p.codigo);
-    if(p.sob_medida || (s && s.exige_medida === 0) || !p.pedido_hoje) continue;
-    m += p.pedido_hoje; faltaTotal += p.falta;
+    if(p.sob_medida || (s && s.exige_medida === 0) || !(p.pedido_hoje + p.pedido_proxima)) continue;
+    m += p.pedido_hoje + p.pedido_proxima; mProx += p.pedido_proxima; faltaTotal += p.falta;
   }
 
   // Bloco 1.
@@ -113,13 +117,16 @@ function montar(db, opcoes){
        passou pela Revisão" e a peça é revisada de novo. */
     if(!(g.aqui > 0)){ if(g.sendo.length) soReservadas.push({ codigo:p.codigo, sendo:g.sendo, ids:g.ids }); continue; }
     const para = Math.min(g.aqui, p.falta), listrado = Math.min(g.sendo.length, p.falta - para);
+    const paraHoje = Math.min(g.aqui, p.falta_hoje);
     if(g.aqui > para) excesso.set(p.codigo, g.aqui - para);
     dia.push({ codigo:p.codigo, medida:medida(s), cor:s ? s.cor || '' : '',
-      paradas:p.falta, para_embalar:para, aqui:g.aqui, minha:g.minha, sendo:g.sendo,
+      paradas:p.falta, paradas_hoje:p.falta_hoje, paradas_proxima:p.falta - p.falta_hoje,
+      para_embalar:para, para_proxima:para - paraHoje, aqui:g.aqui, minha:g.minha, sendo:g.sendo,
       quadros:{ amarelo:para, listrado }, desde:g.desde, ids:g.ids });
   }
-  /* Mais vendas paradas primeiro; depois a revisada há mais tempo. */
-  dia.sort((a, b) => (b.paradas - a.paradas)
+  /* A venda de HOJE em cima (decisão do dono, 26/11/2026); dentro de cada
+     uma, mais vendas paradas primeiro; depois a revisada há mais tempo. */
+  dia.sort((a, b) => ((b.paradas_hoje > 0) - (a.paradas_hoje > 0)) || (b.paradas_hoje - a.paradas_hoje) || (b.paradas - a.paradas)
     || String(a.desde || '9').localeCompare(String(b.desde || '9')) || a.codigo.localeCompare(b.codigo));
   /* Todo SKU do dia fica fora dos outros blocos — o que sobra dele entra na
      Reposição pelo `excesso`, logo abaixo. */
@@ -165,7 +172,9 @@ function montar(db, opcoes){
   }
 
   return {
-    dia:{ linhas:dia, m, n:m - faltaTotal, todas:m > 0 && faltaTotal === 0,
+    dia:{ linhas:dia, m, m_proxima:mProx, n:m - faltaTotal, todas:m > 0 && faltaTotal === 0,
+      proxima:{ data:ped.ate, rotulo:ped.rotulo },
+      faltam_embalar_proxima:dia.reduce((s, d) => s + d.para_proxima, 0),
       aqui:dia.reduce((s, d) => s + d.aqui, 0),
       /* a barra do topo: quantas peças do dia faltam embalar (decisão 1b, 24/11/2026) */
       faltam_embalar:dia.reduce((s, d) => s + d.para_embalar, 0) },
