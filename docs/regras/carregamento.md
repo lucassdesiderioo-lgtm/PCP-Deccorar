@@ -389,70 +389,70 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 - **Por quê:** decisão do dono (24/11/2026): a conferência é feita de uma vez, quando o processo termina ou o caminhão chega, no lugar dos carrinhos; o motorista leva o carrinho inteiro.
 - **Exceções:** a página antiga em cache não manda o carrinho: a caixa é conferida e fica **sem carrinho**, e entra num pelo próximo bipe (R-CRR-05).
 - **Teste que trava:** `teste_carrinhos.js` (44) · `teste_conferencia_tela.js`.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ### R-CRR-02 · O bipe não tem modo
 - **Regra:** a caixa de **coleta** vai para o **carrinho ativo** do aparelho; sem carrinho escolhido é recusada (`sem_carrinho`), e nada grava. A de **agência** vai sozinha para o Carro da agência, qualquer que seja o carrinho ativo. Bipar a **etiqueta do carrinho** (`CARRINHO-A`) troca o ativo; carrinho fora do cadastro é recusado. A caixa de coleta nunca vai para o Carro da agência pelo bipe.
 - **Por quê:** os cinco modos de bipe da tela antiga (área, carro, sobras, ficou, cancelada) eram o que fazia a pessoa largar o processo no meio (o dono, 24/11/2026).
 - **Exceções:** a caixa já num carrinho, bipada de novo, diz onde está e **não troca** (trocar é o "passar" da recontagem). **A tela não escolhe o carrinho pela pessoa**: aparelho sem carrinho escolhido pede para bipar a etiqueta do carrinho (③ REVISÃO). O campo do bipe nunca fica sem foco: depois de um toque num botão ou num filtro, o foco volta a ele (§12). O bipe de peça da caixa de várias mantém a trava de 700 ms (R-PEC-04).
 - **Teste que trava:** `teste_carrinhos.js` · `teste_conferencia_tela.js` · `teste_pecas_carga.js`.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ### R-CRR-03 · Os carrinhos são a lista "Carrinhos da expedição"
 - **Regra:** a lista mora na 902 Cadastros (`listas.tipo='carrinho_expedicao'`), nasce com A e B (uma vez só, `config.seed_carrinho_expedicao_1`), e cada carrinho tem a etiqueta em PDF (`GET /api/carrinho/etiqueta/:codigo`, a porta da etiqueta de SKU). O nome é só letras ou números (até 8), sem repetir e sem `AG`. **Carrinho com caixa dentro não se desativa** (409).
 - **Por quê:** o C pode vir (o dono); carrinho desativado com caixa dentro tiraria a caixa da tela sem ela ter saído da fábrica.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_carrinhos.js`.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ### R-CRR-04 · A recontagem é cega, e o "não achei" não mexe no estoque
 - **Regra:** "Recontar" num destino: a tela junta os bipes e só no fim manda ao servidor (`POST /api/carrinho/recontar`), que grava em `carrinho_recontagem` quem recontou, o esperado, o contado e o que faltou e sobrou. "Achei" refaz a conta com a caixa; "Passar para este" muda o carrinho; **"Não achei" tira a caixa do carrinho, ela continua conferida, o estoque NÃO mexe**, e ela vira a pendência "Conferência — caixa não achada no carrinho" na 204 (com a caixinha "Abrir em Pendências").
 - **Por quê:** a caixa já baixou quando foi conferida; voltá-la a "faltam bipar" obrigaria a desfazer a baixa e baixar de novo quando achada (decisão do dono, 25/11/2026).
 - **Exceções:** o bipe depois de "Terminei" vale como "Achei": a conta se refaz no servidor. A caixa impressa e nunca conferida achada no carrinho vem à parte ("caixa sem conferência no carrinho"), para conferir.
 - **Teste que trava:** `teste_carrinhos.js` · `teste_conferencia_tela.js`.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ### R-CRR-05 · A caixa conferida sem carrinho entra num carrinho pelo bipe, sem baixar de novo
 - **Regra:** a caixa conferida e ainda na fábrica sem carrinho (a de antes do deploy, a da página antiga, a não achada que apareceu) entra no carrinho ativo pelo bipe, **sem baixar de novo** e sem passar pela trava de quem imprimiu (ela já foi conferida). A tela mostra essas caixas no filtro "Conferidas sem carrinho".
 - **Por quê:** no dia do deploy há caixas conferidas no canto e na área; sem isso elas ficariam fora de toda entrega.
 - **Exceções:** a caixa cancelada e a que já saiu não entram.
 - **Teste que trava:** `teste_carrinhos.js` · `teste_conferencia_tela.js`.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ### R-ENT-01 · A entrega leva destinos inteiros, e quem entrega é quem está logado
 - **Regra:** "Entregar →" no destino: escolhe-se um ou vários destinos, a foto da tela do motorista (ou do atendente) e o número. A conta é *sistema = caixas dos destinos escolhidos*; o que não foi escolhido continua na fábrica. **Não se bipam sobras.** Fecha uma linha em `saida` (com `carrinhos`), e cada caixa grava `saida_id`, `saiu_em`, `saiu_por` e `retirado_em`. Não há PIN no meio: quem entrega é o login (o aparelho é compartilhado e cada um entra com o seu, decisão do dono).
 - **Por quê:** o motorista leva o carrinho inteiro (o dono, 24/11/2026).
 - **Exceções:** destino vazio não se entrega; carrinho de coleta só vai ao motorista.
 - **Teste que trava:** `teste_entrega.js` (28) · `teste_conferencia_tela.js`.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ### R-ENT-02 · Antes de entregar, a tela mostra o que ficou sem bipe
 - **Regra:** a prévia (`GET /api/entrega/previa`) lista as caixas impressas e não bipadas da mesma modalidade; a tela as mostra antes da entrega, para bipar agora, ou seguir sem elas. Nenhuma é marcada como perdida aqui.
 - **Por quê:** é o passo que a equipe pulava (as 188 caixas da limpeza de 19/11/2026).
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_entrega.js`.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ### R-ENT-03 · Não existe "foi sem conferir"
 - **Regra:** número diferente não fecha e não grava nada. Se o motorista bipou **a mais**, a caixa foi sem bipe: acha-se a caixa no caminhão e **bipa-se ali**; com a entrega aberta, o bipe a põe **no carrinho que está sendo entregue** (e não no ativo do aparelho), e ela entra na conta. Se faltou, reconta-se o carrinho. Se não fechar de jeito nenhum, só **"Liberar com divergência"** (`POST /api/entrega/liberar`, chave `saida.liberar`, motivo obrigatório).
 - **Por quê:** decisão do dono (24/11/2026): *"nessa etapa não deve ter erro"*.
 - **Exceções:** nenhuma.
 - **Teste que trava:** `teste_entrega.js`.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ### R-ENT-04 · A agência pelo carro fecha com quem levou
 - **Regra:** a entrega à agência (só o Carro da agência) exige quem levou, pessoa **ativa** do cadastro (R-VIA-02), e grava `saiu_por='agencia'`. O Carro da agência também pode ir ao **motorista**, junto com os carrinhos: sai com `saiu_por='coleta'` e a modalidade não muda (R-MOD-04).
 - **Por quê:** a caixa de agência ainda pode ir no caminhão (decisão do dono, 24/11/2026).
 - **Exceções:** ⚠️ **a caixa adiantada (despacho futuro) que foi bipada vai na entrega do dia, com aviso**: o passo de escolher os carrinhos mostra "N caixas adiantadas nesta entrega", com o dia de cada uma, e deixa seguir (decisão do dono, 25/11/2026). Na viagem antiga a venda futura não entrava sozinha no carro (#9); aqui ela só entra se alguém a bipou.
 - **Teste que trava:** `teste_entrega.js` (a prévia diz se a caixa é adiantada) · ⚠ o aviso na tela não tem teste.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ### R-ENT-05 · As duas barras do dia não têm conta própria de prazo
 - **Regra:** "Entrega do dia" = sem etiqueta ainda (a régua do `fila_dia.js`, a da 201) + impressas sem bipe + nos destinos + conferidas fora de carrinho (linha própria, para a barra bater com a soma dos carrinhos) + entregues hoje; "Bipar o que foi impresso hoje" = impressas hoje × bipadas. Quem conta é o `carrinho_dominio.barras`. A caixa de antes de hoje sem bipe aparece ao lado ("+ N impressas antes de hoje").
 - **Por quê:** o pedido do dono (24/11/2026): ver quantas faltam entregar no dia e quantas faltam bipar do que foi impresso.
 - **Exceções:** a venda futura entra quando é impressa (está na fábrica).
 - **Teste que trava:** `teste_carrinhos.js`.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ## A trava do dia seguinte (a 201)
 
@@ -461,25 +461,25 @@ disse. Tela **206 Horários de coleta** (`/coleta-horarios`) e o quadro
 - **Por quê:** o dono (25/11/2026): *"a tela de etiqueta de venda não pode deixar avançar se tiver peças que não foram conferidas"* — a caixa esquecida no carrinho sem bipe é a que vai embora sem baixa.
 - **Exceções:** a conta que falhar (banco sem as colunas) não derruba a bancada: vai ao log e a tela diz *"não consegui conferir a trava"*.
 - **Teste que trava:** `teste_trava_dia.js`.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ### R-TRV-02 · A reimpressão nunca trava
 - **Regra:** o `POST /api/reimprimir` passa com a trava ligada, sem motivo (D16), e não baixa (R-EST-04). É a saída prática da caixa que sumiu: pegar outra persiana, reimprimir e bipar.
 - **Por quê:** sem isso a fábrica ficaria presa.
 - **Teste que trava:** `teste_trava_dia.js`.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ### R-TRV-03 · O que solta a trava
 - **Regra:** o bipe na 202; separar como venda cancelada; ou, sem persiana para repor, quem tem `expedicao.caixa_nao_encontrada` (Supervisor, sensível) marca **"caixa não encontrada"** com motivo — a caixa não muda de estágio nem de saldo, e vira a pendência "Etiqueta de Venda — caixa não encontrada" na 204 até alguém resolver com o que foi decidido com o ML (ou até a caixa aparecer e ser bipada).
 - **Por quê:** a venda está parada; decidir com o Mercado Livre (spec §6).
 - **Teste que trava:** `teste_trava_dia.js`.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ### R-TRV-04 · Fica fora da trava, e a caixa reimpressa no dia seguinte vira pendência
 - **Regra:** fora da trava: a conferida (no carrinho ou não), a cancelada e a separada, a que já saiu, a de teste, e **a caixa de várias com item cancelado pelo ML** (`cancelada_varias=1`, decisão do dono de 25/11/2026: ela espera decisão no card "Canceladas depois da etiqueta"). **Reimprimir uma caixa que está travando** abre a pendência "caixa reimpressa no dia seguinte" (§7, D6), uma por caixa; quem tem a chave decide: *achei a caixa velha* (nada), *foi só a etiqueta* (nada) ou *persiana perdida* — que abre o **pedido** de ajuste −1 por peça (por SKU, a caixa de várias pelo `lote_item`; o sob medida não pede), e outra pessoa aprova (R-EST-20). Com pedido de ajuste do SKU já aberto, a decisão é recusada e nada grava. **"Persiana perdida" só depois de a caixa reimpressa baixar** (pelo bipe da 202 ou pelo passivo das nunca conferidas): antes, a reposição pode nem acontecer, e o passivo baixaria a mesma peça que o ajuste. **A caixa marcada "não encontrada" e depois reimpressa também abre a pendência** — ela saiu da trava, mas é a mais provável de ser reposta.
 - **Por quê:** a reimpressão não pede motivo, e é assim que o sistema reconhece sozinho a persiana que pode ter sumido (saíram duas da prateleira e baixou uma).
 - **Teste que trava:** `teste_trava_dia.js`.
-- **Status:** construído em 25/11/2026, falta subir.
+- **Status:** no ar desde 25/11/2026 (PRs #375 e #377).
 
 ## A saída do caminhão (coleta)
 

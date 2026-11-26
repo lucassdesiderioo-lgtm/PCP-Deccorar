@@ -1,8 +1,8 @@
 # CONFERENCIA-CARRINHOS — a 202 Conferência com carrinhos, as barras do dia e a trava do dia seguinte
 
 > **STATUS — 25/11/2026: APROVADA PELO DONO** (*"p1 sim, p2 sim, p3 sim,
-> aprovado"*) · **fases 1 e 2 mescladas em 25/11/2026** (PR #375; o deploy é do
-> dono) · **fase 3 (a trava da 201) construída em 25/11/2026, falta subir** —
+> aprovado"*) · **as três fases no ar desde 25/11/2026** (PRs #375 e #377; o dono: *"deu
+> tudo certo no deploy"*) —
 > `teste_trava_dia.js` (66), cartões R-TRV-01 a 04; a D18 ficou como estava
 > (o dono, 25/11/2026: a adiantada sem conferência também trava).
 >   Na construção (③ REVISÃO, vale o que está aqui): a caixa marcada "não
