@@ -423,7 +423,7 @@
 - **Por quê:** o bipe grava quem fez, e uma chave só faria a recusa acusar a pessoa errada. Nível admin vira **diretor** no portão do módulo (a porta A da #28). O prefixo separa "Revisão" e "Embalagem" dos setores de mesmo nome da medida padrão.
 - **Exceções:** na tela de Acessos eles saem em ordem alfabética; a ordem da fábrica é o `SETORES` do `tecido/nucleo/acesso.js`.
 - **Teste que trava:** `teste_acesso.js` (seção 6-C) · `tecido/teste/acesso.test.js`.
-- **Status:** no ar desde 24/09/2026 · a regra só pega quando alguém é marcado num dos cinco (armadilha #30); a marcação não foi conferida aqui.
+- **Status:** no ar desde 24/09/2026 · a regra só pega quando alguém é marcado num dos cinco (armadilha #30); **uma pessoa marcada em cada setor em 24/09/2026** (`SOBMEDIDA-PEDIDO-REVENDA`, pendência 1).
 - **História:** "A fase 5-A".
 
 ### R-SMS-02 · Setor é cadastro, chave é código

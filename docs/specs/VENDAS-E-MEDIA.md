@@ -256,7 +256,7 @@ Colunas novas em `lote` (por `ALTER`, no fim, no `exp_route.js` — §17):
   conta 1; teste e cancelada ficam fora; bloqueado conta; janela maior que a
   história é cortada e avisada; PDF repetido não dobra.
 
-### Fase 2 — planilha só de futuras, e as canceladas 🔴 ☑ construída (26/09/2026, falta deploy)
+### Fase 2 — planilha só de futuras, e as canceladas 🔴 ☑ no ar (26/09/2026, PR #148; o recorte provado, a cancelada ainda sem caso real)
 
 - §5 e §6. Colunas em `lote`. `fila_dia`, `carga`, `urgencia`, `ordem_dia` e a média
   ignoram cancelada.

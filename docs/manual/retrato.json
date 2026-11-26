@@ -159,9 +159,9 @@
   "R-PDF-03": "5a1ceb96b98c1d6c",
   "R-PDF-04": "c7a1cba0a91244d9",
   "R-PDF-05": "0f71efe5e321f540",
-  "R-PDF-06": "709a31ad54a8d573",
-  "R-PDF-07": "afcb2b4ff15fc4c8",
-  "R-PDF-08": "006ad0064b21d75d",
+  "R-PDF-06": "7a2271b75db5b67d",
+  "R-PDF-07": "7fa5c13f3b4b1742",
+  "R-PDF-08": "e7969877fb4cae6b",
   "R-PDF-09": "1eca11e016c26eb1",
   "R-PDF-10": "f2ce7ddebf28c4e5",
   "R-PDF-11": "cc054e367cfa14c2",
@@ -301,7 +301,7 @@
   "R-SMR-04": "3b54b0a2a79e29b5",
   "R-SMR-05": "f6b178c05f742ec4",
   "R-SMR-06": "c854b0655f276804",
-  "R-SMS-01": "57c9d4010220dec6",
+  "R-SMS-01": "42dfe6b5857f042b",
   "R-SMS-02": "0226b070366f6722",
   "R-SMS-03": "c3046be43a4d419e",
   "R-SMT-01": "4c920252aa482e46",
@@ -423,7 +423,8 @@
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
     "21/11/2026 — ficha criada em rascunho",
-    "26/11/2026 — A urgência que nasce do PDF passou a contar todas as vendas até a próxima saída (o próximo dia de coleta), qualquer que seja o dia em que o PDF subiu: a venda de amanhã do PDF de hoje à noite continua urgente amanhã de manhã."
+    "26/11/2026 — A urgência que nasce do PDF passou a contar todas as vendas até a próxima saída (o próximo dia de coleta), qualquer que seja o dia em que o PDF subiu: a venda de amanhã do PDF de hoje à noite continua urgente amanhã de manhã.",
+    "26/11/2026 — Registro: a terceira chave de duplicidade (o número do envio da etiqueta) está no ar desde 12/11/2026, e a venda repetida cujo PDF já foi apagado volta a ter PDF ao subir o arquivo de novo desde 27/10/2026. Nada mudou na tela: só o papel dizia \"aguardando deploy\"."
    ],
    "situacao": "rascunho"
   },
@@ -507,7 +508,8 @@
     "25/11/2026 — \"Persiana perdida\" só aparece depois que a caixa reimpressa for bipada na Conferência; quem só decide a trava abre a tela e vê só o quadro",
     "25/11/2026 — a caixa de várias persianas com um item cancelado pelo Mercado Livre depois da etiqueta não trava mais a tela; ela continua esperando decisão no card das canceladas",
     "25/11/2026 — no ar: a conferência nos carrinhos, a entrega por carrinho e a trava do dia seguinte passaram a valer na fábrica",
-    "26/11/2026 — O aviso \"sem estoque\" passou a contar também as vendas da próxima saída (o próximo dia de coleta) cujo PDF já subiu: \"só 2 livres para 3 de hoje e 4 de amanhã — faltam 5\". A lista \"Faltam imprimir\" continua só com as de hoje."
+    "26/11/2026 — O aviso \"sem estoque\" passou a contar também as vendas da próxima saída (o próximo dia de coleta) cujo PDF já subiu: \"só 2 livres para 3 de hoje e 4 de amanhã — faltam 5\". A lista \"Faltam imprimir\" continua só com as de hoje.",
+    "26/11/2026 — Registro: a busca do \"Já impressos\" pelo histórico inteiro está no ar desde 27/10/2026; a busca pelo número do envio ainda vai subir. Nada mudou na tela: só o papel dizia \"aguardando deploy\"."
    ],
    "situacao": "rascunho"
   },
@@ -806,7 +808,8 @@
    ],
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
-    "21/11/2026 — ficha criada em rascunho"
+    "21/11/2026 — ficha criada em rascunho",
+    "26/11/2026 — Registro: os cinco setores da produção do sob medida têm uma pessoa marcada em cada desde 24/09/2026. Nada mudou na tela: só o papel dizia que a marcação não tinha sido conferida."
    ],
    "situacao": "rascunho"
   },
@@ -892,7 +895,8 @@
    ],
    "corpo": "da39a3ee5e6b4b0d",
    "linhas": [
-    "21/11/2026 — ficha criada em rascunho"
+    "21/11/2026 — ficha criada em rascunho",
+    "26/11/2026 — Registro: os cinco setores da produção do sob medida têm uma pessoa marcada em cada desde 24/09/2026. Nada mudou na tela: só o papel dizia que a marcação não tinha sido conferida."
    ],
    "situacao": "rascunho"
   },

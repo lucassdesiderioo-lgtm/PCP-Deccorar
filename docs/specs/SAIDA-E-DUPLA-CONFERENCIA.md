@@ -25,6 +25,13 @@
 > **No ar em 26/09 (PR #142), deploy conferido pelo dono.**
 > **Com as quatro fases em código, a spec vai para `docs/arquivo/` quando a fase 4 estiver
 > no ar e a primeira viagem e o primeiro caminhão tiverem saído por ela.**
+> **26/11/2026 — a prova mudou de lugar, sem ter sido feita:** desde 25/11/2026 a 202
+> entrega por carrinho (`CONFERENCIA-CARRINHOS`), e as rotas da saída do caminhão e da
+> viagem ficam só para a página antiga em cache. Saídas foram fechadas de verdade pela
+> tela antiga (a numeração chegou à #30 em 19/11 e à #42 em 25/11), mas "o primeiro
+> caminhão" e "a primeira viagem" com a dupla conferência nunca foram relatados um a um.
+> O que resta provar é o da tela nova: a primeira entrega de carrinho com a foto do
+> motorista (`CLAUDE.md` §8-B, "A 202 CONFERE NOS CARRINHOS").
 > Criada em 25/09/2026 · PLANEJADO até a fase 1
 > Nasceu da conversa no Projeto "PCP - Deccorar" em 25/09/2026 (NOVIDADE).
 > Substitui o "Fechar coleta" de 10/09/2026 (`CLAUDE.md` §8-B), que não foi adotado pela equipe.

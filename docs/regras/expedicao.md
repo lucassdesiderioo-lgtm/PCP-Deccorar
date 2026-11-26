@@ -69,7 +69,7 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Por quê:** com a dedup só do dia, resubir um PDF gerou 94 volumes fantasmas em 25/08/2026, cobrando etiqueta de peça que estava no caminhão.
 - **Exceções:** nenhuma. O passivo antigo sai pela Mesa (R-COR-02). A venda repetida cujo PDF sumiu **não entra de novo** — só volta a ter PDF (R-PDF-07).
 - **Teste que trava:** `teste_upload.js` (84: o envio nos dois sentidos, contra o volume de antes do deploy, e o envio igual com pack ou venda diferentes entrando — escritos antes dos consertos da ③ REVISÃO) · `teste_casos_reais.js` (`casos/2026-11-12-nf-9738.json` sobe o PDF duas vezes, e a segunda não grava nada).
-- **Status:** no ar desde 25/08/2026 · a chave do envio no código desde 12/11/2026, aguardando deploy.
+- **Status:** no ar desde 25/08/2026 · a chave do envio no ar desde 12/11/2026 (PRs #342 e #343), provada no mesmo dia: o PDF de 12/11 subido de novo deu "0 novas, 85 repetidas".
 - **História:** armadilha #5.
 
 ### R-PDF-07 · A venda repetida cujo PDF sumiu volta a ter PDF
@@ -77,14 +77,14 @@ PDF do ML → parse (folha + etiqueta + nota) → um volume por ETIQUETA em `lot
 - **Por quê:** o cron apaga os PDFs em 7 dias, e a reimpressão mandava "suba o PDF de novo" — mas até 27/10/2026 a dedup pulava a venda sem religar nada, e subir de novo não destravava a reimpressão. A tela prometia o que o sistema não fazia.
 - **Exceções:** venda com PDF ainda no disco **não troca** de arquivo. Quando pack e venda existem dos dois lados, os dois têm que bater: a mesma venda com outro pack é outra etiqueta, e religar trocaria o papel da caixa.
 - **Teste que trava:** `teste_upload.js` (bloco 8, escrito antes do conserto).
-- **Status:** no código desde 27/10/2026, aguardando deploy. ⚠ Não foi provado com um PDF real do ML: o teste troca o `parsePdf`.
+- **Status:** no ar desde 27/10/2026. ⚠ Não foi provado com um PDF real do ML: o teste troca o `parsePdf`; a prova é subir de novo um PDF antigo de venda que já está no sistema e ver "N religadas".
 
 ### R-PDF-08 · A busca do "Já impressos" olha o histórico inteiro, e a lista não corta calada
 - **Regra:** `GET /api/impressos?q=` busca no **banco**, em todas as datas, por cliente, NF, SKU (inclusive os da caixa de várias), cidade, pack, venda e — desde 16/11/2026 — o **número do envio** (`lote.envio`, com ou sem o espaço da etiqueta) — até 60 resultados. Sem `q`, a lista é a do período (até 30 dias), com teto de 400. Quando qualquer das duas bate no teto, o cabeçalho `X-Cortado` diz, e a tela avisa. Só aparece o que foi impresso (`embalado`/`carregado`). `tem_pdf` diz antes do clique se o PDF ainda está no servidor; o caminho do arquivo não viaja.
 - **Por quê:** até 27/10/2026 a busca filtrava **no navegador** só as 400 da lista, e saindo ~57 caixas por dia as 400 eram uns 7 dias. O "30 dias" não trazia 30 dias, e a NF de uma semana e meia atrás dava "Nada com esse termo", calado.
 - **Exceções:** nenhuma. A permissão é a mesma de antes (`etiqueta.emitir`).
 - **Teste que trava:** `teste_impressos.js` (42: o envio, seção 7).
-- **Status:** no código desde 27/10/2026, aguardando deploy. Aberta a 1440 e a 400 px num banco semeado.
+- **Status:** no ar desde 27/10/2026; o envio na busca desde 16/11/2026 (construído, falta subir). Aberta a 1440 e a 400 px num banco semeado.
 
 ### R-PDF-11 · A etiqueta só com "Envio:" é etiqueta, e o número do envio é a chave dela
 - **Regra:** a página que traz `Envio: 485023 18254` — e não traz `Pack ID:` nem `Venda:` — é etiqueta (`folha.js → tipoDaPagina`). Na folha, o item traz `Envio: 48502318254` no lugar dos dois; é por esse número (o do código de barras) que a etiqueta acha o item, e ele é a identidade do item (`envioLinha`): abre a sua venda na folha inteira (R-VOL-09) e não é irmão de pacote. O item **sem** envio, sem comprador, logo abaixo, continua sendo irmão (R-VOL-03). O upload grava o número em `lote.envio` e o usa como chave de duplicidade de **toda** etiqueta, nos dois sentidos, inclusive contra o volume de antes do deploy, cujo número só está nos `codes` (R-PDF-06). A modalidade não muda: vem da linha "Despachar:" (R-MOD-01).

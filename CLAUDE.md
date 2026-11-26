@@ -796,11 +796,15 @@ pelo ritmo.
 > teste de segurança e disse *"deu tudo certo no deploy"*. A fase 4 está
 > **desligada** (`config.ordem_por_falta = 0`), como nasceu.
 >
-> ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** o primeiro import depois do deploy
-> classificando as linhas pela §3-B (o resumo por grupo); a falta da aba batendo
-> com o que a bancada vê por alguns dias (é a prova que libera ligar a fase 4);
-> o ritmo mudando o alvo da tela azul; e o primeiro estado novo aparecendo no
-> aviso do import. Prova que não foi feita se escreve como não feita.
+> ⚠️ **AINDA NÃO PROVADO COM DADO REAL:** ~~o primeiro import depois do deploy
+> classificando as linhas pela §3-B (o resumo por grupo)~~ e ~~o primeiro estado
+> novo aparecendo no aviso do import~~ — **provados em 08 e 09/11/2026**: o
+> relatório das 17:34 de 08/11 saiu classificado, com três estados novos no
+> aviso que o dono classificou no mesmo dia, e o das 10:53 de 09/11 trouxe 60
+> "Pronto para coleta" (os dois blocos de CONSERTO acima). **Continuam sem
+> prova:** a falta da aba batendo com o que a bancada vê por alguns dias (é a
+> prova que libera ligar a fase 4) e o ritmo mudando o alvo da tela azul. Prova
+> que não foi feita se escreve como não feita.
 
 > **A ordem da tela azul e a regra da exceção** (SKU fora da lista no vermelho:
 > avisa e deixa passar) estão em [`docs/regras/estoque.md`](docs/regras/estoque.md),
@@ -4161,6 +4165,8 @@ reintroduzidos um a um, e cada um reprova.
 > permissão mais alta que ela tinha, e o corte só tira o que passa desse nível.
 > A prova com dado real é rodar `node nivel_relatorio.js` no servidor depois do
 > deploy: a seção 2 tem que dizer *"ninguém"*. Se não disser, é defeito.
+> ✅ **Feita em 04/11/2026** (PR #282): o relatório deu *ninguém* perdendo
+> permissão e nenhum setor acima do nível (bloco "AS OITO FASES", abaixo).
 >
 > ⚠️ **NÍVEL VAZIO NÃO CORTA NADA.** Ele só existe em linha criada por SQL
 > direto (um teste, um script); a pessoa criada pela tela nasce `operacao`, e o
@@ -4403,7 +4409,7 @@ aba Modo teste mostra um alerta âmbar. Falha de cobertura é visível, não sil
 | **`!` no bash** | Expansão de histórico quebra heredocs e `sed` | `set +H` antes de blocos com `!` |
 | **`express.json()` 100 kb** | Bloqueia upload de PDF | Já elevado para 25 mb — não reduzir |
 | **pdf.js quebra números** | Pack IDs vêm com espaços no meio | Regex que rejunta dígitos (já em `parse.js`) |
-| **PDF malicioso roda JavaScript no pdf.js 3** | O `pdfjs-dist` 3.11 transforma a fonte de um PDF em código (falha do `npm audit`). Quem sobe o PDF é a bancada, mas o arquivo vem de fora | Todo `getDocument` leva `isEvalSupported:false` (07/11/2026) — a extração de texto não passa por ali. `node teste_audit.js` varre os `.js` e recusa a chamada sem a opção. A troca para o pdfjs 6 é a dívida 22 (§14). ✅ **No ar desde 07/11/2026** (PR #307): o dono fez o backup, o deploy com `npm ci` e o teste de segurança, e conferiu `proxy-addr` 2.0.8 e `isEvalSupported` no `parse.js`. ⚠️ Ainda não provado com dado real: o primeiro PDF do ML subido depois disso entrando como antes |
+| **PDF malicioso roda JavaScript no pdf.js 3** | O `pdfjs-dist` 3.11 transforma a fonte de um PDF em código (falha do `npm audit`). Quem sobe o PDF é a bancada, mas o arquivo vem de fora | Todo `getDocument` leva `isEvalSupported:false` (07/11/2026) — a extração de texto não passa por ali. `node teste_audit.js` varre os `.js` e recusa a chamada sem a opção. A troca para o pdfjs 6 é a dívida 22 (§14). ✅ **No ar desde 07/11/2026** (PR #307): o dono fez o backup, o deploy com `npm ci` e o teste de segurança, e conferiu `proxy-addr` 2.0.8 e `isEvalSupported` no `parse.js`. ✅ Provado com dado real em 12/11/2026: os PDFs do ML daquele dia entraram (85 volumes, as 27 vendas só com "Envio:" no banco — §5) |
 | **Campo invisível no iPad** | Leitor bipa e nada acontece — iOS tira o foco de campos fora da tela | Campos de bipe devem ser **visíveis**, com `autocorrect="off"` |
 | **Leitor no modo "Alt + teclado numérico" troca de tela** (o Alt+1..8 saiu com o rodapé em 04/11/2026; a regra vale para o Alt+0) | Em PC com teclado ABNT2 o leitor costuma mandar cada caractere pelo código do Windows: Alt segurado + dígitos do teclado **numérico** (o "5" chega como Alt+5-3). O `nav.js` aceitava qualquer dígito com Alt, e o primeiro dígito do código virava atalho: bipar jogava a pessoa na Etiqueta de Venda, no Carregamento, no Admin ou no "Sair do sistema?" (20/10/2026) | Atalho só pelo número da **fileira de cima** (`code` = `Digit1`…); teclado numérico com Alt nunca é atalho — `digitoDoAtalho()` no `nav.js`, travado pelo `teste_atalho.js`. ⚠️ O Playwright aperta o teclado numérico com NumLock **desligado** (`key` = "Clear"), e por isso não reproduz o defeito: para ver no navegador de verdade, mande a tecla pelo CDP com `key` = "5" e `code` = "Numpad5" |
 | **Redesenho periódico apaga o campo que mora dentro do card** | A tela que se atualiza sozinha (o Carregamento, a cada 4 s) troca o `innerHTML` do card, e o campo de dentro nasce de novo, **vazio**. O motivo do "Liberar com divergência" sumia no meio da frase e, no iPad, o teclado fechava. Corrigido em 20/10/2026 | Quem redesenha guarda o digitado e devolve com o foco (`digitado`/`devolverDigitado` no `carregamento.html`), e a atualização **espera** enquanto a pessoa digita (`digitando()`) — o campo do bipe não conta, ele tem o foco o tempo todo. Campo novo dentro de card redesenhado entra nas duas listas. Travado pelo `teste_carregamento_tela.js` |
@@ -5715,10 +5721,11 @@ barra e tela com a barra da outra operação. Um comentário com a palavra
 > duas vezes. A spec foi para `docs/arquivo/`.
 >
 > ⚠️ **O QUE NÃO FOI RELATADO UM A UM:** os três perfis da barra (só medida
-> padrão, só sob medida, as duas) e as frases novas dos fluxos de Sobras
-> (propor correção) e Corte (pedir correção), que pedem uma sobra e um corte
-> feito de verdade para aparecer. Prova que não foi feita se escreve como não
-> feita (§4).
+> padrão, só sob medida, as duas) e a frase nova do fluxo de Sobras (propor
+> correção), que pede uma sobra de verdade para aparecer. ~~E a do Corte (pedir
+> correção)~~ — **provada em 02/10/2026**, na correção do corte de 01/10 (prova
+> de fábrica da CORTE-EM-ETAPAS, `docs/specs/README.md`). Prova que não foi
+> feita se escreve como não feita (§4).
 
 ### ⚠️ ~~TRÊS~~ DUAS LISTAS DE TELAS NO SOB MEDIDA, e a tela nova entra nas duas (02/10/2026; o rodapé saiu em 10/11/2026)
 
