@@ -22,3 +22,4 @@ parametros:
 ## Mudanças
 - 21/11/2026 — ficha criada em rascunho
 - 26/11/2026 — A urgência que nasce do PDF passou a contar todas as vendas até a próxima saída (o próximo dia de coleta), qualquer que seja o dia em que o PDF subiu: a venda de amanhã do PDF de hoje à noite continua urgente amanhã de manhã.
+- 26/11/2026 — Registro: a terceira chave de duplicidade (o número do envio da etiqueta) está no ar desde 12/11/2026, e a venda repetida cujo PDF já foi apagado volta a ter PDF ao subir o arquivo de novo desde 27/10/2026. Nada mudou na tela: só o papel dizia "aguardando deploy".

@@ -758,9 +758,10 @@ régua — e é idempotente. O pedido 5001, aprovado em produção na manhã de
 
 ### O que ainda não foi conferido
 
-**O rolo impresso.** A régua final de código de barras é o leitor bipando, e
-enquanto isso não acontecer o que existe é indício: 405 casos verdes e a tela
-aberta. O módulo do CODE128 é o `public/barras.js`, o mesmo do PCP e da
+**O rolo impresso.** A régua final de código de barras é o leitor bipando —
+✅ **e ele bipou no papel em 23/09/2026** (fase 4-A da `SOBMEDIDA-PEDIDO-REVENDA`,
+conferida no deploy). Até ali o que existia era indício: 405 casos verdes e a
+tela aberta. O módulo do CODE128 é o `public/barras.js`, o mesmo do PCP e da
 etiqueta de sobra, numa faixa de 66 mm no rodapé — a primeira versão punha o
 código numa coluna de 38 mm e o módulo caía a 0,23 mm, abaixo do que a ZD220
 resolve numa etiqueta amassada.
@@ -2185,8 +2186,10 @@ um leitor que não reconhece a etiqueta que o gerador imprimiu.
 > `barras_ler.test.js` desenha o código com o mesmo `barras.js` e o estraga do
 > jeito que a câmera estraga — borrada, girada, invertida, com sombra, em
 > perspectiva, pequena. **Isso é indício, não prova**: a prova é o iPad da
-> bancada achando a sobra pela foto. O QR do kit passou por três rodadas verdes
-> sem ler em celular nenhum (CLAUDE.md §4).
+> bancada achando a sobra pela foto — ✅ **feita em 02/10/2026** (prova de
+> fábrica da `CORTE-EM-ETAPAS`: sobra lida pela foto no iPad,
+> `docs/specs/README.md`). O QR do kit passou por três rodadas verdes sem ler
+> em celular nenhum (CLAUDE.md §4).
 
 ## ⚠️ A MEDIDA DA SOBRA É LISTA, e não campo digitado
 

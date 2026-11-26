@@ -28,3 +28,4 @@ parametros:
 - 25/11/2026 — a caixa de várias persianas com um item cancelado pelo Mercado Livre depois da etiqueta não trava mais a tela; ela continua esperando decisão no card das canceladas
 - 25/11/2026 — no ar: a conferência nos carrinhos, a entrega por carrinho e a trava do dia seguinte passaram a valer na fábrica
 - 26/11/2026 — O aviso "sem estoque" passou a contar também as vendas da próxima saída (o próximo dia de coleta) cujo PDF já subiu: "só 2 livres para 3 de hoje e 4 de amanhã — faltam 5". A lista "Faltam imprimir" continua só com as de hoje.
+- 26/11/2026 — Registro: a busca do "Já impressos" pelo histórico inteiro está no ar desde 27/10/2026; a busca pelo número do envio ainda vai subir. Nada mudou na tela: só o papel dizia "aguardando deploy".

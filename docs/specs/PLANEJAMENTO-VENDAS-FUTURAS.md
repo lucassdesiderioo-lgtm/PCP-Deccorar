@@ -7,9 +7,10 @@
 > o fechamento do dia foi para a 904 Relatórios e a tarja dos SKUs fora do
 > cadastro saiu (AJUSTE). **E a tabela §3-B ganhou dois estados** (CONSERTO de
 > 08/11/2026, o dono): "Para entregar na coleta de amanhã" e "Etiqueta pronta para
-> impressão" são ainda na fábrica, para o dia seguinte. **Falta a prova com dado real:** o primeiro import
-> classificando pela §3-B, a aba conferida com a bancada por alguns dias e, só
-> depois, o dono ligar a fase 4. O que mudou na construção, com o dono:
+> impressão" são ainda na fábrica, para o dia seguinte. **Falta a prova com dado real:** ~~o primeiro import
+> classificando pela §3-B~~ (provado em 08 e 09/11/2026, os dois CONSERTOs
+> abaixo), a aba conferida com a bancada por alguns dias e, só depois, o dono
+> ligar a fase 4. O que mudou na construção, com o dono:
 > - **O relatório real dá 228 linhas · 239 peças ainda na fábrica, e não
 >   235 · 246** como o §3 escrevia; e **40 estados** (26 no pós-venda), não 38.
 >   O dono, 07/11/2026: *"vale 239, os 26 no grupo 4"*.
