@@ -4,9 +4,11 @@
 STATUS
 Situação: EM CONSTRUÇÃO · aprovada pelo dono em 21/11/2026 ("pode seguir, monte o PLANO da fase 1")
 Criada em: 21/11/2026
-Última atualização: 22/11/2026 (③ REVISÃO da fase 1)
-Fase atual: 1 construída, falta subir — a fundação: 907, "?", seis rotas, 53 fichas em
-            rascunho, glossário, retrato, teste_manual.js (115) e teste_manual_tela.js (55).
+Última atualização: 26/11/2026 (fase 1 no ar)
+Fase atual: 1 NO AR desde 22/11/2026 (PR #362) — a fundação: 907, "?", seis rotas, 53 fichas
+            em rascunho, glossário, retrato, teste_manual.js (115) e teste_manual_tela.js (55).
+            Ainda não provado com dado real: a 907 aberta pelo dono no servidor, /manual 302
+            sem login, o "?" só para o Admin Geral.
             ⚠️ NÃO é apresentada ao time antes da fase 2 (§10). Próxima: fase 2.
 Fases: 1 ☑  2 ☐  3 ☐  4 ☐  5 ☐
 Divergências na construção (valem sobre o texto da spec):

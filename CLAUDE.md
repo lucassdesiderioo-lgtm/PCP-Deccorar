@@ -6508,7 +6508,7 @@ dia de corte, montagem e revisão pela etiqueta em série na fábrica.
 ## 26. O manual do sistema — a ficha de cada tela, dentro da tela (21/11/2026)
 
 Spec `docs/specs/MANUAL-DO-SISTEMA.md`, fase 1 (a fundação) construída em
-21/11/2026, falta subir; duas linhas em `docs/DECISOES.md` (D7 e D8). O dono:
+21/11/2026 e **no ar desde 22/11/2026** (PR #362); duas linhas em `docs/DECISOES.md` (D7 e D8). O dono:
 *"estar a regra de cada tela … dentro de cada tela eu também consigo ler como
 funciona … tudo que for novo, esse manual vai se atualizando"*.
 
@@ -6629,7 +6629,11 @@ depois de escrever a linha de "Mudanças".** Também `teste_mapa`, `teste_lugar`
 `teste_cobertura`, `teste_acesso`, `teste_menu`, `teste_linguagem` e `cd tecido
 && npm test` ganharam a 907.
 
-⚠️ **Construído, falta subir.** Ainda não provado com dado real: a 907 aberta
-pelo dono no servidor com as 53 em rascunho e o mapa; `/manual` dando 302 sem
-login no servidor; o "?" aparecendo para o Admin Geral e para ninguém mais.
-Prova que não foi feita se escreve como não feita.
+✅ **NO AR DESDE 22/11/2026** (PR #362, mesclado depois do #363 — o retrato
+recusou o merge até as fichas 101, 102 e 104 ganharem a linha do R-EMB-11 e do
+R-TEM-01 no ar, a primeira vez que a régua pegou um merge de verdade): o dono
+fez o deploy e disse *"feito"*. ⚠️ **Ainda não provado com dado real:** a 907
+aberta pelo dono no servidor com as 53 em rascunho e o mapa; `/manual` dando
+302 e `/api/manual/minhas` 401 sem login no servidor; o "?" aparecendo para o
+Admin Geral e para ninguém mais. Prova que não foi feita se escreve como não
+feita.
