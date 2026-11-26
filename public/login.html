@@ -65,7 +65,12 @@ var q=new URLSearchParams(location.search);
 var voluntaria=false;
 /* O `r` so vale como caminho DESTE sistema (comeca com uma barra so, e sem a barra invertida, que o navegador le como barra): sem a
    guarda, /login?r=https://outro-site levaria a pessoa para fora depois do PIN. */
-var destino=(function(r){ return /^\/(?![\/\\])/.test(r)?r:''; })(q.get('r')||'');
+var destino=(function(r){
+  if(!/^\/(?![\/\\])/.test(r)) return '';
+  /* E o endereco resolvido tem que ficar neste sistema: o navegador descarta
+     tab e quebra de linha ("/<tab>/outro" vira "//outro"). */
+  try{ var u=new URL(r,location.origin); return u.origin===location.origin?(u.pathname+u.search+u.hash):''; }catch(e){ return ''; }
+})(q.get('r')||'');
 var feito=false;
 var MAX=6;
 function $(s){return document.querySelector(s);}
@@ -152,6 +157,9 @@ function enviar(){
     if(pin.length<MAX) return;
     if(pin!==novoPin){ mostrar('novo'); return erro('Os dois PINs não batem. Crie de novo.'); }
     if(novoPin===atual){ mostrar('novo'); return erro('O PIN novo tem que ser diferente do de hoje.'); }
+    /* Trava ANTES de mandar: um OK a mais enquanto o servidor responde mandaria
+       de novo o PIN de hoje (ja trocado) e contaria um erro na trava. */
+    feito=true;
     fetch('/api/auth/trocar-pin',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({atual:atual,novo:novoPin})})
      .then(r=>r.json().then(j=>({ok:r.ok,status:r.status,j:j})))
@@ -166,9 +174,10 @@ function enviar(){
        }
        /* O PIN de hoje estava errado: volta a pedi-lo. Os outros erros
           (429, formato) voltam ao PIN novo, com a frase do servidor. */
+       feito=false;
        if(r.status===401){ mostrar('atual'); return erro(r.j.erro||'PIN atual incorreto'); }
        mostrar(r.status===429?'atual':'novo'); erro(r.j.erro||'Erro');
-     });
+     }).catch(function(){ feito=false; mostrar('atual'); erro('Sem conexão: o PIN pode não ter sido trocado. Tente de novo.'); });
   }
 }
 // PARA ONDE A PESSOA VAI DEPOIS DO PIN: quem responde e o servidor

@@ -233,10 +233,15 @@ module.exports=function(app, db){
          sessao fechada pela troca nao vale mais; e o cookie de antes, sem
          numero, nao vale depois de qualquer troca. A sessao fechada por
          "Sair" continua como era (a fase 3 da spec muda isso). */
-      if(Number.isInteger(o.s)){
-        const ls=db.prepare('SELECT derrubada FROM sessao WHERE id=?').get(o.s);
-        if(ls&&ls.derrubada) return null;
-      } else if(u.pin_trocado_em) return null;
+      /* A linha tem que ser DESTA pessoa (um backup restaurado reaproveita
+         numeros); linha que nao existe e julgada como o cookie sem numero.
+         E a consulta que falha (a coluna nao subiu) NAO tranca ninguem: vai
+         ao log e a sessao segue — como o resto do portao (③ REVISAO). */
+      let ls;
+      try{ ls=Number.isInteger(o.s)?db.prepare('SELECT derrubada FROM sessao WHERE id=? AND usuario_id=?').get(o.s,u.id):undefined; }
+      catch(e){ console.log('[auth] conferir sessao derrubada falhou: '+e.message); ls={derrubada:0}; }
+      if(ls){ if(ls.derrubada) return null; }
+      else if(u.pin_trocado_em) return null;
       const s={id:u.id,nome:u.nome,areas:u.areas.split(',').filter(Boolean),trocarPin:!!u.pin_curto};
       /* O numero da sessao viaja escondido: nao entra no `...u` do
          /api/auth/eu, e a tela nao precisa dele. */

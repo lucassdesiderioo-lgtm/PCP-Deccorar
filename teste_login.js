@@ -477,13 +477,27 @@ async function main(){
     ok('e a tela recusa o PIN novo igual ao de hoje antes de mandar', /diferente do de hoje/.test(telaLogin));
     {
       /* A guarda do "r", tirada da propria tela e rodada aqui. */
-      const m = telaLogin.match(/var destino=\(function\(r\)\{ return (\/.+\/)\.test\(r\)/);
+      const m = telaLogin.match(/var destino=(\(function\(r\)\{[\s\S]*?\}\))\(q\.get/);
       ok('a tela tem a guarda do "r"', !!m);
-      const re = m ? eval(m[1]) : /^$/;
-      ok('e o "r" so leva a um caminho deste sistema', re.test('/operador?x=1#h')
-        && !re.test('javascript:alert(1)') && !re.test('https://outro.site') && !re.test('//outro.site') && !re.test('/\\outro.site'));
+      const location = { origin:'https://pcp.deccorar.com.br' };
+      const guarda = m ? eval(m[1]) : (() => 'x');
+      eq('o "r" deste sistema passa, com a busca e a ancora', guarda('/operador?x=1#h'), '/operador?x=1#h');
+      ok('e nenhum leva para fora: javascript:, https://, //, barra invertida, tab', ['javascript:alert(1)','https://outro.site','//outro.site','/\\outro.site','/\t/outro.site','/\n/outro.site'].every(r => guarda(r) === ''));
     }
-    ok('e depois de trocar o teclado para (um OK a mais nao conta erro na trava)', /feito=true/.test(telaLogin) && /\|\|feito\) return/.test(telaLogin));
+    ok('e o teclado para ANTES de mandar a troca (um OK a mais nao conta erro na trava)', /feito=true;\s*fetch\('\/api\/auth\/trocar-pin'/.test(telaLogin) && /\|\|feito\) return/.test(telaLogin));
+
+    /* ③ REVISAO (2a rodada): a linha da sessao tem que ser da pessoa, e a
+       consulta que falha nao tranca ninguem. */
+    const RUI = pessoa('Rui', '232323', 'painel'); db.prepare('UPDATE usuarios SET pin_curto=0 WHERE id=?').run(RUI);
+    const cRui = sess((await login(RUI, '232323')).cookie);
+    const cRuiB = sess((await login(RUI, '232323')).cookie);
+    const sRuiB = JSON.parse(Buffer.from(decodeURIComponent(cRuiB.slice(5)).split('.')[0], 'base64').toString('utf8')).s;
+    db.prepare('UPDATE sessao SET usuario_id=? WHERE id=?').run(OTO, sRuiB);
+    await trocar2(cRui, '232323', '454545');
+    eq('o cookie cuja linha e de outra pessoa cai depois da troca (julgado como o cookie sem numero)', (await eu(cRuiB)).logado, false);
+    db.exec('ALTER TABLE sessao RENAME COLUMN derrubada TO derrubada_x');
+    eq('sem a coluna, a sessao nao tranca: a pessoa continua logada', (await eu(cRui)).logado, true);
+    db.exec('ALTER TABLE sessao RENAME COLUMN derrubada_x TO derrubada');
   } finally {
     srv.close();
   }
